@@ -1,0 +1,122 @@
+\chapter{METODE DAN RANCANGAN PENELITIAN}
+
+\section{Deskripsi Umum Penelitian}
+
+Penelitian ini mengusulkan pengembangan sistem deployment berbasis GitOps untuk platform repositori data penelitian InvenioRDM pada lingkungan klaster Kubernetes. Sistem yang dikembangkan menggunakan pola Apps of Apps pada ArgoCD untuk mengorkestrasi deployment seluruh komponen InvenioRDM secara deklaratif. Pendekatan Research and Development (R\&D) dipilih karena penelitian berfokus pada pengembangan produk berupa sistem deployment yang dapat diimplementasikan dan dievaluasi.
+
+Secara umum, penelitian ini terdiri dari empat tahapan utama: (1) analisis kebutuhan komponen InvenioRDM dan karakteristik deployment pada Kubernetes; (2) perancangan arsitektur GitOps menggunakan pola Apps of Apps ArgoCD; (3) implementasi manifest ArgoCD, Helm chart, dan konfigurasi Kubernetes; serta (4) pengujian fungsionalitas dan evaluasi kinerja sistem deployment.
+
+\section{Metodologi}
+
+Metode penelitian yang digunakan adalah \textbf{Research and Development (R\&D)}. Metode R\&D dipilih karena penelitian ini bertujuan untuk menghasilkan produk berupa sistem deployment GitOps yang baru dan dapat diuji keefektifannya \citep{limoncelli2018}. Tahapan penelitian R\&D dalam konteks ini mengikuti siklus pengembangan sistem yang meliputi analisis, desain, implementasi, dan evaluasi.
+
+Tahapan penelitian dilakukan secara sistematis sebagai berikut:
+
+\begin{enumerate}
+    \item \textbf{Tahap 1: Studi Literatur dan Analisis Kebutuhan}
+    
+    Tahap ini meliputi pengumpulan informasi mengenai arsitektur InvenioRDM, komponen-komponen yang diperlukan, dependensi antar komponen, serta kebutuhan resource pada Kubernetes. Studi literatur juga mencakup analisis dokumentasi ArgoCD, pola Apps of Apps, dan best practices GitOps deployment.
+    
+    \item \textbf{Tahap 2: Perancangan Arsitektur Sistem}
+    
+    Berdasarkan hasil analisis kebutuhan, dirancang arsitektur sistem deployment GitOps yang menggunakan pola Apps of Apps. Perancangan mencakup struktur repositori Git, hierarki aplikasi ArgoCD, konfigurasi Helm chart untuk masing-masing komponen, serta definisi resource Kubernetes (Deployment, Service, Ingress, PVC, Secret, ConfigMap).
+    
+    \item \textbf{Tahap 3: Implementasi Sistem}
+    
+    Tahap implementasi meliputi pembuatan klaster Kubernetes (menggunakan Minikube atau k3s), instalasi ArgoCD, pembuatan repositori Git untuk menyimpan manifest, pembuatan aplikasi ArgoCD induk dan anak, konfigurasi Helm chart untuk InvenioRDM beserta dependensinya, serta konfigurasi networking dan penyimpanan pada Kubernetes.
+    
+    \item \textbf{Tahap 4: Pengujian dan Evaluasi}
+    
+    Sistem yang telah diimplementasikan diuji menggunakan skenario pengujian yang telah dirancang. Metrik evaluasi meliputi waktu deployment, keberhasilan sinkronisasi otomatis, deteksi dan koreksi drift, serta kemampuan rollback. Hasil pengujian dianalisis untuk menentukan efektivitas sistem.
+    
+    \item \textbf{Tahap 5: Dokumentasi dan Pelaporan}
+    
+    Tahap akhir meliputi dokumentasi sistem, penulisan laporan penelitian, serta publikasi hasil jika memungkinkan.
+\end{enumerate}
+
+\section{Perancangan Sistem}
+
+\subsection{Arsitektur Umum}
+
+Arsitektur sistem yang dirancang terdiri dari empat lapisan utama yang saling berinteraksi:
+
+\begin{itemize}
+    \item \textbf{Lapisan 1: Git Repository} --- Berfungsi sebagai single source of truth yang menyimpan seluruh manifest Kubernetes, Helm values, dan konfigurasi ArgoCD dalam bentuk Infrastructure as Code (IaC).
+    
+    \item \textbf{Lapisan 2: ArgoCD} --- Agen GitOps yang berjalan di dalam klaster Kubernetes. ArgoCD secara kontinu memantau repositori Git dan menyelaraskan state klaster dengan state yang didefinisikan di Git. ArgoCD juga menyediakan antarmuka web untuk visualisasi dan manajemen aplikasi.
+    
+    \item \textbf{Lapisan 3: Kubernetes Cluster} --- Platform orkestrasi yang menjalankan seluruh komponen InvenioRDM dalam bentuk Pod, Deployment, Service, dan resource Kubernetes lainnya.
+    
+    \item \textbf{Lapisan 4: InvenioRDM Services} --- Kumpulan layanan aplikasi yang terdiri dari web application, Celery workers, PostgreSQL, Elasticsearch, Redis, dan MinIO object storage.
+\end{itemize}
+
+Dalam pola Apps of Apps, sebuah aplikasi ArgoCD induk bernama \texttt{inveniordm-platform} didefinisikan untuk mengelola seluruh stack. Aplikasi induk ini mereferensikan beberapa aplikasi anak yang masing-masing bertanggung jawab atas satu komponen utama:
+
+\begin{itemize}
+    \item \texttt{inveniordm-infra} --- Mengelola komponen infrastruktur (PostgreSQL, Elasticsearch, Redis, MinIO).
+    \item \texttt{inveniordm-web} --- Mengelola deployment aplikasi web InvenioRDM.
+    \item \texttt{inveniordm-worker} --- Mengelola deployment Celery workers.
+\end{itemize}
+
+Pembagian ini memungkinkan pengelolaan yang modular dan memfasilitasi penggunaan \textit{sync waves} untuk mengatur urutan deployment berdasarkan dependensi antar komponen.
+
+% TODO: Ganti dengan diagram arsitektur sistem Anda.
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.9\textwidth]{figures/arsitektur-sistem}
+%   \caption{Diagram Arsitektur Sistem GitOps untuk InvenioRDM}
+%   \label{fig:arsitektur}
+% \end{figure}
+
+\subsection{Bagan Alir Metodologi}
+
+% TODO: Ganti dengan bagan alir metodologi Anda.
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.8\textwidth]{figures/bagan-alir}
+%   \caption{Bagan Alir Metodologi Penelitian}
+%   \label{fig:bagan-alir}
+% \end{figure}
+
+Bagan alir metodologi penelitian menggambarkan alur dari tahap studi literatur hingga evaluasi. Setiap tahap memiliki deliverable yang jelas dan kriteria kelulusan sebelum melanjutkan ke tahap berikutnya.
+
+\section{Lingkungan Pengembangan}
+
+Lingkungan pengembangan yang digunakan dalam penelitian ini adalah:
+
+\begin{itemize}
+    \item \textbf{Sistem Operasi:} Ubuntu 22.04 LTS (untuk klaster Kubernetes) dan macOS/Linux/Windows dengan WSL2 (untuk development).
+    \item \textbf{Container Runtime:} Docker Engine v24.x atau containerd.
+    \item \textbf{Kubernetes:} Minikube v1.33+ atau k3s v1.29+ untuk lingkungan lokal.
+    \item \textbf{GitOps Tools:} ArgoCD v2.10+.
+    \item \textbf{Package Manager:} Helm v3.14+ untuk templating manifest Kubernetes.
+    \item \textbf{Version Control:} Git dengan repositori pada GitHub.
+    \item \textbf{Perangkat Keras:} Workstation dengan minimum 16 GB RAM, 8 core CPU, dan 100 GB storage (untuk menjalankan klaster Kubernetes lokal dengan banyak komponen).
+\end{itemize}
+
+\section{Metode Pengujian}
+
+Pengujian dilakukan dengan beberapa pendekatan untuk memastikan sistem berfungsi sesuai harapan:
+
+\begin{enumerate}
+    \item \textbf{Pengujian Fungsional:}
+    \begin{itemize}
+        \item Deployment awal (fresh install) dari repositori Git ke klaster Kubernetes kosong.
+        \item Verifikasi seluruh komponen InvenioRDM berjalan dan dapat berkomunikasi.
+        \item Pengujian akses antarmuka web InvenioRDM melalui Ingress.
+    \end{itemize}
+    
+    \item \textbf{Pengujian GitOps:}
+    \begin{itemize}
+        \item Perubahan konfigurasi pada Git dan verifikasi sinkronisasi otomatis oleh ArgoCD.
+        \item Simulasi drift (perubahan manual pada klaster) dan verifikasi self-healing oleh ArgoCD.
+        \item Pengujian rollback ke versi sebelumnya melalui Git revert.
+    \end{itemize}
+    
+    \item \textbf{Pengujian Non-Fungsional:}
+    \begin{itemize}
+        \item Pengukuran waktu deployment dari awal hingga aplikasi siap digunakan.
+        \item Pengukuran waktu sinkronisasi setelah perubahan pada Git.
+        \item Evaluasi konsumsi resource (CPU, memory) pada klaster Kubernetes.
+    \end{itemize}
+\end{enumerate}

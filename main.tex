@@ -1,0 +1,110 @@
+\documentclass[proposal,indonesia]{ugmskripsi}
+% Options:
+%   skripsi / proposal        (default: skripsi)
+%   satuspasi / duaspasi / satusetengahspasi (default: satusetengahspasi)
+%   indonesia / inggris       (default: indonesia)
+
+%------------------------------------------------------------
+% Metadata Proposal
+%------------------------------------------------------------
+% TODO: Ganti metadata di bawah ini dengan data Anda sendiri
+\titleind{Penerapan Pola Apps of Apps ArgoCD untuk Orkestrasi Deployment Layanan Repositori Ilmiah InvenioRDM pada Kubernetes}
+\titleeng{Implementation of ArgoCD Apps of Apps Pattern for Orchestrating Scientific Repository Service InvenioRDM Deployment on Kubernetes}
+\fullname{Muhammad Argya Vityasy}
+\idnum{23/522547/PA/22475}
+\degree{Sarjana}
+\gelar{S.T.}
+\yearsubmit{2026}
+\program{Informatika}
+\dept{Teknik Elektro dan Informatika}
+\firstsupervisor{Guntur Budi Herwanto, S.Kom., M.Cs.}
+\firstexaminer{Nama Dosen Penguji 1}
+\secondexaminer{Nama Dosen Penguji 2}
+
+%------------------------------------------------------------
+% Packages
+%------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{enumitem}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{orange},
+    showstringspaces=false,
+    tabsize=2
+}
+
+% Define YAML language for listings
+\lstdefinelanguage{yaml}{
+  keywords={true,false,null,y,n},
+  sensitive=false,
+  comment=[l]{\#},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]"
+}
+
+% Define Docker language for listings
+\lstdefinelanguage{docker}{
+  alsoletter={-},
+  keywords={FROM,RUN,CMD,LABEL,MAINTAINER,EXPOSE,ENV,ADD,COPY,ENTRYPOINT,VOLUME,USER,WORKDIR,ARG,ONBUILD,STOPSIGNAL,HEALTHCHECK,SHELL},
+  sensitive=false,
+  comment=[l]{\#},
+  morestring=[b]',
+  morestring=[b]"
+}
+
+%------------------------------------------------------------
+% Document Body
+%------------------------------------------------------------
+\begin{document}
+
+% Preliminary Pages (Proposal: minimal)
+\cover
+\titlepageind
+\approvalpage
+
+\tableofcontents
+
+\abstractind
+InvenioRDM merupakan platform repositori data penelitian open-source yang memiliki arsitektur microservices kompleks meliputi layanan web, worker, database, mesin pencari, dan penyimpanan objek. Deployment manual pada lingkungan Kubernetes memerlukan pengelolaan banyak komponen secara terpisah yang rentan terhadap kesalahan konfigurasi dan sulit untuk dilacak. Penelitian ini mengusulkan penerapan pola Apps of Apps pada ArgoCD untuk mengorkestrasi deployment seluruh komponen InvenioRDM secara deklaratif. Pendekatan GitOps yang digunakan memungkinkan seluruh state infrastruktur tersimpan dalam repositori Git sebagai single source of truth, sehingga deployment, pembaruan, dan rollback dapat dilakukan secara otomatis dan teraudit. Metode penelitian yang digunakan adalah Research and Development (R\&D) dengan tahapan analisis kebutuhan, perancangan arsitektur Apps of Apps, implementasi manifest ArgoCD, serta pengujian fungsional dan non-fungsional pada klaster Kubernetes. Hasil penelitian diharapkan dapat menghasilkan sistem deployment GitOps untuk InvenioRDM yang mampu mengurangi kompleksitas manajemen konfigurasi dan meningkatkan reliabilitas deployment.
+\endabstractind
+
+\abstracteng
+InvenioRDM is an open-source research data repository platform with a complex microservices architecture including web services, workers, databases, search engines, and object storage. Manual deployment in Kubernetes environments requires managing many separate components, which is prone to configuration errors and difficult to track. This research proposes implementing the Apps of Apps pattern on ArgoCD to orchestrate the deployment of all InvenioRDM components declaratively. The GitOps approach enables the entire infrastructure state to be stored in a Git repository as a single source of truth, allowing automated and auditable deployments, updates, and rollbacks. The research method used is Research and Development (R\&D) with stages of requirements analysis, Apps of Apps architecture design, ArgoCD manifest implementation, and functional and non-functional testing on a Kubernetes cluster. The expected result is a GitOps deployment system for InvenioRDM that can reduce configuration management complexity and improve deployment reliability.
+\endabstracteng
+
+%------------------------------------------------------------
+% Chapters
+%------------------------------------------------------------
+\include{chapters/bab1-pendahuluan}
+\include{chapters/bab2-penelitian-terkait}
+\include{chapters/bab3-metodologi}
+\include{chapters/bab4-jadwal-penelitian}
+
+%------------------------------------------------------------
+% Bibliography
+%------------------------------------------------------------
+\bibliography{references}
+
+\end{document}

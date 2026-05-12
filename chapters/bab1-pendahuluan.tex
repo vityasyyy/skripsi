@@ -1,0 +1,67 @@
+\chapter{PENDAHULUAN}
+
+\section{Latar Belakang}
+
+Dalam era digital, pengelolaan data penelitian menjadi aspek krusial bagi institusi akademik dan lembaga riset. Repositori data penelitian berfungsi sebagai wadah penyimpanan, publikasi, dan pengelolaan aset digital ilmiah yang memastikan keberlanjutan, aksesibilitas, dan citabilitas hasil penelitian. InvenioRDM merupakan salah satu platform repositori data penelitian open-source yang dikembangkan oleh CERN dan komunitas internasional. Platform ini menyediakan fitur lengkap mulai dari pengunggahan data, pemberian metadata, pencarian, hingga integrasi dengan sistem persistent identifier seperti DOI \citep{invenio2024}.
+
+Arsitektur InvenioRDM bersifat microservices yang terdiri dari beberapa komponen independen yang saling berinteraksi. Komponen-komponen tersebut meliputi layanan web berbasis Flask, worker Celery untuk pemrosesan asinkron, database PostgreSQL untuk penyimpanan data, Elasticsearch untuk indeks pencarian, Redis untuk caching dan message broker, serta penyimpanan objek seperti MinIO atau Amazon S3. Kompleksitas arsitektur ini menuntut pendekatan deployment yang terstruktur dan dapat direproduksi dengan konsisten.
+
+Kubernetes telah menjadi platform orkestrasi kontainer yang dominan dalam industri maupun akademisi. Kubernetes menyediakan abstraksi untuk deployment, scaling, dan manajemen aplikasi kontainerisasi. Namun, deployment aplikasi kompleks seperti InvenioRDM pada Kubernetes menghadapi tantangan tersendiri. Pengelolaan banyak komponen secara manual melalui perintah \texttt{kubectl} atau skrip \textit{ad-hoc} rentan terhadap \textit{configuration drift}, sulit dilacak, dan tidak memiliki mekanisme rollback yang terstandarisasi \citep{kubernetes2024}.
+
+GitOps merupakan paradigma deployment modern yang mengusulkan penggunaan repositori Git sebagai \textit{single source of truth} untuk seluruh state infrastruktur dan aplikasi. Dalam GitOps, setiap perubahan pada sistem dilakukan melalui commit ke repositori Git, yang kemudian secara otomatis disinkronkan ke lingkungan target oleh agen GitOps. Pendekatan ini menawarkan beberapa keuntungan: deklaratif, terverifikasi, teraudit, dan mampu melakukan \textit{self-healing} \citep{gitops2023}.
+
+ArgoCD adalah salah satu implementasi GitOps yang paling banyak digunakan untuk ekosistem Kubernetes. ArgoCD memungkinkan definisi aplikasi Kubernetes dalam bentuk manifest YAML atau Helm chart yang disimpan di Git, kemudian secara kontinu memantau dan menyelaraskan state klaster dengan state yang didefinisikan di Git. Salah satu pola yang didukung ArgoCD adalah \textit{Apps of Apps}, yaitu sebuah aplikasi ArgoCD induk yang mengelola beberapa aplikasi anak. Pola ini sangat cocok untuk aplikasi kompleks dengan banyak komponen seperti InvenioRDM \citep{argocd2024}.
+
+Berdasarkan pemaparan di atas, terdapat kesenjangan antara kompleksitas deployment InvenioRDM dan ketersediaan solusi GitOps yang terintegrasi untuk platform tersebut. Penelitian ini bertujuan untuk mengisi kesenjangan tersebut dengan merancang dan mengimplementasikan sistem deployment berbasis GitOps menggunakan pola Apps of Apps ArgoCD untuk InvenioRDM pada klaster Kubernetes.
+
+\section{Rumusan Masalah}
+
+Berdasarkan latar belakang di atas, rumusan masalah dalam penelitian ini adalah:
+
+\begin{enumerate}
+  \item Bagaimana merancang arsitektur deployment GitOps menggunakan pola Apps of Apps ArgoCD untuk orkestrasi komponen-komponen InvenioRDM pada klaster Kubernetes?
+  \item Bagaimana mengimplementasikan sistem deployment yang mampu mengelola dependensi antar komponen InvenioRDM secara deklaratif dan otomatis?
+  \item Bagaimana mengukur efektivitas sistem deployment GitOps yang dikembangkan dibandingkan dengan pendekatan deployment manual pada Kubernetes?
+\end{enumerate}
+
+\section{Batasan Masalah}
+
+Agar penelitian ini tetap fokus dan terukur, batasan masalah yang ditetapkan adalah:
+
+\begin{enumerate}
+  \item Penelitian dilakukan pada lingkungan klaster Kubernetes tunggal (single cluster) tanpa mempertimbangkan skenario multi-cluster.
+  \item Implementasi GitOps menggunakan ArgoCD sebagai tools utama, tidak membandingkan dengan tools GitOps lain seperti Flux atau Rancher Fleet.
+  \item Versi InvenioRDM yang digunakan adalah versi 12.x dengan konfigurasi standar yang mendukung komponen web, worker, database PostgreSQL, Elasticsearch, Redis, dan penyimpanan objek MinIO.
+  \item Aspek migrasi data dari sistem lama ke InvenioRDM tidak termasuk dalam ruang lingkup penelitian.
+  \item Pengujian difokuskan pada aspek fungsionalitas deployment, sinkronisasi otomatis, drift detection, dan rollback, tanpa melakukan pengujian beban (load testing) skala besar.
+\end{enumerate}
+
+\section{Tujuan Penelitian}
+
+Tujuan dari penelitian ini adalah:
+
+\begin{enumerate}
+  \item Merancang arsitektur deployment GitOps menggunakan pola Apps of Apps ArgoCD untuk mengorkestrasi seluruh komponen InvenioRDM pada klaster Kubernetes.
+  \item Mengimplementasikan sistem deployment yang mampu mengelola dependensi antar komponen InvenioRDM secara deklaratif melalui manifest ArgoCD dan Helm chart.
+  \item Mengevaluasi efektivitas sistem deployment GitOps yang dikembangkan berdasarkan metrik deployment time, sinkronisasi otomatis, dan kemampuan rollback.
+\end{enumerate}
+
+\section{Manfaat Penelitian}
+
+Penelitian ini diharapkan memberikan manfaat berikut:
+
+\begin{enumerate}
+  \item \textbf{Teoritis:} Menambah khazanah keilmuan di bidang DevOps dan GitOps, khususnya penerapan pola Apps of Apps untuk aplikasi microservices kompleks pada Kubernetes.
+  \item \textbf{Praktis:} Menghasilkan sistem deployment terstandarisasi untuk InvenioRDM yang dapat digunakan oleh institusi akademik dalam mengelola repositori data penelitian dengan lebih andal, teraudit, dan mudah direproduksi.
+\end{enumerate}
+
+\section{Sistematika Penulisan}
+
+Sistematika penulisan proposal tugas akhir ini adalah sebagai berikut:
+
+\begin{itemize}
+  \item \textbf{Bab I:} Pendahuluan --- berisi latar belakang, rumusan masalah, batasan masalah, tujuan, manfaat, dan sistematika penulisan.
+  \item \textbf{Bab II:} Penelitian Terkait --- membahas state of the art mengenai InvenioRDM, Kubernetes, GitOps, ArgoCD, dan pola Apps of Apps, serta hasil-hasil penelitian sebelumnya yang relevan.
+  \item \textbf{Bab III:} Metode dan Rancangan Penelitian --- menjelaskan metodologi Research and Development (R\&D), perancangan arsitektur sistem, bagan alir metodologi, lingkungan pengembangan, dan metode pengujian.
+  \item \textbf{Bab IV:} Jadwal Penelitian --- memuat rencana jadwal pelaksanaan penelitian berbasis bulan dalam bentuk Gantt Chart.
+\end{itemize}
