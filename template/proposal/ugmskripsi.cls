@@ -1,0 +1,1 @@
+../../ugmskripsi.cls

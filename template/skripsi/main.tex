@@ -1,0 +1,134 @@
+\documentclass[skripsi,indonesia]{ugmskripsi}
+% Options:
+%   skripsi / proposal        (default: skripsi)
+%   satuspasi / duaspasi / satusetengahspasi (default: satusetengahspasi)
+%   indonesia / inggris       (default: indonesia)
+
+%------------------------------------------------------------
+% Metadata Skripsi
+%------------------------------------------------------------
+% TODO: Ganti metadata di bawah ini dengan data Anda sendiri
+\titleind{JUDUL BAHASA INDONESIA}
+\titleeng{JUDUL BAHASA INGGRIS}
+\fullname{NAMA LENGKAP}
+\idnum{NIM}
+\degree{JENJANG}
+\gelar{GELAR}
+\yearsubmit{TAHUN}
+\program{PROGRAM STUDI}
+\dept{DEPARTEMEN}
+\firstsupervisor{NAMA DOSEN PEMBIMBING}
+\firstexaminer{NAMA DOSEN PENGUJI 1}
+\secondexaminer{NAMA DOSEN PENGUJI 2}
+
+%------------------------------------------------------------
+% Packages
+%------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{enumitem}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{orange},
+    showstringspaces=false,
+    tabsize=2
+}
+
+% Define YAML language for listings
+\lstdefinelanguage{yaml}{
+  keywords={true,false,null,y,n},
+  sensitive=false,
+  comment=[l]{\#},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]"
+}
+
+% Define Docker language for listings
+\lstdefinelanguage{docker}{
+  alsoletter={-},
+  keywords={FROM,RUN,CMD,LABEL,MAINTAINER,EXPOSE,ENV,ADD,COPY,ENTRYPOINT,VOLUME,USER,WORKDIR,ARG,ONBUILD,STOPSIGNAL,HEALTHCHECK,SHELL},
+  sensitive=false,
+  comment=[l]{\#},
+  morestring=[b]',
+  morestring=[b]"
+}
+
+%------------------------------------------------------------
+% Document Body
+%------------------------------------------------------------
+\begin{document}
+
+% Preliminary Pages (Skripsi: lengkap)
+\cover
+\titlepageind
+\approvalpage
+\declarepage
+\motto
+\acknowledment
+
+\preface
+\addcontentsline{toc}{chapter}{\prefacename}
+Isi Prakata di sini...
+
+\tableofcontents
+\listoftables
+\listoffigures
+% \lambang  % Uncomment when you have nomenclature entries defined
+
+\abstractind
+% TODO: Tulis intisari dalam Bahasa Indonesia di sini (150-250 kata).
+% Jelaskan latar belakang, tujuan, metode, dan hasil penelitian.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+\endabstractind
+
+\abstracteng
+% TODO: Write abstract in English here (150-250 words).
+% Explain background, objectives, methods, and results.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+\endabstracteng
+
+%------------------------------------------------------------
+% Chapters
+%------------------------------------------------------------
+\include{chapters/bab1-pendahuluan}
+\include{chapters/bab2-identifikasi-masalah}
+\include{chapters/bab3-kajian-ilmiah}
+\include{chapters/bab4-perancangan}
+\include{chapters/bab5-pembuatan}
+\include{chapters/bab6-pengujian}
+
+%------------------------------------------------------------
+% Bibliography
+%------------------------------------------------------------
+\bibliography{references}
+
+%------------------------------------------------------------
+% Appendices
+%------------------------------------------------------------
+\appendix
+\include{lampiran/lampiran-a}
+
+\end{document}

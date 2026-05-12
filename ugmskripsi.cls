@@ -233,22 +233,22 @@
       \vspace{1.0cm}
       \MakeUppercase{\normalfont\slshape\bfseries\@titleeng}\par\nobreak
        \vfill
-       \includegraphics[width=3cm]{figures/logougm.png}
-       \vfill
-       {\normalfont
-        \MakeUppercase{\@fullname}\\
-        \@idnum}\\
-       \vspace{1.5cm}
-       {\normalfont 
-         \MakeUppercase{\normalfont\bfseries Program Studi \@program}\\
-         \MakeUppercase{\normalfont\bfseries Departemen \@dept}\\
-         \MakeUppercase{\normalfont\bfseries\@faculty}\\
-         \MakeUppercase{\normalfont\bfseries\@university}\\
-         \MakeUppercase{\normalfont\bfseries\@city}\\
-         \vspace{0.5cm}
-         {\normalfont\bfseries\@yearsubmit}}\\
-      \end{singlespace}
-      \end{center}
+        \includegraphics{logougm}
+        \vfill
+        {\normalfont
+         \MakeUppercase{\@fullname}\\
+         \@idnum}\\
+        \vspace{1.5cm}
+        {\normalfont 
+          \MakeUppercase{\normalfont\bfseries Program Studi \@program}\\
+          \MakeUppercase{\normalfont\bfseries Departemen \@dept}\\
+          \MakeUppercase{\normalfont\bfseries\@faculty}\\
+          \MakeUppercase{\normalfont\bfseries\@university}\\
+          \MakeUppercase{\normalfont\bfseries\@city}\\
+          \vspace{0.5cm}
+          {\normalfont\bfseries\@yearsubmit}}\\
+       \end{singlespace}
+       \end{center}
 }  
 
 %------------------------------------------------------------
@@ -277,7 +277,7 @@
         {\normalfont Usulan Penelitian}\\
        \fi
        \vfill
-       \includegraphics[width=3cm]{figures/logougm.png}
+       \includegraphics{logougm}
        \vfill
        {\normalfont
         \MakeUppercase{\@fullname}\\
@@ -285,7 +285,7 @@
        \vspace{1.5cm}
        {\normalfont 
          \MakeUppercase{\normalfont\bfseries Program Studi \@program}\\
-         \MakeUppercase{\normalfont\bfseries Depertemen \@dept}\\
+          \MakeUppercase{\normalfont\bfseries Departemen \@dept}\\
          \MakeUppercase{\normalfont\bfseries\@faculty}\\
          \MakeUppercase{\normalfont\bfseries\@university}\\
          \MakeUppercase{\normalfont\bfseries\@city}\\
