@@ -1,0 +1,24 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.glo
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# PDF output (optional - uncomment if you don't want to track compiled PDFs)
+# *.pdf
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
