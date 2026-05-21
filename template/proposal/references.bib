@@ -1,9 +1,17 @@
-@misc{invenio2024,
-  author    = {{CERN}},
-  title     = {InvenioRDM Documentation},
-  year      = {2024},
-  url       = {https://inveniordm.docs.cern.ch},
-  urldate   = {2024-12-15}
+%------------------------------------------------------------
+% Referensi untuk Proposal NASI CUSTOM
+%------------------------------------------------------------
+
+% === K8s & Container Orchestration ===
+
+@article{burns2016borg,
+  author    = {Brendan Burns and Brian Grant and David Oppenheimer and Eric Brewer and John Wilkes},
+  title     = {Borg, Omega, and Kubernetes},
+  journal   = {ACM Queue},
+  year      = {2016},
+  volume    = {14},
+  number    = {1},
+  pages     = {70--93}
 }
 
 @misc{kubernetes2024,
@@ -11,23 +19,147 @@
   title     = {Kubernetes Documentation},
   year      = {2024},
   url       = {https://kubernetes.io/docs},
-  urldate   = {2024-12-15}
+  urldate   = {2025-05-10}
 }
 
-@misc{gitops2023,
-  author    = {{Weaveworks}},
-  title     = {GitOps Documentation},
-  year      = {2023},
-  url       = {https://www.weave.works/technologies/gitops},
-  urldate   = {2024-12-15}
+@misc{cncf2024,
+  author    = {{Cloud Native Computing Foundation}},
+  title     = {CNCF Cloud Native Definition v1.0},
+  year      = {2024},
+  url       = {https://www.cncf.io/about/who-we-are},
+  urldate   = {2025-05-10}
 }
+
+% === GitOps ===
+
+@misc{opengitops2021,
+  author    = {{CNCF GitOps Working Group}},
+  title     = {OpenGitOps Principles v1.0.0},
+  year      = {2021},
+  howpublished = {\url{https://opengitops.dev}},
+  urldate   = {2025-05-10}
+}
+
+@book{yuen2021gitops,
+  author    = {Billy Yuen and Alexander Matyushentsev and Jesse Suen and Thomas Ekenstam},
+  title     = {GitOps and Kubernetes: Continuous Deployment with Argo CD, Jenkins X, and Flux},
+  year      = {2021},
+  publisher = {O'Reilly Media},
+  isbn      = {978-1492094877}
+}
+
+% === ArgoCD & App of Apps ===
 
 @misc{argocd2024,
   author    = {{Argo Project}},
   title     = {ArgoCD Documentation},
   year      = {2024},
   url       = {https://argo-cd.readthedocs.io},
-  urldate   = {2024-12-15}
+  urldate   = {2025-05-10}
+}
+
+@book{costea2022argocd,
+  author    = {Liviu Costea and Stefan Economakis and Alexander Matyushentsev},
+  title     = {Argo CD in Practice: The GitOps Way of Managing Cloud-Native Applications},
+  year      = {2022},
+  publisher = {Packt Publishing}
+}
+
+% === GitOps Academic Evaluation ===
+
+@inproceedings{utami2021analysis,
+  author    = {Ervina Utami and Hanif Al Fatta},
+  title     = {Analysis on the Use of Declarative and Pull-Based Deployment Models on GitOps Using Argo CD},
+  booktitle = {2021 4th International Conference on Information and Communications Technology (ICOIACT)},
+  year      = {2021},
+  publisher = {IEEE}
+}
+
+@inproceedings{shrestha2024configuration,
+  author    = {R. Shrestha and A. A. N. Ali},
+  title     = {Configuration Management in Kubernetes Environments: A GitOps Approach},
+  booktitle = {2024 IEEE/ACM 17th International Conference on Utility and Cloud Computing (UCC)},
+  year      = {2024},
+  publisher = {IEEE}
+}
+
+@inproceedings{kurrewar2025streamlining,
+  author    = {S. Kurrewar and S. Dhomane and A. Dahake},
+  title     = {Streamlining Kubernetes Deployments through GitOps Methodologies},
+  booktitle = {2025 IEEE International Conference on Electronics and Sustainable Communication Technologies},
+  year      = {2025},
+  publisher = {IEEE}
+}
+
+@mastersthesis{paavola2021managing,
+  author    = {E. Paavola},
+  title     = {Managing Multiple Applications on Kubernetes Using GitOps Principles},
+  school    = {Turku University of Applied Sciences},
+  year      = {2021}
+}
+
+@mastersthesis{damore2021gitops,
+  author    = {M. D'Amore},
+  title     = {GitOps and ArgoCD: Continuous Deployment and Maintenance of a Full Stack Application in a Hybrid Cloud Kubernetes Environment},
+  school    = {Politecnico di Torino},
+  year      = {2021}
+}
+
+@mastersthesis{matubber2025managing,
+  author    = {M. E. Matubber},
+  title     = {Managing 5G Kubernetes Infrastructures Using GitOps Principles},
+  school    = {KTH Royal Institute of Technology},
+  year      = {2025}
+}
+
+% === Configuration Drift & Reliability ===
+
+@article{zhang2026configuration,
+  author    = {Y. Zhang and U. Paul and M. d'Amorim and A. Rahman},
+  title     = {Configuration Defects in Kubernetes},
+  journal   = {IEEE Transactions on Software Engineering},
+  year      = {2026},
+  publisher = {IEEE}
+}
+
+@article{rahman2023security,
+  author    = {A. Rahman and S. I. Shamim and D. B. Bose and others},
+  title     = {Security Misconfigurations in Open Source Kubernetes Manifests: An Empirical Study},
+  journal   = {ACM Transactions on Software Engineering and Methodology},
+  year      = {2023},
+  publisher = {ACM}
+}
+
+@mastersthesis{kaggantinataraja2025security,
+  author    = {P. Kagganti Nataraja},
+  title     = {A Security-Centric Analysis of Declarative and Imperative Deployment Approaches in Kubernetes-Based Application Environments},
+  school    = {National College of Ireland},
+  year      = {2025}
+}
+
+@mastersthesis{pohjola2025mitigating,
+  author    = {O. Pohjola},
+  title     = {Mitigating Configuration Drift in Infrastructure-as-Code Systems},
+  school    = {Aalto University},
+  year      = {2025}
+}
+
+% === Deployment Alternatives ===
+
+@misc{helm2024,
+  author    = {{Helm Project}},
+  title     = {Helm Documentation},
+  year      = {2024},
+  url       = {https://helm.sh/docs},
+  urldate   = {2025-05-10}
+}
+
+@misc{kustomize2024,
+  author    = {{The Kubernetes Authors}},
+  title     = {Kustomize Documentation},
+  year      = {2024},
+  url       = {https://kustomize.io},
+  urldate   = {2025-05-10}
 }
 
 @book{limoncelli2018,
@@ -38,47 +170,53 @@
   edition   = {2nd}
 }
 
-@article{zhang2022,
-  author    = {Wei Zhang and Li Chen},
-  title     = {Microservices Architecture for Scientific Data Repository Platform},
-  journal   = {Journal of Cloud Computing},
-  year      = {2022},
-  volume    = {11},
-  number    = {3},
-  pages     = {45--58}
+% === InvenioRDM ===
+
+@misc{invenio2024,
+  author    = {{CERN}},
+  title     = {InvenioRDM Documentation},
+  year      = {2024},
+  url       = {https://inveniordm.docs.cern.ch},
+  urldate   = {2025-05-10}
 }
 
-@article{wang2021,
-  author    = {Jie Wang and Ming Liu},
-  title     = {Enterprise Application Deployment Using ArgoCD on Kubernetes},
-  journal   = {IEEE Access},
-  year      = {2021},
-  volume    = {9},
-  pages     = {112345--112356}
+@inproceedings{przerwa2025modern,
+  author    = {K. Przerwa and S. Rohr},
+  title     = {A Modern Open Source Integrated Library System by Invenio},
+  booktitle = {International Conference on Theory and Practice of Digital Libraries (TPDL)},
+  year      = {2025},
+  publisher = {Springer}
 }
 
-@inproceedings{burns2016,
-  author    = {Brendan Burns and Brian Grant and David Oppenheimer and Eric Brewer and John Wilkes},
-  title     = {Borg, Omega, and Kubernetes},
-  booktitle = {ACM Queue},
+@inproceedings{simko2016cern,
+  author    = {J. D. Fern{\'a}ndez and P. Fokianos and P. Herterich and T. {\v{S}}imko},
+  title     = {CERN Analysis Preservation: A Novel Digital Library Service to Enable Reusable and Reproducible Research},
+  booktitle = {Research and Advanced Technology for Digital Libraries},
   year      = {2016},
-  volume    = {14},
-  number    = {1},
-  pages     = {70--93}
+  publisher = {Springer}
 }
 
-@misc{cncf2024,
-  author    = {{Cloud Native Computing Foundation}},
-  title     = {CNCF Cloud Native Definition},
-  year      = {2024},
-  url       = {https://www.cncf.io/about/who-we-are},
-  urldate   = {2024-12-15}
+@mastersthesis{chelakis2022creating,
+  author    = {K. Chelakis},
+  title     = {Creating an Open Archival Information System Compliant Archive for CERN},
+  school    = {CERN},
+  year      = {2022}
 }
 
-@misc{helm2024,
-  author    = {{Helm Project}},
-  title     = {Helm Documentation},
+% === Sealed Secrets & Security ===
+
+@misc{sealedsecrets2024,
+  author    = {{Bitnami Labs}},
+  title     = {Sealed Secrets Documentation},
   year      = {2024},
-  url       = {https://helm.sh/docs},
-  urldate   = {2024-12-15}
+  url       = {https://github.com/bitnami-labs/sealed-secrets},
+  urldate   = {2025-05-10}
+}
+
+@misc{cloudflare2024,
+  author    = {{Cloudflare}},
+  title     = {Cloudflare Tunnel Documentation},
+  year      = {2024},
+  url       = {https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/},
+  urldate   = {2025-05-10}
 }

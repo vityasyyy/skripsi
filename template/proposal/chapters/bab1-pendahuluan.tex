@@ -2,26 +2,27 @@
 
 \section{Latar Belakang}
 
-Dalam era digital, pengelolaan data penelitian menjadi aspek krusial bagi institusi akademik dan lembaga riset. Repositori data penelitian berfungsi sebagai wadah penyimpanan, publikasi, dan pengelolaan aset digital ilmiah yang memastikan keberlanjutan, aksesibilitas, dan citabilitas hasil penelitian. InvenioRDM merupakan salah satu platform repositori data penelitian open-source yang dikembangkan oleh CERN dan komunitas internasional. Platform ini menyediakan fitur lengkap mulai dari pengunggahan data, pemberian metadata, pencarian, hingga integrasi dengan sistem persistent identifier seperti DOI \citep{invenio2024}.
+Kubernetes telah menjadi platform orkestrasi kontainer yang dominan di industri maupun akademisi, digunakan oleh lebih dari 5,6 juta developer secara global \citep{cncf2024}. Kemampuan Kubernetes dalam mengelola deployment, scaling, dan self-healing menjadikannya pilihan utama untuk menjalankan aplikasi yang memerlukan availability tinggi \citep{burns2016borg}. Namun, seiring bertambahnya jumlah layanan yang di-deploy pada sebuah klaster, kompleksitas operasional meningkat secara drastis. Sebuah aplikasi seperti InvenioRDM --- platform repositori data penelitian open-source yang dikembangkan oleh CERN --- terdiri dari setidaknya 16 komponen yang saling bergantung: layanan web, worker asinkron, database relasional, mesin pencari, cache, penyimpanan objek, ingress controller, manajer sertifikat, enkripsi secret, tunnel jaringan, kebijakan keamanan, sistem pemantauan, dan pencadangan \citep{invenio2024}.
 
-Arsitektur InvenioRDM bersifat microservices yang terdiri dari beberapa komponen independen yang saling berinteraksi. Komponen-komponen tersebut meliputi layanan web berbasis Flask, worker Celery untuk pemrosesan asinkron, database PostgreSQL untuk penyimpanan data, Elasticsearch untuk indeks pencarian, Redis untuk caching dan message broker, serta penyimpanan objek seperti MinIO atau Amazon S3. Kompleksitas arsitektur ini menuntut pendekatan deployment yang terstruktur dan dapat direproduksi dengan konsisten.
+Pengelolaan deployment untuk aplikasi multi-service semacam ini tanpa pola yang terstruktur menghasilkan kekacauan operasional (\textit{deployment chaos}). Dalam pendekatan manual, operator menjalankan puluhan perintah \texttt{kubectl apply} atau membuat aplikasi satu per satu melalui antarmuka ArgoCD (\textit{click-ops}). Akibatnya, tiga masalah muncul secara berulang. Pertama, \textit{urutan dependensi tidak terjamin}: layanan aplikasi dapat di-deploy sebelum database atau cache siap, menyebabkan crash loop dan kegagalan deployment. Kedua, \textit{configuration drift tidak terdeteksi}: perubahan manual langsung pada klaster (di luar Git) tidak ditemukan sampai menyebabkan insiden produksi. Ketiga, \textit{blast radius tidak terkontrol}: satu perubahan konfigurasi pada satu layanan dapat memicu re-deploy pada layanan lain yang tidak terkait, atau sebaliknya, perubahan yang seharusnya merambat tidak terpropagasi \citep{zhang2026configuration, rahman2023security}.
 
-Kubernetes telah menjadi platform orkestrasi kontainer yang dominan dalam industri maupun akademisi. Kubernetes menyediakan abstraksi untuk deployment, scaling, dan manajemen aplikasi kontainerisasi. Namun, deployment aplikasi kompleks seperti InvenioRDM pada Kubernetes menghadapi tantangan tersendiri. Pengelolaan banyak komponen secara manual melalui perintah \texttt{kubectl} atau skrip \textit{ad-hoc} rentan terhadap \textit{configuration drift}, sulit dilacak, dan tidak memiliki mekanisme rollback yang terstandarisasi \citep{kubernetes2024}.
+GitOps menawarkan disiplin untuk mengatasi kekacauan ini. Dengan menjadikan repositori Git sebagai \textit{single source of truth}, seluruh state infrastruktur tercatat, terverifikasi, dan dapat diaudit \citep{opengitops2021}. ArgoCD mengimplementasikan prinsip-prinsip GitOps pada ekosistem Kubernetes: agen yang berjalan di dalam klaster secara periodik membandingkan state yang diinginkan di Git dengan state aktual di klaster, dan secara otomatis menyelaraskan keduanya \citep{argocd2024}. Namun, ArgoCD dalam konfigurasi datar (\textit{flat}) --- di mana setiap Application didefinisikan secara independen tanpa hierarki --- tidak menyelesaikan persoalan urutan dependensi maupun isolasi perubahan. Enam belas Application tanpa sync wave saling berlomba untuk di-deploy pertama, dan perubahan pada satu direktori Git dapat memicu re-sync pada Application yang tidak terkait.
 
-GitOps merupakan paradigma deployment modern yang mengusulkan penggunaan repositori Git sebagai \textit{single source of truth} untuk seluruh state infrastruktur dan aplikasi. Dalam GitOps, setiap perubahan pada sistem dilakukan melalui commit ke repositori Git, yang kemudian secara otomatis disinkronkan ke lingkungan target oleh agen GitOps. Pendekatan ini menawarkan beberapa keuntungan: deklaratif, terverifikasi, teraudit, dan mampu melakukan \textit{self-healing} \citep{gitops2023}.
+Pola \textit{App of Apps} pada ArgoCD mengatasi keterbatasan ini dengan memperkenalkan hierarki induk-anak dan mekanisme \textit{sync wave}. Sebuah Application induk mereferensikan direktori yang berisi manifest Application anak; ArgoCD secara otomatis membuat dan mengelola setiap anak. Anotasi \texttt{argocd.argoproj.io/sync-wave} pada setiap anak menentukan urutan deployment yang ketat, sehingga batas keamanan (\textit{security policies}) di-deploy sebelum ingress controller, ingress controller sebelum manajer sertifikat, dan seterusnya hingga layanan aplikasi \citep{argocd2024, yuen2021gitops}. Fitur \texttt{selfHeal} pada setiap Application memastikan bahwa setiap penyimpangan konfigurasi (\textit{configuration drift}) dideteksi dan dikoreksi secara otomatis.
 
-ArgoCD adalah salah satu implementasi GitOps yang paling banyak digunakan untuk ekosistem Kubernetes. ArgoCD memungkinkan definisi aplikasi Kubernetes dalam bentuk manifest YAML atau Helm chart yang disimpan di Git, kemudian secara kontinu memantau dan menyelaraskan state klaster dengan state yang didefinisikan di Git. Salah satu pola yang didukung ArgoCD adalah \textit{Apps of Apps}, yaitu sebuah aplikasi ArgoCD induk yang mengelola beberapa aplikasi anak. Pola ini sangat cocok untuk aplikasi kompleks dengan banyak komponen seperti InvenioRDM \citep{argocd2024}.
+Meskipun pola App of Apps telah diadopsi secara luas di industri, evaluasi kuantitatif terhadap pola ini belum banyak dilakukan dalam literatur akademis. Pertanyaan mendasar yang belum dijawab: sejauh mana pola ini benar-benar meningkatkan keandalan deployment, mempercepat pemulihan dari drift, dan mengisolasi blast radius dibandingkan pendekatan tanpa hierarki? Penelitian mengenai drift dan misconfiguration pada Kubernetes menunjukkan bahwa 71\% defect konfigurasi menyebabkan downtime atau degradasi layanan \citep{zhang2026configuration}, namun belum ada studi yang mengukur bagaimana pola GitOps hierarkis dapat mencegah atau memitigasi defect tersebut.
 
-Berdasarkan pemaparan di atas, terdapat kesenjangan antara kompleksitas deployment InvenioRDM dan ketersediaan solusi GitOps yang terintegrasi untuk platform tersebut. Penelitian ini bertujuan untuk mengisi kesenjangan tersebut dengan merancang dan mengimplementasikan sistem deployment berbasis GitOps menggunakan pola Apps of Apps ArgoCD untuk InvenioRDM pada klaster Kubernetes.
+Berdasarkan kesenjangan tersebut, penelitian ini mengimplementasikan dan mengevaluasi \textbf{NASI CUSTOM} (\textit{Nested ArgoCD Service Integration -- Cascading Unified Service Template Orchestration \& Manifest}), sebuah realisasi konkret dari pola App of Apps untuk deployment multi-service InvenioRDM pada klaster Kubernetes. NASI CUSTOM mengorganisasi 16+ ArgoCD Application dalam hierarki induk-anak dengan 8 tingkat sync wave, dimulai dari security policies (wave $-5$) hingga dependensi database (wave $8$). Evaluasi dilakukan dengan mengukur tiga metrik --- \textit{first-attempt success rate}, \textit{drift detection \& recovery time}, dan \textit{blast radius} --- dan membandingkannya dengan dua baseline: deployment manual/click-ops dan ArgoCD flat tanpa hierarki maupun sync waves.
 
 \section{Rumusan Masalah}
 
 Berdasarkan latar belakang di atas, rumusan masalah dalam penelitian ini adalah:
 
 \begin{enumerate}
-  \item Bagaimana merancang arsitektur deployment GitOps menggunakan pola Apps of Apps ArgoCD untuk orkestrasi komponen-komponen InvenioRDM pada klaster Kubernetes?
-  \item Bagaimana mengimplementasikan sistem deployment yang mampu mengelola dependensi antar komponen InvenioRDM secara deklaratif dan otomatis?
-  \item Bagaimana mengukur efektivitas sistem deployment GitOps yang dikembangkan dibandingkan dengan pendekatan deployment manual pada Kubernetes?
+  \item Bagaimana pola ArgoCD App of Apps dengan sync waves dapat menjamin urutan deployment yang benar pada aplikasi multi-service di klaster Kubernetes?
+  \item Sejauh mana pola NASI CUSTOM meningkatkan \textit{first-attempt success rate} deployment dibandingkan pendekatan manual dan ArgoCD tanpa hierarki?
+  \item Bagaimana pola NASI CUSTOM mendeteksi dan memulihkan \textit{configuration drift} secara otomatis, dan berapa lama waktu pemulihannya?
+  \item Bagaimana pola NASI CUSTOM membatasi \textit{blast radius} ketika terjadi perubahan pada satu layanan --- apakah perubahan tersebut terisolasi atau merambat ke layanan lain?
 \end{enumerate}
 
 \section{Batasan Masalah}
@@ -29,11 +30,11 @@ Berdasarkan latar belakang di atas, rumusan masalah dalam penelitian ini adalah:
 Agar penelitian ini tetap fokus dan terukur, batasan masalah yang ditetapkan adalah:
 
 \begin{enumerate}
-  \item Penelitian dilakukan pada lingkungan klaster Kubernetes tunggal (single cluster) tanpa mempertimbangkan skenario multi-cluster.
-  \item Implementasi GitOps menggunakan ArgoCD sebagai tools utama, tidak membandingkan dengan tools GitOps lain seperti Flux atau Rancher Fleet.
-  \item Versi InvenioRDM yang digunakan adalah versi 12.x dengan konfigurasi standar yang mendukung komponen web, worker, database PostgreSQL, Elasticsearch, Redis, dan penyimpanan objek MinIO.
-  \item Aspek migrasi data dari sistem lama ke InvenioRDM tidak termasuk dalam ruang lingkup penelitian.
-  \item Pengujian difokuskan pada aspek fungsionalitas deployment, sinkronisasi otomatis, drift detection, dan rollback, tanpa melakukan pengujian beban (load testing) skala besar.
+  \item Penelitian menguji pola App of Apps pada satu studi kasus: deployment InvenioRDM beserta 16 komponen infrastruktur dan dependensinya pada klaster Kubernetes.
+  \item Perbandingan dilakukan terhadap dua baseline: (a)~deployment manual/click-ops, dan (b)~ArgoCD flat Application tanpa hierarki dan tanpa sync waves.
+  \item Pengukuran dilakukan pada klaster Kubernetes tunggal (\textit{Rancher-managed}); skenario multi-cluster tidak termasuk dalam ruang lingkup.
+  \item Komponen InvenioRDM sebagai aplikasi (fitur, antarmuka, logika bisnis) bukan variabel penelitian --- InvenioRDM merupakan subjek uji, bukan objek penelitian.
+  \item Metrik yang diukur terbatas pada: \textit{first-attempt success rate}, \textit{drift detection \& recovery time}, dan \textit{blast radius/isolation}.
 \end{enumerate}
 
 \section{Tujuan Penelitian}
@@ -41,9 +42,10 @@ Agar penelitian ini tetap fokus dan terukur, batasan masalah yang ditetapkan ada
 Tujuan dari penelitian ini adalah:
 
 \begin{enumerate}
-  \item Merancang arsitektur deployment GitOps menggunakan pola Apps of Apps ArgoCD untuk mengorkestrasi seluruh komponen InvenioRDM pada klaster Kubernetes.
-  \item Mengimplementasikan sistem deployment yang mampu mengelola dependensi antar komponen InvenioRDM secara deklaratif melalui manifest ArgoCD dan Helm chart.
-  \item Mengevaluasi efektivitas sistem deployment GitOps yang dikembangkan berdasarkan metrik deployment time, sinkronisasi otomatis, dan kemampuan rollback.
+  \item Mengimplementasikan pola ArgoCD App of Apps dengan sync waves (NASI CUSTOM) untuk deployment multi-service InvenioRDM pada klaster Kubernetes.
+  \item Mengukur \textit{first-attempt success rate} deployment NASI CUSTOM dibandingkan baseline manual dan ArgoCD flat.
+  \item Mengukur \textit{drift detection time} dan \textit{recovery time} pada NASI CUSTOM dibandingkan ArgoCD flat.
+  \item Mengukur \textit{blast radius} perubahan konfigurasi pada NASI CUSTOM --- apakah perubahan pada satu Application mempengaruhi Application lain.
 \end{enumerate}
 
 \section{Manfaat Penelitian}
@@ -51,8 +53,8 @@ Tujuan dari penelitian ini adalah:
 Penelitian ini diharapkan memberikan manfaat berikut:
 
 \begin{enumerate}
-  \item \textbf{Teoritis:} Menambah khazanah keilmuan di bidang DevOps dan GitOps, khususnya penerapan pola Apps of Apps untuk aplikasi microservices kompleks pada Kubernetes.
-  \item \textbf{Praktis:} Menghasilkan sistem deployment terstandarisasi untuk InvenioRDM yang dapat digunakan oleh institusi akademik dalam mengelola repositori data penelitian dengan lebih andal, teraudit, dan mudah direproduksi.
+  \item \textbf{Teoritis:} Memberikan evaluasi kuantitatif pertama terhadap pola ArgoCD App of Apps pada aspek keandalan deployment, pemulihan drift, dan isolasi perubahan --- aspek yang belum ditemukan dalam literatur akademis eksisting.
+  \item \textbf{Praktis:} Menyediakan pola deployment GitOps yang terukur dan dapat diadopsi oleh organisasi yang mengelola aplikasi multi-service pada Kubernetes, mengurangi kekacauan operasional dan meningkatkan reliabilitas deployment.
 \end{enumerate}
 
 \section{Sistematika Penulisan}
@@ -61,7 +63,7 @@ Sistematika penulisan proposal tugas akhir ini adalah sebagai berikut:
 
 \begin{itemize}
   \item \textbf{Bab I:} Pendahuluan --- berisi latar belakang, rumusan masalah, batasan masalah, tujuan, manfaat, dan sistematika penulisan.
-  \item \textbf{Bab II:} Penelitian Terkait --- membahas state of the art mengenai InvenioRDM, Kubernetes, GitOps, ArgoCD, dan pola Apps of Apps, serta hasil-hasil penelitian sebelumnya yang relevan.
-  \item \textbf{Bab III:} Metode dan Rancangan Penelitian --- menjelaskan metodologi Research and Development (R\&D), perancangan arsitektur sistem, bagan alir metodologi, lingkungan pengembangan, dan metode pengujian.
-  \item \textbf{Bab IV:} Jadwal Penelitian --- memuat rencana jadwal pelaksanaan penelitian berbasis bulan dalam bentuk Gantt Chart.
+  \item \textbf{Bab II:} Penelitian Terkait --- membahas Kubernetes, GitOps, ArgoCD dan pola App of Apps, pendekatan deployment alternatif, InvenioRDM sebagai studi kasus, serta penelitian terdahulu yang relevan.
+  \item \textbf{Bab III:} Metode dan Rancangan Penelitian --- menjelaskan metodologi Design Science Research, perancangan arsitektur NASI CUSTOM, tiga eksperimen pengukuran, bagan alir, lingkungan pengembangan, dan metode pengujian.
+  \item \textbf{Bab IV:} Jadwal Penelitian --- memuat Gantt Chart berbasis bulan untuk perencanaan waktu penelitian selama 8 bulan.
 \end{itemize}

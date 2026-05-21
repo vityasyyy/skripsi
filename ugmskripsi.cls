@@ -233,23 +233,23 @@
       \vspace{1.0cm}
       \MakeUppercase{\normalfont\slshape\bfseries\@titleeng}\par\nobreak
        \vfill
-        \includegraphics{logougm}
+        \includegraphics[width=4cm]{logougm}
         \vfill
         {\normalfont
          \MakeUppercase{\@fullname}\\
-         \@idnum}\\
-        \vspace{1.5cm}
-        {\normalfont 
-          \MakeUppercase{\normalfont\bfseries Program Studi \@program}\\
-          \MakeUppercase{\normalfont\bfseries Departemen \@dept}\\
-          \MakeUppercase{\normalfont\bfseries\@faculty}\\
-          \MakeUppercase{\normalfont\bfseries\@university}\\
-          \MakeUppercase{\normalfont\bfseries\@city}\\
-          \vspace{0.5cm}
-          {\normalfont\bfseries\@yearsubmit}}\\
-       \end{singlespace}
-       \end{center}
-}  
+          \@idnum}\\
+         \vspace{1.5cm}
+         {\normalfont 
+           \MakeUppercase{\normalfont\bfseries Program Studi \@program}\\
+           \MakeUppercase{\normalfont\bfseries Departemen \@dept}\\
+           \MakeUppercase{\normalfont\bfseries\@faculty}\\
+           \MakeUppercase{\normalfont\bfseries\@university}\\
+           \MakeUppercase{\normalfont\bfseries\@city}\\
+           \vspace{0.5cm}
+           {\normalfont\bfseries\@yearsubmit}}\\
+        \end{singlespace}
+        \end{center}
+}
 
 %------------------------------------------------------------
 %Define titlepage in Indonesian
@@ -277,7 +277,7 @@
         {\normalfont Usulan Penelitian}\\
        \fi
        \vfill
-       \includegraphics{logougm}
+       \includegraphics[width=4cm]{logougm}
        \vfill
        {\normalfont
         \MakeUppercase{\@fullname}\\

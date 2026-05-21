@@ -1,14 +1,10 @@
 \documentclass[proposal,indonesia]{ugmskripsi}
-% Options:
-%   skripsi / proposal        (default: skripsi)
-%   satuspasi / duaspasi / satusetengahspasi (default: satusetengahspasi)
-%   indonesia / inggris       (default: indonesia)
 
 %------------------------------------------------------------
 % Metadata Proposal
 %------------------------------------------------------------
-\titleind{Penerapan Pola Apps of Apps ArgoCD untuk Orkestrasi Deployment Layanan Repositori Ilmiah InvenioRDM pada Kubernetes}
-\titleeng{Implementation of ArgoCD Apps of Apps Pattern for Orchestrating Scientific Repository Service InvenioRDM Deployment on Kubernetes}
+\titleind{Implementasi NASI CUSTOM (Nested ArgoCD Service Integration -- Cascading Unified Service Template Orchestration \& Manifest) untuk Manajemen Deployment GitOps pada Klaster Kubernetes: Studi Kasus InvenioRDM}
+\titleeng{Implementation of NASI CUSTOM (Nested ArgoCD Service Integration -- Cascading Unified Service Template Orchestration \& Manifest) for GitOps Deployment Management on Kubernetes Clusters: A Case Study of InvenioRDM}
 \fullname{Muhammad Argya Vityasy}
 \idnum{23/522547/PA/22475}
 \degree{Sarjana}
@@ -39,7 +35,6 @@
 \usepackage{url}
 \usepackage{enumitem}
 
-% Code listing style
 \lstset{
     basicstyle=\ttfamily\small,
     breaklines=true,
@@ -53,7 +48,6 @@
     tabsize=2
 }
 
-% Define YAML language for listings
 \lstdefinelanguage{yaml}{
   keywords={true,false,null,y,n},
   sensitive=false,
@@ -63,7 +57,6 @@
   morestring=[b]"
 }
 
-% Define Docker language for listings
 \lstdefinelanguage{docker}{
   alsoletter={-},
   keywords={FROM,RUN,CMD,LABEL,MAINTAINER,EXPOSE,ENV,ADD,COPY,ENTRYPOINT,VOLUME,USER,WORKDIR,ARG,ONBUILD,STOPSIGNAL,HEALTHCHECK,SHELL},
@@ -78,7 +71,6 @@
 %------------------------------------------------------------
 \begin{document}
 
-% Preliminary Pages (Proposal: minimal)
 \cover
 \titlepageind
 \approvalpage
@@ -86,11 +78,11 @@
 \tableofcontents
 
 \abstractind
-InvenioRDM merupakan platform repositori data penelitian open-source yang memiliki arsitektur microservices kompleks meliputi layanan web, worker, database, mesin pencari, dan penyimpanan objek. Deployment manual pada lingkungan Kubernetes memerlukan pengelolaan banyak komponen secara terpisah yang rentan terhadap kesalahan konfigurasi dan sulit untuk dilacak. Penelitian ini mengusulkan penerapan pola Apps of Apps pada ArgoCD untuk mengorkestrasi deployment seluruh komponen InvenioRDM secara deklaratif. Pendekatan GitOps yang digunakan memungkinkan seluruh state infrastruktur tersimpan dalam repositori Git sebagai single source of truth, sehingga deployment, pembaruan, dan rollback dapat dilakukan secara otomatis dan teraudit. Metode penelitian yang digunakan adalah Research and Development (R\&D) dengan tahapan analisis kebutuhan, perancangan arsitektur Apps of Apps, implementasi manifest ArgoCD, serta pengujian fungsional dan non-fungsional pada klaster Kubernetes. Hasil penelitian diharapkan dapat menghasilkan sistem deployment GitOps untuk InvenioRDM yang mampu mengurangi kompleksitas manajemen konfigurasi dan meningkatkan reliabilitas deployment.
+Deployment aplikasi multi-service pada klaster Kubernetes tanpa pola yang terstruktur menghasilkan kekacauan operasional: layanan di-deploy tanpa urutan dependensi yang benar, perubahan konfigurasi tidak terdeteksi secara otomatis, dan satu kesalahan dapat merambat ke seluruh klaster. Penelitian ini mengimplementasikan dan mengevaluasi NASI CUSTOM (Nested ArgoCD Service Integration -- Cascading Unified Service Template Orchestration \& Manifest), sebuah pola ArgoCD App of Apps dengan sync waves untuk manajemen deployment GitOps pada klaster Kubernetes, menggunakan InvenioRDM sebagai studi kasus. NASI CUSTOM mengorganisasi 16+ ArgoCD Application dalam hierarki induk-anak dengan anotasi sync wave yang menjamin urutan deployment dari batas keamanan hingga layanan aplikasi. Penelitian menggunakan metodologi Design Science Research dengan mengukur tiga metrik: (1) first-attempt success rate, yakni persentase deployment yang berhasil tanpa intervensi manual; (2) drift detection \& recovery time, yakni waktu dari terjadinya penyimpangan konfigurasi hingga ArgoCD mendeteksi dan memulihkan secara otomatis; dan (3) blast radius, yakni jumlah aplikasi yang terpengaruh ketika konfigurasi satu aplikasi berubah. Hasil evaluasi dibandingkan dengan dua baseline: deployment manual/click-ops dan ArgoCD flat tanpa hierarki maupun sync waves. Penelitian ini diharapkan memberikan evaluasi kuantitatif pertama terhadap pola App of Apps pada aspek keandalan deployment, pemulihan drift, dan isolasi perubahan.
 \endabstractind
 
 \abstracteng
-InvenioRDM is an open-source research data repository platform with a complex microservices architecture including web services, workers, databases, search engines, and object storage. Manual deployment in Kubernetes environments requires managing many separate components, which is prone to configuration errors and difficult to track. This research proposes implementing the Apps of Apps pattern on ArgoCD to orchestrate the deployment of all InvenioRDM components declaratively. The GitOps approach enables the entire infrastructure state to be stored in a Git repository as a single source of truth, allowing automated and auditable deployments, updates, and rollbacks. The research method used is Research and Development (R\&D) with stages of requirements analysis, Apps of Apps architecture design, ArgoCD manifest implementation, and functional and non-functional testing on a Kubernetes cluster. The expected result is a GitOps deployment system for InvenioRDM that can reduce configuration management complexity and improve deployment reliability.
+Deploying multi-service applications on Kubernetes clusters without a structured pattern leads to operational chaos: services are deployed without correct dependency ordering, configuration changes go undetected, and a single mistake can cascade across the entire cluster. This research implements and evaluates NASI CUSTOM (Nested ArgoCD Service Integration -- Cascading Unified Service Template Orchestration \& Manifest), an ArgoCD App of Apps pattern with sync waves for GitOps deployment management on Kubernetes clusters, using InvenioRDM as a case study. NASI CUSTOM organizes 16+ ArgoCD Applications in a parent-child hierarchy with sync wave annotations that guarantee deployment ordering from security boundaries to application services. The research employs Design Science Research methodology, measuring three metrics: (1) first-attempt success rate, the percentage of deployments that succeed without manual intervention; (2) drift detection \& recovery time, the time from configuration drift occurrence to ArgoCD detection and auto-healing; and (3) blast radius, the number of applications affected when one application's configuration changes. Evaluation results are compared against two baselines: manual/click-ops deployment and flat ArgoCD without hierarchy or sync waves. This research is expected to provide the first quantitative evaluation of the App of Apps pattern in terms of deployment reliability, drift recovery, and change isolation.
 \endabstracteng
 
 %------------------------------------------------------------

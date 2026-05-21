@@ -1,30 +1,32 @@
 \chapter{JADWAL PENELITIAN}
 
-Penelitian ini direncanakan untuk dilaksanakan selama enam bulan, dari bulan Februari 2026 hingga Juli 2026. Jadwal penelitian disusun berdasarkan tahapan metodologi Research and Development (R\&D) yang telah dijelaskan pada Bab III.
+Penelitian ini direncanakan untuk dilaksanakan selama delapan bulan, dari bulan Januari 2026 hingga Agustus 2026. Jadwal penelitian disusun berdasarkan tahapan Design Science Research (DSR) yang telah dijelaskan pada Bab III.
 
 Tabel \ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasis bulan. Simbol $\bullet$ menunjukkan bahwa kegiatan dilaksanakan pada bulan tersebut.
 
 \begin{table}[H]
   \centering
-  \caption{Jadwal Penelitian}
+  \caption{Jadwal Penelitian (Gantt Chart)}
   \label{tab:jadwal}
-  \begin{tabular}{|l|c|c|c|c|c|c|}
+  \begin{tabular}{|l|c|c|c|c|c|c|c|c|}
     \hline
-    \textbf{Kegiatan} & \textbf{Feb} & \textbf{Mar} & \textbf{Apr} & \textbf{Mei} & \textbf{Jun} & \textbf{Jul} \\
+    \multirow{2}{*}{\textbf{Kegiatan}} & \multicolumn{8}{c|}{\textbf{Bulan}} \\
+    \cline{2-9}
+     & \textbf{Jan} & \textbf{Feb} & \textbf{Mar} & \textbf{Apr} & \textbf{Mei} & \textbf{Jun} & \textbf{Jul} & \textbf{Agu} \\
     \hline
-    Studi Literatur & $\bullet$ & $\bullet$ & & & & \\
+    Studi Literatur & $\bullet$ & $\bullet$ & & & & & & \\
     \hline
-    Analisis Kebutuhan & $\bullet$ & $\bullet$ & & & & \\
+    Perancangan NASI CUSTOM & & $\bullet$ & $\bullet$ & & & & & \\
     \hline
-    Perancangan Sistem & & $\bullet$ & $\bullet$ & & & \\
+    Implementasi & & & $\bullet$ & $\bullet$ & $\bullet$ & & & \\
     \hline
-    Implementasi Sistem & & & $\bullet$ & $\bullet$ & & \\
+    Pengujian (E1, E2, E3) & & & & & $\bullet$ & $\bullet$ & & \\
     \hline
-    Pengujian dan Evaluasi & & & & $\bullet$ & $\bullet$ & \\
+    Analisis \& Evaluasi & & & & & & $\bullet$ & $\bullet$ & \\
     \hline
-    Dokumentasi dan Penulisan & & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ \\
+    Penulisan Laporan & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ \\
     \hline
-    Seminar Proposal / Sidang & & & & & & $\bullet$ \\
+    Seminar / Sidang & & & & & & & & $\bullet$ \\
     \hline
   \end{tabular}
 \end{table}
@@ -32,31 +34,31 @@ Tabel \ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
 \section{Penjelasan Kegiatan}
 
 \begin{enumerate}
-    \item \textbf{Studi Literatur (Februari -- Maret 2026)}
-    
-    Kegiatan ini mencakup pengumpulan dan analisis literatur mengenai InvenioRDM, Kubernetes, GitOps, ArgoCD, dan pola Apps of Apps. Sumber literatur meliputi dokumentasi resmi, buku teks, jurnal ilmiah, dan artikel teknis.
-    
-    \item \textbf{Analisis Kebutuhan (Februari -- Maret 2026)}
-    
-    Tahap ini meliputi analisis kebutuhan komponen InvenioRDM, dependensi antar komponen, kebutuhan resource Kubernetes, serta identifikasi tools dan teknologi yang diperlukan untuk implementasi.
-    
-    \item \textbf{Perancangan Sistem (Maret -- April 2026)}
-    
-    Kegiatan perancangan meliputi pembuatan diagram arsitektur sistem, desain struktur repositori Git, perancangan hierarki Apps of Apps ArgoCD, dan perancangan manifest Kubernetes serta Helm chart.
-    
-    \item \textbf{Implementasi Sistem (April -- Mei 2026)}
-    
-    Tahap implementasi meliputi pembuatan klaster Kubernetes, instalasi ArgoCD, pembuatan repositori Git, implementasi aplikasi ArgoCD induk dan anak, konfigurasi Helm chart InvenioRDM, serta konfigurasi networking dan storage.
-    
-    \item \textbf{Pengujian dan Evaluasi (Mei -- Juni 2026)}
-    
-    Kegiatan pengujian meliputi pengujian fungsional deployment, pengujian sinkronisasi GitOps, pengujian drift detection, pengujian rollback, serta pengukuran metrik kinerja sistem.
-    
-    \item \textbf{Dokumentasi dan Penulisan (Maret -- Juli 2026)}
-    
-    Kegiatan dokumentasi dilakukan secara paralel dengan tahapan lainnya. Penulisan proposal tugas akhir dilakukan pada semester ini, sedangkan penulisan skripsi lengkap akan dilanjutkan pada semester berikutnya.
-    
-    \item \textbf{Seminar Proposal / Sidang (Juli 2026)}
-    
-    Tahap akhir adalah presentasi dan sidang proposal tugas akhir di depan dosen penguji.
+    \item \textbf{Studi Literatur (Januari -- Februari 2026)}
+
+    Kegiatan ini mencakup pengumpulan dan analisis literatur mengenai Kubernetes, GitOps, ArgoCD, pola App of Apps, configuration drift, dan arsitektur InvenioRDM. Sumber literatur meliputi jurnal ilmiah (IEEE, ACM, Springer), dokumentasi resmi, buku teks, dan artikel teknis.
+
+    \item \textbf{Perancangan NASI CUSTOM (Februari -- Maret 2026)}
+
+    Tahap ini meliputi perancangan arsitektur App of Apps, struktur direktori repositori Git, definisi 8 tingkat sync wave, desain AppProject dengan RBAC, desain wiring dependensi melalui ExternalName Service, serta desain skenario eksperimen E1, E2, dan E3.
+
+    \item \textbf{Implementasi (Maret -- Mei 2026)}
+
+    Tahap implementasi meliputi: pembuatan repositori GitOps, konfigurasi ArgoCD, pembuatan Application induk dan 16+ Application anak dengan anotasi sync wave, konfigurasi InvenioRDM (web, worker, setup job, ExternalName Service), konfigurasi komponen infrastruktur (Sealed Secrets, Traefik, Cert-manager, Cloudflare Tunnel, Velero, MinIO, Monitoring, Security Policies), serta pembuatan baseline ArgoCD flat untuk perbandingan.
+
+    \item \textbf{Pengujian E1, E2, E3 (Mei -- Juni 2026)}
+
+    Pelaksanaan tiga eksperimen sesuai desain pada Bab III. E1: first-attempt success rate (5 pengulangan per pendekatan). E2: drift detection \& recovery time (3 jenis drift $\times$ 5 pengulangan per pendekatan). E3: blast radius (5 perubahan berbeda per pendekatan). Data dikumpulkan dalam bentuk timestamp dan status dari \texttt{argocd} CLI serta \texttt{kubectl}.
+
+    \item \textbf{Analisis dan Evaluasi (Juni -- Juli 2026)}
+
+    Analisis hasil eksperimen mencakup: perbandingan first-attempt success rate antara tiga pendekatan, perbandingan drift detection time dan recovery time antara dua pendekatan, serta perbandingan blast radius (jumlah Application yang terpengaruh) antara dua pendekatan. Pembahasan mencakup interpretasi hasil, identifikasi faktor yang mempengaruhi, dan implikasi terhadap praktik GitOps.
+
+    \item \textbf{Penulisan Laporan (Januari -- Agustus 2026)}
+
+    Penulisan laporan dilakukan secara paralel sepanjang penelitian. Setiap tahap menghasilkan bab atau bagian yang sesuai. Draft proposal diselesaikan pada pertengahan semester, draft skripsi lengkap pada akhir penelitian.
+
+    \item \textbf{Seminar / Sidang (Agustus 2026)}
+
+    Presentasi dan sidang tugas akhir di depan dosen penguji.
 \end{enumerate}
