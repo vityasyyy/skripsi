@@ -1,75 +1,65 @@
 \chapter{PENELITIAN TERKAIT}
 
-\section{Kubernetes dan Orkestrasi Kontainer}
+\section{Configuration Drift pada Lingkungan Kubernetes}
 
-Kubernetes adalah sistem orkestrasi kontainer open-source yang awalnya dikembangkan oleh Google berdasarkan pengalaman sistem Borg dan Omega, dan saat ini dikelola oleh Cloud Native Computing Foundation (CNCF) \citep{burns2016borg}. Kubernetes menyediakan abstraksi untuk automasi deployment, scaling, dan operasi aplikasi kontainerisasi \citep{kubernetes2024}. Abstraksi utama dalam Kubernetes meliputi: \textit{Pod} sebagai unit deploy terkecil, \textit{Deployment} untuk manajemen replika aplikasi stateless, \textit{StatefulSet} untuk aplikasi stateful, \textit{Service} untuk eksposur jaringan, \textit{ConfigMap} dan \textit{Secret} untuk manajemen konfigurasi, serta \textit{Ingress} untuk routing HTTP/HTTPS.
+\textit{Configuration drift} adalah situasi di mana \textit{state} aktual sebuah sistem menyimpang dari \textit{state} yang didefinisikan secara deklaratif \citep{pohjola2025mitigating}. Dalam konteks Kubernetes, drift terjadi ketika operator---secara langsung atau tidak sengaja---mengubah manifest klaster tanpa memperbarui sumber kebenaran deklaratif, sehingga \textit{state} aktual dan \textit{desired state} menjadi tidak konsisten.
 
-Dalam konteks deployment, Kubernetes menyediakan mekanisme rolling update yang secara default mengganti Pod lama dengan Pod baru secara bertahap. Namun, Kubernetes sendiri tidak menyediakan mekanisme bawaan untuk mengatur urutan deployment antar komponen yang saling bergantung. Sebuah aplikasi web yang memerlukan database tidak dapat secara deklaratif menyatakan ``deploy setelah database siap'' tanpa mekanisme eksternal. Keterbatasan ini menjadi masalah pada aplikasi multi-service di mana urutan dependensi bersifat kritis \citep{limoncelli2018}.
+Penelitian empiris oleh \citet{zhang2026configuration} melakukan studi terhadap 719 defect konfigurasi dari 2.260 skrip Kubernetes dan mengidentifikasi 15 kategori defect, di mana 71\% di antaranya menyebabkan \textit{downtime} atau degradasi layanan. Studi ini menegaskan bahwa \textit{misconfiguration} merupakan risiko operasional utama pada Kubernetes. \citet{rahman2023security} menambahkan bahwa \textit{security misconfiguration} pada manifest Kubernetes \textit{open-source} mencakup 11 kategori yang berulang, termasuk \textit{container} yang berjalan sebagai root, tanpa \textit{drop capabilities}, dan tanpa \textit{resource limits}. Penelitian menunjukkan bahwa drift bukan hanya masalah estetika konfigurasi, tetapi ancaman nyata terhadap keandalan dan keamanan layanan.
 
-\subsection{Manajemen Konfigurasi dan Configuration Drift}
+\citet{pohjola2025mitigating} memberikan kerangka konseptual untuk memahami sumber dan dampak drift pada sistem \textit{Infrastructure-as-Code} (IaC). Penelitian ini mengidentifikasi tiga faktor pendorong utama drift: (1)~\textit{keahlian manusia} yang tidak konsisten; (2)~\textit{tekanan waktu} yang memicu perubahan cepat dan tidak didokumentasikan; dan (3)~\textit{absensi mekanisme deteksi otomatis} pada pipeline deployment. Meskipun penelitian ini tidak beroperasi pada Kubernetes secara eksklusif, prinsip-prinsip yang dikemukakan berlaku umum untuk platform orkestrasi berbasis konfigurasi deklaratif.
 
-Penelitian terbaru oleh \citet{zhang2026configuration} melakukan studi empiris terhadap 719 defect konfigurasi dari 2.260 skrip Kubernetes dan mengidentifikasi 15 kategori defect, di mana 71\% di antaranya menyebabkan downtime atau degradasi layanan. Studi ini menegaskan bahwa misconfiguration merupakan risiko operasional utama pada Kubernetes. \citet{rahman2023security} menambahkan bahwa security misconfiguration pada manifest Kubernetes open-source mencakup 11 kategori yang berulang, termasuk container yang berjalan sebagai root, tanpa drop capabilities, dan tanpa resource limits.
+\subsection{Faktor yang Menimbulkan Configuration Drift}
 
-\textit{Configuration drift} --- situasi di mana state aktual klaster menyimpang dari state yang didefinisikan --- dapat terjadi ketika operator melakukan perubahan langsung pada klaster melalui \texttt{kubectl edit} atau manual patch, melewati proses Git. Deteksi dan koreksi drift secara manual memerlukan waktu dan rentan terhadap kelalaian \citep{pohjola2025mitigating}. GitOps dengan mekanisme self-healing menawarkan solusi otomatis untuk masalah ini.
+Berdasarkan literatur, faktor-faktor utama yang memperburuk \textit{configuration drift} pada Kubernetes meliputi:
 
-\section{GitOps sebagai Paradigma Deployment Modern}
+\begin{enumerate}
+  \item \textbf{Perubahan langsung pada klaster:} Penggunaan \texttt{kubectl edit}, \texttt{kubectl patch}, atau \texttt{kubectl scale} secara langsung tanpa memperbarui repositori sumber kebenaran \citep{zhang2026configuration}.
+  
+  \item \textbf{Prosedur deployment yang tidak terdokumentasi:} Setiap operator dapat memiliki urutan perintah yang berbeda, yang mengakibatkan \textit{state} klaster tidak deterministik \citep{pohjola2025mitigating}.
+  
+  \item \textbf{Kurangnya mekanisme \textit{rollback} yang terintegrasi:} Deployment manual seringkali tidak memiliki mekanisme \textit{rollback} otomatis; operator harus mengingat konfigurasi sebelumnya atau mengandalkan \textit{backup} yang mungkin tidak konsisten \citep{rahman2023security}.
+  
+  \item \textbf{Absensi deteksi drift otomatis:} Tanpa pengecekan berkala antara \textit{state} aktual dan \textit{desired state}, drift dapat terakumulasi selama periode lama tanpa terdeteksi \citep{zhang2026configuration}.
+\end{enumerate}
 
-GitOps adalah paradigma untuk mengelola infrastruktur dan aplikasi yang menggunakan repositori Git sebagai sumber kebenaran tunggal (\textit{single source of truth}). CNCF GitOps Working Group mendefinisikan empat prinsip OpenGitOps: (1)~sistem dideklarasikan secara deklaratif; (2)~state sistem yang diinginkan tersimpan dan berversi dalam Git; (3)~perubahan state ditarik (\textit{pulled}) secara otomatis oleh agen software; dan (4)~agen software secara kontinu mendeteksi dan mengoreksi deviasi dari state yang diinginkan \citep{opengitops2021}.
+\section{Evaluasi Empiris GitOps dan ArgoCD}
 
-Keunggulan GitOps dibandingkan deployment imperatif tradisional meliputi: audit trail lengkap melalui Git history, penerapan code review pada perubahan infrastruktur, rollback yang sederhana melalui \texttt{git revert}, dan reproduktibilitas konfigurasi di berbagai lingkungan \citep{yuen2021gitops}. Dalam model \textit{pull-based} GitOps, agen yang berjalan di dalam klaster secara periodik membandingkan state Git dengan state klaster dan menyelaraskan keduanya, menghilangkan kebutuhan akan akses kredensial klaster dari luar \citep{utami2021analysis}.
+GitOps adalah paradigma untuk mengelola infrastruktur dan aplikasi yang menggunakan repositori Git sebagai \textit{single source of truth}. CNCF GitOps Working Group mendefinisikan empat prinsip OpenGitOps: (1)~sistem dideklarasikan secara deklaratif; (2)~\textit{state} sistem yang diinginkan tersimpan dan berversi dalam Git; (3)~perubahan \textit{state} ditarik (\textit{pulled}) secara otomatis oleh agen software; dan (4)~agen software secara kontinu mendeteksi dan mengoreksi deviasi dari \textit{state} yang diinginkan \citep{opengitops2021}.
 
-\citet{shrestha2024configuration} melakukan evaluasi empiris pendekatan GitOps versus Ansible untuk manajemen konfigurasi Kubernetes, dan menemukan bahwa pendekatan GitOps memiliki drift detection time yang lebih cepat dibandingkan pendekatan imperatif. \citet{kurrewar2025streamlining} mengkonfirmasi bahwa GitOps dengan ArgoCD menghasilkan deployment yang lebih andal untuk aplikasi pada Kubernetes.
+Keunggulan GitOps dibandingkan deployment imperatif tradisional meliputi: \textit{audit trail} lengkap melalui Git history, penerapan \textit{code review} pada perubahan infrastruktur, \textit{rollback} yang sederhana melalui \texttt{git revert}, dan reprodusibilitas konfigurasi di berbagai lingkungan \citep{yuen2021gitops}. Dalam model \textit{pull-based} GitOps, agen yang berjalan di dalam klaster secara periodik membandingkan \textit{state} Git dengan \textit{state} klaster dan menyelaraskan keduanya, menghilangkan kebutuhan akan akses kredensial klaster dari luar \citep{utami2021analysis}.
 
-\section{ArgoCD dan Pola App of Apps}
+\citet{utami2021analysis} melakukan analisis perbandingan model deployment deklaratif \textit{pull-based} (GitOps dengan ArgoCD) versus \textit{push-based} pada Kubernetes, dan menemukan bahwa model \textit{pull-based} lebih andal karena agen berjalan di dalam klaster dan tidak memerlukan kredensial eksternal. \citet{shrestha2024configuration} mengevaluasi GitOps versus Ansible untuk manajemen konfigurasi Kubernetes, khususnya pada aspek \textit{drift detection} dan \textit{remedy time}. \citet{kaggantinataraja2025security} melakukan analisis berpusat keamanan terhadap pendekatan deklaratif (GitOps/ArgoCD) dan imperatif (Jenkins/\texttt{kubectl}), menemukan bahwa pendekatan deklaratif menghasilkan \textit{drift correction} yang lebih cepat, \textit{compliance rate} yang lebih tinggi, dan paparan kerentanan yang lebih rendah.
 
-ArgoCD adalah tools GitOps yang dirancang khusus untuk ekosistem Kubernetes. ArgoCD mengimplementasikan model pull-based GitOps di mana agen yang berjalan di dalam klaster memantau repositori Git dan menyelaraskan state klaster dengan state yang didefinisikan \citep{argocd2024}. ArgoCD mendukung berbagai format manifest termasuk plain YAML, Kustomize, Helm chart, dan Jsonnet. Setiap aplikasi didefinisikan sebagai \textit{Application} Custom Resource Definition (CRD) yang mereferensikan sumber manifest di Git dan destination di klaster.
+\citet{paavola2021managing} membandingkan ArgoCD dan FluxCD untuk pengelolaan multi-application pada Kubernetes dan menyimpulkan bahwa ArgoCD lebih cocok untuk skenario multi-application karena dukungan UI dan integrasi yang lebih baik. \citet{damore2021gitops} mengimplementasikan ArgoCD untuk \textit{continuous deployment} pada lingkungan \textit{hybrid cloud}, namun tidak membahas evaluasi metrik kuantitatif secara eksplisit. \citet{matubber2025managing} mengukur \textit{reconciliation time}, \textit{scalability}, dan \textit{reliability} GitOps untuk infrastruktur K8s, termasuk \textit{self-healing} terhadap \textit{configuration drift}.
 
-\subsection{Pola App of Apps}
+Namun, seluruh penelitian di atas memiliki satu kelemahan bersama: tidak adanya studi kuasi-eksperimental yang secara sistematis membandingkan pendekatan GitOps (ArgoCD) dengan deployment manual pada metrik operasional yang terdefinisi secara eksplisit menggunakan protokol statistik yang jelas.
 
-\textit{Apps of Apps} adalah pola arsitektur di mana sebuah Application ArgoCD induk (\textit{parent}) mereferensikan direktori Git yang berisi manifest Application anak (\textit{child}). Ketika parent disinkronkan, ArgoCD membaca manifest anak dan secara otomatis membuat serta mengelola setiap child Application \citep{argocd2024, yuen2021gitops}. Pola ini menghasilkan hierarki yang memungkinkan: (1)~\textit{single entry point}, operator hanya mengelola satu Application induk untuk mengontrol seluruh stack; (2)~organisasi modular, Application anak dikelompokkan berdasarkan domain atau tanggung jawab; dan (3)~\textit{reusability}, struktur dapat digunakan sebagai template untuk lingkungan berbeda \citep{costea2022argocd}.
+\section{Metode Eksperimental pada Penelitian Sistem}
 
-\subsection{Sync Waves dan Dependency Ordering}
+Evaluasi empiris pada riset sistem dan infrastruktur sering menggunakan desain kuasi-eksperimen karena unit eksperimen (klaster, aplikasi, jaringan) tidak dapat dirandomisasi secara penuh. \citet{limoncelli2018} menjelaskan bahwa penelitian sistem harus membangun lingkungan yang dapat direproduksi, mengendalikan variabel pengganggu, dan mendefiniskan metrik yang jelas sebelum menyimpulkan hubungan kausal.
 
-\textit{Sync wave} adalah mekanisme ArgoCD untuk mengatur urutan deployment. Setiap Application dapat diberi anotasi \texttt{argocd.argoproj.io/sync-wave} dengan nilai numerik. ArgoCD menjamin bahwa semua Application pada wave $n$ telah selesai dan sehat sebelum Application pada wave $n+1$ dimulai \citep{argocd2024}. Mekanisme ini menyelesaikan masalah dependensi deployment yang tidak ditangani oleh Kubernetes sendiri: batas keamanan dapat di-deploy pada wave $-5$, ingress controller pada wave $-4$, manajer sertifikat pada wave $-2$, dan layanan aplikasi pada wave yang lebih tinggi.
+Dalam konteks Kubernetes, desain kuasi-eksperimen standar melibatkan: (1)~\textit{baseline measurement} pada keadaan bersih; (2)~\textit{treatment} berupa injeksi beban, kegagalan, atau drift; dan (3)~\textit{post-treatment measurement} untuk membandingkan perilaku sistem. Analisis data menggunakan uji statistik parametrik (\textit{t-test}) jika distribusi data normal, atau non-parametrik (\textit{Wilcoxon}, \textit{Mann--Whitney U}) jika tidak \citep{limoncelli2018}.
 
-\subsection{Self-Heal dan Drift Correction}
+Prinsip-prinsip rigor statistik yang harus diterapkan meliputi: (1)~pengulangan (\textit{replication}) untuk memastikan reliabilitas; (2)~kontrol variabel pengganggu (\textit{confounding variable control}) untuk menjaga validitas internal; dan (3)~ukuran efek (\textit{effect size}) untuk menilai signifikansi praktis di luar signifikansi statistik.
 
-Ketika \texttt{syncPolicy.automated.selfHeal} diaktifkan, ArgoCD secara kontinu membandingkan state aktual klaster dengan state yang diinginkan di Git. Jika terjadi deviasi --- misalnya, seorang operator mengubah ConfigMap langsung melalui \texttt{kubectl} --- ArgoCD mendeteksi penyimpangan ini dan secara otomatis mengembalikan konfigurasi ke state yang didefinisikan di Git. Mekanisme ini merupakan implementasi langsung dari prinsip keempat OpenGitOps: \textit{continuously reconciled} \citep{opengitops2021}.
+\section{InvenioRDM sebagai Beban Uji (Workload)}
 
-\subsection{AppProject dan Batas Keamanan}
+InvenioRDM adalah platform repositori data penelitian \textit{open-source} yang dikembangkan oleh CERN dan komunitas internasional, dirancang untuk memenuhi prinsip FAIR (\textit{Findable, Accessible, Interoperable, Reusable}) \citep{invenio2024}. Arsitektur InvenioRDM bersifat \textit{microservices} yang terdiri dari beberapa komponen: (1)~\textit{web application} berbasis Flask/Gunicorn, (2)~\textit{Celery workers} untuk pemrosesan asinkron, (3)~PostgreSQL untuk penyimpanan data, (4)~OpenSearch untuk \textit{indexing} dan pencarian, (5)~Redis sebagai \textit{cache} dan \textit{message broker}, serta (6)~MinIO/S3 untuk penyimpanan objek \citep{przerwa2025modern}.
 
-ArgoCD menyediakan \textit{AppProject} CRD untuk mengendalikan akses dan batas deployment. AppProject mendefinisikan repositori sumber yang diizinkan, namespace destinasi, dan jenis resource klaster yang dapat dibuat oleh Application dalam project tersebut \citep{argocd2024}. Dalam konteks pola App of Apps, AppProject berfungsi sebagai batas keamanan yang memastikan setiap Application hanya dapat mengakses sumber dan destinasi yang diizinkan, mencegah privilege escalation antar tim atau layanan.
+InvenioRDM dipilih sebagai beban uji karena memenuhi tiga kriteria kerja: (a)~kompleksitas dependensi yang memerlukan urutan deployment --- \textit{web} bergantung pada \textit{database}, \textit{cache}, dan \textit{search engine}; (b)~keberadaan komponen infrastruktur yang luas --- mencakup \textit{ingress}, TLS, \textit{secrets}, monitoring, \textit{backup}, dan kebijakan keamanan; dan (c)~ketersediaan sebagai platform \textit{open-source} yang dapat direproduksi \citep{chelakis2022creating, simko2016cern}. Dalam konteks penelitian ini, InvenioRDM berfungsi sebagai subjek uji (\textit{test subject}), bukan objek penelitian. Segala temuan dan metrik berlaku untuk workload secara umum, tidak terbatas pada InvenioRDM.
 
-\section{Pendekatan Deployment Alternatif}
+\section{Kesenjangan Penelitian \textit{(Research Gap)}}
 
-Beberapa pendekatan alternatif untuk deployment aplikasi multi-service pada Kubernetes layak dibandingkan dengan pola App of Apps.
+Berdasarkan tinjauan pustaka di atas, terdapat kesenjangan utama yang menjadi landasan penelitian ini:
 
-\subsection{Helm Umbrella Chart}
+\begin{enumerate}
+  \item \textbf{Kurangnya studi kuasi-eksperimental:} Sebagian besar penelitian GitOps bersifat descriptif, komparatif tanpa kontrol, atau fokus pada implementasi tanpa pengukuran metrik \citep{utami2021analysis, paavola2021managing, damore2021gitops}.
+  
+  \item \textbf{Metrik yang tidak terdefinisi secara operasional:} Penelitian sebelumnya sering mengandalkan metrik kualitatif atau komposit tanpa protokol pengukuran yang dapat direplikasi \citep{shrestha2024configuration, kaggantinataraja2025security}.
+  
+  \item \textbf{Tidak adanya analisis statistik formal:} Belum ditemukan penelitian yang menerapkan uji hipotesis (H0/H1), uji normalitas, dan ukuran efek pada pembandingan GitOps versus manual \citep{matubber2025managing}.
+  
+  \item \textbf{Absensi skenario drift terkontrol:} Hanya sedikit penelitian yang secara sengaja memasukkan \textit{configuration drift} sebagai variabel perlakuan (treatment) untuk mengukur kemampuan sistem dalam mendeteksi dan memulihkannya \citep{zhang2026configuration}.
+\end{enumerate}
 
-Helm mendukung \textit{umbrella chart} yang menginstal beberapa sub-chart sekaligus \citep{helm2024}. Pendekatan ini mengemas seluruh stack dalam satu chart tunggal, namun memiliki beberapa keterbatasan: (1)~tidak ada mekanisme bawaan untuk mengatur urutan antar sub-chart pada level runtime; (2)~perubahan pada satu sub-chart mengharuskan re-deploy seluruh umbrella chart; dan (3)~drift detection bergantung pada \texttt{helm diff} yang tidak kontinu \citep{yuen2021gitops}.
-
-\subsection{Kustomize Overlays}
-
-Kustomize menyediakan mekanisme overlay untuk mengkomposisi dan menyesuaikan manifest Kubernetes secara deklaratif \citep{kustomize2024}. Kustomize dapat digunakan bersama ArgoCD sebagai sumber manifest, namun sendirian tidak menyediakan mekanisme deployment ordering, drift detection, atau self-healing.
-
-\subsection{Deployment Manual/Click-ops}
-
-Pendekatan manual --- baik melalui \texttt{kubectl apply} atau pembuatan Application secara manual melalui ArgoCD UI --- merupakan baseline paling dasar. \citet{kaggantinataraja2025security} membandingkan pendekatan deklaratif (GitOps/ArgoCD) dengan imperatif (Jenkins/kubectl) dan menemukan bahwa pendekatan deklaratif menghasilkan drift correction yang lebih cepat, compliance rate yang lebih tinggi, dan paparan kerentanan yang lebih rendah. Pendekatan manual tidak memiliki versioning otomatis, drift detection, atau rollback yang terstandarisasi.
-
-\section{InvenioRDM sebagai Studi Kasus}
-
-InvenioRDM adalah platform repositori data penelitian open-source yang dikembangkan oleh CERN dan komunitas internasional, dirancang untuk memenuhi prinsip FAIR (\textit{Findable, Accessible, Interoperable, Reusable}) \citep{invenio2024}. Arsitektur InvenioRDM bersifat microservices yang terdiri dari beberapa komponen: (1)~\textit{web application} berbasis Flask/Gunicorn, (2)~\textit{Celery workers} untuk pemrosesan asinkron, (3)~PostgreSQL untuk penyimpanan data, (4)~OpenSearch untuk indexing dan pencarian, (5)~Redis sebagai cache dan message broker, serta (6)~MinIO/S3 untuk penyimpanan objek \citep{przerwa2025modern}.
-
-InvenioRDM dipilih sebagai studi kasus karena memenuhi tiga kriteria: (a)~kompleksitas dependensi yang memerlukan ordering --- web bergantung pada database, cache, dan search engine; (b)~keberadaan komponen infrastruktur yang luas --- mencakup ingress, TLS, secrets, monitoring, backup, dan kebijakan keamanan; dan (c)~ketersediaan sebagai platform open-source yang dapat direproduksi \citep{chelakis2022creating, simko2016cern}.
-
-Dalam implementasi NASI CUSTOM, dependensi InvenioRDM diwiring melalui \textit{ExternalName Service}: \texttt{invenio-postgresql} merujuk ke \texttt{postgres-rw.database.svc.cluster.local}, \texttt{invenio-redis} ke \texttt{redis-master.redis.svc.cluster.local}, dan \texttt{invenio-search} ke \texttt{opensearch-cluster-master.search.svc.cluster.local}. Pola ini memungkinkan InvenioRDM mengakses dependensi melalui nama layanan internal tanpa mengetahui lokasi fisik komponen, mendukung modularitas dan penggantian implementasi dependensi tanpa mengubah konfigurasi aplikasi.
-
-\section{Penelitian Terdahulu}
-
-Beberapa penelitian terkait telah dilakukan dalam konteks GitOps, ArgoCD, dan deployment Kubernetes. \citet{utami2021analysis} melakukan analisis perbandingan model deployment deklaratif pull-based (GitOps dengan ArgoCD) versus push-based pada Kubernetes, dan menemukan bahwa model pull-based lebih andal karena agen berjalan di dalam klaster dan tidak memerlukan kredensial eksternal. \citet{shrestha2024configuration} mengevaluasi GitOps versus Ansible untuk manajemen konfigurasi Kubernetes, khususnya pada aspek drift detection dan remedy time.
-
-\citet{paavola2021managing} membandingkan ArgoCD dan FluxCD untuk pengelolaan multi-application pada Kubernetes dan menyimpulkan bahwa ArgoCD lebih cocok untuk skenario multi-application karena dukungan UI dan integrasi yang lebih baik. \citet{damore2021gitops} mengimplementasikan ArgoCD untuk continuous deployment pada lingkungan hybrid cloud, namun tidak membahas pola App of Apps.
-
-\citet{matubber2025managing} mengukur reconciliation time, scalability, dan reliability GitOps untuk infrastruktur K8s, termasuk self-healing terhadap configuration drift. \citet{pohjola2025mitigating} mempelajari mitigasi drift pada sistem Infrastructure-as-Code, memberikan kerangka konseptual untuk memahami sumber dan dampak drift.
-
-Namun, dari seluruh penelitian di atas, belum ada yang secara khusus mengevaluasi pola ArgoCD App of Apps dengan metrik keandalan deployment (\textit{first-attempt success rate}), pemulihan drift (\textit{drift detection \& recovery time}), dan isolasi perubahan (\textit{blast radius}). Penelitian ini mengisi kesenjangan tersebut dengan memberikan evaluasi kuantitatif terhadap ketiga aspek tersebut.
+Penelitian ini mengisi kesenjangan tersebut dengan menerapkan studi kuasi-eksperimen yang terkontrol, menggunakan metrik terdefinisi secara operasional, dan menerapkan analisis statistik formal untuk membandingkan pendekatan GitOps (ArgoCD) dengan deployment manual (\texttt{kubectl}).

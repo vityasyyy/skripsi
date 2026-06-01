@@ -2,206 +2,317 @@
 
 \section{Deskripsi Umum Penelitian}
 
-Penelitian ini mengimplementasikan dan mengevaluasi NASI CUSTOM (\textit{Nested ArgoCD Service Integration -- Cascading Unified Service Template Orchestration \& Manifest}), sebuah pola ArgoCD App of Apps dengan sync waves untuk manajemen deployment GitOps pada klaster Kubernetes. InvenioRDM digunakan sebagai studi kasus multi-service yang memerlukan ordering dependensi. Evaluasi dilakukan dengan mengukur tiga metrik --- \textit{first-attempt success rate}, \textit{drift detection \& recovery time}, dan \textit{blast radius} --- dan membandingkannya dengan dua baseline: deployment manual/click-ops dan ArgoCD flat tanpa hierarki maupun sync waves.
+Penelitian ini mengevaluasi secara empiris dampak manajemen deployment berbasis GitOps menggunakan ArgoCD terhadap \textit{configuration drift} pada sebuah klaster Kubernetes. Evaluasi dilakukan dengan membandingkan dua lingkungan paralel: Lingkungan A (deployment manual menggunakan \texttt{kubectl}) dan Lingkungan B (deployment GitOps menggunakan ArgoCD). Pada kedua lingkungan, \textit{configuration drift} disuntikkan secara terkontrol melalui tujuh skenario yang dirancang untuk merepresentasikan kesalahan operasional yang umum terjadi. Hasil pengukuran terhadap empat metrik utama (konsistensi deployment, waktu pemulihan drift, jumlah intervensi manual, dan traceability) dianalisis menggunakan uji statistik untuk menguji hipotesis yang telah dirumuskan.
 
 \section{Metodologi}
 
-Metode penelitian yang digunakan adalah \textbf{Design Science Research (DSR)}. DSR dipilih karena penelitian ini membangun sebuah artefak (NASI CUSTOM) dan mengevaluasinya terhadap metrik yang terdefinisi untuk menghasilkan pengetahuan yang dapat digeneralisasi \citep{limoncelli2018}. Tahapan DSR dalam penelitian ini terdiri dari lima tahapan:
+Metode penelitian yang digunakan adalah \textbf{Studi Kuasi-Eksperimen} (\textit{Quasi-Experimental Study}). Desain ini dipilih karena subjek eksperimen (klaster Kubernetes dan workload InvenioRDM) tidak dapat dirandomisasi secara penuh, namun kondisi perlakuan (pendekatan deployment) dapat dikendalikan dan diacak urutannya untuk memitigasi efek urutan (\textit{order effect}).
+
+Tahapan kuasi-eksperimen dalam penelitian ini mengikuti rancangan \textit{pre-test -- treatment -- post-test}:
 
 \begin{enumerate}
-    \item \textbf{Tahap 1: Studi Literatur} --- Pengumpulan dan analisis literatur mengenai Kubernetes, GitOps, ArgoCD, pola App of Apps, configuration drift, serta arsitektur InvenioRDM.
-
-    \item \textbf{Tahap 2: Perancangan NASI CUSTOM} --- Perancangan arsitektur App of Apps, struktur direktori repositori Git, definisi sync wave, AppProject, dan mekanisme wiring dependensi melalui ExternalName Service.
-
-    \item \textbf{Tahap 3: Implementasi} --- Pembangunan repositori GitOps, konfigurasi 16+ ArgoCD Application, deployment InvenioRDM beserta seluruh komponen infrastruktur, serta konfigurasi baseline perbandingan (ArgoCD flat).
-
-    \item \textbf{Tahap 4: Pengujian Terukur} --- Pelaksanaan tiga eksperimen (E1, E2, E3) yang masing-masing diulang untuk reliabilitas.
-
-    \item \textbf{Tahap 5: Analisis dan Evaluasi} --- Interpretasi hasil eksperimen, perbandingan dengan baseline, dan pembahasan implikasi.
+    \item \textbf{Tahap 1: Persiapan Lingkungan} --- Pembangunan Lingkungan A (manual) dan Lingkungan B (GitOps) pada klaster Kubernetes yang identik. Konfigurasi klaster, versi ArgoCD, dan spesifikasi node disamakan untuk mengendalikan variabel pengganggu.
+    
+    \item \textbf{Tahap 2: Kalibrasi Baseline (O1)} --- Pengukuran \textit{baseline} pada keadaan bersih sebelum injeksi drift. Mencakup verifikasi status deployment, pengukuran awal konsistensi, dan pencatatan metrik lingkungan (penggunaan CPU/memori, latensi jaringan).
+    
+    \item \textbf{Tahap 3: Injeksi Drift (X)} --- Penyuntikan \textit{configuration drift} terkontrol pada kedua lingkungan menggunakan perintah identik (mis. \texttt{kubectl edit}, \texttt{kubectl scale}, \texttt{kubectl patch}).
+    
+    \item \textbf{Tahap 4: Pengukuran Pasca-Perlakuan (O2)} --- Pengumpulan data metrik pasca-injeksi, termasuk waktu deteksi, waktu pemulihan, jumlah intervensi manual yang diperlukan, dan skor traceability.
+    
+    \item \textbf{Tahap 5: Analisis Statistik} --- Penerapan uji Shapiro--Wilk, uji t berpasangan (\textit{paired t-test}) atau uji Wilcoxon, serta perhitungan ukuran efek untuk menguji H0 dan H1.
+    
+    \item \textbf{Tahap 6: Interpretasi dan Kesimpulan} --- Pembahasan hasil statistik dalam konteks literatur dan praktik operasional.
 \end{enumerate}
 
-% TODO: Ganti dengan diagram bagan alir metodologi.
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=0.8\textwidth]{figures/bagan-alir}
-%   \caption{Bagan Alir Metodologi Penelitian Design Science Research}
-%   \label{fig:bagan-alir}
-% \end{figure}
+\section{Definisi Variabel Penelitian}
 
-\section{Perancangan Sistem}
+\subsection{Variabel Independen (Variabel Bebas)}
 
-\subsection{Arsitektur NASI CUSTOM}
-
-Arsitektur NASI CUSTOM terdiri dari empat lapisan yang saling berinteraksi:
-
-\begin{itemize}
-    \item \textbf{Lapisan 1: Git Repository} --- \textit{Single source of truth} yang menyimpan seluruh manifest Kubernetes, ArgoCD Application, Helm values, dan konfigurasi SealedSecret dalam bentuk Infrastructure as Code. Repositori terstruktur dalam dua direktori utama: \texttt{argocd/} (definisi Application dan AppProject) dan \texttt{k8s/} (manifest infrastruktur dan aplikasi).
-
-    \item \textbf{Lapisan 2: ArgoCD App of Apps} --- Application induk (\texttt{argocd/root.yaml}) mereferensikan direktori \texttt{argocd/apps/} yang berisi 16+ Application anak. ArgoCD membaca direktori ini dan secara otomatis membuat serta mengelola setiap anak. Setiap anak memiliki anotasi sync wave yang menjamin urutan deployment.
-
-    \item \textbf{Lapisan 3: Kubernetes Cluster} --- Platform orkestrasi yang menjalankan seluruh komponen. AppProject \texttt{infra} mendefinisikan batas keamanan: repositori sumber yang diizinkan, namespace destinasi, dan resource yang dapat dibuat.
-
-    \item \textbf{Lapisan 4: InvenioRDM dan Infrastruktur} --- Kumpulan layanan yang terdiri dari komponen aplikasi (web, worker) dan komponen infrastruktur (PostgreSQL, OpenSearch, Redis, MinIO, Traefik, Cert-manager, Sealed Secrets, Cloudflare Tunnel, Velero, Monitoring, Security Policies).
-\end{itemize}
-
-% TODO: Ganti dengan diagram arsitektur sistem.
-% \begin{figure}[H]
-%   \centering
-%   \includegraphics[width=0.9\textwidth]{figures/arsitektur-nasi-custom}
-%   \caption{Diagram Arsitektur NASI CUSTOM}
-%   \label{fig:arsitektur}
-% \end{figure}
-
-\subsection{Sync Wave dan Urutan Deployment}
-
-Tabel \ref{tab:syncwave} menunjukkan urutan deployment dalam NASI CUSTOM berdasarkan anotasi sync wave. ArgoCD menjamin bahwa semua Application pada wave $n$ telah sehat sebelum Application pada wave $n+1$ dimulai.
-
-\begin{table}[H]
-  \centering
-  \caption{Urutan Sync Wave NASI CUSTOM}
-  \label{tab:syncwave}
-  \begin{tabular}{|c|l|l|}
-    \hline
-    \textbf{Wave} & \textbf{Application} & \textbf{Tujuan} \\
-    \hline
-    $-5$ & security-policies & Batas keamanan, NetworkPolicy, ResourceQuota \\
-    \hline
-    $-4$ & traefik, cloudflared & Ingress controller + tunnel jaringan \\
-    \hline
-    $-3$ & sealed-secrets, argocd-self & Enkripsi secret + manajemen ArgoCD \\
-    \hline
-    $-2$ & cert-manager & Manajemen sertifikat TLS \\
-    \hline
-    2 & velero & Pencadangan klaster \\
-    \hline
-    5 & monitoring & Prometheus + Grafana \\
-    \hline
-    7 & invenio-bootstrap & Layanan InvenioRDM (web, worker, setup) \\
-    \hline
-    8 & invenio-opensearch, invenio-postgresql, invenio-redis & Dependensi database \\
-    \hline
-  \end{tabular}
-\end{table}
-
-\subsection{Wiring Dependensi melalui ExternalName Service}
-
-InvenioRDM mengakses dependensi melalui ExternalName Service yang berfungsi sebagai abstraksi. Tabel \ref{tab:externalname} menunjukkan pemetaan layanan internal ke layanan fisik.
-
-\begin{table}[H]
-  \centering
-  \caption{Pemetaan ExternalName Service pada InvenioRDM}
-  \label{tab:externalname}
-  \begin{tabular}{|l|l|l|}
-    \hline
-    \textbf{Layanan Internal} & \textbf{ExternalName} & \textbf{Namespace} \\
-    \hline
-    invenio-postgresql & postgres-rw.database.svc.cluster.local & database \\
-    \hline
-    invenio-redis & redis-master.redis.svc.cluster.local & redis \\
-    \hline
-    invenio-search & opensearch-cluster-master.search.svc.cluster.local & search \\
-    \hline
-  \end{tabular}
-\end{table}
-
-Pola ini memungkinkan substitusi implementasi dependensi tanpa mengubah konfigurasi aplikasi InvenioRDM.
-
-\section{Lingkungan Pengembangan}
-
-Lingkungan pengembangan yang digunakan dalam penelitian ini adalah:
-
-\begin{itemize}
-    \item \textbf{Sistem Operasi:} macOS (workstation), Ubuntu 22.04 LTS (node klaster).
-    \item \textbf{Kubernetes:} Rancher-managed cluster, K8s v1.29+.
-    \item \textbf{ArgoCD:} v2.12+.
-    \item \textbf{GitOps Repository:} GitHub (\texttt{invenio-rdm-gitops}).
-    \item \textbf{Package Manager:} Helm v3.14+, Kustomize.
-    \item \textbf{Container Runtime:} containerd.
-    \item \textbf{Secret Management:} Sealed Secrets v0.27+.
-    \item \textbf{Ingress:} Traefik Helm chart.
-    \item \textbf{Monitoring:} kube-prometheus-stack v69.6.0.
-    \item \textbf{InvenioRDM:} v12.x (custom image dari GHCR).
-\end{itemize}
-
-\section{Metode Pengujian}
-
-Pengujian dilakukan melalui tiga eksperimen yang masing-masing mengukur satu metrik utama. Setiap eksperimen diulang 5 kali untuk memastikan reliabilitas hasil.
-
-\subsection{E1: First-Attempt Success Rate}
-
-\begin{table}[H]
-  \centering
-  \caption{Desain Eksperimen E1 --- First-Attempt Success Rate}
-  \label{tab:e1}
-  \begin{tabular}{|l|p{10cm}|}
-    \hline
-    \textbf{Parameter} & \textbf{Deskripsi} \\
-    \hline
-    Metrik & Persentase deployment yang berhasil tanpa intervensi manual \\
-    \hline
-    Cara Ukur & Deploy dari awal (hapus semua Application, re-sync) 5 kali per pendekatan; hitung jumlah keberhasilan dibagi total percobaan \\
-    \hline
-    Pendekatan & (a) Manual/click-ops, (b) ArgoCD flat (tanpa hierarki, tanpa sync wave), (c) NASI CUSTOM \\
-    \hline
-    Kriteria Sukses & Seluruh Application menunjukkan status \texttt{Healthy} dan \texttt{Synced}; tidak diperlukan \texttt{argocd app sync} manual, \texttt{kubectl rollout restart}, atau perbaikan konfigurasi \\
-    \hline
-    Kriteria Gagal & Setiap intervensi manual setelah sync awal dianggap kegagalan \\
-    \hline
-  \end{tabular}
-\end{table}
-
-\subsection{E2: Drift Detection \& Recovery Time}
-
-\begin{table}[H]
-  \centering
-  \caption{Desain Eksperimen E2 --- Drift Detection \& Recovery Time}
-  \label{tab:e2}
-  \begin{tabular}{|l|p{10cm}|}
-    \hline
-    \textbf{Parameter} & \textbf{Deskripsi} \\
-    \hline
-    Metrik & Waktu (detik) dari drift terjadi hingga ArgoCD mendeteksi + waktu dari deteksi hingga konfigurasi dipulihkan \\
-    \hline
-    Cara Ukur & Introduce drift secara deliberat (edit ConfigMap atau Deployment melalui \texttt{kubectl} langsung, bypass Git); catat timestamp $t_0$ (drift dibuat), $t_1$ (ArgoCD mendeteksi via \texttt{argocd app diff}), $t_2$ (ArgoCD selesai memulihkan via \texttt{selfHeal}) \\
-    \hline
-    Pendekatan & (a) ArgoCD flat (dengan selfHeal), (b) NASI CUSTOM (dengan selfHeal) \\
-    \hline
-    Jenis Drift & Perubahan isi ConfigMap, perubahan replika Deployment, perubahan image tag \\
-    \hline
-    Pengulangan & 3 jenis drift $\times$ 5 pengulangan = 15 pengukuran per pendekatan \\
-    \hline
-  \end{tabular}
-\end{table}
-
-\subsection{E3: Blast Radius / Isolation}
-
-\begin{table}[H]
-  \centering
-  \caption{Desain Eksperimen E3 --- Blast Radius / Isolation}
-  \label{tab:e3}
-  \begin{tabular}{|l|p{10cm}|}
-    \hline
-    \textbf{Parameter} & \textbf{Deskripsi} \\
-    \hline
-    Metrik & Jumlah Application yang melakukan re-sync ketika satu Application berubah \\
-    \hline
-    Cara Ukur & Ubah satu parameter pada Git (misal: image tag InvenioRDM); amati berapa Application lain yang menunjukkan aktivitas \texttt{status.operationState} setelah perubahan \\
-    \hline
-    Pendekatan & (a) ArgoCD flat, (b) NASI CUSTOM \\
-    \hline
-    Hasil Diharapkan & NASI CUSTOM: hanya 1--2 Application re-sync (yang berubah + parent). ArgoCD flat: berpotensi lebih banyak karena shared source path \\
-    \hline
-    Pengulangan & 5 perubahan berbeda pada 5 Application berbeda per pendekatan \\
-    \hline
-  \end{tabular}
-\end{table}
-
-\subsection{Baseline Perbandingan}
-
-Untuk eksperimen E1, E2, dan E3, dua baseline digunakan:
+Variabel independen adalah pendekatan manajemen deployment dengan dua level:
 
 \begin{enumerate}
-    \item \textbf{Manual/click-ops:} Deployment dilakukan melalui \texttt{kubectl apply} satu per satu atau pembuatan Application melalui ArgoCD UI tanpa automasi. Baseline ini hanya relevan untuk E1 karena tidak memiliki mekanisme drift detection atau blast radius yang terukur.
+    \item \textbf{Lingkungan A --- Deployment Manual:} Deployment dan modifikasi dilakukan langsung pada klaster menggunakan \texttt{kubectl apply}, \texttt{kubectl edit}, \texttt{kubectl scale}, dan perintah imperatif lainnya tanpa repositori Git sebagai sumber kebenaran.
+    
+    \item \textbf{Lingkungan B --- Deployment GitOps (ArgoCD):} Deployment dikelola secara deklaratif melalui repositori Git; ArgoCD berjalan di dalam klaster sebagai agen rekonsiliasi yang secara kontinu menyelaraskan \textit{state} klaster dengan \textit{state} di Git.
+\end{enumerate}
 
-    \item \textbf{ArgoCD flat:} 16+ Application didefinisikan secara independen tanpa parent Application, tanpa hierarki, dan tanpa anotasi sync wave. Semua Application disimpan dalam satu direktori yang sama. Baseline ini mengisolasi pengaruh hierarki dan ordering terhadap metrik yang diukur.
+\subsection{Variabel Dependen (Variabel Terikat)}
+
+Empat metrik utama diukur sebagai variabel dependen:
+
+\subsubsection{Metrik R1: Konsistensi Deployment}
+\textbf{Definisi:} Persentase sumber daya klaster (\textit{Pod}, \textit{Deployment}, \textit{ConfigMap}, \textit{Service}) yang cocok dengan \textit{desired declarative state} setelah skenario drift.
+
+\textbf{Cara Ukur:}
+\[
+\text{Konsistensi (\%)} = \frac{\text{Jumlah sumber daya dengan status Healthy/Synced}}{\text{Total sumber daya yang diharapkan}} \times 100
+\]
+
+Untuk Lingkungan B, status diambil dari ArgoCD Application status. Untuk Lingkungan A, status diverifikasi menggunakan \texttt{kubectl get} dan \texttt{kubectl describe}. Konsistensi diukur pada $t_0$ (sebelum drift), $t_1$ (sebelum pemulihan), dan $t_2$ (setelah pemulihan).
+
+\subsubsection{Metrik R2: Waktu Deteksi dan Pemulihan Drift}
+\textbf{Definisi:} Waktu (dalam detik) mulai dari injeksi drift hingga drift terdeteksi dan dikoreksi.
+
+\begin{itemize}
+    \item \textbf{Waktu Deteksi ($t_d - t_0$):} Untuk Lingkungan B, waktu dari injeksi drift hingga ArgoCD menunjukkan status \textit{OutOfSync} pada aplikasi yang terkena drift (dipantau menggunakan \texttt{argocd app get} dan log ArgoCD). Untuk Lingkungan A, waktu hingga operator --- tanpa prompt otomatis --- secara manual mendeteksi deviasi melalui \texttt{kubectl get} atau monitoring.
+    
+    \item \textbf{Waktu Pemulihan ($t_2 - t_0$):} Untuk Lingkungan B, waktu dari injeksi drift hingga ArgoCD menyelesaikan rekonsiliasi otomatis (\textit{self-heal}) dan menunjukkan status \textit{Synced/Healthy}. Untuk Lingkungan A, waktu dari injeksi drift hingga operator menyelesaikan seluruh perintah \texttt{kubectl} manual yang diperlukan untuk mengembalikan \textit{state} ke baseline.
+\end{itemize}
+
+\textbf{Pengulangan:} Setiap skenario diulang \textbf{n = 10} kali per lingkungan untuk menghasilkan distribusi waktu yang memadai untuk analisis statistik.
+
+\subsubsection{Metrik R3: Jumlah Intervensi Manual}
+\textbf{Definisi:} Jumlah tindakan korektif manual yang diperlukan untuk memulihkan \textit{state} klaster setelah insiden drift.
+
+\textbf{Cara Ukur:} Setiap perintah \texttt{kubectl} (\texttt{edit}, \texttt{patch}, \texttt{scale}, \texttt{rollout restart}, \texttt{delete}, \texttt{apply}) yang dieksekusi oleh operator pada Lingkungan A dihitung sebagai satu intervensi. Pada Lingkungan B, catat jumlah intervensi manual tambahan yang diperlukan ketika \textit{self-heal} gagal atau tidak berjalan otomatis.
+
+\textbf{Perihal Lingkungan B:} Untuk eksperimen R3, \textit{self-heal} dinonaktifkan sementara agar operator harus memulihkan secara manual; hal ini memungkinkan perbandingan jumlah intervensi yang setara. Eksperimen terpisah dilakukan dengan \textit{self-heal} aktif untuk mengukur \textit{fully automated recovery}.
+
+\subsubsection{Metrik R4: Jejak Audit Operasional (Traceability)}
+\textbf{Definisi:} Kemampuan untuk merekonstruksi siapa yang mengubah \textit{state}, apa yang berubah, kapan perubahan terjadi, dan bagaimana pemulihan dilakukan.
+
+\textbf{Cara Ukur (Rubric 1--5):}
+\begin{enumerate}
+    \item \textbf{Skor 1:} Tidak ada jejak yang dapat direkonstruksi.
+    \item \textbf{Skor 2:} Hanya sebagian kecil jejak tersedia; mis. terdeteksi bahwa drift pernah terjadi, namun tidak jelas \textit{who/what/when/how}.
+    \item \textbf{Skor 3:} Dua atau lebih aspek dapat diidentifikasi (mis. \textit{what} dan \textit{when}), namun satu atau lebih aspek tidak dapat dipastikan.
+    \item \textbf{Skor 4:} Tiga aspek dapat diidentifikasi dengan tingkat keyakinan tinggi.
+    \item \textbf{Skor 5:} Seluruh aspek (who, what, when, how) dapat direkonstruksi dengan bukti kuat dari log atau Git history.
+\end{enumerate}
+
+\textbf{MTTI (Mean Time To Identify Drift):} Waktu rata-rata dari injeksi drift hingga drift teridentifikasi dan terdokumentasikan. Lingkungan B: didasarkan pada notifikasi ArgoCD atau log \textit{controller}. Lingkungan A: didasarkan pada Kubernetes audit logs dan waktu \texttt{kubectl get} pertama yang mengungkapkan drift.
+
+\textbf{Kelengkapan Audit Log:} Persentase perubahan yang dapat direkonstruksi dari Git \textit{commit history} (Lingkungan B) dibandingkan dengan Kubernetes audit logs (Lingkungan A).
+
+\section{Lingkungan Eksperimen}
+
+\subsection{Klaster Kubernetes}
+
+Penelitian menggunakan klaster Kubernetes yang dikelola Rancher dengan spesifikasi hardware sebagai berikut:
+
+\begin{itemize}
+    \item \textbf{Jumlah Node:} 3 node
+    \item \textbf{Total CPU:} 24 inti
+    \item \textbf{Total Memori:} $\sim$23 Gi
+    \item \textbf{Versi Kubernetes:} v1.29+
+    \item \textbf{\textit{Container Runtime}:} containerd
+    \item \textbf{Sistem Operasi Node:} Ubuntu 22.04 LTS
+\end{itemize}
+
+\subsection{ArgoCD (Lingkungan B)}
+
+\begin{itemize}
+    \item \textbf{Versi ArgoCD:} v2.12+
+    \item \textbf{Konfigurasi \textit{Sync}:} \textit{Auto-sync} diaktifkan untuk eksperimen R2 (pemulihan otomatis), dimatikan untuk eksperimen R3 (intervensi manual). Interval sinkronisasi ditetapkan pada 60 detik untuk konsistensi waktu deteksi.
+    \item \textbf{Konfigurasi \textit{Self-Heal}:} Diaktifkan pada eksperimen R2; dinonaktifkan pada eksperimen R3.
+    \item \textbf{Konfigurasi \textit{Prune}:} \textit{Pruning} diaktifkan agar sumber daya yang dihapus secara manual (Skenario D) dapat dideteksi dan diciptakan kembali oleh ArgoCD.
+\end{itemize}
+
+\subsection{Beban Uji (Workload)}
+
+Deployment InvenioRDM dengan 16+ komponen: \textit{web}, \textit{worker}, PostgreSQL, OpenSearch, Redis, MinIO, Traefik, Cert-manager, Sealed Secrets, monitoring, \textit{backup}, dan kebijakan keamanan. Komponen InvenioRDM sebagai aplikasi (fitur, antarmuka, logika bisnis) bukan variabel penelitian --- InvenioRDM merupakan subjek uji, bukan objek penelitian.
+
+\subsection{Kontrol Variabel Pengganggu}
+
+Agar validitas internal tetap tinggi, variabel berikut dikendalikan secara sistematis:
+
+\begin{enumerate}
+    \item \textbf{Interval Sinkronisasi ArgoCD:} Ditetapkan pada 60 detik (bukan default 180 detik) agar waktu deteksi konsisten.
+    
+    \item \textbf{Tekanan Sumber Daya Node:} Rekam penggunaan CPU/memori klaster sebelum setiap pengujian. Hanya jalankan eksperimen jika node berada di bawah 70\% kapasitas.
+    
+    \item \textbf{Latensi Jaringan:} Gunakan klaster \textit{on-premise} dengan latensi stabil. Catat RTT antar-node.
+    
+    \item \textbf{Waktu Injeksi Drift:} Injeksi selalu dilakukan pada interval sinkronisasi ArgoCD untuk menghindari \textit{edge case} waktu tunggu yang tidak dapat diprediksi.
+    
+    \item \textbf{Versi ArgoCD:} Gunakan satu versi ArgoCD (v2.12+) sepanjang eksperimen.
+\end{enumerate}
+
+\section{Matriks Eksperimen}
+
+Tabel \ref{tab:matriks-eksperimen} menunjukkan rancangan eksperimental secara keseluruhan.
+
+\begin{table}[H]
+  \centering
+  \caption{Matriks Eksperimen}
+  \label{tab:matriks-eksperimen}
+  \begin{tabular}{|p{2.5cm}|p{5cm}|p{5cm}|}
+    \hline
+    \textbf{Dimensi} & \textbf{Lingkungan A (Manual)} & \textbf{Lingkungan B (GitOps)} \\
+    \hline
+    \textbf{Perlakuan} & \texttt{kubectl} imperatif & ArgoCD deklaratif + Git \\
+    \hline
+    \textbf{Skenario Drift} & A, B, C, D, E, F, G & A, B, C, D, E, F, G \\
+    \hline
+    \textbf{Pengulangan} & n = 5 per skenario (R1, R3, R4); n = 10 per skenario (R2) & n = 5 per skenario (R1, R3, R4); n = 10 per skenario (R2) \\
+    \hline
+    \textbf{Metrik} & R1, R2, R3, R4 & R1, R2, R3, R4 \\
+    \hline
+    \textbf{Baseline} & \texttt{kubectl get} semua sumber daya sebelum drift & ArgoCD \textit{App status} sebelum drift \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\section{Skenario Drift Terkontrol}
+
+Tujuh skenario drift dirancang untuk merepresentasikan kesalahan operasional yang umum. Setiap skenario dieksekusi secara identik pada kedua lingkungan. Untuk Lingkungan A, operator kemudian memulihkan secara manual. Untuk Lingkungan B, ArgoCD secara otomatis mendeteksi dan memulihkan (pada eksperimen R2 dengan \textit{self-heal} aktif).
+
+\subsection{Skenario A --- Perubahan Replika (Replica Drift)}
+Secara manual mengubah jumlah replika Deployment menggunakan \texttt{kubectl scale deployment/nama-deployment --replicas=5} ketika \textit{desired} adalah 3. Perubahan ini melewati Git pada Lingkungan B.
+
+\subsection{Skenario B --- Perubahan Image (Image Drift)}
+Secara manual mengganti versi image kontainer pada Deployment menggunakan \texttt{kubectl edit deployment/nama-deployment} dan mengubah kolom \texttt{image} ke versi yang berbeda.
+
+\subsection{Skenario C --- Perubahan ConfigMap (ConfigMap Drift)}
+Mengubah isi ConfigMap langsung di dalam klaster menggunakan \texttt{kubectl edit configmap/nama-configmap}. Memodifikasi parameter konfigurasi seperti \texttt{DATABASE\_URL} atau \texttt{LOG\_LEVEL}.
+
+\subsection{Skenario D --- Penghapusan Sumber Daya (Resource Deletion)}
+Menghapus Deployment atau Service secara manual menggunakan \texttt{kubectl delete deployment/nama-deployment}. Untuk Lingkungan B, ArgoCD dengan \textit{prune} aktif akan mendeteksi sumber daya yang hilang dan menciptakan ulang dari manifest Git.
+
+\subsection{Skenario E --- Patch Manual Tidak Sah (Unauthorized Manual Patch)}
+Menerapkan \texttt{kubectl patch} langsung terhadap sumber daya yang dikelola, mis. mengubah \textit{resource limits} pada sebuah Pod menggunakan patch JSON.
+
+\subsection{Skenario F --- Drift Lintas Namespace (Cross-namespace Drift)}
+Menerapkan sumber daya ke namespace yang salah secara manual. Mengukur apakah GitOps membatasi propagasi atau mendeteksi kesalahan namespace secara otomatis. Contoh: \texttt{kubectl apply -f deployment.yaml --namespace=wrong-namespace}.
+
+\subsection{Skenario G --- Perubahan Secret (Secret Drift)}
+Mengubah secret secara manual di luar Git. Skenario ini sangat umum dalam praktik produksi. Contoh: \verb|kubectl patch secret my-secret --patch={\"data\":{\"password\":\"<new-base64>\"}}|.
+
+\section{Protokol Pengukuran}
+
+\subsection{Protokol Pengukuran Baseline (O1)}
+Sebelum setiap pengujian:
+\begin{enumerate}
+  \item Verifikasi semua \textit{pod} dalam status \textit{Running} dan \textit{healthy}.
+  \item Catat \textit{timestamp} awal.
+  \item Catat penggunaan CPU/memori node (untuk kontrol variabel).
+  \item Simpan output \texttt{kubectl get all -n \u003cnamespace\u003e} (Lingkungan A) atau \texttt{argocd app list} (Lingkungan B) sebagai baseline.
+\end{enumerate}
+
+\subsection{Protokol Injeksi Drift (X)}
+\begin{enumerate}
+  \item Pilih skenario secara acak dari daftar {A, B, C, D, E, F, G} untuk menghindari efek urutan.
+  \item Eksekusi perintah injeksi drift pada kedua lingkungan secara paralel atau berurutan dengan jeda tetap (5 menit).
+  \item Catat \textit{timestamp} $t_0$ (waktu eksekusi perintah injeksi).
+\end{enumerate}
+
+\subsection{Protokol Pengukuran Pasca-Injeksi (O2)}
+\begin{enumerate}
+  \item \textbf{Untuk Lingkungan B (GitOps):} Pantau status ArgoCD menggunakan \texttt{argocd app get} setiap 5 detik. Catat: (a) waktu ArgoCD menunjukkan \textit{OutOfSync} (deteksi); (b) waktu ArgoCD menunjukkan \textit{Synced} setelah \textit{auto-heal} (pemulihan). Hitung $t_d - t_0$ (waktu deteksi) dan $t_2 - t_0$ (waktu pemulihan total).
+  
+  \item \textbf{Untuk Lingkungan A (Manual):} Operator melakukan pemantauan manual menggunakan \texttt{kubectl get} dan \texttt{kubectl describe}. Catat waktu eksekusi setiap perintah korektif. Hitung $t_2 - t_0$ (waktu total hingga \textit{state} kembali ke baseline).
+  
+  \item Catat jumlah perintah \texttt{kubectl} yang diperlukan (R3).
+  
+  \item Dokumentasikan traceability: lengkapi rubrik skor 1--5 berdasarkan log yang tersedia (Git history untuk Lingkungan B; Kubernetes audit logs untuk Lingkungan A).
+\end{enumerate}
+
+\section{Metode Pengujian (Eksperimen E1 s.d. E4)}
+
+\subsection{E1: Konsistensi Deployment (R1)}
+
+\begin{table}[H]
+  \centering
+  \caption{Desain Eksperimen E1 --- Konsistensi Deployment}
+  \label{tab:e1}
+  \begin{tabular}{|l|p{9cm}|}
+    \hline
+    \textbf{Parameter} & \textbf{Deskripsi} \\
+    \hline
+    Metrik & Persentase sumber daya yang cocok dengan \textit{desired declarative state} \\
+    \hline
+    Cara Ukur & Hitung jumlah sumber daya Healthy/Synced dibagi total \textit{expected resources} \\
+    \hline
+    Pendekatan & (a) Manual/\texttt{kubectl}, (b) GitOps/ArgoCD \\
+    \hline
+    Pengulangan & n = 5 per skenario per lingkungan \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{E2: Waktu Deteksi dan Pemulihan Drift (R2)}
+
+\begin{table}[H]
+  \centering
+  \caption{Desain Eksperimen E2 --- Waktu Deteksi dan Pemulihan Drift}
+  \label{tab:e2}
+  \begin{tabular}{|l|p{9cm}|}
+    \hline
+    \textbf{Parameter} & \textbf{Deskripsi} \\
+    \hline
+    Metrik & Waktu (detik) dari drift terjadi hingga terdeteksi (Lingkungan B) atau dipulihkan (kedua lingkungan) \\
+    \hline
+    Cara Ukur & Lingkungan B: pantau status ArgoCD setiap 5 detik; Lingkungan A: catat setiap perintah \texttt{kubectl} manual \\
+    \hline
+    Pendekatan & (a) Manual/\texttt{kubectl}, (b) GitOps/ArgoCD (dengan \textit{self-heal} aktif) \\
+    \hline
+    Pengulangan & n = 10 per skenario per lingkungan \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{E3: Jumlah Intervensi Manual (R3)}
+
+\begin{table}[H]
+  \centering
+  \caption{Desain Eksperimen E3 --- Jumlah Intervensi Manual}
+  \label{tab:e3}
+  \begin{tabular}{|l|p{9cm}|}
+    \hline
+    \textbf{Parameter} & \textbf{Deskripsi} \\
+    \hline
+    Metrik & Jumlah tindakan korektif manual yang diperlukan \\
+    \hline
+    Cara Ukur & Hitung setiap perintah \texttt{kubectl} (edit, patch, scale, rollout restart, delete, apply) \\
+    \hline
+    Pendekatan & (a) Manual/\texttt{kubectl} (tanpa bantuan otomatis), (b) GitOps/ArgoCD (dengan \textit{self-heal} dimatikan) \\
+    \hline
+    Pengulangan & n = 5 per skenario per lingkungan \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{E4: Jejak Audit Operasional (R4)}
+
+\begin{table}[H]
+  \centering
+  \caption{Desain Eksperimen E4 --- Jejak Audit Operasional (Traceability)}
+  \label{tab:e4}
+  \begin{tabular}{|l|p{9cm}|}
+    \hline
+    \textbf{Parameter} & \textbf{Deskripsi} \\
+    \hline
+    Metrik & Skor rubrik 1--5 (\textit{who/what/when/how}) dan MTTI (detik) \\
+    \hline
+    Cara Ukur & Lingkungan B: Git commit history + ArgoCD notifications; Lingkungan A: Kubernetes audit logs + \texttt{kubectl} timestamps \\
+    \hline
+    Pendekatan & (a) Manual/\texttt{kubectl}, (b) GitOps/ArgoCD \\
+    \hline
+    Pengulangan & n = 5 per skenario per lingkungan \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\section{Analisis Statistik}
+
+Setelah pengumpulan data selesai, analisis statistik dilakukan dengan langkah berikut:
+
+\begin{enumerate}
+    \item \textbf{Uji Normalitas:} Terapkan \textit{Shapiro--Wilk test} pada setiap metrik untuk menentukan apakah data berdistribusi normal.
+    
+    \item \textbf{Uji Hipotesis:}
+    \begin{itemize}
+        \item Jika data normal: gunakan \textit{paired t-test} untuk membandingkan rata-rata metrik antara Lingkungan A dan Lingkungan B.
+        \item Jika data tidak normal: gunakan \textit{Wilcoxon signed-rank test} (non-parametrik).
+    \end{itemize}
+    
+    \item \textbf{Tingkat Signifikansi:} Gunakan $\alpha = 0,05$. Jika $p < 0,05$, tolak H$_0$ dan terima H$_1$.
+    
+    \item \textbf{Ukuran Efek:}
+    \begin{itemize}
+        \item Untuk \textit{paired t-test}: hitung \textit{Cohen's d} untuk menilai signifikansi praktis.
+        \item Untuk \textit{Wilcoxon}: hitung \textit{Cliff's delta} untuk menilai signifikansi praktis.
+    \end{itemize}
+    
+    \item \textbf{Interpretasi:} Jika perbedaan signifikan secara statistik ($p < 0,05$) dan ukuran efek besar ($|d| > 0,8$ atau $|\delta| > 0,474$), maka H$_1$ didukung kuat. Jika perbedaan tidak signifikan, H$_0$ gagal ditolak.
 \end{enumerate}
