@@ -10,7 +10,7 @@ Penelitian empiris oleh \citet{zhang2026configuration} melakukan studi terhadap 
 
 \subsection{Faktor yang Menimbulkan Configuration Drift}
 
-Berdasarkan literatur, faktor-faktor utama yang memperburuk \textit{configuration drift} pada Kubernetes meliputi:
+Berdasarkan literatur, faktor-faktur utama yang memperburuk \textit{configuration drift} pada Kubernetes meliputi:
 
 \begin{enumerate}
   \item \textbf{Perubahan langsung pada klaster:} Penggunaan \texttt{kubectl edit}, \texttt{kubectl patch}, atau \texttt{kubectl scale} secara langsung tanpa memperbarui repositori sumber kebenaran \citep{zhang2026configuration}.
@@ -22,25 +22,60 @@ Berdasarkan literatur, faktor-faktor utama yang memperburuk \textit{configuratio
   \item \textbf{Absensi deteksi drift otomatis:} Tanpa pengecekan berkala antara \textit{state} aktual dan \textit{desired state}, drift dapat terakumulasi selama periode lama tanpa terdeteksi \citep{zhang2026configuration}.
 \end{enumerate}
 
+\section{Dasar Teori: Rekonsiliasi dan Konvergensi pada Sistem Deklaratif}
+
+Keunggulan GitOps atas pendekatan imperatif dapat dijelaskan melalui dua prinsip teoretis yang saling berkaitan.
+
+\subsection{Konvergensi Menuju Desired State}
+
+Dalam teori sistem, sistem deklaratif yang menyimpan \textit{desired state} dan secara kontinu berupaya mencapainya dikatakan bersifat \textit{convergent} \citep{limoncelli2018}. ArgoCD mengimplementasikan prinsip ini melalui \textit{reconciliation loop}: sebuah \textit{negative feedback controller} yang secara periodik (1)~membaca \textit{desired state} dari repositori Git, (2)~membandingkannya dengan \textit{state} aktual di klaster, dan (3)~melakukan tindakan korektif jika terdapat deviasi \citep{argocd2024}. Mekanisme ini menjamin bahwa setiap deviasi (\textit{drift}) bersifat \textit{transien} --- sistem secara otomatis kembali ke \textit{desired state} tanpa memerlukan intervensi manusia, sepanjang \textit{self-heal} diaktifkan.
+
+Sebaliknya, pendekatan manual/imperatif tidak memiliki \textit{feedback loop} bawaan. Setiap deviasi bersifat \textit{persisten} sampai operator secara manual mendeteksi dan mengoreksinya. Tanpa mekanisme otomatis, interval antara drift dan pemulihan bergantung sepenuhnya pada kewaspadaan dan ketersediaan operator, yang bervariasi secara tidak deterministik \citep{pohjola2025mitigating}.
+
+\subsection{Audit Trail sebagai Kontrol Sosial}
+
+GitOps memanfaatkan Git sebagai \textit{append-only log} yang merekam setiap perubahan konfigurasi beserta metadata (penulis, waktu, pesan commit). Prinsip keempat OpenGitOps --- \textit{continuous reconciliation} --- bergantung pada kemampuan Git untuk merekonstruksi keputusan konfigurasi secara retroaktif \citep{opengitops2021}. Hal ini tidak hanya meningkatkan \textit{traceability}, tetapi juga berfungsi sebagai \textit{social control mechanism}: setiap perubahan tunduk pada \textit{code review}, sehingga mengurangi kemungkinan perubahan yang tidak terverifikasi masuk ke produksi.
+
 \section{Evaluasi Empiris GitOps dan ArgoCD}
 
 GitOps adalah paradigma untuk mengelola infrastruktur dan aplikasi yang menggunakan repositori Git sebagai \textit{single source of truth}. CNCF GitOps Working Group mendefinisikan empat prinsip OpenGitOps: (1)~sistem dideklarasikan secara deklaratif; (2)~\textit{state} sistem yang diinginkan tersimpan dan berversi dalam Git; (3)~perubahan \textit{state} ditarik (\textit{pulled}) secara otomatis oleh agen software; dan (4)~agen software secara kontinu mendeteksi dan mengoreksi deviasi dari \textit{state} yang diinginkan \citep{opengitops2021}.
 
 Keunggulan GitOps dibandingkan deployment imperatif tradisional meliputi: \textit{audit trail} lengkap melalui Git history, penerapan \textit{code review} pada perubahan infrastruktur, \textit{rollback} yang sederhana melalui \texttt{git revert}, dan reprodusibilitas konfigurasi di berbagai lingkungan \citep{yuen2021gitops}. Dalam model \textit{pull-based} GitOps, agen yang berjalan di dalam klaster secara periodik membandingkan \textit{state} Git dengan \textit{state} klaster dan menyelaraskan keduanya, menghilangkan kebutuhan akan akses kredensial klaster dari luar \citep{utami2021analysis}.
 
-\citet{utami2021analysis} melakukan analisis perbandingan model deployment deklaratif \textit{pull-based} (GitOps dengan ArgoCD) versus \textit{push-based} pada Kubernetes, dan menemukan bahwa model \textit{pull-based} lebih andal karena agen berjalan di dalam klaster dan tidak memerlukan kredensial eksternal. \citet{shrestha2024configuration} mengevaluasi GitOps versus Ansible untuk manajemen konfigurasi Kubernetes, khususnya pada aspek \textit{drift detection} dan \textit{remedy time}. \citet{kaggantinataraja2025security} melakukan analisis berpusat keamanan terhadap pendekatan deklaratif (GitOps/ArgoCD) dan imperatif (Jenkins/\texttt{kubectl}), menemukan bahwa pendekatan deklaratif menghasilkan \textit{drift correction} yang lebih cepat, \textit{compliance rate} yang lebih tinggi, dan paparan kerentanan yang lebih rendah.
+\citet{utami2021analysis} melakukan analisis perbandingan model deployment deklaratif \textit{pull-based} (GitOps dengan ArgoCD) versus \textit{push-based} pada Kubernetes, dan menemukan bahwa model \textit{pull-based} lebih andal karena agen berjalan di dalam klaster dan tidak memerlukan kredensial eksternal. \citet{shrestha2024configuration} mengevaluasi GitOps versus Ansible untuk manajemen konfigurasi Kubernetes, khususnya pada aspek \textit{drift detection} dan \textit{remedy time}; namun, studi ini mengandalkan penilaian kualitatif untuk menilai tingkat keparahan drift alih-alih metrik kuantitatif yang dapat direplikasi. \citet{kaggantinataraja2025security} melakukan analisis berpusat keamanan terhadap pendekatan deklaratif (GitOps/ArgoCD) dan imperatif (Jenkins/\texttt{kubectl}), menemukan bahwa pendekatan deklaratif menghasilkan \textit{drift correction} yang lebih cepat, \textit{compliance rate} yang lebih tinggi, dan paparan kerentanan yang lebih rendah; namun, studi ini tidak mengisolasi efek pendekatan deployment dari variabel pengganggu seperti ukuran klaster dan keahlian tim.
 
-\citet{paavola2021managing} membandingkan ArgoCD dan FluxCD untuk pengelolaan multi-application pada Kubernetes dan menyimpulkan bahwa ArgoCD lebih cocok untuk skenario multi-application karena dukungan UI dan integrasi yang lebih baik. \citet{damore2021gitops} mengimplementasikan ArgoCD untuk \textit{continuous deployment} pada lingkungan \textit{hybrid cloud}, namun tidak membahas evaluasi metrik kuantitatif secara eksplisit. \citet{matubber2025managing} mengukur \textit{reconciliation time}, \textit{scalability}, dan \textit{reliability} GitOps untuk infrastruktur K8s, termasuk \textit{self-healing} terhadap \textit{configuration drift}.
+\citet{paavola2021managing} membandingkan ArgoCD dan FluxCD untuk pengelolaan multi-application pada Kubernetes dan menyimpulkan bahwa ArgoCD lebih cocok untuk skenario multi-application karena dukungan UI dan integrasi yang lebih baik. \citet{damore2021gitops} mengimplementasikan ArgoCD untuk \textit{continuous deployment} pada lingkungan \textit{hybrid cloud}, namun tidak membahas evaluasi metrik kuantitatif secara eksplisit. \citet{matubber2025managing} mengukur \textit{reconciliation time}, \textit{scalability}, dan \textit{reliability} GitOps untuk infrastruktur K8s, termasuk \textit{self-healing} terhadap \textit{configuration drift}; namun, pengukuran dilakukan tanpa kelompok pembanding (\textit{control group}) yang menjalankan alur kerja manual, sehingga tidak dapat disimpulkan apakah waktu rekonsiliasi yang terukur lebih unggul daripada pemulihan manual.
 
-Namun, seluruh penelitian di atas memiliki satu kelemahan bersama: tidak adanya studi kuasi-eksperimental yang secara sistematis membandingkan pendekatan GitOps (ArgoCD) dengan deployment manual pada metrik operasional yang terdefinisi secara eksplisit menggunakan protokol statistik yang jelas.
+Tabel~\ref{tab:literatur-comparison} merangkum kelemahan metodologis kunci dari penelitian-penelitian di atas.
 
-\section{Metode Eksperimental pada Penelitian Sistem}
+\begin{table}[H]
+  \centering
+  \caption{Perbandingan Kelemahan Metodologis Penelitian Terdahulu}
+  \label{tab:literatur-comparison}
+  \begin{tabular}{|p{3.5cm}|p{3cm}|p{6cm}|}
+    \hline
+    \textbf{Penelitian} & \textbf{Fokus} & \textbf{Kelemahan Metodologis} \\
+    \hline
+    \citet{shrestha2024configuration} & GitOps vs Ansible & Penilaian kualitatif untuk drift severity; tidak ada uji hipotesis statistik \\
+    \hline
+    \citet{kaggantinataraja2025security} & Keamanan deklaratif vs imperatif & Tidak mengisolasi confounding variables; desain observasional \\
+    \hline
+    \citet{matubber2025managing} & Reconciliation time GitOps & Tanpa control group (alur manual); tidak membandingkan secara terkontrol \\
+    \hline
+    \citet{paavola2021managing} & ArgoCD vs FluxCD & Komparatif deskriptif; tanpa metrik kuantitatif formal \\
+    \hline
+    \citet{damore2021gitops} & ArgoCD hybrid cloud & Studi implementasi; tanpa evaluasi metrik \\
+    \hline
+  \end{tabular}
+\end{table}
 
-Evaluasi empiris pada riset sistem dan infrastruktur sering menggunakan desain kuasi-eksperimen karena unit eksperimen (klaster, aplikasi, jaringan) tidak dapat dirandomisasi secara penuh. \citet{limoncelli2018} menjelaskan bahwa penelitian sistem harus membangun lingkungan yang dapat direproduksi, mengendalikan variabel pengganggu, dan mendefiniskan metrik yang jelas sebelum menyimpulkan hubungan kausal.
+\section{Metode Eksperimental Terkontrol pada Riset Sistem}
 
-Dalam konteks Kubernetes, desain kuasi-eksperimen standar melibatkan: (1)~\textit{baseline measurement} pada keadaan bersih; (2)~\textit{treatment} berupa injeksi beban, kegagalan, atau drift; dan (3)~\textit{post-treatment measurement} untuk membandingkan perilaku sistem. Analisis data menggunakan uji statistik parametrik (\textit{t-test}) jika distribusi data normal, atau non-parametrik (\textit{Wilcoxon}, \textit{Mann--Whitney U}) jika tidak \citep{limoncelli2018}.
+Evaluasi empiris pada riset sistem dan infrastruktur memerlukan desain eksperimental yang memitigasi ancaman terhadap validitas \citep{wohlin2012experimentation}. \citet{limoncelli2018} menjelaskan bahwa penelitian sistem harus membangun lingkungan yang dapat direproduksi, mengendalikan variabel pengganggu, dan mendefinisikan metrik yang jelas sebelum menyimpulkan hubungan kausal.
 
-Prinsip-prinsip rigor statistik yang harus diterapkan meliputi: (1)~pengulangan (\textit{replication}) untuk memastikan reliabilitas; (2)~kontrol variabel pengganggu (\textit{confounding variable control}) untuk menjaga validitas internal; dan (3)~ukuran efek (\textit{effect size}) untuk menilai signifikansi praktis di luar signifikansi statistik.
+Desain eksperimental terkontrol yang digunakan dalam penelitian ini adalah \textit{between-subjects design with matched pairs}: kedua lingkungan (manual dan GitOps) menerima perlakuan identik (skenario drift yang sama), sehingga setiap pasangan pengamatan antara Lingkungan A dan Lingkungan B pada skenario yang sama membentuk pasangan alami (\textit{matched by scenario}). Hal ini memungkinkan pengujian perbedaan antara kedua pendekatan dengan mengendalikan variasi yang berasal dari jenis skenario drift.
+
+Analisis data menggunakan uji statistik parametrik (\textit{independent samples t-test}) jika distribusi data normal, atau non-parametrik (\textit{Mann--Whitney U test}) jika tidak \citep{wohlin2012experimentation}. Prinsip-prinsip rigor statistik yang diterapkan meliputi: (1)~pengulangan (\textit{replication}) untuk memastikan reliabilitas; (2)~kontrol variabel pengganggu untuk menjaga validitas internal; (3)~ukuran efek (\textit{effect size}) untuk menilai signifikansi praktis di luar signifikansi statistik; dan (4)~analisis \textit{power} untuk memastikan ukuran sampel memadai.
 
 \section{InvenioRDM sebagai Beban Uji (Workload)}
 
@@ -50,16 +85,16 @@ InvenioRDM dipilih sebagai beban uji karena memenuhi tiga kriteria kerja: (a)~ko
 
 \section{Kesenjangan Penelitian \textit{(Research Gap)}}
 
-Berdasarkan tinjauan pustaka di atas, terdapat kesenjangan utama yang menjadi landasan penelitian ini:
+Berdasarkan tinjauan pustaka di atas, terdapat empat kesenjangan yang saling berkaitan dan menjadi landasan penelitian ini:
 
 \begin{enumerate}
-  \item \textbf{Kurangnya studi kuasi-eksperimental:} Sebagian besar penelitian GitOps bersifat descriptif, komparatif tanpa kontrol, atau fokus pada implementasi tanpa pengukuran metrik \citep{utami2021analysis, paavola2021managing, damore2021gitops}.
-  
-  \item \textbf{Metrik yang tidak terdefinisi secara operasional:} Penelitian sebelumnya sering mengandalkan metrik kualitatif atau komposit tanpa protokol pengukuran yang dapat direplikasi \citep{shrestha2024configuration, kaggantinataraja2025security}.
-  
-  \item \textbf{Tidak adanya analisis statistik formal:} Belum ditemukan penelitian yang menerapkan uji hipotesis (H0/H1), uji normalitas, dan ukuran efek pada pembandingan GitOps versus manual \citep{matubber2025managing}.
-  
-  \item \textbf{Absensi skenario drift terkontrol:} Hanya sedikit penelitian yang secara sengaja memasukkan \textit{configuration drift} sebagai variabel perlakuan (treatment) untuk mengukur kemampuan sistem dalam mendeteksi dan memulihkannya \citep{zhang2026configuration}.
+  \item \textbf{Kesenjangan Validitas Konstruk:} Penelitian sebelumnya menunjukkan bahwa GitOps mengurangi drift, namun temuan-temuan ini bergantung pada metrik yang tidak teroperasionalisasi secara kuantitatif. \citet{shrestha2024configuration} menggunakan penilaian kualitatif untuk tingkat keparahan drift, sementara \citet{kaggantinataraja2025security} mengukur \textit{compliance rate} tanpa mendefinisikan protokol pengukuran yang dapat direplikasi. Tanpa operasionalisasi metrik yang tegas, klaim keunggulan GitOps tidak dapat diverifikasi secara independen.
+
+  \item \textbf{Kesenjangan Validitas Internal:} Studi-studi yang ada tidak mengisolasi efek paradigma deployment dari variabel pengganggu. \citet{kaggantinataraja2025security} tidak mengendalikan ukuran klaster atau keahlian operator; \citet{matubber2025managing} mengukur waktu rekonsiliasi GitOps tanpa kelompok pembanding (alur kerja manual). Akibatnya, efek yang diamati tidak dapat diatribusikan secara kausal kepada GitOps --- mungkin disebabkan oleh keahlian operator yang lebih tinggi, karakteristik \textit{workload} yang lebih sederhana, atau kondisi klaster yang lebih stabil.
+
+  \item \textbf{Kesenjangan Metodologis:} Tidak ditemukan penelitian yang menerapkan desain eksperimental terkontrol dengan uji hipotesis formal (H0/H1), uji normalitas, ukuran efek, dan analisis \textit{power} pada pembandingan GitOps versus manual. Absensi rigor statistik ini mengakibatkan temuan yang ada tidak dapat digeneralisasi dan rentan terhadap \textit{Type I error} (menerima klaim positif yang sebenarnya palsu).
+
+  \item \textbf{Kesenjangan Kontekstual:} Evaluasi GitOps yang ada berfokus pada lingkungan berskala besar atau \textit{cloud provider} komersial. Belum ada evaluasi pada konteks klaster berukuran kecil-sedang yang mengelola \textit{workload} akademis seperti InvenioRDM, di mana sumber daya operasional terbatas dan satu insiden drift dapat mengancam integritas data penelitian.
 \end{enumerate}
 
-Penelitian ini mengisi kesenjangan tersebut dengan menerapkan studi kuasi-eksperimen yang terkontrol, menggunakan metrik terdefinisi secara operasional, dan menerapkan analisis statistik formal untuk membandingkan pendekatan GitOps (ArgoCD) dengan deployment manual (\texttt{kubectl}).
+Penelitian ini mengisi keempat kesenjangan tersebut dengan: (1)~mengoperasionalisasi empat metrik kuantitatif yang dapat direplikasi; (2)~mengendalikan variabel pengganggu melalui desain eksperimental terkontrol (\textit{matched-pairs between-subjects}); (3)~menerapkan uji hipotesis formal dengan analisis statistik lengkap (normalitas, signifikansi, ukuran efek, analisis \textit{power}); dan (4)~mengevaluasi pada konteks klaster akademis dengan \textit{workload} InvenioRDM.
