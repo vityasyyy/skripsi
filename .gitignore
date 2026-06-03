@@ -16,10 +16,6 @@
 **/*.ilg
 **/*.ist
 **/*.loa
-**/*.pdf
-
-# Generated PDFs (uncomment to ignore)
-# **/*.pdf
 
 # OS & Editor files
 .DS_Store
@@ -30,6 +26,11 @@ Thumbs.db
 *.swo
 *~
 
+# Internal / planning
+PLAN.md
+.backup-original/
+.opencode/
+
 # Secrets
 .env
-secrets/**/*.pdf
+secrets/
