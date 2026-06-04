@@ -13,7 +13,7 @@ Penelitian empiris oleh \citet{zhang2026configuration} melakukan studi terhadap 
 Berdasarkan literatur, faktor-faktur utama yang memperburuk \textit{configuration drift} pada Kubernetes meliputi:
 
 \begin{enumerate}
-  \item \textbf{Perubahan langsung pada klaster:} Penggunaan \texttt{kubectl edit}, \texttt{kubectl patch}, atau \texttt{kubectl scale} secara langsung tanpa memperbarui repositori sumber kebenaran \citep{zhang2026configuration}.
+  \item \textbf{Perubahan langsung pada klaster:} Penggunaan \texttt{kubectl\allowbreak{} edit}, \texttt{kubectl\allowbreak{} patch}, atau \texttt{kubectl\allowbreak{} scale} secara langsung tanpa memperbarui repositori sumber kebenaran \citep{zhang2026configuration}.
   
   \item \textbf{Prosedur deployment yang tidak terdokumentasi:} Setiap operator dapat memiliki urutan perintah yang berbeda, yang mengakibatkan \textit{state} klaster tidak deterministik \citep{pohjola2025mitigating}.
   
@@ -44,23 +44,24 @@ Keunggulan GitOps dibandingkan deployment imperatif tradisional meliputi: \texti
 
 \citet{utami2021analysis} melakukan analisis perbandingan model deployment deklaratif \textit{pull-based} (GitOps dengan ArgoCD) versus \textit{push-based} pada Kubernetes, dan menemukan bahwa model \textit{pull-based} lebih andal karena agen berjalan di dalam klaster dan tidak memerlukan kredensial eksternal. \citet{shrestha2024configuration} mengevaluasi GitOps versus Ansible untuk manajemen konfigurasi Kubernetes, khususnya pada aspek \textit{drift detection} dan \textit{remedy time}; namun, studi ini mengandalkan penilaian kualitatif untuk menilai tingkat keparahan drift alih-alih metrik kuantitatif yang dapat direplikasi. \citet{kaggantinataraja2025security} melakukan analisis berpusat keamanan terhadap pendekatan deklaratif (GitOps/ArgoCD) dan imperatif (Jenkins/\texttt{kubectl}), menemukan bahwa pendekatan deklaratif menghasilkan \textit{drift correction} yang lebih cepat, \textit{compliance rate} yang lebih tinggi, dan paparan kerentanan yang lebih rendah; namun, studi ini tidak mengisolasi efek pendekatan deployment dari variabel pengganggu seperti ukuran klaster dan keahlian tim.
 
-\citet{paavola2021managing} membandingkan ArgoCD dan FluxCD untuk pengelolaan multi-application pada Kubernetes dan menyimpulkan bahwa ArgoCD lebih cocok untuk skenario multi-application karena dukungan UI dan integrasi yang lebih baik. \citet{damore2021gitops} mengimplementasikan ArgoCD untuk \textit{continuous deployment} pada lingkungan \textit{hybrid cloud}, namun tidak membahas evaluasi metrik kuantitatif secara eksplisit. \citet{matubber2025managing} mengukur \textit{reconciliation time}, \textit{scalability}, dan \textit{reliability} GitOps untuk infrastruktur K8s, termasuk \textit{self-healing} terhadap \textit{configuration drift}; namun, pengukuran dilakukan tanpa kelompok pembanding (\textit{control group}) yang menjalankan alur kerja manual, sehingga tidak dapat disimpulkan apakah waktu rekonsiliasi yang terukur lebih unggul daripada pemulihan manual.
+\citet{paavola2021managing} membandingkan ArgoCD dan FluxCD untuk pengelolaan multi-application pada Kubernetes dan melaporkan bahwa ArgoCD lebih sesuai untuk skenario multi-application, berkat dukungan UI dan integrasi yang lebih baik. \citet{damore2021gitops} mengimplementasikan ArgoCD untuk \textit{continuous deployment} pada lingkungan \textit{hybrid cloud}, namun tidak membahas evaluasi metrik kuantitatif secara eksplisit. \citet{matubber2025managing} mengukur \textit{reconciliation time}, \textit{scalability}, dan \textit{reliability} GitOps untuk infrastruktur K8s, termasuk \textit{self-healing} terhadap \textit{configuration drift}; namun, pengukuran dilakukan tanpa kelompok pembanding (\textit{control group}) yang menjalankan alur kerja manual, sehingga tidak dapat disimpulkan apakah waktu rekonsiliasi yang terukur lebih unggul daripada pemulihan manual.
 
 Tabel~\ref{tab:literatur-comparison} merangkum kelemahan metodologis kunci dari penelitian-penelitian di atas.
 
 \begin{table}[H]
   \centering
+  \small
   \caption{Perbandingan Kelemahan Metodologis Penelitian Terdahulu}
   \label{tab:literatur-comparison}
-  \begin{tabular}{|p{3.5cm}|p{3cm}|p{6cm}|}
+  \begin{tabular}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{5.8cm}|}
     \hline
     \textbf{Penelitian} & \textbf{Fokus} & \textbf{Kelemahan Metodologis} \\
     \hline
-    \citet{shrestha2024configuration} & GitOps vs Ansible & Penilaian kualitatif untuk drift severity; tidak ada uji hipotesis statistik \\
+    \citet{shrestha2024configuration} & GitOps vs Ansible & Penilaian kualitatif untuk tingkat keparahan drift; tidak ada uji hipotesis statistik \\
     \hline
-    \citet{kaggantinataraja2025security} & Keamanan deklaratif vs imperatif & Tidak mengisolasi confounding variables; desain observasional \\
+    \citet{kaggantinataraja2025security} & Keamanan deklaratif vs imperatif & Tidak mengisolasi variabel pengganggu; desain observasional \\
     \hline
-    \citet{matubber2025managing} & Reconciliation time GitOps & Tanpa control group (alur manual); tidak membandingkan secara terkontrol \\
+    \citet{matubber2025managing} & Reconciliation time GitOps & Tanpa kelompok pembanding (alur manual); tidak membandingkan secara terkontrol \\
     \hline
     \citet{paavola2021managing} & ArgoCD vs FluxCD & Komparatif deskriptif; tanpa metrik kuantitatif formal \\
     \hline

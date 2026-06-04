@@ -6,6 +6,7 @@ Penelitian ini mengevaluasi secara empiris dampak manajemen deployment berbasis 
 
 \begin{figure}[H]
   \centering
+  \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[
     node distance=1.2cm and 1.8cm,
    box/.style={
@@ -70,7 +71,8 @@ Penelitian ini mengevaluasi secara empiris dampak manajemen deployment berbasis 
     \node[fit=(kubectl)(clusterA)(metricsA), draw=gray, dashed, rounded corners=6pt, inner sep=10pt, label={[font=\footnotesize\bfseries, gray]above:Lingkungan A (Manual)}] {};
     \node[fit=(argocd)(clusterB)(metricsB), draw=blue!50, dashed, rounded corners=6pt, inner sep=10pt, label={[font=\footnotesize\bfseries, blue!70]above:Lingkungan B (GitOps)}] {};
   \end{scope}
-\end{tikzpicture}
+\end{tikzpicture}%
+}
   \caption{Arsitektur eksperimen: perbandingan Lingkungan A (deployment manual dengan \texttt{kubectl}) dan Lingkungan B (deployment GitOps dengan ArgoCD). Injeksi drift dilakukan pada kedua lingkungan, dan metrik R1--R4 dikumpulkan dari masing-masing lingkungan.}
   \label{fig:arsitektur-eksperimen}
 \end{figure}
@@ -97,6 +99,7 @@ Tahapan eksperimen dalam penelitian ini mengikuti rancangan \textit{pre-test -- 
 
 \begin{figure}[H]
   \centering
+  \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[
     node distance=0.7cm,
     stage/.style={
@@ -126,8 +129,9 @@ Tahapan eksperimen dalam penelitian ini mengikuti rancangan \textit{pre-test -- 
   \node[font=\footnotesize, text width=2.5cm, align=center, left=0.8cm of s3] (driftlabel) {7 skenario drift\\(A--G) diacak\\urutannya};
   \draw[-Stealth, dotted, thick] (driftlabel) -- (s3);
 
-\end{tikzpicture}
-  \caption{Bagan alir eksperimen: tahapan penelitian dari persiapan lingkungan hingga interpretasi dan kesimpulan. Iterasi per skenario menunjukkan pengulangan acak dari baseline hingga pengukuran untuk setiap skenario drift.}
+\end{tikzpicture}%
+}
+  \caption{Bagan alir eksperimen: tahapan penelitian dari persiapan hingga interpretasi. Iterasi per skenario menunjukkan pengulangan acak dari baseline hingga pengukuran untuk setiap skenario drift.}
   \label{fig:bagan-alir-eksperimen}
 \end{figure}
 
@@ -261,9 +265,10 @@ Tabel \ref{tab:matriks-eksperimen} menunjukkan rancangan eksperimental secara ke
 
 \begin{table}[H]
   \centering
+  \small
   \caption{Matriks Eksperimen}
   \label{tab:matriks-eksperimen}
-  \begin{tabular}{|p{2.5cm}|p{5cm}|p{5cm}|}
+  \begin{tabular}{|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{5.3cm}|>{\raggedright\arraybackslash}p{5.3cm}|}
     \hline
     \textbf{Dimensi} & \textbf{Lingkungan A (Manual)} & \textbf{Lingkungan B (GitOps)} \\
     \hline
@@ -285,25 +290,31 @@ Tabel \ref{tab:matriks-eksperimen} menunjukkan rancangan eksperimental secara ke
 Tujuh skenario drift dirancang untuk merepresentasikan kesalahan operasional yang umum. Setiap skenario dieksekusi secara identik pada kedua lingkungan. Untuk Lingkungan A, operator kemudian memulihkan secara manual. Untuk Lingkungan B, ArgoCD secara otomatis mendeteksi dan memulihkan (pada eksperimen R2 dengan \textit{self-heal} aktif).
 
 \subsection{Skenario A --- Perubahan Replika (Replica Drift)}
-Secara manual mengubah jumlah replika Deployment menggunakan \texttt{kubectl scale deployment/nama-deployment --replicas=5} ketika \textit{desired} adalah 3. Perubahan ini melewati Git pada Lingkungan B.
+Secara manual mengubah jumlah replika Deployment menggunakan \texttt{kubectl\allowbreak{} scale\allowbreak{} deployment/nama-deployment\allowbreak{} --replicas=5} ketika \textit{desired} adalah 3. Perubahan ini melewati Git pada Lingkungan B.
 
 \subsection{Skenario B --- Perubahan Image (Image Drift)}
-Secara manual mengganti versi image kontainer pada Deployment menggunakan \texttt{kubectl edit deployment/nama-deployment} dan mengubah kolom \texttt{image} ke versi yang berbeda.
+Secara manual mengganti versi image kontainer pada Deployment menggunakan \texttt{kubectl\allowbreak{} edit\allowbreak{} deployment/nama-deployment} dan mengubah kolom \texttt{image} ke versi yang berbeda.
 
 \subsection{Skenario C --- Perubahan ConfigMap (ConfigMap Drift)}
-Mengubah isi ConfigMap langsung di dalam klaster menggunakan \texttt{kubectl edit configmap/nama-configmap}. Memodifikasi parameter konfigurasi seperti \texttt{DATABASE\_URL} atau \texttt{LOG\_LEVEL}.
+Mengubah isi ConfigMap langsung di dalam klaster menggunakan \texttt{kubectl\allowbreak{} edit\allowbreak{} configmap/nama-configmap}. Memodifikasi parameter konfigurasi seperti \texttt{DATABASE\_URL} atau \texttt{LOG\_LEVEL}.
 
 \subsection{Skenario D --- Penghapusan Sumber Daya (Resource Deletion)}
-Menghapus Deployment atau Service secara manual menggunakan \texttt{kubectl delete deployment/nama-deployment}. Untuk Lingkungan B, ArgoCD dengan \textit{prune} aktif akan mendeteksi sumber daya yang hilang dan menciptakan ulang dari manifest Git.
+Menghapus Deployment atau Service secara manual menggunakan \texttt{kubectl\allowbreak{} delete\allowbreak{} deployment/nama-deployment}. Untuk Lingkungan B, ArgoCD dengan \textit{prune} aktif akan mendeteksi sumber daya yang hilang dan menciptakan ulang dari manifest Git.
 
 \subsection{Skenario E --- Patch Manual Tidak Sah (Unauthorized Manual Patch)}
 Menerapkan \texttt{kubectl patch} langsung terhadap sumber daya yang dikelola, mis. mengubah \textit{resource limits} pada sebuah Pod menggunakan patch JSON.
 
 \subsection{Skenario F --- Drift Lintas Namespace (Cross-namespace Drift)}
-Menerapkan sumber daya ke namespace yang salah secara manual. Mengukur apakah GitOps membatasi propagasi atau mendeteksi kesalahan namespace secara otomatis. Contoh: \texttt{kubectl apply -f deployment.yaml --namespace=wrong-namespace}.
+Menerapkan sumber daya ke namespace yang salah secara manual. Mengukur apakah GitOps membatasi propagasi atau mendeteksi kesalahan namespace secara otomatis. Contoh: \texttt{kubectl\allowbreak{} apply\allowbreak{} -f\allowbreak{} deployment.yaml\allowbreak{} --namespace=wrong-namespace}.
 
 \subsection{Skenario G --- Perubahan Secret (Secret Drift)}
-Mengubah secret secara manual di luar Git. Skenario ini sangat umum dalam praktik produksi. Contoh: \verb|kubectl patch secret my-secret --patch={\"data\":{\"password\":\"<new_base64>\"}}|.
+Mengubah secret secara manual di luar Git. Skenario ini sangat umum dalam praktik produksi. Contoh perintah:
+
+\begin{center}
+\small
+\texttt{kubectl patch secret my-secret \textbackslash{}} \\
+\texttt{\hspace*{1em}--patch=\{``data'':\{``password'':\textless new\_base64\textgreater\}\}}
+\end{center}
 
 \section{Protokol Pengukuran}
 
@@ -326,7 +337,7 @@ Sebelum setiap pengujian:
 
 \subsection{Protokol Pengukuran Pasca-Injeksi (O2)}
 \begin{enumerate}
-  \item \textbf{Untuk Lingkungan B (GitOps):} Pantau status ArgoCD menggunakan \texttt{argocd app get} setiap 5 detik. Catat: (a) waktu ArgoCD menunjukkan \textit{OutOfSync} (deteksi); (b) waktu ArgoCD menunjukkan \textit{Synced} setelah \textit{auto-heal} (pemulihan). Hitung $t_d - t_0$ (waktu deteksi) dan $t_2 - t_0$ (waktu pemulihan total).
+  \item \textbf{Untuk Lingkungan B (GitOps):} Pantau status ArgoCD menggunakan \texttt{argocd\allowbreak{} app\allowbreak{} get} setiap 5 detik. Catat: (a) waktu ArgoCD menunjukkan \textit{OutOfSync} (deteksi); (b) waktu ArgoCD menunjukkan \textit{Synced} setelah \textit{auto-heal} (pemulihan). Hitung $t_d - t_0$ (waktu deteksi) dan $t_2 - t_0$ (waktu pemulihan total).
   
   \item \textbf{Untuk Lingkungan A (Manual):} Operator melakukan pemantauan manual menggunakan \texttt{kubectl get} dan \texttt{kubectl describe}. Catat waktu eksekusi setiap perintah korektif. Hitung $t_2 - t_0$ (waktu total hingga \textit{state} kembali ke baseline).
   
@@ -341,6 +352,7 @@ Sebelum setiap pengujian:
 
 \begin{table}[H]
   \centering
+  \small
   \caption{Desain Eksperimen E1 --- Konsistensi Deployment}
   \label{tab:e1}
   \begin{tabular}{|l|p{9cm}|}
@@ -362,6 +374,7 @@ Sebelum setiap pengujian:
 
 \begin{table}[H]
   \centering
+  \small
   \caption{Desain Eksperimen E2 --- Waktu Deteksi dan Pemulihan Drift}
   \label{tab:e2}
   \begin{tabular}{|l|p{9cm}|}
@@ -383,6 +396,7 @@ Sebelum setiap pengujian:
 
 \begin{table}[H]
   \centering
+  \small
   \caption{Desain Eksperimen E3 --- Jumlah Intervensi Manual}
   \label{tab:e3}
   \begin{tabular}{|l|p{9cm}|}
@@ -404,6 +418,7 @@ Sebelum setiap pengujian:
 
 \begin{table}[H]
   \centering
+  \small
   \caption{Desain Eksperimen E4 --- Jejak Audit Operasional (Traceability)}
   \label{tab:e4}
   \begin{tabular}{|l|p{9cm}|}
