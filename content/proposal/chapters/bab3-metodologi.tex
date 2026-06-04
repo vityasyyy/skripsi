@@ -6,31 +6,30 @@ Penelitian ini mengevaluasi secara empiris dampak manajemen deployment berbasis 
 
 \begin{figure}[H]
   \centering
-  \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[
-    node distance=1.2cm and 1.8cm,
+    node distance=1.0cm and 1.4cm,
    box/.style={
-      rectangle, draw, rounded corners=3pt, minimum width=2.8cm,
-      minimum height=0.9cm, align=center, font=\small
+      rectangle, draw, rounded corners=3pt, minimum width=2.6cm,
+      minimum height=0.85cm, align=center, font=\small
     },
     gitbox/.style={
-      rectangle, draw, rounded corners=3pt, minimum width=3.2cm,
-      minimum height=0.9cm, align=center, font=\small,
+      rectangle, draw, rounded corners=3pt, minimum width=2.8cm,
+      minimum height=0.85cm, align=center, font=\small,
       fill=blue!10
     },
     clusterbox/.style={
-      rectangle, draw, rounded corners=3pt, minimum width=3cm,
-      minimum height=0.9cm, align=center, font=\small,
+      rectangle, draw, rounded corners=3pt, minimum width=2.8cm,
+      minimum height=0.85cm, align=center, font=\small,
       fill=green!10
     },
     driftbox/.style={
-      rectangle, draw, rounded corners=3pt, minimum width=2.6cm,
-      minimum height=0.9cm, align=center, font=\small,
+      rectangle, draw, rounded corners=3pt, minimum width=2.4cm,
+      minimum height=0.85cm, align=center, font=\small,
       fill=red!15
     },
     metricbox/.style={
-      rectangle, draw, dashed, rounded corners=3pt, minimum width=2.4cm,
-      minimum height=0.7cm, align=center, font=\footnotesize,
+      rectangle, draw, dashed, rounded corners=3pt, minimum width=1.6cm,
+      minimum height=0.6cm, align=center, font=\scriptsize,
       fill=yellow!15
     },
     arr/.style={-Stealth, thick},
@@ -39,40 +38,39 @@ Penelitian ini mengevaluasi secara empiris dampak manajemen deployment berbasis 
 
   \node[gitbox] (git) {Repositori Git\\(Manifes YAML/Helm)};
 
-  \node[box, fill=orange!15] (operator) [below=1.5cm of git] {Operator\\(Peneliti)};
+  \node[box, fill=orange!15] (operator) [below=1.3cm of git] {Operator\\(Peneliti)};
 
-  \node[box, fill=gray!15] (kubectl) [below left=1.2cm and 0.8cm of operator] {\texttt{kubectl}\\(Imperatif)};
+  \node[box, fill=gray!15] (kubectl) [below left=1.0cm and 0.6cm of operator] {\texttt{kubectl}\\(Imperatif)};
 
-  \node[clusterbox] (clusterA) [below=1.2cm of kubectl] {Klaster K8s\\Lingkungan A};
+  \node[clusterbox] (clusterA) [below=1.0cm of kubectl] {Klaster K8s\\Lingkungan A};
 
-  \node[box, fill=blue!10] (argocd) [below right=1.2cm and 0.8cm of operator] {ArgoCD\\(\textit{Controller})};
+  \node[box, fill=blue!10] (argocd) [below right=1.0cm and 0.6cm of operator] {ArgoCD\\(\textit{Controller})};
 
-  \node[clusterbox] (clusterB) [below=1.2cm of argocd] {Klaster K8s\\Lingkungan B};
+  \node[clusterbox] (clusterB) [below=1.0cm of argocd] {Klaster K8s\\Lingkungan B};
 
-  \node[driftbox] (drift) [left=2.5cm of operator] {Injeksi Drift\\(Skenario A--G)};
+  \node[driftbox] (drift) [left=1.8cm of operator] {Injeksi Drift\\(Skenario A--G)};
 
-  \node[metricbox] (metricsA) [left=0.6cm of clusterA] {R1--R4};
+  \node[metricbox] (metricsA) [left=0.4cm of clusterA] {R1--R4};
 
-  \node[metricbox] (metricsB) [right=0.6cm of clusterB] {R1--R4};
+  \node[metricbox] (metricsB) [right=0.4cm of clusterB] {R1--R4};
 
-  \draw[arr] (git) -- (argocd) node[midway, right, font=\footnotesize] {watch};
+  \draw[arr] (git) -- (argocd) node[midway, right, font=\scriptsize] {watch};
   \draw[arr] (operator) -- (kubectl);
-  \draw[arr] (operator) -- node[midway, above, font=\footnotesize] {push} (git);
+  \draw[arr] (operator) -- node[midway, above, font=\scriptsize] {push} (git);
   \draw[arr] (kubectl) -- (clusterA);
-  \draw[arr] (argocd) -- (clusterB) node[midway, right, font=\footnotesize] {sync};
-  \draw[arr] (clusterB.west) -- ++(-0.5,0) |- (argocd.south east) node[pos=0.25, right, font=\footnotesize] {\textit{reconcile}};
-  \draw[dasharr] (drift) -- (clusterA) node[midway, below, font=\footnotesize] {\texttt{kubectl edit}};
+  \draw[arr] (argocd) -- (clusterB) node[midway, right, font=\scriptsize] {sync};
+  \draw[arr] (clusterB.west) -- ++(-0.4,0) |- (argocd.south east) node[pos=0.25, right, font=\scriptsize] {\textit{reconcile}};
+  \draw[dasharr] (drift) -- (clusterA) node[midway, below, font=\scriptsize] {\texttt{kubectl edit}};
   \draw[dasharr] (drift) -- (operator);
-  \draw[dasharr] (drift.south) |- (clusterB.west) node[pos=0.7, below, font=\footnotesize] {\texttt{kubectl edit}};
+  \draw[dasharr] (drift.south) |- (clusterB.west) node[pos=0.7, below, font=\scriptsize] {\texttt{kubectl edit}};
   \draw[dasharr] (metricsA) -- (clusterA);
   \draw[dasharr] (metricsB) -- (clusterB);
 
   \begin{scope}[on background layer]
-    \node[fit=(kubectl)(clusterA)(metricsA), draw=gray, dashed, rounded corners=6pt, inner sep=10pt, label={[font=\footnotesize\bfseries, gray]above:Lingkungan A (Manual)}] {};
-    \node[fit=(argocd)(clusterB)(metricsB), draw=blue!50, dashed, rounded corners=6pt, inner sep=10pt, label={[font=\footnotesize\bfseries, blue!70]above:Lingkungan B (GitOps)}] {};
+    \node[fit=(kubectl)(clusterA)(metricsA), draw=gray, dashed, rounded corners=6pt, inner sep=8pt, label={[font=\scriptsize\bfseries, gray]above:Lingkungan A (Manual)}] {};
+    \node[fit=(argocd)(clusterB)(metricsB), draw=blue!50, dashed, rounded corners=6pt, inner sep=8pt, label={[font=\scriptsize\bfseries, blue!70]above:Lingkungan B (GitOps)}] {};
   \end{scope}
-\end{tikzpicture}%
-}
+\end{tikzpicture}
   \caption{Arsitektur eksperimen: perbandingan Lingkungan A (deployment manual dengan \texttt{kubectl}) dan Lingkungan B (deployment GitOps dengan ArgoCD). Injeksi drift dilakukan pada kedua lingkungan, dan metrik R1--R4 dikumpulkan dari masing-masing lingkungan.}
   \label{fig:arsitektur-eksperimen}
 \end{figure}
@@ -99,12 +97,11 @@ Tahapan eksperimen dalam penelitian ini mengikuti rancangan \textit{pre-test -- 
 
 \begin{figure}[H]
   \centering
-  \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[
     node distance=0.7cm,
     stage/.style={
-      rectangle, draw, rounded corners=4pt, minimum width=4.2cm,
-      minimum height=0.85cm, align=center, font=\small, text width=4cm
+      rectangle, draw, rounded corners=4pt, minimum width=4cm,
+      minimum height=0.8cm, align=center, font=\small, text width=3.8cm
     },
     arr/.style={-Stealth, thick},
     looparr/.style={-Stealth, thick, dashed}
@@ -123,14 +120,13 @@ Tahapan eksperimen dalam penelitian ini mengikuti rancangan \textit{pre-test -- 
   \draw[arr] (s4) -- (s5);
   \draw[arr] (s5) -- (s6);
 
-  \draw[looparr] (s4.east) -- ++(1.5,0) |- (s2.east)
-    node[pos=0.25, right, font=\footnotesize, text width=2.2cm, align=left] {Iterasi per\\skenario (acak)};
+  \draw[looparr] (s4.east) -- ++(1.3,0) |- (s2.east)
+    node[pos=0.25, right, font=\scriptsize, text width=2cm, align=left] {Iterasi per\\skenario (acak)};
 
-  \node[font=\footnotesize, text width=2.5cm, align=center, left=0.8cm of s3] (driftlabel) {7 skenario drift\\(A--G) diacak\\urutannya};
+  \node[font=\scriptsize, text width=2.3cm, align=center, left=0.6cm of s3] (driftlabel) {7 skenario drift\\(A--G) diacak\\urutannya};
   \draw[-Stealth, dotted, thick] (driftlabel) -- (s3);
 
-\end{tikzpicture}%
-}
+\end{tikzpicture}
   \caption{Bagan alir eksperimen: tahapan penelitian dari persiapan hingga interpretasi. Iterasi per skenario menunjukkan pengulangan acak dari baseline hingga pengukuran untuk setiap skenario drift.}
   \label{fig:bagan-alir-eksperimen}
 \end{figure}
