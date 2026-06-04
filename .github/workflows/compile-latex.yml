@@ -15,6 +15,9 @@ on:
       - '.github/workflows/compile-latex.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   compile-proposal:
     runs-on: ubuntu-latest
@@ -32,6 +35,24 @@ jobs:
           name: proposal-pdf
           path: content/proposal/main.pdf
           retention-days: 90
+
+  release-proposal:
+    needs: compile-proposal
+    runs-on: ubuntu-latest
+    name: Create Proposal Release
+    if: github.event_name == 'push'
+    steps:
+      - name: Download proposal PDF
+        uses: actions/download-artifact@v4
+        with:
+          name: proposal-pdf
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: proposal-v${{ github.run_number }}
+          name: Proposal PDF #${{ github.run_number }}
+          files: main.pdf
 
   compile-skripsi:
     runs-on: ubuntu-latest
