@@ -1,0 +1,81 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{metricyellow}{RGB}{251,192,45}
+\definecolor{scenariored}{RGB}{229,115,115}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=1.2cm and 1.5cm,
+    box/.style={rectangle, rounded corners=3pt, draw=#1, fill=white, 
+                minimum width=2.8cm, minimum height=1.2cm, align=center,
+                line width=1pt, font=\small},
+    group/.style={rectangle, rounded corners=5pt, draw=#1, fill=#1!10,
+                  inner sep=8pt, line width=1.5pt},
+    arrow/.style={->, >=stealth, line width=1pt, draw=gray!70}
+]
+
+% Git Repository
+\node[box=gitopsblue] (git) {
+    \includegraphics[height=14pt]{logos/git.png}\\[2pt]
+    \textbf{Git Repo}
+};
+
+% GitOps Environment
+\node[box=gitopsblue, right=2.5cm of git] (argo) {
+    \includegraphics[height=14pt]{logos/argocd.png}\\[2pt]
+    \textbf{ArgoCD}
+};
+
+\node[box=gitopsblue, below=0.8cm of argo] (k8sB) {
+    \includegraphics[height=14pt]{logos/kubernetes.png}\\[2pt]
+    Klaster K8s
+};
+
+% Manual Environment  
+\node[box=manualgray, below=2.5cm of git] (kubectl) {
+    \textbf{kubectl}
+};
+
+\node[box=manualgray, below=0.8cm of kubectl] (k8sA) {
+    \includegraphics[height=14pt]{logos/kubernetes.png}\\[2pt]
+    Klaster K8s
+};
+
+% Metrics
+\node[box=metricyellow, right=2.5cm of k8sA, yshift=0.6cm] (m1) {R1 Konsistensi};
+\node[box=metricyellow, above=0.3cm of m1] (m2) {R2 Waktu (s)};
+\node[box=metricyellow, below=0.3cm of m1] (m3) {R3 Intervensi};
+\node[box=metricyellow, below=0.3cm of m3] (m4) {R4 Traceability};
+
+% Group boxes
+\begin{scope}[on background layer]
+    \node[group=gitopsblue, fit=(argo)(k8sB), label={[font=\small\bfseries]above:Lingkungan B: GitOps}] (envB) {};
+    \node[group=manualgray, fit=(kubectl)(k8sA), label={[font=\small\bfseries]above:Lingkungan A: Manual}] (envA) {};
+    \node[group=metricyellow, fit=(m1)(m2)(m3)(m4), label={[font=\small\bfseries]above:Metrik}] (metrics) {};
+\end{scope}
+
+% Arrows
+\draw[arrow] (git) -- (argo);
+\draw[arrow] (argo) -- (k8sB);
+\draw[arrow] (kubectl) -- (k8sA);
+\draw[arrow] (k8sA) -- (m1);
+\draw[arrow] (k8sA) -- (m2);
+\draw[arrow] (k8sA) -- (m3);
+\draw[arrow] (k8sA) -- (m4);
+\draw[arrow] (k8sB) -- (m1);
+\draw[arrow] (k8sB) -- (m2);
+\draw[arrow] (k8sB) -- (m3);
+\draw[arrow] (k8sB) -- (m4);
+
+% Drift injection label
+\node[font=\footnotesize, text=scenariored!80!black] at ($(k8sA)!0.5!(k8sB) + (0,0.6)$) 
+    {Injeksi Drift (A--G)};
+
+\end{tikzpicture}
+\end{document}

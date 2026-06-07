@@ -1,0 +1,44 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{metricyellow}{RGB}{251,192,45}
+\definecolor{scenariored}{RGB}{229,115,115}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=1.0cm,
+    box/.style={rectangle, rounded corners=3pt, draw=gray!60, fill=white,
+                minimum width=2.2cm, minimum height=1.0cm, align=center,
+                line width=0.8pt, font=\small},
+    group/.style={rectangle, rounded corners=5pt, draw=gray!40, fill=gray!5,
+                  inner sep=8pt, line width=1pt},
+    arrow/.style={->, >=stealth, line width=1pt, draw=gray!60},
+    looparrow/.style={->, >=stealth, line width=1pt, draw=scenariored!70, dashed}
+]
+
+% Timeline nodes
+\node[box] (s1) {\includegraphics[height=12pt]{logos/kubernetes.png}\\[2pt]1. Persiapan};
+\node[box, right=0.8cm of s1] (s2) {2. Baseline};
+\node[box, right=0.8cm of s2] (s3) {3. Injeksi Drift};
+\node[box, right=0.8cm of s3] (s4) {\includegraphics[height=12pt]{logos/argocd.png}\\[2pt]4. Pengukuran};
+\node[box, right=0.8cm of s4] (s5) {5. Analisis};
+\node[box, right=0.8cm of s5] (s6) {6. Interpretasi};
+
+% Arrows
+\draw[arrow] (s1) -- (s2);
+\draw[arrow] (s2) -- (s3);
+\draw[arrow] (s3) -- (s4);
+\draw[arrow] (s4) -- (s5);
+\draw[arrow] (s5) -- (s6);
+
+% Loop arrow
+\draw[looparrow] (s4.south) to[out=-90, in=-90, looseness=1.8] 
+    node[below, font=\scriptsize, text=scenariored!80!black] {Iterasi per skenario} (s2.south);
+
+\end{tikzpicture}
+\end{document}
