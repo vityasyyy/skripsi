@@ -1,8 +1,8 @@
 \chapter{JADWAL PENELITIAN}
 
-Penelitian ini direncanakan untuk dilaksanakan selama delapan bulan, dari bulan Juni 2026 hingga Januari 2027. Jadwal penelitian disusun berdasarkan tahapan studi eksperimental terkontrol: persiapan lingkungan, kalibrasi baseline, pelaksanaan eksperimen, analisis statistik, dan penulisan laporan.
+Penelitian ini direncanakan untuk dilaksanakan selama delapan bulan, dari bulan Juni 2026 hingga Januari 2027. Jadwal penelitian disusun berdasarkan tahapan studi eksperimental terkontrol: persiapan lingkungan, pengembangan skrip otomasi, kalibrasi baseline, pelaksanaan eksperimen, analisis statistik, dan penulisan laporan.
 
-Tabel \ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasis bulan. Simbol $\bullet$ menunjukkan bahwa kegiatan dilaksanakan pada bulan tersebut.
+Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasis bulan. Simbol $\bullet$ menunjukkan bahwa kegiatan dilaksanakan pada bulan tersebut.
 
 \begin{table}[H]
   \centering
@@ -20,6 +20,8 @@ Tabel \ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     Perancangan Lingkungan & & $\bullet$ & $\bullet$ & & & & & \\
     \hline
     Implementasi ArgoCD + Baseline Manual & & & $\bullet$ & $\bullet$ & & & & \\
+    \hline
+    Pengembangan Skrip Otomasi & & $\bullet$ & $\bullet$ & $\bullet$ & & & & \\
     \hline
     Persiapan Baseline \& Kalibrasi & & & & $\bullet$ & $\bullet$ & & & \\
     \hline
@@ -40,27 +42,31 @@ Tabel \ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
 \begin{enumerate}
     \item \textbf{Studi Literatur (Juni -- Juli 2026)}
     
-    Kegiatan ini mencakup pengumpulan dan analisis literatur mengenai: \textit{configuration drift} pada Kubernetes, evaluasi empiris GitOps, metode eksperimental pada riset sistem, dan arsitektur InvenioRDM sebagai beban uji. Sumber literatur meliputi jurnal ilmiah (IEEE, ACM, Springer), dokumentasi resmi, buku teks, dan artikel teknis. Tujuan dari fase ini adalah membangun landasan teoretis dan menetapkan hipotesis yang dapat diuji.
+    Kegiatan ini mencakup pengumpulan dan analisis literatur mengenai: \textit{configuration drift} pada Kubernetes, evaluasi empiris GitOps, metode eksperimental pada riset sistem, dan arsitektur InvenioRDM sebagai beban uji. Sumber literatur meliputi jurnal ilmiah (IEEE, ACM, Springer), dokumentasi resmi, buku teks, dan artikel teknis. Tujuan dari fase ini adalah membangun landasan teoretis yang kuat.
     
     \item \textbf{Perancangan Lingkungan (Juli -- Agustus 2026)}
     
-    Tahap ini meliputi perancangan arsitektur Lingkungan A (deployment manual/\texttt{kubectl}) dan Lingkungan B (deployment GitOps/ArgoCD) pada klaster Kubernetes yang sama. Perancangan meliputi: definisi variabel independen dan dependen, pemilihan tujuh skenario drift, rancangan tabel rubrik traceability, dan spesifikasi protokol pengukuran.
+    Tahap ini meliputi perancangan arsitektur Lingkungan A (deployment manual/\texttt{kubectl}) dan Lingkungan B (deployment GitOps/ArgoCD) pada klaster Kubernetes yang sama. Perancangan meliputi: definisi variabel dan intervensi, pemilihan tujuh skenario drift, rancangan tabel rubrik traceability, dan spesifikasi protokol pengukuran.
     
-    \item \textbf{Implementasi ArgoCD + Baseline Manual (Agustus -- Oktober 2026)}
+    \item \textbf{Implementasi ArgoCD + Baseline Manual (Agustus -- September 2026)}
     
-    Tahap implementasi meliputi: konfigurasi ArgoCD pada klaster, pembuatan repositori GitOps dengan manifest deklaratif, konfigurasi baseline manual (alur kerja \texttt{kubectl}), implementasi skenario drift (script injeksi otomatis), serta konfigurasi logging dan monitoring (Prometheus, Grafana, Kubernetes audit logs, ArgoCD notifications). Pada akhir fase ini, kedua lingkungan siap untuk eksperimen.
+    Tahap implementasi meliputi: konfigurasi ArgoCD pada klaster, pembuatan repositori GitOps dengan manifest deklaratif, konfigurasi baseline manual (alur kerja \texttt{kubectl}), serta konfigurasi logging dan monitoring (Prometheus, Grafana, Kubernetes audit logs, ArgoCD notifications). Pada akhir fase ini, kedua lingkungan siap untuk eksperimen.
+    
+    \item \textbf{Pengembangan Skrip Otomasi (Juli -- September 2026)}
+    
+    Pengembangan empat skrip otomasi yang mendukung konsistensi prosedural eksperimen: (a)~\texttt{drift-inject.sh} untuk penyuntikan skenario drift secara acak dengan pencatatan \textit{timestamp}; (b)~\texttt{metrics-collect.sh} untuk pengumpulan metrik secara berkala via ArgoCD API dan \texttt{kubectl}; (c)~\texttt{baseline-check.sh} untuk verifikasi kondisi klaster sebelum setiap \textit{run}; dan (d)~\texttt{recovery-runbook.sh} untuk memandu operator pada Lingkungan A melalui prosedur pemulihan terstandarisasi. Skrip dikembangkan secara paralel dengan perancangan dan implementasi lingkungan agar siap digunakan saat eksperimen dimulai.
     
     \item \textbf{Persiapan Baseline \& Kalibrasi (September -- Oktober 2026)}
     
-    Sebelum eksperimen dimulai, fase kalibrasi dilakukan untuk memastikan validitas internal. Kegiatan meliputi: (a)~deployment InvenioRDM pada kedua lingkungan; (b)~verifikasi baseline bersih; (c)~pengukuran awal konsistensi; (d)~verifikasi penggunaan sumber daya node di bawah 70\%; dan (e)~uji coba awal untuk memvalidasi protokol pengukuran.
+    Sebelum eksperimen dimulai, fase kalibrasi dilakukan untuk memastikan validitas internal. Kegiatan meliputi: (a)~deployment InvenioRDM pada kedua lingkungan; (b)~verifikasi baseline bersih; (c)~pengukuran awal konsistensi; (d)~verifikasi penggunaan sumber daya node di bawah 70\%; dan (e)~uji coba awal untuk memvalidasi protokol pengukuran dan skrip otomasi.
     
     \item \textbf{Eksperimen dan Pengumpulan Data (Oktober -- November 2026)}
     
-    Pelaksanaan empat eksperimen sesuai desain pada Bab III. E1: konsistensi deployment (n = 5 per skenario). E2: waktu deteksi dan pemulihan drift (n = 10 per skenario). E3: jumlah intervensi manual (n = 5 per skenario). E4: traceability (n = 5 per skenario, lengkap dengan rubrik dan MTTI). Data dikumpulkan dalam bentuk \textit{timestamp}, status aplikasi, dan log. Skenario diacak untuk setiap lingkungan untuk memitigasi \textit{order effect}.
+    Pelaksanaan empat eksperimen sesuai desain pada Bab III. E1: konsistensi deployment (n = 5 per skenario). E2: waktu deteksi dan pemulihan drift (n = 10 per skenario). E3: jumlah intervensi manual (n = 5 per skenario). E4: traceability (n = 5 per skenario, lengkap dengan rubrik dan MTTI). Data dikumpulkan dalam bentuk \textit{timestamp}, status aplikasi, dan log. Skenario diacak untuk setiap lingkungan untuk memitigasi \textit{order effect}. Seluruh prosedur dijalankan menggunakan skrip otomasi untuk konsistensi.
     
     \item \textbf{Analisis Statistik dan Interpretasi (November -- Desember 2026)}
     
-    Analisis data meliputi: uji normalitas (Shapiro--Wilk), uji hipotesis (\textit{independent samples t-test} atau \textit{Mann--Whitney U test}), perhitungan ukuran efek (Cohen's $d$ atau Cliff's $\delta$), dan interpretasi hasil dalam konteks H0 dan H1. Pembahasan mencakup identifikasi skenario drift yang paling berdampak, faktor yang mempengaruhi hasil, serta ancaman terhadap validitas internal dan eksternal penelitian.
+    Analisis data meliputi: uji normalitas (Shapiro--Wilk), uji perbandingan (\textit{independent samples t-test} atau \textit{Mann--Whitney U test}), perhitungan ukuran efek (Cohen's $d$ atau Cliff's $\delta$), dan interpretasi hasil. Pembahasan mencakup identifikasi skenario drift yang paling berdampak, faktor yang mempengaruhi hasil, serta ancaman terhadap validitas internal dan eksternal penelitian.
     
     \item \textbf{Penulisan Laporan (Juni 2026 -- Januari 2027)}
     

@@ -2,47 +2,36 @@
 
 \section{Latar Belakang}
 
-Kubernetes telah menjadi platform orkestrasi kontainer yang dominan di industri maupun akademisi, digunakan oleh lebih dari 5,6 juta developer secara global \citep{cncf2024}. Kemampuan Kubernetes dalam mengelola deployment, \textit{scaling}, dan \textit{self-healing} menjadikannya pilihan utama untuk menjalankan aplikasi yang memerlukan \textit{availability} tinggi \citep{burns2016borg}. Namun, seiring bertambahnya jumlah layanan yang di-deploy pada sebuah klaster, kompleksitas operasional meningkat secara drastis. Sebuah aplikasi sekompleks InvenioRDM --- platform repositori data penelitian \textit{open-source} yang dikembangkan oleh CERN --- terdiri dari setidaknya 16 komponen yang saling bergantung: layanan \textit{web}, \textit{worker} asinkron, database relasional, mesin pencari, \textit{cache}, penyimpanan objek, \textit{ingress controller}, manajer sertifikat, enkripsi \textit{secret}, tunnel jaringan, kebijakan keamanan, sistem pemantauan, dan pencadangan \citep{invenio2024}.
+Kubernetes telah menjadi platform orkestrasi kontainer yang dominan di industri maupun akademisi, digunakan oleh lebih dari 5,6 juta developer secara global \citep{cncf2024}. Kemampuan Kubernetes dalam mengelola deployment, \textit{scaling}, dan \textit{self-healing} menjadikannya pilihan utama untuk menjalankan aplikasi yang memerlukan \textit{availability} tinggi \citep{burns2016borg}. Namun, seiring bertambahnya jumlah layanan yang di-deploy pada sebuah klaster, kompleksitas operasional meningkat secara drastis. Sebuah aplikasi sekompleks InvenioRDM, yaitu platform repositori data penelitian \textit{open-source} yang dikembangkan oleh CERN, terdiri dari setidaknya 16 komponen yang saling bergantung: layanan \textit{web}, \textit{worker} asinkron, database relasional, mesin pencari, \textit{cache}, penyimpanan objek, \textit{ingress controller}, manajer sertifikat, enkripsi \textit{secret}, tunnel jaringan, kebijakan keamanan, sistem pemantauan, dan pencadangan \citep{invenio2024}.
 
-Pengelolaan deployment aplikasi multi-service menggunakan pendekatan manual --- melalui perintah \texttt{kubectl apply}, penskalaan manual, atau \textit{patching} langsung pada klaster --- sering menghasilkan ketidakkonsistenan operasional. Praktik ini rentan terhadap \textit{configuration drift}, yaitu situasi di mana \textit{state} aktual klaster menyimpang dari \textit{state} yang didefinisikan secara deklaratif \citep{zhang2026configuration}. Drift dapat timbul akibat tiga penyebab utama: (1)~\textit{perubahan langsung pada klaster} yang tidak tercatat dalam sistem \textit{version control}; (2)~\textit{prosedur deployment yang tidak konsisten} antar operator; dan (3)~\textit{kurangnya mekanisme deteksi otomatis} yang dapat mengidentifikasi deviasi sebelum menimbulkan insiden.
+Pengelolaan deployment aplikasi multi-service menggunakan pendekatan manual, yakni melalui perintah \texttt{kubectl apply}, penskalaan manual, atau \textit{patching} langsung pada klaster, sering menghasilkan ketidakkonsistenan operasional. Praktik ini rentan terhadap \textit{configuration drift}, yaitu situasi di mana \textit{state} aktual klaster menyimpang dari \textit{state} yang didefinisikan secara deklaratif \citep{zhang2026configuration}. Drift dapat timbul akibat tiga penyebab utama: (1)~\textit{perubahan langsung pada klaster} yang tidak tercatat dalam sistem \textit{version control}; (2)~\textit{prosedur deployment yang tidak konsisten} antar operator; dan (3)~\textit{kurangnya mekanisme deteksi otomatis} yang dapat mengidentifikasi deviasi sebelum menimbulkan insiden.
 
 Penelitian empiris oleh \citet{zhang2026configuration} menunjukkan bahwa 71\% dari 2.260 skrip Kubernetes yang dianalisis mengandung \textit{misconfiguration} yang bermakna, di mana sebagian besar menyebabkan \textit{downtime} atau degradasi layanan. \citet{rahman2023security} menambahkan bahwa \textit{security misconfiguration} pada manifest Kubernetes mencakup 11 kategori yang berulang, termasuk \textit{container} yang berjalan sebagai root dan tanpa \textit{resource limits}. Studi-studi ini mengonfirmasi bahwa drift bukan sekadar masalah estetika konfigurasi, melainkan ancaman nyata terhadap keandalan dan keamanan layanan.
 
-GitOps menawarkan disiplin yang berpotensi mengatasi masalah ini. Dengan menjadikan repositori Git sebagai \textit{single source of truth}, seluruh \textit{state} infrastruktur tercatat, terverifikasi, dan dapat diaudit \citep{opengitops2021}. ArgoCD mengimplementasikan prinsip-prinsip GitOps melalui \textit{reconciliation loop} yang berjalan di dalam klaster: agen secara periodik membandingkan \textit{state} Git dengan \textit{state} aktual, dan secara otomatis menyelaraskan keduanya (\textit{negative feedback controller}) \citep{argocd2024}. Secara teoretis, model ini menjamin \textit{convergence} --- sistem selalu bergerak menuju \textit{desired state} yang dideklarasikan dalam Git \citep{limoncelli2018}.
+GitOps telah muncul sebagai paradigma yang diajukan sebagai alternatif untuk mengatasi masalah ini dengan menjadikan repositori Git sebagai \textit{single source of truth} dan mengandalkan agen \textit{software} untuk menyelaraskan \textit{state} klaster secara otomatis \citep{opengitops2021}. Beberapa penelitian mendukung klaim ini secara kualitatif: \citet{kaggantinataraja2025security} menemukan bahwa pendekatan deklaratif menghasilkan \textit{drift correction} yang lebih cepat dan paparan kerentanan yang lebih rendah; \citet{shrestha2024configuration} melaporkan karakteristik GitOps pada aspek \textit{drift detection}; dan \citet{matubber2025managing} mengukur \textit{reconciliation time} GitOps terhadap \textit{self-healing}. Namun, temuan-temuan ini mengandung kelemahan metodologis, yakni tidak ada yang mengisolasi efek paradigma deployment dari variabel pengganggu, dan tidak ada yang menerapkan uji statistik formal pada perbandingan terkontrol \citep{shrestha2024configuration, kaggantinataraja2025security, matubber2025managing}.
 
-Beberapa penelitian mendukung klaim ini secara kualitatif. \citet{kaggantinataraja2025security} menemukan bahwa pendekatan deklaratif (GitOps/ArgoCD) menghasilkan \textit{drift correction} yang lebih cepat, \textit{compliance rate} yang lebih tinggi, dan paparan kerentanan yang lebih rendah dibandingkan pendekatan imperatif. \citet{shrestha2024configuration} mengevaluasi GitOps versus Ansible untuk manajemen konfigurasi Kubernetes dan melaporkan keunggulan GitOps pada aspek \textit{drift detection} dan \textit{remedy time}. \citet{matubber2025managing} mengukur \textit{reconciliation time} dan \textit{reliability} GitOps, termasuk \textit{self-healing} terhadap \textit{configuration drift}.
-
-Namun, temuan-temuan ini mengandung kelemahan metodologis yang belum teratasi. \citet{shrestha2024configuration} menggunakan penilaian kualitatif untuk tingkat keparahan drift alih-alih operasionalisasi kuantitatif yang dapat direplikasi. \citet{kaggantinataraja2025security} tidak mengisolasi efek pendekatan deployment dari variabel pengganggu seperti ukuran klaster dan tingkat keahlian tim. \citet{matubber2025managing} mengukur waktu rekonsiliasi tanpa membandingkan secara terkontrol dengan alur kerja manual pada kondisi eksperimental yang setara. Tanpa eksperimen terkontrol yang memitigasi variabel pengganggu dan menerapkan uji hipotesis formal, klaim bahwa GitOps secara kausal mengurangi drift tidak dapat dibuktikan --- efek yang diamati mungkin atribut dari faktor ekstraneous (keahlian operator, karakteristik \textit{workload}, versi \textit{tool}) dan bukan dari paradigma deployment itu sendiri.
-
-Kesenjangan ini menjadi landasan penelitian ini, yang mengevaluasi secara empiris dampak GitOps menggunakan ArgoCD terhadap \textit{configuration drift} pada sebuah \textit{workload} multi-service (InvenioRDM) yang di-deploy pada klaster Kubernetes, melalui desain eksperimental terkontrol dengan empat metrik operasional yang terdefinisi secara eksplisit dan analisis statistik formal.
+Kesenjangan ini menjadi landasan penelitian ini: terdapat kebutuhan untuk mengevaluasi secara empiris seberapa besar dampak \textit{configuration drift} terhadap karakteristik operasional deployment (konsistensi, waktu pemulihan, intervensi manual, dan jejak audit) ketika berbagai skenario drift terjadi pada dua paradigma manajemen deployment yang berbeda, yaitu manual dan GitOps, melalui desain eksperimental terkontrol pada sebuah \textit{workload} multi-service (InvenioRDM) di klaster Kubernetes.
 
 \section{Rumusan Masalah}
 
-Berdasarkan latar belakang di atas, rumusan masalah dalam penelitian ini adalah:
+Berdasarkan latar belakang di atas, penelitian ini merumuskan permasalahan utama sebagai berikut: sejauh mana paradigma manajemen deployment yang berbeda, yaitu pendekatan manual menggunakan \texttt{kubectl} dan pendekatan GitOps menggunakan ArgoCD, menghasilkan perbedaan pada karakteristik operasional ketika menghadapi \textit{configuration drift} yang terkontrol? Permasalahan ini diuraikan ke dalam empat dimensi pengukuran. Pertama, sejauh mana konsistensi deployment berbeda antara kedua paradigma setelah terjadinya drift? Kedua, seberapa besar perbedaan waktu deteksi dan pemulihan drift antara lingkungan yang mendeteksi secara otomatis dan lingkungan yang bergantung pada intervensi manual? Ketiga, berapa banyak intervensi manual yang diperlukan untuk memulihkan \textit{state} klaster pada masing-masing paradigma setelah insiden drift? Keempat, sejauh mana perbedaan jejak audit (\textit{traceability}) antara paradigma yang mencatat setiap perubahan secara otomatis dan paradigma yang mengandalkan pencatatan manual?
 
-\begin{enumerate}
-  \item Bagaimana tingkat konsistensi deployment pada lingkungan GitOps (ArgoCD) dibandingkan dengan lingkungan deployment manual (\texttt{kubectl}) setelah diberikan skenario \textit{configuration drift} terkontrol?
-  \item Berapa lama waktu yang dibutuhkan untuk mendeteksi dan memulihkan \textit{configuration drift} pada lingkungan GitOps dibandingkan dengan lingkungan manual?
-  \item Berapa banyak intervensi manual yang diperlukan untuk memulihkan \textit{state} klaster setelah insiden drift pada masing-masing lingkungan?
-  \item Bagaimana tingkat jejak audit (\textit{traceability}) dan auditabilitas deployment pada lingkungan GitOps dibandingkan dengan lingkungan manual?
-\end{enumerate}
+Untuk menjawab pertanyaan-pertanyaan tersebut, kedua lingkungan diuji terhadap tujuh skenario \textit{configuration drift} yang merepresentasikan kesalahan operasional umum pada Kubernetes: (A)~perubahan replika yang melewati deklarasi Git, (B)~perubahan \textit{image} kontainer langsung pada klaster, (C)~modifikasi ConfigMap tanpa pembaruan sumber kebenaran, (D)~penghapusan sumber daya secara manual, (E)~\textit{patch} yang tidak sah pada sumber daya yang dikelola, (F)~aplikasi sumber daya pada \textit{namespace} yang salah, dan (G)~perubahan Secret di luar Git.
 
 \section{Batasan Masalah}
 
 Agar penelitian ini tetap fokus dan terukur, batasan masalah yang ditetapkan adalah:
 
 \begin{enumerate}
-  \item \textbf{Variabel Independen:} Pendekatan manajemen deployment dengan dua level --- (a)~deployment manual menggunakan \texttt{kubectl}, dan (b)~deployment GitOps menggunakan ArgoCD.
-  
-  \item \textbf{Variabel Dependen:} Empat metrik utama --- (1)~\textit{konsistensi deployment} (persentase), (2)~\textit{waktu deteksi dan pemulihan drift} (detik), (3)~\textit{jumlah intervensi manual} (jumlah tindakan korektif), dan (4)~\textit{tingkat jejak audit / traceability} (skor rubrik 1--5, MTTI, serta kelengkapan audit log).
-  
   \item Penelitian dilakukan pada klaster Kubernetes tunggal yang dikelola Rancher dengan spesifikasi 3 node, 24 total inti CPU, dan $\sim$23 Gi total memori; skenario \textit{multi-cluster} tidak termasuk dalam ruang lingkup.
   
-  \item Studi kasus yang digunakan adalah deployment InvenioRDM beserta 16 komponen infrastruktur dan dependensinya. Komponen InvenioRDM sebagai aplikasi (fitur, antarmuka, logika bisnis) bukan variabel penelitian --- InvenioRDM merupakan subjek uji, bukan objek penelitian.
+  \item Studi kasus yang digunakan adalah deployment InvenioRDM beserta 16 komponen infrastruktur dan dependensinya. InvenioRDM merupakan subjek uji (\textit{test subject}), bukan objek penelitian.
   
-  \item Skenario \textit{drift} yang diuji terbatas pada tujuh kategori: (A)~perubahan replika, (B)~perubahan \textit{image}, (C)~modifikasi ConfigMap, (D)~penghapusan sumber daya, (E)~\textit{patch} manual, (F)~\textit{drift} lintas \textit{namespace}, dan (G)~perubahan Secret.
+  \item Skenario \textit{drift} yang diuji terbatas pada tujuh kategori: (A)~perubahan replika, (B)~perubahan \textit{image}, (C)~modifikasi ConfigMap, (D)~penghapusan sumber daya, (E)~\textit{patch} manual tidak sah, (F)~drift lintas \textit{namespace}, dan (G)~perubahan Secret.
   
-  \item Analisis statistik menggunakan uji Shapiro-Wilk untuk normalitas, dilanjutkan dengan \textit{independent samples t-test} (jika data normal) atau \textit{Mann--Whitney U test} (jika data tidak normal), dengan tingkat signifikansi $\alpha = 0,05$ dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$).
+  \item Dua paradigma manajemen deployment dibandingkan: (a)~deployment manual menggunakan \texttt{kubectl}, dan (b)~deployment GitOps menggunakan ArgoCD.
+  
+  \item Analisis statistik menggunakan uji Shapiro-Wilk untuk normalitas, dilanjutkan dengan \textit{independent samples t-test} (jika data normal) atau \textit{Mann--Whitney U test} (jika data tidak normal), dengan tingkat signifikansi $\alpha = 0{,}05$ dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$).
 \end{enumerate}
 
 \section{Tujuan Penelitian}
@@ -50,37 +39,25 @@ Agar penelitian ini tetap fokus dan terukur, batasan masalah yang ditetapkan ada
 Tujuan dari penelitian ini adalah:
 
 \begin{enumerate}
-  \item Mengukur dan membandingkan tingkat konsistensi deployment pada lingkungan GitOps (ArgoCD) dan lingkungan manual (\texttt{kubectl}) setelah skenario \textit{configuration drift}.
+  \item Mengukur dan membandingkan konsistensi deployment pada lingkungan GitOps dan lingkungan manual setelah skenario \textit{configuration drift} terkontrol.
   
-  \item Mengukur dan membandingkan waktu deteksi dan pemulihan \textit{configuration drift} pada kedua lingkungan menggunakan metrik kuantitatif.
+  \item Mengukur dan membandingkan waktu deteksi dan pemulihan \textit{configuration drift} antara kedua lingkungan.
   
-  \item Mengukur dan membandingkan jumlah intervensi manual yang diperlukan oleh operator untuk memulihkan \textit{state} klaster setelah insiden drift pada masing-masing lingkungan.
+  \item Mengukur dan membandingkan jumlah intervensi manual yang diperlukan untuk memulihkan \textit{state} klaster setelah insiden drift pada masing-masing lingkungan.
   
-  \item Mengukur dan membandingkan tingkat jejak audit (\textit{traceability}) pada lingkungan GitOps dan lingkungan manual menggunakan rubrik operasional dan metrik kuantitatif.
+  \item Mengukur dan membandingkan jejak audit (\textit{traceability}) antara lingkungan GitOps dan manual.
 \end{enumerate}
-
-\section{Hipotesis Penelitian}
-
-Penelitian ini menguji hipotesis berikut:
-
-\subsection{Hipotesis Nol \texorpdfstring{(H$_0$)}{(H0)}}
-
-Tidak terdapat perbedaan yang signifikan secara statistik antara pendekatan deployment GitOps (ArgoCD) dan pendekatan deployment manual (\texttt{kubectl}) pada metrik: konsistensi deployment, waktu pemulihan drift, jumlah intervensi manual, dan tingkat jejak audit.
-
-\subsection{Hipotesis Alternatif \texorpdfstring{(H$_1$)}{(H1)}}
-
-Pendekatan deployment GitOps (ArgoCD) secara signifikan meningkatkan konsistensi deployment, mengurangi waktu pemulihan drift, menurunkan jumlah intervensi manual, dan meningkatkan tingkat jejak audit (\textit{traceability}) dibandingkan dengan pendekatan deployment manual (\texttt{kubectl}).
 
 \section{Manfaat Penelitian}
 
 Penelitian ini diharapkan memberikan manfaat berikut:
 
 \begin{enumerate}
-  \item \textbf{Teoritis:} Memberikan bukti empiris terukur mengenai dampak operasional GitOps/ArgoCD pada aspek konsistensi deployment, pemulihan drift, dan jejak audit --- yang selama ini banyak didasarkan pada klaim vendor atau studi kasus deskriptif. Hasil ini melengkapi literatur akademis dengan data eksperimental yang dapat direproduksi dan diverifikasi, serta memperkuat atau menantang klaim kausal yang belum teruji secara terkontrol.
+  \item \textbf{Teoritis:} Memberikan bukti empiris terukur mengenai dampak operasional skenario \textit{configuration drift} pada dua paradigma deployment, yang selama ini banyak didasarkan pada klaim vendor atau studi kasus deskriptif. Hasil ini melengkapi literatur akademis dengan data eksperimental yang dapat direproduksi dan diverifikasi.
   
-  \item \textbf{Metodologis:} Menawarkan protokol eksperimental yang dapat direplikasi --- termasuk skenario drift terstandarisasi, metrik operasional, dan prosedur analisis statistik --- sehingga penelitian selanjutnya dapat mereplikasi, memperluas, atau mengkritik temuan ini pada konteks dan platform yang berbeda.
+  \item \textbf{Metodologis:} Menawarkan protokol eksperimental yang dapat direplikasi, termasuk skenario drift terstandarisasi, metrik operasional, dan prosedur analisis statistik, sehingga penelitian selanjutnya dapat mereplikasi, memperluas, atau mengkritik temuan ini pada konteks dan platform yang berbeda.
   
-  \item \textbf{Praktis:} Menyediakan wawasan operasional yang dapat membantu administrator klaster Kubernetes dalam memilih pendekatan deployment yang sesuai berdasarkan bukti kuantitatif, serta menyoroti skenario drift yang paling rentan pada masing-masing pendekatan.
+  \item \textbf{Praktis:} Menyediakan wawasan operasional yang dapat membantu administrator klaster Kubernetes dalam memilih paradigma deployment yang sesuai berdasarkan bukti kuantitatif, serta menyoroti skenario drift yang paling rentan pada masing-masing paradigma.
 \end{enumerate}
 
 \section{Sistematika Penulisan}
@@ -88,8 +65,8 @@ Penelitian ini diharapkan memberikan manfaat berikut:
 Sistematika penulisan proposal tugas akhir ini adalah sebagai berikut:
 
 \begin{itemize}
-  \item \textbf{Bab I:} Pendahuluan --- berisi latar belakang, rumusan masalah, batasan masalah, tujuan penelitian, hipotesis, manfaat penelitian, dan sistematika penulisan.
-  \item \textbf{Bab II:} Penelitian Terkait --- membahas studi empiris terkait \textit{configuration drift} pada Kubernetes, evaluasi GitOps, dasar teori rekonsiliasi dan konvergensi, metode eksperimental pada riset sistem, serta \textit{research gap} yang menjadi landasan penelitian.
-  \item \textbf{Bab III:} Metode dan Rancangan Penelitian --- menjelaskan metodologi studi eksperimental terkontrol, definisi variabel, tujuh skenario drift, protokol pengukuran, analisis statistik, ancaman terhadap validitas, dan lingkungan eksperimen.
-  \item \textbf{Bab IV:} Jadwal Penelitian --- memuat Gantt Chart berbasis bulan untuk perencanaan waktu penelitian selama 8 bulan.
+  \item \textbf{Bab I:} Pendahuluan, berisi latar belakang, rumusan masalah, batasan masalah, tujuan penelitian, manfaat penelitian, dan sistematika penulisan.
+  \item \textbf{Bab II:} Penelitian Terkait, membahas studi empiris terkait \textit{configuration drift} pada Kubernetes, evaluasi GitOps, dasar teori rekonsiliasi dan konvergensi, metode eksperimental pada riset sistem, serta \textit{research gap} yang menjadi landasan penelitian.
+  \item \textbf{Bab III:} Metode dan Rancangan Penelitian, menjelaskan metodologi studi eksperimental terkontrol, definisi variabel dan intervensi, tujuh skenario drift, protokol pengukuran, analisis statistik komparatif, ancaman terhadap validitas, dan lingkungan eksperimen.
+  \item \textbf{Bab IV:} Jadwal Penelitian, memuat Gantt Chart berbasis bulan untuk perencanaan waktu penelitian selama 8 bulan.
 \end{itemize}
