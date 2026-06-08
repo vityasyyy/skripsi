@@ -50,11 +50,11 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     
     \item \textbf{Implementasi ArgoCD + Baseline Manual (Agustus -- September 2026)}
     
-    Tahap implementasi meliputi: konfigurasi ArgoCD pada klaster, pembuatan repositori GitOps dengan manifest deklaratif, konfigurasi baseline manual (alur kerja \texttt{kubectl}), serta konfigurasi logging dan monitoring (Prometheus, Grafana, Kubernetes audit logs, ArgoCD notifications). Pada akhir fase ini, kedua lingkungan siap untuk eksperimen.
+    Tahap implementasi meliputi: konfigurasi ArgoCD pada klaster, pembuatan repositori GitOps dengan manifest deklaratif, konfigurasi baseline manual (\textit{workflow} \texttt{kubectl}), serta konfigurasi \textit{logging} dan \textit{monitoring} (Prometheus, Grafana, Kubernetes audit logs, ArgoCD notifications). Pada akhir fase ini, kedua lingkungan siap untuk eksperimen.
     
     \item \textbf{Pengembangan Skrip Otomasi (Juli -- September 2026)}
     
-    Pengembangan empat skrip otomasi yang mendukung konsistensi prosedural eksperimen: (a)~\texttt{drift-inject.sh} untuk penyuntikan skenario drift secara acak dengan pencatatan \textit{timestamp}; (b)~\texttt{metrics-collect.sh} untuk pengumpulan metrik secara berkala via ArgoCD API dan \texttt{kubectl}; (c)~\texttt{baseline-check.sh} untuk verifikasi kondisi klaster sebelum setiap \textit{run}; dan (d)~\texttt{recovery-runbook.sh} untuk memandu operator pada Lingkungan A melalui prosedur pemulihan terstandarisasi. Skrip dikembangkan secara paralel dengan perancangan dan implementasi lingkungan agar siap digunakan saat eksperimen dimulai.
+    Pengembangan empat skrip otomasi yang mendukung konsistensi prosedural eksperimen: (a)~\texttt{drift-inject.sh} untuk \textit{injection} skenario drift secara acak dengan \textit{logging} \textit{timestamp}; (b)~\texttt{metrics-collect.sh} untuk pengumpulan metrik secara berkala via ArgoCD API dan \texttt{kubectl}; (c)~\texttt{baseline-check.sh} untuk verifikasi kondisi klaster sebelum setiap \textit{run}; dan (d)~\texttt{recovery-runbook.sh} untuk memandu operator pada Lingkungan A melalui prosedur \textit{recovery} terstandarisasi. Skrip dikembangkan secara paralel dengan perancangan dan implementasi lingkungan agar siap digunakan saat eksperimen dimulai.
     
     \item \textbf{Persiapan Baseline \& Kalibrasi (September -- Oktober 2026)}
     
@@ -62,7 +62,7 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     
     \item \textbf{Eksperimen dan Pengumpulan Data (Oktober -- November 2026)}
     
-    Pelaksanaan empat eksperimen sesuai desain pada Bab III. E1: konsistensi deployment (n = 5 per skenario). E2: waktu deteksi dan pemulihan drift (n = 10 per skenario). E3: jumlah intervensi manual (n = 5 per skenario). E4: traceability (n = 5 per skenario, lengkap dengan rubrik dan MTTI). Data dikumpulkan dalam bentuk \textit{timestamp}, status aplikasi, dan log. Skenario diacak untuk setiap lingkungan untuk memitigasi \textit{order effect}. Seluruh prosedur dijalankan menggunakan skrip otomasi untuk konsistensi.
+    Pelaksanaan empat eksperimen sesuai desain pada Bab III. E1: konsistensi deployment (n = 5 per skenario). E2: \textit{detection time} dan \textit{drift recovery time} (n = 10 per skenario). E3: jumlah intervensi manual (n = 5 per skenario). E4: \textit{traceability} (n = 5 per skenario, lengkap dengan rubrik dan MTTI). Data dikumpulkan dalam bentuk \textit{timestamp}, status aplikasi, dan log. Skenario diacak untuk setiap lingkungan untuk memitigasi \textit{order effect}. Seluruh prosedur dijalankan menggunakan skrip otomasi untuk konsistensi.
     
     \item \textbf{Analisis Statistik dan Interpretasi (November -- Desember 2026)}
     
