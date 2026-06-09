@@ -1,6 +1,6 @@
 \chapter{JADWAL PENELITIAN}
 
-Penelitian ini direncanakan untuk dilaksanakan selama delapan bulan, dari bulan Juni 2026 hingga Januari 2027. Jadwal penelitian disusun berdasarkan tahapan studi eksperimental terkontrol: persiapan lingkungan, pengembangan skrip otomasi, kalibrasi baseline, pelaksanaan eksperimen, analisis statistik, dan penulisan laporan.
+Penelitian ini direncanakan untuk dilaksanakan selama delapan bulan, dari bulan Juni 2026 hingga Januari 2027. Jadwal penelitian disusun berdasarkan tahapan evaluasi empiris terkontrol: persiapan lingkungan, pengembangan skrip otomasi, kalibrasi baseline, pelaksanaan eksperimen, analisis statistik, dan penulisan laporan.
 
 Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasis bulan. Simbol $\bullet$ menunjukkan bahwa kegiatan dilaksanakan pada bulan tersebut.
 
@@ -25,7 +25,7 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     \hline
     Persiapan Baseline \& Kalibrasi & & & & $\bullet$ & $\bullet$ & & & \\
     \hline
-    Eksperimen \& Pengumpulan Data (E1--E4) & & & & & $\bullet$ & $\bullet$ & & \\
+    Eksperimen \& Pengumpulan Data (E1--E3) & & & & & $\bullet$ & $\bullet$ & & \\
     \hline
     Analisis Statistik \& Interpretasi & & & & & & $\bullet$ & $\bullet$ & \\
     \hline
@@ -46,7 +46,7 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     
     \item \textbf{Perancangan Lingkungan (Juli -- Agustus 2026)}
     
-    Tahap ini meliputi perancangan arsitektur Lingkungan A (deployment manual/\texttt{kubectl}) dan Lingkungan B (deployment GitOps/ArgoCD) pada klaster Kubernetes yang sama. Perancangan meliputi: definisi variabel dan intervensi, pemilihan tujuh skenario drift, rancangan tabel rubrik traceability, dan spesifikasi protokol pengukuran.
+    Tahap ini meliputi perancangan arsitektur Lingkungan A (deployment manual/\texttt{kubectl}) dan Lingkungan B (deployment GitOps/ArgoCD) pada klaster Kubernetes yang sama. Perancangan meliputi: definisi variabel dan intervensi, pemilihan tujuh skenario drift, spesifikasi protokol pengukuran untuk tiga metrik (R1, R2, R3), dan rancangan eksperimen.
     
     \item \textbf{Implementasi ArgoCD + Baseline Manual (Agustus -- September 2026)}
     
@@ -62,11 +62,11 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     
     \item \textbf{Eksperimen dan Pengumpulan Data (Oktober -- November 2026)}
     
-    Pelaksanaan empat eksperimen sesuai desain pada Bab III. E1: konsistensi deployment (n = 5 per skenario). E2: \textit{detection time} dan \textit{drift recovery time} (n = 10 per skenario). E3: jumlah intervensi manual (n = 5 per skenario). E4: \textit{traceability} (n = 5 per skenario, lengkap dengan rubrik dan MTTI). Data dikumpulkan dalam bentuk \textit{timestamp}, status aplikasi, dan log. Skenario diacak untuk setiap lingkungan untuk memitigasi \textit{order effect}. Seluruh prosedur dijalankan menggunakan skrip otomasi untuk konsistensi.
+    Pelaksanaan tiga eksperimen sesuai desain pada Bab III. E1: konsistensi deployment (n = 5 per skenario). E2: \textit{detection time}, \textit{recovery time}, dan \textit{root cause identification time} (n = 10 per skenario). E3: \textit{traceability} operasional (deskriptif, dokumentasi kelengkapan audit log per skenario). Data dikumpulkan dalam bentuk \textit{timestamp}, status aplikasi, dan log. Skenario diacak untuk setiap lingkungan untuk memitigasi \textit{order effect}. Seluruh prosedur dijalankan menggunakan skrip otomasi untuk konsistensi.
     
     \item \textbf{Analisis Statistik dan Interpretasi (November -- Desember 2026)}
     
-    Analisis data meliputi: uji normalitas (Shapiro--Wilk), uji perbandingan (\textit{independent samples t-test} atau \textit{Mann--Whitney U test}), perhitungan ukuran efek (Cohen's $d$ atau Cliff's $\delta$), dan interpretasi hasil. Pembahasan mencakup identifikasi skenario drift yang paling berdampak, faktor yang mempengaruhi hasil, serta ancaman terhadap validitas internal dan eksternal penelitian.
+    Analisis data meliputi: statistik deskriptif (mean, median, rentang, deviasi standar), uji perbandingan (\textit{Mann--Whitney U test}), perhitungan ukuran efek (Cohen's \textit{d}), dan interpretasi hasil. Pembahasan mencakup identifikasi skenario drift yang paling berdampak, faktor yang mempengaruhi hasil, serta ancaman terhadap validitas internal dan eksternal penelitian.
     
     \item \textbf{Penulisan Laporan (Juni 2026 -- Januari 2027)}
     
