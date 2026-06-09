@@ -57,13 +57,12 @@
 \end{scope}
 
 % Metrics
-\node[box=metricyellow, below=0.8cm of m3, xshift=0.8cm] (mr1) {R1};
+\node[box=metricyellow, below=0.8cm of m3, xshift=0.5cm] (mr1) {R1};
 \node[box=metricyellow, right=0.3cm of mr1] (mr2) {R2};
 \node[box=metricyellow, right=0.3cm of mr2] (mr3) {R3};
-\node[box=metricyellow, right=0.3cm of mr3] (mr4) {R4};
 
 \begin{scope}[on background layer]
-    \node[group=metricyellow, fit=(mr1)(mr4), label={[font=\small\bfseries]below:Metrik}] (metrics) {};
+    \node[group=metricyellow, fit=(mr1)(mr3), label={[font=\small\bfseries]below:Metrik}] (metrics) {};
 \end{scope}
 
 % Arrows

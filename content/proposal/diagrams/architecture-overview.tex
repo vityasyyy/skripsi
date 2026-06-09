@@ -48,16 +48,15 @@
 };
 
 % Metrics
-\node[box=metricyellow, right=2.5cm of k8sA, yshift=0.6cm] (m1) {R1 Konsistensi};
+\node[box=metricyellow, right=2.5cm of k8sA] (m1) {R1 Konsistensi};
 \node[box=metricyellow, above=0.3cm of m1] (m2) {R2 Waktu (s)};
-\node[box=metricyellow, below=0.3cm of m1] (m3) {R3 Intervensi};
-\node[box=metricyellow, below=0.3cm of m3] (m4) {R4 Traceability};
+\node[box=metricyellow, below=0.3cm of m1] (m3) {R3 Traceability};
 
 % Group boxes
 \begin{scope}[on background layer]
     \node[group=gitopsblue, fit=(argo)(k8sB), label={[font=\small\bfseries]above:Lingkungan B: GitOps}] (envB) {};
     \node[group=manualgray, fit=(kubectl)(k8sA), label={[font=\small\bfseries]above:Lingkungan A: Manual}] (envA) {};
-    \node[group=metricyellow, fit=(m1)(m2)(m3)(m4), label={[font=\small\bfseries]above:Metrik}] (metrics) {};
+    \node[group=metricyellow, fit=(m1)(m2)(m3), label={[font=\small\bfseries]above:Metrik}] (metrics) {};
 \end{scope}
 
 % Arrows
@@ -67,11 +66,9 @@
 \draw[arrow] (k8sA) -- (m1);
 \draw[arrow] (k8sA) -- (m2);
 \draw[arrow] (k8sA) -- (m3);
-\draw[arrow] (k8sA) -- (m4);
 \draw[arrow] (k8sB) -- (m1);
 \draw[arrow] (k8sB) -- (m2);
 \draw[arrow] (k8sB) -- (m3);
-\draw[arrow] (k8sB) -- (m4);
 
 % Drift injection label
 \node[font=\footnotesize, text=scenariored!80!black] at ($(k8sA)!0.5!(k8sB) + (0,0.6)$) 
