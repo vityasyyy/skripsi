@@ -12,7 +12,7 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.6cm and 2.0cm,
+    node distance=0.35cm and 1.5cm,
     box/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
                 minimum width=2.8cm, minimum height=1.0cm, align=center,
                 line width=1pt, font=\small},
@@ -29,8 +29,8 @@
     \textbf{kubectl}\\
     \scriptsize (imperatif)
 };
-\node[box=manualgray, below=0.6cm of kA] (k8sA) {
-    \includegraphics[height=12pt]{logos/kubernetes.png}\\[1pt]
+\node[box=manualgray, below=0.4cm of kA] (k8sA) {
+    \includegraphics[height=10pt]{logos/kubernetes.png}\\[1pt]
     \textbf{Klaster A}
 };
 
@@ -39,16 +39,16 @@
 \end{scope}
 
 % Environment B
-\node[box=gitopsblue, right=3.5cm of kA] (gitB) {
-    \includegraphics[height=12pt]{logos/git.png}\\[1pt]
+\node[box=gitopsblue, right=2.5cm of kA] (gitB) {
+    \includegraphics[height=10pt]{logos/git.png}\\[1pt]
     \textbf{Git Repo}
 };
-\node[box=gitopsblue, below=0.4cm of gitB] (argoB) {
-    \includegraphics[height=12pt]{logos/argocd.png}\\[1pt]
+\node[box=gitopsblue, below=0.3cm of gitB] (argoB) {
+    \includegraphics[height=10pt]{logos/argocd.png}\\[1pt]
     \textbf{ArgoCD}
 };
-\node[box=gitopsblue, below=0.4cm of argoB] (k8sB) {
-    \includegraphics[height=12pt]{logos/kubernetes.png}\\[1pt]
+\node[box=gitopsblue, below=0.3cm of argoB] (k8sB) {
+    \includegraphics[height=10pt]{logos/kubernetes.png}\\[1pt]
     \textbf{Klaster B}
 };
 
@@ -63,13 +63,13 @@
 \node[rectangle, rounded corners=3pt, draw=driftred, fill=driftred!10,
       minimum width=3.5cm, minimum height=0.8cm, align=center,
       line width=1pt, font=\small\bfseries, text=driftred!80!black,
-      above=1.2cm of $(k8sA)!0.5!(k8sB)$] (drift) {Injeksi Drift (A--G)};
+      above=0.5cm of $(k8sA)!0.5!(k8sB)$] (drift) {Injeksi Drift (A--G)};
 
 \draw[arrow, draw=driftred] (drift.south west) -- (envA.north);
 \draw[arrow, draw=driftred] (drift.south east) -- (envB.north);
 
 % Controls (bottom)
-\node[control, below=0.8cm of $(k8sA)!0.5!(k8sB)$] (ctrl) {
+\node[control, below=0.3cm of $(k8sA)!0.5!(k8sB)$] (ctrl) {
     \textbf{Kontrol:} Klaster sama $\cdot$ Workload sama $\cdot$ Drift sama $\cdot$ Hardware sama
 };
 
@@ -83,15 +83,15 @@
 \node[rectangle, rounded corners=2pt, draw=metricyellow, fill=metricyellow!15,
       minimum width=1.5cm, minimum height=0.5cm, align=center,
       line width=0.8pt, font=\scriptsize\bfseries,
-      below=0.3cm of ctrl, xshift=-2.5cm] (m1) {R1: Konsistensi};
+      below=0.15cm of ctrl, xshift=-2.0cm] (m1) {R1: Konsistensi};
 \node[rectangle, rounded corners=2pt, draw=metricyellow, fill=metricyellow!15,
       minimum width=1.5cm, minimum height=0.5cm, align=center,
       line width=0.8pt, font=\scriptsize\bfseries,
-      below=0.3cm of ctrl] (m2) {R2: Waktu};
+      below=0.15cm of ctrl] (m2) {R2: Waktu};
 \node[rectangle, rounded corners=2pt, draw=metricyellow, fill=metricyellow!15,
       minimum width=1.5cm, minimum height=0.5cm, align=center,
       line width=0.8pt, font=\scriptsize\bfseries,
-      below=0.3cm of ctrl, xshift=2.5cm] (m3) {R3: Traceability};
+      below=0.15cm of ctrl, xshift=2.0cm] (m3) {R3: Traceability};
 
 \end{tikzpicture}
 \end{document}

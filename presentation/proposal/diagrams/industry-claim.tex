@@ -17,7 +17,7 @@
                   minimum width=4.0cm, minimum height=0.65cm, align=center,
                   line width=0.8pt, font=\scriptsize},
     evidence/.style={rectangle, rounded corners=2pt, draw=warnorange, fill=warnorange!10,
-                     minimum width=5.0cm, minimum height=0.65cm, align=center,
+                     minimum width=4.2cm, minimum height=0.65cm, align=center,
                      line width=0.8pt, font=\scriptsize},
     gapbox/.style={rectangle, rounded corners=5pt, draw=driftred, fill=driftred!15,
                    inner sep=8pt, line width=2pt},
@@ -35,11 +35,11 @@
 \node[claim, below=0.2cm of s4] (s5) {Matubber (2025)};
 
 % Evidence types
-\node[evidence, right=1.0cm of s1] (e1) {Konseptual / prinsip};
-\node[evidence, right=1.0cm of s2] (e2) {Klaim produk};
-\node[evidence, right=1.0cm of s3] (e3) {Kualitatif, tanpa statistik};
-\node[evidence, right=1.0cm of s4] (e4) {Observasional, variabel tidak dikontrol};
-\node[evidence, right=1.0cm of s5] (e5) {Tanpa control group};
+\node[evidence, right=0.7cm of s1] (e1) {Konseptual / prinsip};
+\node[evidence, right=0.7cm of s2] (e2) {Klaim produk};
+\node[evidence, right=0.7cm of s3] (e3) {Kualitatif, tanpa statistik};
+\node[evidence, right=0.7cm of s4] (e4) {Observasional, variabel tidak dikontrol};
+\node[evidence, right=0.7cm of s5] (e5) {Tanpa control group};
 
 % Arrows
 \draw[arrow] (s1) -- (e1);
@@ -49,7 +49,7 @@
 \draw[arrow] (s5) -- (e5);
 
 % Gap message
-\node[gapbox, below=0.7cm of $(e3)!0.5!(e4)$, text width=9cm, align=center, font=\small\bfseries, text=driftred!80!black] (gap) {
+\node[gapbox, below=0.7cm of $(e3)!0.5!(e4)$, text width=7.5cm, align=center, font=\small\bfseries, text=driftred!80!black] (gap) {
     Klaim diterima luas.\\
     Bukti terkontrol lemah.\\[4pt]
     \normalfont\small Dampak kausal paradigma deployment tetap tidak jelas
@@ -61,7 +61,7 @@
 % Our contribution
 \node[rectangle, rounded corners=5pt, draw=okgreen, fill=okgreen!10,
       inner sep=8pt, line width=1.5pt, below=0.5cm of gap, 
-      text width=9cm, align=center, font=\small\bfseries, text=okgreen!80!black] (ours) {
+      text width=7.5cm, align=center, font=\small\bfseries, text=okgreen!80!black] (ours) {
     Penelitian ini:\\
     Evaluasi empiris terkontrol + analisis statistik komparatif
 };

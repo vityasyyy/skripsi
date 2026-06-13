@@ -1,15 +1,22 @@
 \usetheme{ugm1}
 \usepackage{array}
+\usepackage{fix-cm}
+\hypersetup{
+    pdftitle={Configuration Drift pada Deployment Aplikasi Multi-Service di Klaster Kubernetes},
+    pdfauthor={Muhammad Argya Vityasy},
+    pdfsubject={Proposal Tugas Akhir},
+}
+\pdfstringdefDisableCommands{\def\translate#1{#1}}
 
 % -------------------------------------------------------
 % Presentation metadata
 % -------------------------------------------------------
-\title{Configuration Drift pada Deployment Aplikasi\\Multi-Service di Klaster Kubernetes}
-\subtitle{Evaluasi Empiris Paradigma Manual dan GitOps\\(Studi Kasus InvenioRDM)}
-\author{Muhammad Argya Vityasy\\[3pt]
-NIM: 23/522547/PA/22475\\[2pt]
-Dosen Pembimbing: Dr.\ techn.\ Guntur Budi Herwanto, S.Kom., M.Cs.\\[2pt]
-Dosen Penguji 1: Dr.\ techn.\ Kabul Kurniawan, S.Kom., M.Cs.\\[2pt]
+\title{Configuration Drift pada Deployment Aplikasi\texorpdfstring{\\}{} Multi-Service di Klaster Kubernetes}
+\subtitle{Evaluasi Empiris Paradigma Manual dan GitOps\texorpdfstring{\\}{} (Studi Kasus InvenioRDM)}
+\author{Muhammad Argya Vityasy\texorpdfstring{\\[3pt]}{, }
+NIM: 23/522547/PA/22475\texorpdfstring{\\[2pt]}{, }
+Dosen Pembimbing: Dr.\ techn.\ Guntur Budi Herwanto, S.Kom., M.Cs.\texorpdfstring{\\[2pt]}{, }
+Dosen Penguji 1: Dr.\ techn.\ Kabul Kurniawan, S.Kom., M.Cs.\texorpdfstring{\\[2pt]}{, }
 Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \date{2026}
 
@@ -56,7 +63,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \end{column}
         \begin{column}{0.49\textwidth}
             \centering
-            \includegraphics[height=0.6\textheight]{motivation-drift}
+            \includegraphics[height=0.65\textheight,keepaspectratio]{motivation-drift}
         \end{column}
     \end{columns}
 \end{frame}
@@ -70,7 +77,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Klaim Industri vs. Bukti Ilmiah}
     \centering
-    \includegraphics[height=0.65\textheight]{industry-claim}
+    \includegraphics[width=0.92\textwidth,height=0.58\textheight,keepaspectratio]{industry-claim}
 \end{frame}
 }
 
@@ -82,7 +89,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Mengapa Bukti Terdahulu Tidak Cukup?}
     \centering
-    \includegraphics[height=0.6\textheight]{research-gap}
+    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{research-gap}
 \end{frame}
 }
 
@@ -125,7 +132,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Desain Eksperimen}
     \centering
-    \includegraphics[height=0.55\textheight]{experiment-comparison}
+    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{experiment-comparison}
     \vspace{0.1cm}
     \begin{beamercolorbox}[wd=0.9\textwidth, sep=0.15cm, center, rounded=true]{structure}
         \small Satu variabel independen: \textbf{paradigma deployment}\\
@@ -142,7 +149,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Mengapa InvenioRDM?}
     \centering
-    \includegraphics[height=0.6\textheight]{inveniordm-justification}
+    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{inveniordm-justification}
 \end{frame}
 }
 
@@ -154,7 +161,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Skenario \textit{Configuration Drift} Terkontrol}
     \centering
-    \includegraphics[height=0.65\textheight]{drift-scenarios}
+    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{drift-scenarios}
 \end{frame}
 }
 
@@ -166,7 +173,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Metrik Pengukuran dan Operasionalisasi}
     \centering
-    \includegraphics[height=0.65\textheight]{operationalization-validity}
+    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{operationalization-validity}
 \end{frame}
 }
 
@@ -229,7 +236,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \end{column}
         \begin{column}{0.42\textwidth}
             \centering
-            \includegraphics[height=0.45\textheight]{experiment-flow-presentation}
+            \includegraphics[width=\columnwidth,height=0.6\textheight,keepaspectratio]{experiment-flow-presentation}
             \vspace{0.3cm}
             \begin{beamercolorbox}[wd=\textwidth, sep=0.25cm, rounded=true]{structure}
                 \centering\small
@@ -307,7 +314,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \end{column}
         \begin{column}{0.55\textwidth}
             \centering
-            \includegraphics[height=0.6\textheight]{gitops-flow}
+            \includegraphics[width=\columnwidth,height=0.6\textheight,keepaspectratio]{gitops-flow}
         \end{column}
     \end{columns}
 \end{frame}
@@ -339,7 +346,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Backup: Detail Metrik Pengukuran}
     \centering
-    \includegraphics[height=0.65\textheight]{metrics-overview}
+    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{metrics-overview}
 \end{frame}
 }
 
@@ -408,23 +415,23 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Backup: Detail Skenario Drift}
     \small
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{1.2cm}|p{3.0cm}|p{5.5cm}|}
+    \begin{tabular}{|c|l|l|}
         \hline
         \textbf{ID} & \textbf{Skenario} & \textbf{Perintah} \\
         \hline
-        A & Perubahan Replika & \texttt{kubectl scale deployment --replicas=5} \\
+        A & Perubahan Replika & \texttt{\small kubectl scale deployment --replicas=5} \\
         \hline
-        B & Perubahan Image & \texttt{kubectl edit deployment} (ubah \texttt{image}) \\
+        B & Perubahan Image & \texttt{\small kubectl edit deployment} {\small(ubah image)} \\
         \hline
-        C & Perubahan ConfigMap & \texttt{kubectl edit configmap} \\
+        C & Perubahan ConfigMap & \texttt{\small kubectl edit configmap} \\
         \hline
-        D & Resource Deletion & \texttt{kubectl delete deployment} \\
+        D & Resource Deletion & \texttt{\small kubectl delete deployment} \\
         \hline
-        E & Patch Manual Tidak Sah & \texttt{kubectl patch} (JSON patch) \\
+        E & Patch Manual Tidak Sah & \texttt{\small kubectl patch} {\small(JSON patch)} \\
         \hline
-        F & Drift Lintas Namespace & \texttt{kubectl apply -f ... -n wrong-ns} \\
+        F & Drift Lintas Namespace & \texttt{\small kubectl apply -f ... -n wrong-ns} \\
         \hline
-        G & Perubahan Secret & \texttt{kubectl patch secret} \\
+        G & Perubahan Secret & \texttt{\small kubectl patch secret} \\
         \hline
     \end{tabular}
 \end{frame}

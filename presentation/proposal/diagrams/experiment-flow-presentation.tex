@@ -12,50 +12,48 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.6cm and 0.8cm,
+    node distance=0.4cm and 0.3cm,
     box/.style={rectangle, rounded corners=3pt, draw=gray!60, fill=white,
-                minimum width=2.5cm, minimum height=1.2cm, align=center,
-                line width=0.8pt, font=\small},
-    arrow/.style={->, >=stealth, line width=1pt, draw=gray!70},
-    looparrow/.style={->, >=stealth, line width=1pt, draw=driftred!70, dashed}
+                minimum width=1.6cm, minimum height=0.8cm, align=center,
+                line width=0.8pt, font=\tiny},
+    arrow/.style={->, >=stealth, line width=0.8pt, draw=gray!70},
+    looparrow/.style={->, >=stealth, line width=0.8pt, draw=driftred!70, dashed}
 ]
 
-% Timeline
 \node[box, draw=gitopsblue, fill=gitopsblue!10] (s1) {
     \textbf{1. Persiapan}\\
-    \scriptsize Lingkungan A \& B
+    Lingkungan A \& B
 };
-\node[box, draw=okgreen, fill=okgreen!10, right=0.8cm of s1] (s2) {
+\node[box, draw=okgreen, fill=okgreen!10, right=0.3cm of s1] (s2) {
     \textbf{2. Baseline}\\
-    \scriptsize $O_1$: Kalibrasi
+    $O_1$: Kalibrasi
 };
-\node[box, draw=driftred, fill=driftred!10, right=0.8cm of s2] (s3) {
-    \textbf{3. Injeksi Drift}\\
-    \scriptsize Skenario A--G
-};
-\node[box, draw=metricyellow!80!black, fill=metricyellow!10, right=0.8cm of s3] (s4) {
-    \textbf{4. Pengukuran}\\
-    \scriptsize $O_2$: R1, R2, R3
-};
-\node[box, draw=manualgray, fill=manualgray!10, right=0.8cm of s4] (s5) {
-    \textbf{5. Analisis}\\
-    \scriptsize Mann--Whitney U
-};
-\node[box, draw=gitopsblue, fill=gitopsblue!10, right=0.8cm of s5] (s6) {
-    \textbf{6. Interpretasi}\\
-    \scriptsize Kesimpulan
+\node[box, draw=driftred, fill=driftred!10, right=0.3cm of s2] (s3) {
+    \textbf{3. Injeksi}\\
+    Skenario A--G
 };
 
-% Arrows
+\node[box, draw=metricyellow!80!black, fill=metricyellow!10, below=0.5cm of s1] (s4) {
+    \textbf{4. Ukur}\\
+    $O_2$: R1, R2, R3
+};
+\node[box, draw=manualgray, fill=manualgray!10, below=0.5cm of s2] (s5) {
+    \textbf{5. Analisis}\\
+    Mann--Whitney U
+};
+\node[box, draw=gitopsblue, fill=gitopsblue!10, below=0.5cm of s3] (s6) {
+    \textbf{6. Interpretasi}\\
+    Kesimpulan
+};
+
 \draw[arrow] (s1) -- (s2);
 \draw[arrow] (s2) -- (s3);
 \draw[arrow] (s3) -- (s4);
 \draw[arrow] (s4) -- (s5);
 \draw[arrow] (s5) -- (s6);
 
-% Loop
-\draw[looparrow] (s4.south) to[out=-90, in=-90, looseness=1.8]
-    node[below, font=\scriptsize, text=driftred!80!black] {Iterasi per skenario ($n$ kali)} (s2.south);
+\draw[looparrow] (s4.west) to[out=180, in=180, looseness=1.5]
+    node[left, font=\tiny, text=driftred!80!black] {Iterasi ($n$ kali)} (s2.west);
 
 \end{tikzpicture}
 \end{document}

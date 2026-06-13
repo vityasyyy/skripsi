@@ -15,10 +15,10 @@
 \begin{tikzpicture}[
     node distance=0.5cm,
     scen/.style={rectangle, rounded corners=2pt, draw=gray!60, fill=white,
-                 minimum width=1.8cm, minimum height=0.7cm, align=center,
+                 minimum width=1.5cm, minimum height=0.7cm, align=center,
                  line width=0.5pt, font=\scriptsize},
     box/.style={rectangle, rounded corners=2pt, draw=#1, fill=white,
-                minimum width=2.5cm, minimum height=0.8cm, align=center,
+                minimum width=2.0cm, minimum height=0.6cm, align=center,
                 line width=0.5pt, font=\scriptsize},
     group/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!10,
                   inner sep=5pt, line width=1pt},
@@ -27,39 +27,39 @@
 
 % Scenarios row
 \node[scen] (sA) {A: Scale};
-\node[scen, right=0.3cm of sA] (sB) {B: Image};
-\node[scen, right=0.3cm of sB] (sC) {C: ConfigMap};
-\node[scen, right=0.3cm of sC] (sD) {D: Delete};
-\node[scen, right=0.3cm of sD] (sE) {E: Patch};
-\node[scen, right=0.3cm of sE] (sF) {F: Namespace};
-\node[scen, right=0.3cm of sF] (sG) {G: Secret};
+\node[scen, right=0.2cm of sA] (sB) {B: Image};
+\node[scen, right=0.2cm of sB] (sC) {C: ConfigMap};
+\node[scen, right=0.2cm of sC] (sD) {D: Delete};
+\node[scen, right=0.2cm of sD] (sE) {E: Patch};
+\node[scen, right=0.2cm of sE] (sF) {F: Namespace};
+\node[scen, right=0.2cm of sF] (sG) {G: Secret};
 
 \begin{scope}[on background layer]
     \node[group=scenariored, fit=(sA)(sG), label={[font=\small\bfseries]above:Skenario Drift (A--G)}] (scenarios) {};
 \end{scope}
 
 % Manual track
-\node[box=manualgray, below=1.2cm of sA, xshift=0.5cm] (m1) {\includegraphics[height=10pt]{logos/kubernetes.png}~K8s};
-\node[box=manualgray, below=0.4cm of m1] (m2) {Deteksi Manual};
-\node[box=manualgray, below=0.4cm of m2] (m3) {Pemulihan Manual};
+\node[box=manualgray, below=0.8cm of sA, xshift=0.3cm] (m1) {\includegraphics[height=8pt]{logos/kubernetes.png}~K8s};
+\node[box=manualgray, below=0.25cm of m1] (m2) {Deteksi Manual};
+\node[box=manualgray, below=0.25cm of m2] (m3) {Pemulihan Manual};
 
 \begin{scope}[on background layer]
     \node[group=manualgray, fit=(m1)(m3), label={[font=\small\bfseries]left:Lingkungan A: Manual}] (manual) {};
 \end{scope}
 
 % GitOps track
-\node[box=gitopsblue, below=1.2cm of sF, xshift=-0.5cm] (g1) {\includegraphics[height=10pt]{logos/kubernetes.png} K8s};
-\node[box=gitopsblue, below=0.4cm of g1] (g2) {\includegraphics[height=10pt]{logos/argocd.png} Deteksi};
-\node[box=gitopsblue, below=0.4cm of g2] (g3) {\includegraphics[height=10pt]{logos/argocd.png} Pemulihan};
+\node[box=gitopsblue, below=0.8cm of sF, xshift=-0.3cm] (g1) {\includegraphics[height=8pt]{logos/kubernetes.png} K8s};
+\node[box=gitopsblue, below=0.25cm of g1] (g2) {\includegraphics[height=8pt]{logos/argocd.png} Deteksi};
+\node[box=gitopsblue, below=0.25cm of g2] (g3) {\includegraphics[height=8pt]{logos/argocd.png} Pemulihan};
 
 \begin{scope}[on background layer]
     \node[group=gitopsblue, fit=(g1)(g3), label={[font=\small\bfseries]right:Lingkungan B: GitOps}] (gitops) {};
 \end{scope}
 
 % Metrics
-\node[box=metricyellow, below=0.8cm of m3, xshift=0.5cm] (mr1) {R1};
-\node[box=metricyellow, right=0.3cm of mr1] (mr2) {R2};
-\node[box=metricyellow, right=0.3cm of mr2] (mr3) {R3};
+\node[box=metricyellow, below=0.4cm of m3, xshift=0.3cm] (mr1) {R1};
+\node[box=metricyellow, right=0.2cm of mr1] (mr2) {R2};
+\node[box=metricyellow, right=0.2cm of mr2] (mr3) {R3};
 
 \begin{scope}[on background layer]
     \node[group=metricyellow, fit=(mr1)(mr3), label={[font=\small\bfseries]below:Metrik}] (metrics) {};

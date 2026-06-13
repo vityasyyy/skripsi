@@ -15,11 +15,11 @@
 \begin{tikzpicture}[
     node distance=0.35cm and 0.5cm,
     header/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1,
-                   text=white, minimum width=3.2cm, minimum height=0.7cm,
-                   align=center, font=\small\bfseries, line width=1pt},
+                   text=white, minimum width=2.8cm, minimum height=0.6cm,
+                   align=center, font=\scriptsize\bfseries, line width=1pt},
     cell/.style={rectangle, rounded corners=2pt, draw=gray!50, fill=white,
-                 minimum width=3.2cm, minimum height=0.65cm, align=center,
-                 line width=0.5pt, font=\scriptsize},
+                 minimum width=2.8cm, minimum height=0.55cm, align=center,
+                 line width=0.5pt, font=\tiny},
     defense/.style={rectangle, rounded corners=5pt, draw=okgreen, fill=okgreen!10,
                     inner sep=8pt, line width=1.5pt},
     arrow/.style={->, >=stealth, line width=0.8pt, draw=gray!70}
@@ -30,8 +30,8 @@
 
 % Column headers
 \node[header=gitopsblue] (h1) {Metrik};
-\node[header=driftred, right=0.4cm of h1] (h2) {Pengukuran};
-\node[header=okgreen, right=0.4cm of h2] (h3) {Sifat};
+\node[header=driftred, right=0.3cm of h1] (h2) {Pengukuran};
+\node[header=okgreen, right=0.3cm of h2] (h3) {Sifat};
 
 % R1 row
 \node[cell, below=0.25cm of h1] (m1) {R1: Konsistensi};
@@ -59,12 +59,12 @@
 \node[cell, below=0.15cm of s2c] (s3) {Deskriptif};
 
 % Defense statement
-\node[defense, below=0.6cm of $(m3)!0.5!(p3)$, text width=10cm, align=center] (defense) {
+\node[defense, below=0.6cm of $(m3)!0.5!(p3)$, text width=8.5cm, align=center] (defense) {
     \textbf{Pembelaan Operasionalisasi:}\\[4pt]
-    \small Kemampuan deteksi adalah bagian dari paradigma deployment.\\
-    \small Lingkungan A: operator + runbook terstandarisasi + \textit{timestamp} otomatis.\\
-    \small Lingkungan B: ArgoCD \textit{reconciliation loop}.\\[4pt]
-    \small\itshape Kedua mekanisme deteksi adalah properti inherent dari paradigma masing-masing.
+    \scriptsize Kemampuan deteksi adalah bagian dari paradigma deployment.\\
+    \scriptsize Lingkungan A: operator + runbook terstandarisasi + \textit{timestamp} otomatis.\\
+    \scriptsize Lingkungan B: ArgoCD \textit{reconciliation loop}.\\[4pt]
+    \scriptsize\itshape Kedua mekanisme deteksi adalah properti inherent dari paradigma masing-masing.
 };
 
 \end{tikzpicture}

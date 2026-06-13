@@ -11,48 +11,43 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=1.5cm and 2.5cm,
+    node distance=1.0cm and 1.0cm,
     box/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
-                minimum width=3.2cm, minimum height=1.4cm, align=center,
-                line width=1pt, font=\small},
-    arrow/.style={->, >=stealth, line width=1.2pt},
-    label/.style={font=\scriptsize, align=center}
+                minimum width=1.8cm, minimum height=1.0cm, align=center,
+                line width=1pt, font=\tiny},
+    arrow/.style={->, >=stealth, line width=1pt},
+    label/.style={font=\tiny, align=center}
 ]
 
-% Git
 \node[box=gitopsblue] (git) {
-    \includegraphics[height=14pt]{logos/git.png}\\[2pt]
+    \includegraphics[height=9pt]{logos/git.png}\\[1pt]
     \textbf{Git Repo}\\
-    \scriptsize Single Source of Truth
+    Source of Truth
 };
 
-% ArgoCD
-\node[box=gitopsblue, right=2.5cm of git] (argo) {
-    \includegraphics[height=14pt]{logos/argocd.png}\\[2pt]
+\node[box=gitopsblue, right=1.0cm of git] (argo) {
+    \includegraphics[height=9pt]{logos/argocd.png}\\[1pt]
     \textbf{ArgoCD}\\
-    \scriptsize Reconciliation Loop
+    Reconciliation
 };
 
-% Cluster
-\node[box=manualgray, right=2.5cm of argo] (cluster) {
-    \includegraphics[height=14pt]{logos/kubernetes.png}\\[2pt]
+\node[box=manualgray, right=1.0cm of argo] (cluster) {
+    \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
     \textbf{Klaster K8s}\\
-    \scriptsize Actual State
+    Actual State
 };
 
-% Top flow: Desired State
-\draw[arrow, draw=gitopsblue] (git) -- node[above, label] {Desired State\\(deklaratif)} (argo);
-\draw[arrow, draw=gitopsblue] (argo) -- node[above, label] {Sync\\(otomatis)} (cluster);
+\draw[arrow, draw=gitopsblue] (git) -- node[above, label] {Desired State} (argo);
+\draw[arrow, draw=gitopsblue] (argo) -- node[above, label] {Sync} (cluster);
 
-% Bottom feedback: Drift Detection
-\draw[arrow, draw=driftred, dashed, bend left=30] (cluster.south) to node[below, label, text=driftred] {Drift terdeteksi\\(OutOfSync)} (argo.south);
+\draw[arrow, draw=driftred, dashed, bend left=25] (cluster.south) to
+    node[below, label, text=driftred] {Drift terdeteksi} (argo.south);
 
-% Self-heal arrow
-\draw[arrow, draw=okgreen, bend left=25] (argo.south east) to node[below right, label, text=okgreen] {Self-Heal\\(koreksi otomatis)} (cluster.south west);
+\draw[arrow, draw=okgreen, bend left=20] (argo.south east) to
+    node[below right, label, text=okgreen] {Self-Heal} (cluster.south west);
 
-% Principle labels
-\node[font=\small\bfseries, text=gitopsblue, above=1.2cm of argo] {Prinsip GitOps};
-\node[font=\scriptsize, text=manualgray, above=0.5cm of argo] {Konfigurasi deklaratif + Reconciliation otomatis};
+\node[font=\scriptsize\bfseries, text=gitopsblue, above=0.6cm of argo] {Prinsip GitOps};
+\node[font=\tiny, text=manualgray, above=0.2cm of argo] {Deklaratif + Reconciliation otomatis};
 
 \end{tikzpicture}
 \end{document}
