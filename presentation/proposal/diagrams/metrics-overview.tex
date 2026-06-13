@@ -13,14 +13,14 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.5cm and 1.0cm,
+    node distance=0.42cm and 0.78cm,
     metricbox/.style={rectangle, rounded corners=5pt, draw=#1, fill=white,
-                      minimum width=3.6cm, minimum height=3.2cm, align=center,
+                      minimum width=3.85cm, minimum height=3.45cm, align=center,
                       line width=1.5pt},
     metriclabel/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1,
-                        text=white, minimum width=3.4cm, minimum height=0.7cm,
-                        align=center, font=\scriptsize\bfseries, line width=1pt},
-    metricdesc/.style={font=\tiny, align=left, text width=3.1cm},
+                        text=white, minimum width=3.65cm, minimum height=0.75cm,
+                        align=center, font=\small\bfseries, line width=1pt},
+    metricdesc/.style={font=\scriptsize, align=left, text width=3.35cm},
     arrow/.style={->, >=stealth, line width=1pt, draw=gray!70}
 ]
 
@@ -39,7 +39,7 @@
 };
 
 % R2
-\node[metriclabel=driftred, right=0.7cm of r1label] (r2label) {R2: Waktu (detik)};
+\node[metriclabel=driftred, right=0.62cm of r1label] (r2label) {R2: Waktu (detik)};
 \node[metricbox=driftred, below=0pt of r2label] (r2box) {};
 \node[metricdesc, anchor=north west] at ($(r2box.north west)+(0.2,-0.2)$) {
     \textbf{Pertanyaan:}\\
@@ -54,7 +54,7 @@
 };
 
 % R3
-\node[metriclabel=metricpurple, right=0.7cm of r2label] (r3label) {R3: Traceability};
+\node[metriclabel=metricpurple, right=0.62cm of r2label] (r3label) {R3: Traceability};
 \node[metricbox=metricpurple, below=0pt of r3label] (r3box) {};
 \node[metricdesc, anchor=north west] at ($(r3box.north west)+(0.2,-0.2)$) {
     \textbf{Pertanyaan:}\\

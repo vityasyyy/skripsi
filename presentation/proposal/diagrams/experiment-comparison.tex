@@ -12,43 +12,38 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.35cm and 1.5cm,
+    node distance=0.38cm and 1.6cm,
     box/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
-                minimum width=2.8cm, minimum height=1.0cm, align=center,
-                line width=1pt, font=\small},
+                minimum width=3.25cm, minimum height=1.18cm, align=center,
+                line width=1pt, font=\large},
     group/.style={rectangle, rounded corners=5pt, draw=#1, fill=#1!10,
-                  inner sep=8pt, line width=1.5pt},
-    control/.style={rectangle, rounded corners=2pt, draw=okgreen, fill=okgreen!10,
-                    minimum width=4.5cm, minimum height=0.6cm, align=center,
-                    line width=0.8pt, font=\scriptsize},
+                  inner sep=11pt, line width=1.5pt},
     arrow/.style={->, >=stealth, line width=1pt, draw=gray!70}
 ]
 
-% Environment A
 \node[box=manualgray] (kA) {
     \textbf{kubectl}\\
-    \scriptsize (imperatif)
+    \small (imperatif)
 };
-\node[box=manualgray, below=0.4cm of kA] (k8sA) {
-    \includegraphics[height=10pt]{logos/kubernetes.png}\\[1pt]
+\node[box=manualgray, below=0.5cm of kA] (k8sA) {
+    \includegraphics[height=12pt]{logos/kubernetes.png}\\[2pt]
     \textbf{Klaster A}
 };
 
 \begin{scope}[on background layer]
-    \node[group=manualgray, fit=(kA)(k8sA), label={[font=\small\bfseries]above:Lingkungan A: Manual}] (envA) {};
+    \node[group=manualgray, fit=(kA)(k8sA), label={[font=\normalsize\bfseries]above:Lingkungan A: Manual}] (envA) {};
 \end{scope}
 
-% Environment B
-\node[box=gitopsblue, right=2.5cm of kA] (gitB) {
-    \includegraphics[height=10pt]{logos/git.png}\\[1pt]
+\node[box=gitopsblue, right=2.75cm of kA] (gitB) {
+    \includegraphics[height=12pt]{logos/git.png}\\[2pt]
     \textbf{Git Repo}
 };
-\node[box=gitopsblue, below=0.3cm of gitB] (argoB) {
-    \includegraphics[height=10pt]{logos/argocd.png}\\[1pt]
+\node[box=gitopsblue, below=0.4cm of gitB] (argoB) {
+    \includegraphics[height=12pt]{logos/argocd.png}\\[2pt]
     \textbf{ArgoCD}
 };
-\node[box=gitopsblue, below=0.3cm of argoB] (k8sB) {
-    \includegraphics[height=10pt]{logos/kubernetes.png}\\[1pt]
+\node[box=gitopsblue, below=0.4cm of argoB] (k8sB) {
+    \includegraphics[height=12pt]{logos/kubernetes.png}\\[2pt]
     \textbf{Klaster B}
 };
 
@@ -56,42 +51,16 @@
 \draw[arrow] (argoB) -- (k8sB);
 
 \begin{scope}[on background layer]
-    \node[group=gitopsblue, fit=(gitB)(argoB)(k8sB), label={[font=\small\bfseries]above:Lingkungan B: GitOps}] (envB) {};
+    \node[group=gitopsblue, fit=(gitB)(argoB)(k8sB), label={[font=\normalsize\bfseries]above:Lingkungan B: GitOps}] (envB) {};
 \end{scope}
 
-% Drift injection (center)
 \node[rectangle, rounded corners=3pt, draw=driftred, fill=driftred!10,
-      minimum width=3.5cm, minimum height=0.8cm, align=center,
-      line width=1pt, font=\small\bfseries, text=driftred!80!black,
-      above=0.5cm of $(k8sA)!0.5!(k8sB)$] (drift) {Injeksi Drift (A--G)};
+      minimum width=4.8cm, minimum height=1.05cm, align=center,
+      line width=1pt, font=\large\bfseries, text=driftred!80!black,
+      above=1.35cm of $(envA.north)!0.5!(envB.north)$] (drift) {Injeksi Drift (A--G)};
 
 \draw[arrow, draw=driftred] (drift.south west) -- (envA.north);
 \draw[arrow, draw=driftred] (drift.south east) -- (envB.north);
-
-% Controls (bottom)
-\node[control, below=0.3cm of $(k8sA)!0.5!(k8sB)$] (ctrl) {
-    \textbf{Kontrol:} Klaster sama $\cdot$ Workload sama $\cdot$ Drift sama $\cdot$ Hardware sama
-};
-
-\draw[arrow, draw=okgreen] (k8sA) -- (ctrl.west);
-\draw[arrow, draw=okgreen] (k8sB) -- (ctrl.east);
-
-% Difference label
-\node[font=\scriptsize\itshape, text=driftred!80!black, above=0.15cm of drift] {Satu-satunya perbedaan: paradigma deployment};
-
-% Metrics
-\node[rectangle, rounded corners=2pt, draw=metricyellow, fill=metricyellow!15,
-      minimum width=1.5cm, minimum height=0.5cm, align=center,
-      line width=0.8pt, font=\scriptsize\bfseries,
-      below=0.15cm of ctrl, xshift=-2.0cm] (m1) {R1: Konsistensi};
-\node[rectangle, rounded corners=2pt, draw=metricyellow, fill=metricyellow!15,
-      minimum width=1.5cm, minimum height=0.5cm, align=center,
-      line width=0.8pt, font=\scriptsize\bfseries,
-      below=0.15cm of ctrl] (m2) {R2: Waktu};
-\node[rectangle, rounded corners=2pt, draw=metricyellow, fill=metricyellow!15,
-      minimum width=1.5cm, minimum height=0.5cm, align=center,
-      line width=0.8pt, font=\scriptsize\bfseries,
-      below=0.15cm of ctrl, xshift=2.0cm] (m3) {R3: Traceability};
 
 \end{tikzpicture}
 \end{document}

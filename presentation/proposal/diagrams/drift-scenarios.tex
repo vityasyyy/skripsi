@@ -1,0 +1,76 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric,matrix}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{array}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{metricyellow}{RGB}{251,192,45}
+\definecolor{scenariored}{RGB}{229,115,115}
+\definecolor{lightgray}{RGB}{245,245,245}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.36cm,
+    scen/.style={rectangle, rounded corners=2pt, draw=gray!60, fill=white,
+                 minimum width=2.15cm, minimum height=0.78cm, align=center,
+                 line width=0.5pt, font=\small},
+    box/.style={rectangle, rounded corners=2pt, draw=#1, fill=white,
+                minimum width=2.85cm, minimum height=0.76cm, align=center,
+                line width=0.7pt, font=\small},
+    group/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!10,
+                  inner sep=7pt, line width=1pt},
+    arrow/.style={->, >=stealth, line width=0.8pt, draw=gray!60}
+]
+
+\node[scen] (sA) {A: Scale};
+\node[scen, right=0.3cm of sA] (sB) {B: Image};
+\node[scen, right=0.3cm of sB] (sC) {C: ConfigMap};
+\node[scen, right=0.3cm of sC] (sD) {D: Delete};
+\node[scen, below=0.28cm of sB] (sE) {E: Patch};
+\node[scen, right=0.3cm of sE] (sF) {F: Namespace};
+\node[scen, right=0.3cm of sF] (sG) {G: Secret};
+
+\begin{scope}[on background layer]
+    \node[group=scenariored, fit=(sA)(sD)(sE)(sG), label={[font=\large\bfseries]above:Skenario Drift (A--G)}] (scenarios) {};
+\end{scope}
+
+\node[font=\normalsize\bfseries, below=0.92cm of scenarios.south west, anchor=north west, xshift=0.20cm] (manualTitle) {Lingkungan A: Manual};
+\node[box=manualgray, below=0.22cm of manualTitle] (m1) {\includegraphics[height=10pt]{logos/kubernetes.png}~K8s};
+\node[box=manualgray, below=0.3cm of m1] (m2) {Deteksi Manual};
+\node[box=manualgray, below=0.3cm of m2] (m3) {Pemulihan Manual};
+
+\begin{scope}[on background layer]
+    \node[group=manualgray, fit=(manualTitle)(m1)(m3)] (manual) {};
+\end{scope}
+
+\node[font=\normalsize\bfseries, right=2.0cm of manualTitle] (gitopsTitle) {Lingkungan B: GitOps};
+\node[box=gitopsblue, below=0.22cm of gitopsTitle] (g1) {\includegraphics[height=10pt]{logos/kubernetes.png} K8s};
+\node[box=gitopsblue, below=0.3cm of g1] (g2) {\includegraphics[height=10pt]{logos/argocd.png} Deteksi};
+\node[box=gitopsblue, below=0.3cm of g2] (g3) {\includegraphics[height=10pt]{logos/argocd.png} Pemulihan};
+
+\begin{scope}[on background layer]
+    \node[group=gitopsblue, fit=(gitopsTitle)(g1)(g3)] (gitops) {};
+\end{scope}
+
+\node[box=metricyellow, below=1.00cm of $(m3.south)!0.5!(g3.south)$, xshift=-2.95cm] (mr1) {R1};
+\node[box=metricyellow, right=0.3cm of mr1] (mr2) {R2};
+\node[box=metricyellow, right=0.3cm of mr2] (mr3) {R3};
+
+\begin{scope}[on background layer]
+    \node[group=metricyellow, fit=(mr1)(mr3), label={[font=\normalsize\bfseries]below:Metrik}] (metrics) {};
+\end{scope}
+
+\draw[arrow] ($(scenarios.south west)+(0.25,0)$) -- (manual.north);
+\draw[arrow] ($(scenarios.south east)+(-0.25,0)$) -- (gitops.north);
+\draw[arrow] (m1) -- (m2);
+\draw[arrow] (m2) -- (m3);
+\draw[arrow] (g1) -- (g2);
+\draw[arrow] (g2) -- (g3);
+\draw[arrow] (m3) -- (metrics);
+\draw[arrow] (g3) -- (metrics);
+
+\end{tikzpicture}
+\end{document}

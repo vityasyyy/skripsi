@@ -21,6 +21,9 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \date{2026}
 
 \graphicspath{{diagrams/}{../../content/proposal/diagrams/}}
+\newcommand{\fullslidediagram}[2][0.70\textheight]{%
+    \includegraphics[width=0.98\textwidth,height=#1,keepaspectratio]{#2}%
+}
 
 % -------------------------------------------------------
 % Slides
@@ -63,7 +66,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \end{column}
         \begin{column}{0.49\textwidth}
             \centering
-            \includegraphics[height=0.65\textheight,keepaspectratio]{motivation-drift}
+            \includegraphics[width=\columnwidth,height=0.65\textheight,keepaspectratio]{motivation-drift}
         \end{column}
     \end{columns}
 \end{frame}
@@ -77,7 +80,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Klaim Industri vs. Bukti Ilmiah}
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.58\textheight,keepaspectratio]{industry-claim}
+    \fullslidediagram{industry-claim}
 \end{frame}
 }
 
@@ -89,7 +92,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Mengapa Bukti Terdahulu Tidak Cukup?}
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{research-gap}
+    \fullslidediagram{research-gap}
 \end{frame}
 }
 
@@ -132,7 +135,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Desain Eksperimen}
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{experiment-comparison}
+    \fullslidediagram[0.66\textheight]{experiment-comparison}
     \vspace{0.1cm}
     \begin{beamercolorbox}[wd=0.9\textwidth, sep=0.15cm, center, rounded=true]{structure}
         \small Satu variabel independen: \textbf{paradigma deployment}\\
@@ -149,7 +152,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Mengapa InvenioRDM?}
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{inveniordm-justification}
+    \fullslidediagram{inveniordm-justification}
 \end{frame}
 }
 
@@ -161,7 +164,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Skenario \textit{Configuration Drift} Terkontrol}
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{drift-scenarios}
+    \fullslidediagram{diagrams/drift-scenarios}
 \end{frame}
 }
 
@@ -173,7 +176,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Metrik Pengukuran dan Operasionalisasi}
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{operationalization-validity}
+    \fullslidediagram{operationalization-validity}
 \end{frame}
 }
 
@@ -214,7 +217,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Analisis Statistik}
     \begin{columns}
-        \begin{column}{0.55\textwidth}
+        \begin{column}{0.48\textwidth}
             \begin{itemize}
                 \item \textbf{Mann--Whitney U}
                 \begin{itemize}
@@ -234,7 +237,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
                 \end{itemize}
             \end{itemize}
         \end{column}
-        \begin{column}{0.42\textwidth}
+        \begin{column}{0.48\textwidth}
             \centering
             \includegraphics[width=\columnwidth,height=0.6\textheight,keepaspectratio]{experiment-flow-presentation}
             \vspace{0.3cm}
@@ -324,7 +327,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Mengapa Configuration Drift Penting?}
+    \frametitle{Backup: Pentingnya Configuration Drift}
     \begin{itemize}
         \item \textbf{Inkonsistensi operasional:} \textit{State} klaster menyimpang dari deklarasi
         \item \textbf{Peningkatan upaya pemulihan:} \textit{Recovery} memerlukan intervensi manual yang tidak deterministik
@@ -346,7 +349,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Backup: Detail Metrik Pengukuran}
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{metrics-overview}
+    \fullslidediagram{metrics-overview}
 \end{frame}
 }
 
@@ -354,7 +357,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Analisis \textit{Power} dan Justifikasi Ukuran Sampel}
+    \frametitle{Backup: Analisis \textit{Power} dan Ukuran Sampel}
     \begin{itemize}
         \item \textbf{Ukuran efek target:} $d = 1{,}0$ (Cohen's convention, efek besar), berdasarkan temuan Kaggantinataraja (2025)
         \item \textbf{Power dan signifikansi:} $1 - \beta = 0{,}80$, $\alpha = 0{,}05$ (\textit{two-tailed})

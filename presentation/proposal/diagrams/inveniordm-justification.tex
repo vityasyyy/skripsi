@@ -1,7 +1,6 @@
 \documentclass[tikz,border=5pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric,arrows.meta}
-\usepackage{graphicx}
+\usetikzlibrary{positioning,fit,backgrounds,calc,arrows.meta}
 \usepackage{xcolor}
 
 \definecolor{gitopsblue}{RGB}{51,108,229}
@@ -11,68 +10,63 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.25cm and 1.2cm,
     svc/.style={rectangle, rounded corners=2pt, draw=gitopsblue, fill=gitopsblue!15,
-                minimum width=1.8cm, minimum height=0.45cm, align=center,
-                line width=0.8pt, font=\tiny\bfseries},
+                minimum width=2.05cm, minimum height=0.58cm, align=center,
+                line width=0.8pt, font=\small\bfseries},
     infra/.style={rectangle, rounded corners=2pt, draw=manualgray, fill=manualgray!10,
-                  minimum width=1.8cm, minimum height=0.45cm, align=center,
-                  line width=0.8pt, font=\tiny},
+                  minimum width=2.2cm, minimum height=0.58cm, align=center,
+                  line width=0.8pt, font=\small},
     criteria/.style={rectangle, rounded corners=2pt, draw=okgreen, fill=okgreen!10,
-                     minimum width=7.0cm, minimum height=0.4cm, align=left,
-                     line width=0.6pt, font=\tiny},
-    arrow/.style={-{Stealth[length=4pt]}, line width=0.8pt, draw=gray!70}
+                     text width=10.1cm, minimum height=0.58cm, align=left,
+                     line width=0.6pt, font=\small},
+    arrow/.style={-{Stealth[length=4pt]}, line width=0.75pt, draw=gray!65}
 ]
 
-\node[font=\small\bfseries, text=manualgray] (title) {Mengapa InvenioRDM?};
-
-\node[svc, below=0.4cm of title] (web) {Web};
-\node[svc, below=0.2cm of web] (worker) {Worker};
-\node[svc, below=0.2cm of worker] (pg) {PostgreSQL};
-\node[svc, below=0.2cm of pg] (os) {OpenSearch};
-\node[svc, below=0.2cm of os] (redis) {Redis};
-\node[svc, below=0.2cm of redis] (minio) {MinIO};
+\node[svc] (web) {Web};
+\node[svc, right=0.28cm of web] (worker) {Worker};
+\node[svc, below=0.22cm of web] (pg) {PostgreSQL};
+\node[svc, right=0.28cm of pg] (os) {OpenSearch};
+\node[svc, below=0.22cm of pg] (redis) {Redis};
+\node[svc, right=0.28cm of redis] (minio) {MinIO};
 
 \draw[arrow] (web) -- (worker);
-\draw[arrow] (worker) -- (pg);
 \draw[arrow] (pg) -- (os);
-\draw[arrow] (os) -- (redis);
 \draw[arrow] (redis) -- (minio);
+\draw[arrow] (worker.south) -- (os.north);
+\draw[arrow] (os.south) -- (minio.north);
 
-\node[font=\tiny\itshape, text=gitopsblue, left=0.2cm of pg] {Dep.};
-
-\node[infra, right=1.2cm of web] (ingress) {Ingress};
-\node[infra, below=0.15cm of ingress] (cert) {Cert-manager};
-\node[infra, below=0.15cm of cert] (sealed) {Sealed Secrets};
-\node[infra, below=0.15cm of sealed] (monitor) {Monitoring};
-\node[infra, below=0.15cm of monitor] (backup) {Backup};
-
-\begin{scope}[on background layer]
-    \node[rectangle, rounded corners=3pt, draw=manualgray, fill=manualgray!5,
-          inner sep=4pt, line width=0.8pt, fit=(ingress)(cert)(sealed)(monitor)(backup),
-          label={[font=\tiny\bfseries]above:Infrastruktur}] (infragrp) {};
-\end{scope}
+\node[infra, right=1.0cm of worker] (ingress) {Ingress};
+\node[infra, right=0.28cm of ingress] (cert) {Cert-manager};
+\node[infra, below=0.22cm of ingress] (sealed) {Sealed Secrets};
+\node[infra, right=0.28cm of sealed] (monitor) {Monitoring};
+\node[infra, below=0.22cm of $(sealed)!0.5!(monitor)$] (backup) {Backup};
 
 \begin{scope}[on background layer]
     \node[rectangle, rounded corners=3pt, draw=gitopsblue, fill=gitopsblue!5,
-          inner sep=4pt, line width=0.8pt, fit=(web)(worker)(pg)(os)(redis)(minio),
-          label={[font=\tiny\bfseries]above:Layanan}] (svcgrp) {};
+          inner sep=7pt, line width=0.8pt, fit=(web)(worker)(pg)(os)(redis)(minio)] (svcgrp) {};
+    \node[rectangle, rounded corners=3pt, draw=manualgray, fill=manualgray!5,
+          inner sep=7pt, line width=0.8pt, fit=(ingress)(cert)(sealed)(monitor)(backup)] (infragrp) {};
 \end{scope}
 
-\node[criteria, below=0.4cm of $(minio)!0.5!(backup)$] (c1) {
+\node[font=\normalsize\bfseries, above=0.16cm of svcgrp.north] {Layanan};
+\node[font=\normalsize\bfseries, above=0.16cm of infragrp.north] {Infrastruktur};
+
+\coordinate (topcenter) at ($(svcgrp.south)!0.5!(infragrp.south)$);
+\node[criteria, below=0.48cm of topcenter] (c1) {
     \textbf{(a)} Kompleksitas dependensi $\rightarrow$ urutan deployment
 };
-\node[criteria, below=0.12cm of c1] (c2) {
+\node[criteria, below=0.16cm of c1] (c2) {
     \textbf{(b)} 16+ komponen infrastruktur yang saling bergantung
 };
-\node[criteria, below=0.12cm of c2] (c3) {
+\node[criteria, below=0.16cm of c2] (c3) {
     \textbf{(c)} Open-source, dapat direproduksi
 };
 
 \node[rectangle, rounded corners=3pt, draw=driftred, fill=driftred!10,
-      inner sep=4pt, line width=1pt, below=0.2cm of c3,
-      text width=7.0cm, align=center, font=\tiny\bfseries, text=driftred!80!black] (arg) {
-    Workload single-service tidak merepresentasikan kompleksitas operasional
+      inner sep=7pt, line width=1pt, below=0.22cm of c3,
+      text width=10.1cm, align=center, font=\small\bfseries, text=driftred!80!black] (arg) {
+    Workload single-service tidak\\
+    merepresentasikan kompleksitas operasional
 };
 
 \end{tikzpicture}
