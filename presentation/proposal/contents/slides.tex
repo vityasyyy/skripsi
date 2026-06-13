@@ -1,0 +1,415 @@
+\usetheme{ugm1}
+\usepackage{array}
+
+% -------------------------------------------------------
+% Presentation metadata
+% -------------------------------------------------------
+\title{Configuration Drift pada Deployment Aplikasi\\Multi-Service di Klaster Kubernetes}
+\subtitle{Evaluasi Empiris Paradigma Manual dan GitOps\\(Studi Kasus InvenioRDM)}
+\author{Muhammad Argya Vityasy\\[6pt]
+{\small NIM: 23/522547/PA/22475}\\[4pt]
+{\small Dosen Pembimbing: Dr. techn. Guntur Budi Herwanto, S.Kom., M.Cs.}\\[2pt]
+{\small Dosen Penguji 1: Dr. techn. Kabul Kurniawan, S.Kom., M.Cs.}\\[2pt]
+{\small Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}}
+\date{2026}
+
+\graphicspath{{diagrams/}{../../content/proposal/diagrams/}}
+
+% -------------------------------------------------------
+% Slides
+% -------------------------------------------------------
+\begin{document}
+
+% =============================================
+% SLIDE 1: Title
+% =============================================
+\maketitle
+
+% =============================================
+% SECTION: Latar Belakang
+% =============================================
+\section{Latar Belakang}
+\begin{frame}
+    \sectionpage
+\end{frame}
+
+% =============================================
+% SLIDE 2: Configuration Drift Problem (MERGED old 2+3)
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Masalah: Configuration Drift}
+    \begin{columns}
+        \begin{column}{0.48\textwidth}
+            \begin{itemize}
+                \item Engineer mengubah deployment secara manual
+                \item \textit{State} di Git tidak berubah $\Rightarrow$ \textbf{drift}
+                \item 71\% dari 2.260 skrip K8s mengandung \textit{misconfiguration} bermakna {\small (Zhang et al., 2026)}
+                \item Konsekuensi:
+                \begin{itemize}
+                    \item Inkonsistensi operasional
+                    \item Pemulihan sulit dan lambat
+                    \item Penurunan kemampuan audit
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.49\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{motivation-drift}
+        \end{column}
+    \end{columns}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 3: Industry Claim vs Scientific Evidence (NEW)
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Klaim Industri vs. Bukti Ilmiah}
+    \centering
+    \includegraphics[width=0.85\textwidth]{industry-claim}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 4: Why Existing Evidence Is Insufficient (MERGED old 5+6)
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}[shrink=5]
+    \frametitle{Mengapa Bukti Terdahulu Tidak Cukup?}
+    \centering
+    \includegraphics[width=0.78\textwidth]{research-gap}
+\end{frame}
+}
+
+% =============================================
+% SECTION: Rancangan Penelitian
+% =============================================
+\section{Rancangan Penelitian}
+\begin{frame}
+    \sectionpage
+\end{frame}
+
+% =============================================
+% SLIDE 5: Research Questions + Reframing
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Pertanyaan Penelitian}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.35cm, center, rounded=true]{frametitle}
+        Apakah paradigma deployment memengaruhi karakteristik operasional\\ketika menghadapi \textit{configuration drift} yang identik?
+    \end{beamercolorbox}
+    \vspace{0.2cm}
+    \begin{enumerate}
+        \item \textbf{R1 --- Konsistensi:} Sejauh mana konsistensi deployment berbeda setelah \textit{drift}?
+        \item \textbf{R2 --- Waktu:} Seberapa besar perbedaan \textit{detection time}, \textit{recovery time}, dan \textit{root cause identification time}?
+        \item \textbf{R3 --- \textit{Traceability}:} Sejauh mana perbedaan kemampuan merekonstruksi perubahan?
+    \end{enumerate}
+    \vspace{0.2cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.3cm, center, rounded=true]{structure}
+        \small\itshape Penelitian ini tidak berupaya membuktikan bahwa GitOps lebih unggul, melainkan mengisolasi dan mengkuantifikasi dampak operasional dari pilihan paradigma deployment dalam kondisi \textit{configuration drift} terkontrol.
+    \end{beamercolorbox}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 6: Experimental Design
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}[shrink=5]
+    \frametitle{Desain Eksperimen}
+    \centering
+    \includegraphics[width=0.78\textwidth]{experiment-comparison}
+    \vspace{0.1cm}
+    \begin{beamercolorbox}[wd=0.9\textwidth, sep=0.15cm, center, rounded=true]{structure}
+        \small Satu variabel independen: \textbf{paradigma deployment}\\
+        \small Kontrol: klaster sama $\cdot$ workload sama $\cdot$ drift sama $\cdot$ hardware sama
+    \end{beamercolorbox}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 7: Why InvenioRDM? (NEW)
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}[shrink=10]
+    \frametitle{Mengapa InvenioRDM?}
+    \centering
+    \includegraphics[width=0.75\textwidth]{inveniordm-justification}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 8: Drift Scenarios
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Skenario \textit{Configuration Drift} Terkontrol}
+    \centering
+    \includegraphics[width=0.85\textwidth]{drift-scenarios}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 9: Variables, Measurement & Operationalization (EXPANDED)
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Metrik Pengukuran dan Operasionalisasi}
+    \centering
+    \includegraphics[width=0.78\textwidth]{operationalization-validity}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 10: Threats to Validity (ELEVATED)
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Ancaman terhadap Validitas dan Mitigasi}
+    \centering
+    \small
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{4.0cm}|>{\raggedright\arraybackslash}p{5.5cm}|}
+        \hline
+        \textbf{Ancaman} & \textbf{Mitigasi} \\
+        \hline
+        Operator tunggal (\textit{single operator bias}) & \textit{Recovery runbook} terstandarisasi; \textit{timestamp} otomatis \\
+        \hline
+        Satu \textit{workload} (InvenioRDM) & Mewakili kelas \textit{workload} multi-service \\
+        \hline
+        Satu alat GitOps (ArgoCD) & Implementasi GitOps terbanyak digunakan \\
+        \hline
+        Efek pembelajaran (\textit{maturation}) & Urutan skenario diacak; \textit{practice run} \\
+        \hline
+        Instrumentasi & Versi \textit{software} dikunci selama eksperimen \\
+        \hline
+        \textit{Mono-operation bias} & InvenioRDM = 16+ komponen interdependen \\
+        \hline
+    \end{tabular}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 11: Statistical Analysis + Power Analysis
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Analisis Statistik}
+    \begin{columns}
+        \begin{column}{0.55\textwidth}
+            \begin{itemize}
+                \item \textbf{Mann--Whitney U}
+                \begin{itemize}
+                    \item Non-parametrik
+                    \item Cocok untuk sampel kecil
+                    \item $\alpha = 0{,}05$
+                \end{itemize}
+                \item \textbf{Ukuran Efek}
+                \begin{itemize}
+                    \item Cohen's $d$ / Cliff's $\delta$
+                    \item Signifikansi praktis, bukan hanya statistik
+                \end{itemize}
+                \item \textbf{Pengulangan}
+                \begin{itemize}
+                    \item R1: $n = 5$ per skenario
+                    \item R2: $n = 10$ per skenario
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.42\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{experiment-flow-presentation}
+            \vspace{0.3cm}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.25cm, rounded=true]{structure}
+                \centering\small
+                \textbf{Analisis \textit{Power}}\\[2pt]
+                $\mathit{Power} = 0{,}80$\\
+                $\alpha = 0{,}05$\\
+                \textit{Target Effect} $= d = 1{,}0$\\[2pt]
+                $\Rightarrow n = 10$ per skenario\\
+                per lingkungan
+            \end{beamercolorbox}
+        \end{column}
+    \end{columns}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 12: Why This Study Can Fail Productively (REPLACES Contributions)
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Hasil yang Mungkin dan Maknanya}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.3cm, rounded=true]{frametitle}
+                \centering\small\textbf{Jika GitOps lebih unggul}
+            \end{beamercolorbox}
+            \vspace{0.1cm}
+            \small Bukti empiris terukur mengkonfirmasi klaim industri
+            \vspace{0.3cm}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.3cm, rounded=true]{frametitle}
+                \centering\small\textbf{Jika tidak ada perbedaan bermakna}
+            \end{beamercolorbox}
+            \vspace{0.1cm}
+            \small Menantang asumsi bahwa GitOps mengurangi drift
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.3cm, rounded=true]{frametitle}
+                \centering\small\textbf{Jika Manual lebih unggul pada beberapa metrik}
+            \end{beamercolorbox}
+            \vspace{0.1cm}
+            \small Mengidentifikasi batasan GitOps
+            \vspace{0.3cm}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.3cm, rounded=true]{structure}
+                \centering\small\bfseries Terlepas dari hasil, penelitian ini menghasilkan bukti yang informatif secara ilmiah
+            \end{beamercolorbox}
+        \end{column}
+    \end{columns}
+\end{frame}
+}
+
+% =============================================
+% SLIDE 13: Conclusion
+% =============================================
+\quoteslide{``Penelitian ini tidak berupaya membuktikan bahwa GitOps lebih unggul --- melainkan mengisolasi dan mengkuantifikasi dampak operasional dari pilihan paradigma deployment.'' --- Paradigma Penelitian Ini}
+
+% =============================================
+% BACKUP SLIDES
+% =============================================
+\appendix
+
+% B1: GitOps Fundamentals
+\begin{frame}
+    \frametitle{Backup: GitOps --- Prinsip dan Mekanisme}
+    \begin{columns}
+        \begin{column}{0.42\textwidth}
+            \begin{itemize}
+                \item Git sebagai \textit{single source of truth}
+                \item Konfigurasi dideklarasikan secara deklaratif
+                \item Agen \textit{software} menyelaraskan \textit{state} secara otomatis
+                \item Deviasi (\textit{drift}) bersifat \textit{transien}: sistem otomatis kembali ke \textit{desired state}
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.55\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{gitops-flow}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% B2: Why Configuration Drift Matters (detailed)
+\begin{frame}
+    \frametitle{Backup: Mengapa Configuration Drift Penting?}
+    \begin{itemize}
+        \item \textbf{Inkonsistensi operasional:} \textit{State} klaster menyimpang dari deklarasi
+        \item \textbf{Peningkatan upaya pemulihan:} \textit{Recovery} memerlukan intervensi manual yang tidak deterministik
+        \item \textbf{Penurunan kemampuan audit:} Perubahan tidak tercatat secara otomatis
+        \item \textbf{Risiko keamanan:} \textit{Container} berjalan sebagai \textit{root}, tanpa \textit{resource limits}
+    \end{itemize}
+    \vspace{0.5cm}
+    \centering
+    \begin{beamercolorbox}[wd=0.85\textwidth, sep=0.3cm, center, rounded=true]{frametitle}
+        71\% dari 2.260 skrip K8s mengandung \textit{misconfiguration} bermakna\\
+        {\small (Zhang et al., 2026)}
+    \end{beamercolorbox}
+\end{frame}
+
+% B3: Detailed Metrics
+\begin{frame}
+    \frametitle{Backup: Detail Metrik Pengukuran}
+    \centering
+    \includegraphics[width=0.95\textwidth]{metrics-overview}
+\end{frame}
+
+% B4: Power Analysis Detail
+\begin{frame}
+    \frametitle{Backup: Analisis \textit{Power} dan Justifikasi Ukuran Sampel}
+    \begin{itemize}
+        \item \textbf{Ukuran efek target:} $d = 1{,}0$ (Cohen's convention, efek besar), berdasarkan temuan Kaggantinataraja (2025)
+        \item \textbf{Power dan signifikansi:} $1 - \beta = 0{,}80$, $\alpha = 0{,}05$ (\textit{two-tailed})
+        \item \textbf{Ukuran sampel minimum:} $n = 17$ secara total per metrik (Cohen, 1988)
+        \item \textbf{R2:} $7 \times 10 = 70$ observasi per lingkungan $\gg 17$
+        \item \textbf{R1:} $7 \times 5 = 35$ observasi per lingkungan, memadai untuk efek besar
+        \item \textbf{R3:} Deskriptif, tidak memerlukan ukuran sampel statistik
+    \end{itemize}
+\end{frame}
+
+% B5: Full Threats to Validity
+\begin{frame}
+    \frametitle{Backup: Ancaman terhadap Validitas (Detail)}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            {\small\textbf{Validitas Internal}}
+            \begin{itemize}
+                \item[\textcolor{red}{\textbullet}] Seleksi: Lingkungan dibangun deliberatif
+                \item[\textcolor{red}{\textbullet}] Operator tunggal
+                \item[\textcolor{red}{\textbullet}] Maturasi: Efek pembelajaran
+                \item[\textcolor{red}{\textbullet}] Instrumentasi: Versi \textit{software} dikunci
+                \item[\textcolor{red}{\textbullet}] Efek pengujian (\textit{Hawthorne})
+            \end{itemize}
+            \vspace{0.2cm}
+            {\small\textbf{Validitas Konstruk}}
+            \begin{itemize}
+                \item[\textcolor{red}{\textbullet}] Mono-operation bias
+                \item[\textcolor{red}{\textbullet}] Mono-method bias
+                \item[\textcolor{red}{\textbullet}] Operasionalisasi konstruk: 7 skenario drift
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            {\small\textbf{Mitigasi}}
+            \begin{itemize}
+                \item[\textcolor{green!60!black}{\textbullet}] Klaster identik; satu perbedaan = paradigma
+                \item[\textcolor{green!60!black}{\textbullet}] \textit{Runbook} + \textit{timestamp} otomatis
+                \item[\textcolor{green!60!black}{\textbullet}] Skenario diacak; \textit{practice run}
+                \item[\textcolor{green!60!black}{\textbullet}] Versi dikunci
+                \item[\textcolor{green!60!black}{\textbullet}] Operator mengikuti \textit{runbook}
+            \end{itemize}
+            \vspace{0.2cm}
+            {\small\textbf{Validitas Eksternal}}
+            \begin{itemize}
+                \item[\textcolor{red}{\textbullet}] Kekhususan konteks
+                \item[\textcolor{red}{\textbullet}] Interaksi seleksi-perlakuan
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% B6: Drift Scenario Details
+\begin{frame}
+    \frametitle{Backup: Detail Skenario Drift}
+    \small
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{1.2cm}|p{3.0cm}|p{5.5cm}|}
+        \hline
+        \textbf{ID} & \textbf{Skenario} & \textbf{Perintah} \\
+        \hline
+        A & Perubahan Replika & \texttt{kubectl scale deployment --replicas=5} \\
+        \hline
+        B & Perubahan Image & \texttt{kubectl edit deployment} (ubah \texttt{image}) \\
+        \hline
+        C & Perubahan ConfigMap & \texttt{kubectl edit configmap} \\
+        \hline
+        D & Resource Deletion & \texttt{kubectl delete deployment} \\
+        \hline
+        E & Patch Manual Tidak Sah & \texttt{kubectl patch} (JSON patch) \\
+        \hline
+        F & Drift Lintas Namespace & \texttt{kubectl apply -f ... -n wrong-ns} \\
+        \hline
+        G & Perubahan Secret & \texttt{kubectl patch secret} \\
+        \hline
+    \end{tabular}
+\end{frame}
+
+\end{document}

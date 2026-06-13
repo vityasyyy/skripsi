@@ -1,0 +1,88 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric,arrows.meta}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{okgreen}{RGB}{76,175,80}
+\definecolor{driftred}{RGB}{229,115,115}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.6cm and 1.0cm,
+    svc/.style={rectangle, rounded corners=3pt, draw=gitopsblue, fill=gitopsblue!15,
+                minimum width=2.2cm, minimum height=0.8cm, align=center,
+                line width=1pt, font=\small\bfseries},
+    infra/.style={rectangle, rounded corners=3pt, draw=manualgray, fill=manualgray!10,
+                  minimum width=2.2cm, minimum height=0.8cm, align=center,
+                  line width=1pt, font=\small},
+    criteria/.style={rectangle, rounded corners=2pt, draw=okgreen, fill=okgreen!10,
+                     minimum width=4.5cm, minimum height=0.6cm, align=left,
+                     line width=0.8pt, font=\scriptsize},
+    arrow/.style={-{Stealth[length=6pt]}, line width=1pt, draw=gray!70}
+]
+
+% Title
+\node[font=\large\bfseries, text=manualgray] (title) {Mengapa InvenioRDM?};
+
+% Dependency chain
+\node[svc] (web) {Web};
+\node[svc, below=0.5cm of web] (worker) {Worker};
+\node[svc, below=0.5cm of worker] (pg) {PostgreSQL};
+\node[svc, below=0.5cm of pg] (os) {OpenSearch};
+\node[svc, below=0.5cm of os] (redis) {Redis};
+\node[svc, below=0.5cm of redis] (minio) {MinIO};
+
+% Arrows
+\draw[arrow] (web) -- (worker);
+\draw[arrow] (worker) -- (pg);
+\draw[arrow] (pg) -- (os);
+\draw[arrow] (os) -- (redis);
+\draw[arrow] (redis) -- (minio);
+
+% Label
+\node[font=\scriptsize\itshape, text=gitopsblue, left=0.3cm of pg] {Dependency};
+
+% Infrastructure components (right side)
+\node[infra, right=2.5cm of web] (ingress) {Ingress};
+\node[infra, below=0.3cm of ingress] (cert) {Cert-manager};
+\node[infra, below=0.3cm of cert] (sealed) {Sealed Secrets};
+\node[infra, below=0.3cm of sealed] (monitor) {Monitoring};
+\node[infra, below=0.3cm of monitor] (backup) {Backup};
+
+% Group
+\begin{scope}[on background layer]
+    \node[rectangle, rounded corners=5pt, draw=manualgray, fill=manualgray!5,
+          inner sep=6pt, line width=1pt, fit=(ingress)(cert)(sealed)(monitor)(backup),
+          label={[font=\scriptsize\bfseries]above:Infrastruktur}] (infragrp) {};
+\end{scope}
+
+% Service group
+\begin{scope}[on background layer]
+    \node[rectangle, rounded corners=5pt, draw=gitopsblue, fill=gitopsblue!5,
+          inner sep=6pt, line width=1pt, fit=(web)(worker)(pg)(os)(redis)(minio),
+          label={[font=\scriptsize\bfseries]above:Layanan}] (svcgrp) {};
+\end{scope}
+
+% Criteria (bottom)
+\node[criteria, below=0.8cm of $(minio)!0.5!(backup)$] (c1) {
+    \textbf{(a)} Kompleksitas dependensi $\rightarrow$ urutan deployment
+};
+\node[criteria, below=0.2cm of c1] (c2) {
+    \textbf{(b)} 16+ komponen infrastruktur yang saling bergantung
+};
+\node[criteria, below=0.2cm of c2] (c3) {
+    \textbf{(c)} Open-source, dapat direproduksi
+};
+
+% Key argument
+\node[rectangle, rounded corners=5pt, draw=driftred, fill=driftred!10,
+      inner sep=6pt, line width=1.5pt, below=0.4cm of c3,
+      text width=9cm, align=center, font=\small\bfseries, text=driftred!80!black] (arg) {
+    Workload single-service tidak merepresentasikan kompleksitas operasional
+};
+
+\end{tikzpicture}
+\end{document}

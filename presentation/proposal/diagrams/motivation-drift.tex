@@ -1,0 +1,63 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric,arrows.meta}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{driftred}{RGB}{229,115,115}
+\definecolor{warnorange}{RGB}{255,167,38}
+\definecolor{okgreen}{RGB}{76,175,80}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=1.0cm and 1.8cm,
+    box/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
+                minimum width=3.0cm, minimum height=1.4cm, align=center,
+                line width=1pt, font=\small},
+    group/.style={rectangle, rounded corners=5pt, draw=#1, fill=#1!10,
+                  inner sep=8pt, line width=1.5pt},
+    consequence/.style={rectangle, rounded corners=2pt, draw=driftred, fill=driftred!10,
+                        minimum width=3.2cm, minimum height=0.7cm, align=center,
+                        line width=0.8pt, font=\small},
+    arrow/.style={->, >=stealth, line width=1pt, draw=gray!70},
+    biglabel/.style={font=\Large\bfseries}
+]
+
+% Git State
+\node[box=gitopsblue] (git) {
+    \includegraphics[height=14pt]{logos/git.png}\\[2pt]
+    \textbf{Git Repo}\\
+    \scriptsize (Desired State)
+};
+
+% Cluster State
+\node[box=driftred, right=3.5cm of git] (cluster) {
+    \includegraphics[height=14pt]{logos/kubernetes.png}\\[2pt]
+    \textbf{Klaster K8s}\\
+    \scriptsize (Actual State)
+};
+
+% Drift symbol
+\node[biglabel, text=driftred] at ($(git)!0.5!(cluster) + (0,0.3)$) {$\neq$};
+\node[font=\small\bfseries, text=driftred] at ($(git)!0.5!(cluster) + (0,-0.3)$) {Configuration Drift};
+
+% Manual change arrow
+\node[font=\scriptsize, text=manualgray, above=0.8cm of cluster] (manual) {\texttt{kubectl edit/scale/patch}};
+\draw[->, >=stealth, line width=1pt, draw=manualgray, dashed] (manual) -- (cluster);
+
+% Consequences
+\node[consequence, below=1.8cm of git, xshift=1.5cm] (c1) {Inkonsistensi Deployment};
+\node[consequence, below=0.4cm of c1] (c2) {Pemulihan Sulit \& Lambat};
+\node[consequence, below=0.4cm of c2] (c3) {Akar Masalah Tidak Jelas};
+\node[consequence, below=0.4cm of c3] (c4) {Risiko Keamanan};
+
+% Arrows from drift to consequences
+\draw[arrow, draw=driftred] ($(git)!0.5!(cluster) + (0,-0.8)$) -- (c1);
+
+% Time annotation
+\node[font=\scriptsize\itshape, text=manualgray, below=0.3cm of c4] {Minggu berlalu tanpa terdeteksi\ldots};
+
+\end{tikzpicture}
+\end{document}

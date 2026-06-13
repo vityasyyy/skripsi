@@ -1,0 +1,71 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{metricyellow}{RGB}{251,192,45}
+\definecolor{driftred}{RGB}{229,115,115}
+\definecolor{okgreen}{RGB}{76,175,80}
+\definecolor{metricpurple}{RGB}{156,39,176}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.5cm and 1.0cm,
+    metricbox/.style={rectangle, rounded corners=5pt, draw=#1, fill=white,
+                      minimum width=4.2cm, minimum height=3.8cm, align=center,
+                      line width=1.5pt},
+    metriclabel/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1,
+                        text=white, minimum width=4.0cm, minimum height=0.8cm,
+                        align=center, font=\small\bfseries, line width=1pt},
+    metricdesc/.style={font=\scriptsize, align=left, text width=3.6cm},
+    arrow/.style={->, >=stealth, line width=1pt, draw=gray!70}
+]
+
+% R1
+\node[metriclabel=gitopsblue] (r1label) {R1: Konsistensi};
+\node[metricbox=gitopsblue, below=0pt of r1label] (r1box) {};
+\node[metricdesc, anchor=north west] at ($(r1box.north west)+(0.2,-0.2)$) {
+    \textbf{Pertanyaan:}\\
+    Apakah \textit{desired state}\\
+    dapat dipulihkan?\\[6pt]
+    \textbf{Cara Ukur:}\\
+    \% sumber daya\\
+    Healthy/Synced\\[6pt]
+    \textbf{Pengulangan:}\\
+    $n = 5$ per skenario
+};
+
+% R2
+\node[metriclabel=driftred, right=1.2cm of r1label] (r2label) {R2: Waktu (detik)};
+\node[metricbox=driftred, below=0pt of r2label] (r2box) {};
+\node[metricdesc, anchor=north west] at ($(r2box.north west)+(0.2,-0.2)$) {
+    \textbf{Pertanyaan:}\\
+    Seberapa cepat masalah\\
+    terdeteksi \& dipulihkan?\\[6pt]
+    \textbf{Sub-metrik:}\\
+    Detection Time ($t_d - t_0$)\\
+    Recovery Time ($t_2 - t_0$)\\
+    Root Cause ID ($t_{rci} - t_d$)\\[4pt]
+    \textbf{Pengulangan:}\\
+    $n = 10$ per skenario
+};
+
+% R3
+\node[metriclabel=metricpurple, right=1.2cm of r2label] (r3label) {R3: Traceability};
+\node[metricbox=metricpurple, below=0pt of r3label] (r3box) {};
+\node[metricdesc, anchor=north west] at ($(r3box.north west)+(0.2,-0.2)$) {
+    \textbf{Pertanyaan:}\\
+    Apakah perubahan dapat\\
+    direkonstruksi?\\[6pt]
+    \textbf{Cara Ukur:}\\
+    \% \textit{audit log} yang\\
+    dapat direkonstruksi\\[6pt]
+    \textbf{Catatan:}\\
+    Deskriptif, bukan statistik
+};
+
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,71 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{driftred}{RGB}{229,115,115}
+\definecolor{okgreen}{RGB}{76,175,80}
+\definecolor{metricyellow}{RGB}{251,192,45}
+\definecolor{metricpurple}{RGB}{156,39,176}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.35cm and 0.5cm,
+    header/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1,
+                   text=white, minimum width=3.2cm, minimum height=0.7cm,
+                   align=center, font=\small\bfseries, line width=1pt},
+    cell/.style={rectangle, rounded corners=2pt, draw=gray!50, fill=white,
+                 minimum width=3.2cm, minimum height=0.65cm, align=center,
+                 line width=0.5pt, font=\scriptsize},
+    defense/.style={rectangle, rounded corners=5pt, draw=okgreen, fill=okgreen!10,
+                    inner sep=8pt, line width=1.5pt},
+    arrow/.style={->, >=stealth, line width=0.8pt, draw=gray!70}
+]
+
+% Title
+\node[font=\large\bfseries, text=manualgray] (title) {Operasionalisasi Metrik};
+
+% Column headers
+\node[header=gitopsblue] (h1) {Metrik};
+\node[header=driftred, right=0.4cm of h1] (h2) {Pengukuran};
+\node[header=okgreen, right=0.4cm of h2] (h3) {Sifat};
+
+% R1 row
+\node[cell, below=0.25cm of h1] (m1) {R1: Konsistensi};
+\node[cell, below=0.25cm of h2] (p1) {\% resource Healthy/Synced};
+\node[cell, below=0.25cm of h3] (s1) {Objektif (otomatis)};
+
+% R2a row
+\node[cell, below=0.15cm of m1] (m2a) {R2: Detection Time};
+\node[cell, below=0.15cm of p1] (p2a) {$t_d - t_0$};
+\node[cell, below=0.15cm of s1] (s2a) {Bagian paradigma};
+
+% R2b row
+\node[cell, below=0.15cm of m2a] (m2b) {R2: Recovery Time};
+\node[cell, below=0.15cm of p2a] (p2b) {$t_2 - t_0$};
+\node[cell, below=0.15cm of s2a] (s2b) {Bagian paradigma};
+
+% R2c row
+\node[cell, below=0.15cm of m2b] (m2c) {R2: Root Cause ID};
+\node[cell, below=0.15cm of p2b] (p2c) {$t_{rci} - t_d$};
+\node[cell, below=0.15cm of s2b] (s2c) {Bagian paradigma};
+
+% R3 row
+\node[cell, below=0.15cm of m2c] (m3) {R3: Traceability};
+\node[cell, below=0.15cm of p2c] (p3) {\% audit log terrekonstruksi};
+\node[cell, below=0.15cm of s2c] (s3) {Deskriptif};
+
+% Defense statement
+\node[defense, below=0.6cm of $(m3)!0.5!(p3)$, text width=10cm, align=center] (defense) {
+    \textbf{Pembelaan Operasionalisasi:}\\[4pt]
+    \small Kemampuan deteksi adalah bagian dari paradigma deployment.\\
+    \small Lingkungan A: operator + runbook terstandarisasi + \textit{timestamp} otomatis.\\
+    \small Lingkungan B: ArgoCD \textit{reconciliation loop}.\\[4pt]
+    \small\itshape Kedua mekanisme deteksi adalah properti inherent dari paradigma masing-masing.
+};
+
+\end{tikzpicture}
+\end{document}

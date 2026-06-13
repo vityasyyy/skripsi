@@ -1,0 +1,41 @@
+\usetheme{ugm1}
+
+% -------------------------------------------------------
+% Presentation metadata — edit these
+% -------------------------------------------------------
+\title{Your Title}
+\subtitle{Your Subtitle}
+\author{Your Name}
+\date{\today}
+
+% -------------------------------------------------------
+% Slides
+% -------------------------------------------------------
+\begin{document}
+
+% Title slide
+\maketitle
+
+% Section divider
+\section{Introduction}
+\begin{frame}
+    \sectionpage
+\end{frame}
+
+% Content slide
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Slide Title}
+    \begin{itemize}
+        \item First point
+        \item Second point
+        \item Third point
+    \end{itemize}
+\end{frame}
+}
+
+% Quote slide
+\quoteslide{"Your quote here." - Author}
+
+\end{document}

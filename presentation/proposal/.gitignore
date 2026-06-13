@@ -1,0 +1,10 @@
+main.log
+main.aux
+main.nav
+main.out
+main.snm
+main.toc
+main.xdv
+main.fls
+main.fdb_latexmk
+build/

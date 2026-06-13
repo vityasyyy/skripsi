@@ -1,0 +1,58 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric,arrows.meta}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{driftred}{RGB}{229,115,115}
+\definecolor{okgreen}{RGB}{76,175,80}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=1.5cm and 2.5cm,
+    box/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
+                minimum width=3.2cm, minimum height=1.4cm, align=center,
+                line width=1pt, font=\small},
+    arrow/.style={->, >=stealth, line width=1.2pt},
+    label/.style={font=\scriptsize, align=center}
+]
+
+% Git
+\node[box=gitopsblue] (git) {
+    \includegraphics[height=14pt]{logos/git.png}\\[2pt]
+    \textbf{Git Repo}\\
+    \scriptsize Single Source of Truth
+};
+
+% ArgoCD
+\node[box=gitopsblue, right=2.5cm of git] (argo) {
+    \includegraphics[height=14pt]{logos/argocd.png}\\[2pt]
+    \textbf{ArgoCD}\\
+    \scriptsize Reconciliation Loop
+};
+
+% Cluster
+\node[box=manualgray, right=2.5cm of argo] (cluster) {
+    \includegraphics[height=14pt]{logos/kubernetes.png}\\[2pt]
+    \textbf{Klaster K8s}\\
+    \scriptsize Actual State
+};
+
+% Top flow: Desired State
+\draw[arrow, draw=gitopsblue] (git) -- node[above, label] {Desired State\\(deklaratif)} (argo);
+\draw[arrow, draw=gitopsblue] (argo) -- node[above, label] {Sync\\(otomatis)} (cluster);
+
+% Bottom feedback: Drift Detection
+\draw[arrow, draw=driftred, dashed, bend left=30] (cluster.south) to node[below, label, text=driftred] {Drift terdeteksi\\(OutOfSync)} (argo.south);
+
+% Self-heal arrow
+\draw[arrow, draw=okgreen, bend left=25] (argo.south east) to node[below right, label, text=okgreen] {Self-Heal\\(koreksi otomatis)} (cluster.south west);
+
+% Principle labels
+\node[font=\small\bfseries, text=gitopsblue, above=1.2cm of argo] {Prinsip GitOps};
+\node[font=\scriptsize, text=manualgray, above=0.5cm of argo] {Konfigurasi deklaratif + Reconciliation otomatis};
+
+\end{tikzpicture}
+\end{document}
