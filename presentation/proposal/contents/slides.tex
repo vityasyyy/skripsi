@@ -6,11 +6,11 @@
 % -------------------------------------------------------
 \title{Configuration Drift pada Deployment Aplikasi\\Multi-Service di Klaster Kubernetes}
 \subtitle{Evaluasi Empiris Paradigma Manual dan GitOps\\(Studi Kasus InvenioRDM)}
-\author{Muhammad Argya Vityasy\\[6pt]
-{\small NIM: 23/522547/PA/22475}\\[4pt]
-{\small Dosen Pembimbing: Dr. techn. Guntur Budi Herwanto, S.Kom., M.Cs.}\\[2pt]
-{\small Dosen Penguji 1: Dr. techn. Kabul Kurniawan, S.Kom., M.Cs.}\\[2pt]
-{\small Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}}
+\author{Muhammad Argya Vityasy\\[3pt]
+NIM: 23/522547/PA/22475\\[2pt]
+Dosen Pembimbing: Dr.\ techn.\ Guntur Budi Herwanto, S.Kom., M.Cs.\\[2pt]
+Dosen Penguji 1: Dr.\ techn.\ Kabul Kurniawan, S.Kom., M.Cs.\\[2pt]
+Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \date{2026}
 
 \graphicspath{{diagrams/}{../../content/proposal/diagrams/}}
@@ -292,6 +292,8 @@
 \appendix
 
 % B1: GitOps Fundamentals
+{
+\usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: GitOps --- Prinsip dan Mekanisme}
     \begin{columns}
@@ -309,8 +311,11 @@
         \end{column}
     \end{columns}
 \end{frame}
+}
 
 % B2: Why Configuration Drift Matters (detailed)
+{
+\usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: Mengapa Configuration Drift Penting?}
     \begin{itemize}
@@ -326,15 +331,21 @@
         {\small (Zhang et al., 2026)}
     \end{beamercolorbox}
 \end{frame}
+}
 
 % B3: Detailed Metrics
+{
+\usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: Detail Metrik Pengukuran}
     \centering
     \includegraphics[width=0.95\textwidth]{metrics-overview}
 \end{frame}
+}
 
 % B4: Power Analysis Detail
+{
+\usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: Analisis \textit{Power} dan Justifikasi Ukuran Sampel}
     \begin{itemize}
@@ -346,8 +357,11 @@
         \item \textbf{R3:} Deskriptif, tidak memerlukan ukuran sampel statistik
     \end{itemize}
 \end{frame}
+}
 
 % B5: Full Threats to Validity
+{
+\usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: Ancaman terhadap Validitas (Detail)}
     \begin{columns}[T]
@@ -386,8 +400,11 @@
         \end{column}
     \end{columns}
 \end{frame}
+}
 
 % B6: Drift Scenario Details
+{
+\usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: Detail Skenario Drift}
     \small
@@ -411,5 +428,6 @@
         \hline
     \end{tabular}
 \end{frame}
+}
 
 \end{document}
