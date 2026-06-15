@@ -1,0 +1,81 @@
+\documentclass[tikz,border=6pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,calc,arrows.meta}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{metricyellow}{RGB}{251,192,45}
+\definecolor{scenariored}{RGB}{229,115,115}
+\definecolor{okgreen}{RGB}{76,175,80}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.38cm and 0.95cm,
+    stage/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8,
+                  minimum width=2.65cm, minimum height=0.72cm,
+                  align=center, line width=0.8pt, font=\small},
+    group/.style={rectangle, rounded corners=5pt, draw=#1, fill=#1!6,
+                  inner sep=8pt, line width=1.1pt},
+    metric/.style={rectangle, rounded corners=3pt, draw=metricyellow!85!black,
+                   fill=metricyellow!15, minimum width=2.45cm,
+                   minimum height=0.64cm, align=center, font=\small\bfseries},
+    arrow/.style={-{Latex[length=2mm]}, line width=0.85pt, draw=gray!70}
+]
+
+% Common intervention
+\node[stage=scenariored, minimum width=6.2cm, font=\small\bfseries] (drift)
+      {Injeksi drift terkontrol A--G};
+\node[font=\scriptsize, below=0.05cm of drift] (same)
+      {perlakuan identik pada dua lingkungan};
+
+% Manual environment
+\node[stage=manualgray, below left=0.92cm and 1.95cm of same] (m1)
+      {\textbf{Manual}\\\texttt{kubectl}};
+\node[stage=manualgray, below=of m1] (m2)
+      {\includegraphics[height=10pt]{logos/kubernetes.png}\\Klaster A};
+\node[stage=manualgray, below=of m2] (m3)
+      {Runbook\\pemulihan};
+
+% GitOps environment
+\node[stage=gitopsblue, below right=0.92cm and 1.95cm of same] (g1)
+      {\includegraphics[height=10pt]{logos/git.png}\\Git repo};
+\node[stage=gitopsblue, below=of g1] (g2)
+      {\includegraphics[height=10pt]{logos/argocd.png}\\ArgoCD};
+\node[stage=gitopsblue, below=of g2] (g3)
+      {\includegraphics[height=10pt]{logos/kubernetes.png}\\Klaster B};
+
+\begin{scope}[on background layer]
+    \node[group=manualgray, fit=(m1)(m3),
+          label={[font=\small\bfseries]above:Lingkungan A: Manual}] (manual) {};
+    \node[group=gitopsblue, fit=(g1)(g3),
+          label={[font=\small\bfseries]above:Lingkungan B: GitOps}] (gitops) {};
+\end{scope}
+
+% Internal flows
+\draw[arrow] (m1) -- (m2);
+\draw[arrow] (m2) -- (m3);
+\draw[arrow] (g1) -- (g2);
+\draw[arrow] (g2) -- (g3);
+
+% Intervention flows
+\draw[arrow, draw=scenariored] (drift.south west) -- (manual.north);
+\draw[arrow, draw=scenariored] (drift.south east) -- (gitops.north);
+
+% Metrics
+\node[metric, below=0.85cm of $(m3.south)!0.5!(g3.south)$] (r2) {R2 Waktu};
+\node[metric, left=0.38cm of r2] (r1) {R1 Konsistensi};
+\node[metric, right=0.38cm of r2] (r3) {R3 Traceability};
+\node[font=\small\bfseries, below=0.1cm of r2] (mlabel) {Metrik keluaran};
+
+\draw[arrow] (m3.south) -- (r1.north);
+\draw[arrow] (m3.south) -- (r2.north);
+\draw[arrow] (g3.south) -- (r2.north);
+\draw[arrow] (g3.south) -- (r3.north);
+
+\node[font=\scriptsize, text=okgreen!60!black, below=0.25cm of mlabel]
+      {Variabel bebas: paradigma deployment; variabel lain dikendalikan};
+
+\end{tikzpicture}
+\end{document}
