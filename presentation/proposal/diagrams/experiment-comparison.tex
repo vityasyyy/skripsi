@@ -12,7 +12,7 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.38cm and 1.6cm,
+    node distance=0.4cm and 1.6cm,
     box/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
                 minimum width=3.25cm, minimum height=1.18cm, align=center,
                 line width=1pt, font=\large},
@@ -21,20 +21,26 @@
     arrow/.style={->, >=stealth, line width=1pt, draw=gray!70}
 ]
 
+% Environment A: Manual - now 3 rows to match Env B height
 \node[box=manualgray] (kA) {
     \textbf{kubectl}\\
     \small (imperatif)
 };
-\node[box=manualgray, below=0.5cm of kA] (k8sA) {
+\node[box=manualgray, below=0.5cm of kA] (opA) {
+    \textbf{Operator}\\
+    \small (manual)
+};
+\node[box=manualgray, below=0.5cm of opA] (k8sA) {
     \includegraphics[height=12pt]{logos/kubernetes.png}\\[2pt]
     \textbf{Klaster A}
 };
 
 \begin{scope}[on background layer]
-    \node[group=manualgray, fit=(kA)(k8sA), label={[font=\normalsize\bfseries]above:Lingkungan A: Manual}] (envA) {};
+    \node[group=manualgray, fit=(kA)(opA)(k8sA), label={[font=\normalsize\bfseries]above:Lingkungan A: Manual}] (envA) {};
 \end{scope}
 
-\node[box=gitopsblue, right=2.75cm of kA] (gitB) {
+% Environment B: GitOps - 3 rows
+\node[box=gitopsblue, right=2.0cm of envA] (gitB) {
     \includegraphics[height=12pt]{logos/git.png}\\[2pt]
     \textbf{Git Repo}
 };
@@ -54,6 +60,7 @@
     \node[group=gitopsblue, fit=(gitB)(argoB)(k8sB), label={[font=\normalsize\bfseries]above:Lingkungan B: GitOps}] (envB) {};
 \end{scope}
 
+% Drift injection label
 \node[rectangle, rounded corners=3pt, draw=driftred, fill=driftred!10,
       minimum width=4.8cm, minimum height=1.05cm, align=center,
       line width=1pt, font=\large\bfseries, text=driftred!80!black,

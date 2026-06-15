@@ -1,61 +1,53 @@
-\documentclass[tikz,border=5pt]{standalone}
+\documentclass[tikz,border=6pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric}
-\usepackage{graphicx}
+\usetikzlibrary{positioning,fit,backgrounds}
 \usepackage{xcolor}
 
 \definecolor{gitopsblue}{RGB}{51,108,229}
-\definecolor{manualgray}{RGB}{102,102,102}
 \definecolor{driftred}{RGB}{229,115,115}
 \definecolor{okgreen}{RGB}{76,175,80}
 \definecolor{metricyellow}{RGB}{251,192,45}
-\definecolor{metricpurple}{RGB}{156,39,176}
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.34cm and 0.34cm,
+    node distance=0.18cm and 0.28cm,
     header/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1,
-                   text=white, text width=3.6cm, minimum height=0.78cm,
-                   align=center, font=\normalsize\bfseries, line width=1pt},
-    cell/.style={rectangle, rounded corners=2pt, draw=gray!50, fill=white,
-                 text width=3.6cm, minimum height=0.72cm, align=center,
-                 line width=0.5pt, font=\small},
-    defense/.style={rectangle, rounded corners=5pt, draw=okgreen, fill=okgreen!10,
-                    inner sep=10pt, line width=1.5pt},
-    arrow/.style={->, >=stealth, line width=0.8pt, draw=gray!70}
+                   text=white, text width=3.55cm, minimum height=0.62cm,
+                   align=center, font=\small\bfseries, line width=0.8pt},
+    cell/.style={rectangle, rounded corners=2pt, draw=gray!55, fill=white,
+                 text width=3.55cm, minimum height=0.76cm, align=center,
+                 line width=0.5pt, font=\scriptsize},
+    note/.style={rectangle, rounded corners=4pt, draw=okgreen, fill=okgreen!8,
+                 text width=11.2cm, minimum height=0.70cm, align=center,
+                 line width=0.9pt, font=\scriptsize}
 ]
 
 \node[header=gitopsblue] (h1) {Metrik};
-\node[header=driftred, right=0.4cm of h1] (h2) {Pengukuran};
-\node[header=okgreen, right=0.4cm of h2] (h3) {Sifat};
+\node[header=driftred, right=of h1] (h2) {Operasionalisasi};
+\node[header=okgreen, right=of h2] (h3) {Output};
 
-\node[cell, below=0.5cm of h1] (m1) {R1: Konsistensi};
-\node[cell, below=0.5cm of h2] (p1) {\% resource Healthy/Synced};
-\node[cell, below=0.5cm of h3] (s1) {Objektif (otomatis)};
+\node[cell, below=0.34cm of h1] (m1) {R1\\Konsistensi};
+\node[cell, right=of m1] (o1) {Persentase resource yang cocok dengan desired state};
+\node[cell, right=of o1] (u1) {Nilai \% pada baseline, saat drift, dan setelah recovery};
 
-\node[cell, below=0.2cm of m1] (m2a) {R2: Detection Time};
-\node[cell, below=0.2cm of p1] (p2a) {$t_d - t_0$};
-\node[cell, below=0.2cm of s1] (s2a) {Bagian paradigma};
+\node[cell, below=of m1] (m2) {R2a\\Detection time};
+\node[cell, right=of m2] (o2) {$t_d - t_0$};
+\node[cell, right=of o2] (u2) {Waktu dari injeksi hingga drift terdeteksi};
 
-\node[cell, below=0.2cm of m2a] (m2b) {R2: Recovery Time};
-\node[cell, below=0.2cm of p2a] (p2b) {$t_2 - t_0$};
-\node[cell, below=0.2cm of s2a] (s2b) {Bagian paradigma};
+\node[cell, below=of m2] (m3) {R2b\\Recovery time};
+\node[cell, right=of m3] (o3) {$t_2 - t_0$};
+\node[cell, right=of o3] (u3) {Waktu dari injeksi hingga state kembali baseline};
 
-\node[cell, below=0.2cm of m2b] (m2c) {R2: Root Cause ID};
-\node[cell, below=0.2cm of p2b] (p2c) {$t_{rci} - t_d$};
-\node[cell, below=0.2cm of s2b] (s2c) {Bagian paradigma};
+\node[cell, below=of m3] (m4) {R2c\\Root cause ID};
+\node[cell, right=of m4] (o4) {$t_{rci} - t_d$};
+\node[cell, right=of o4] (u4) {Waktu dari deteksi hingga penyebab teridentifikasi};
 
-\node[cell, below=0.2cm of m2c] (m3) {R3: Traceability};
-\node[cell, below=0.2cm of p2c] (p3) {\% audit log terrekonstruksi};
-\node[cell, below=0.2cm of s2c] (s3) {Deskriptif};
+\node[cell, below=of m4] (m5) {R3\\Traceability};
+\node[cell, right=of m5] (o5) {Bukti Git history, audit log, dan diff};
+\node[cell, right=of o5] (u5) {Deskripsi kelengkapan rekonstruksi perubahan};
 
-\node[defense, below=0.62cm of $(m3)!0.5!(p3)$, text width=10.9cm, align=center] (defense) {
-    \textbf{Pembelaan Operasionalisasi:}\\[4pt]
-    \small Kemampuan deteksi adalah bagian dari paradigma deployment.\\
-    \small Lingkungan A: operator + runbook terstandarisasi + \textit{timestamp} otomatis.\\
-    \small Lingkungan B: ArgoCD \textit{reconciliation loop}.\\[4pt]
-    \small\itshape Kedua mekanisme deteksi adalah properti inheren dari paradigma masing-masing.
-};
+\node[note, below=0.42cm of o5] (n1)
+      {R1 dan R2 dibandingkan antar paradigma; R3 dideskripsikan karena sifat audit trail berbeda secara struktural.};
 
 \end{tikzpicture}
 \end{document}
