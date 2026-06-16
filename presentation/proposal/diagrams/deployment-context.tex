@@ -1,0 +1,71 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{driftred}{RGB}{229,115,115}
+\definecolor{warnorange}{RGB}{255,167,38}
+\definecolor{okgreen}{RGB}{76,175,80}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.42cm and 0.55cm,
+    step/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
+                 minimum width=2.35cm, minimum height=0.92cm, align=center,
+                 line width=0.9pt, font=\scriptsize},
+    mode/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8,
+                 minimum width=4.10cm, minimum height=1.18cm, align=center,
+                 line width=0.9pt, font=\scriptsize},
+    arrow/.style={->, >=Stealth, line width=0.9pt},
+    label/.style={font=\scriptsize, align=center, fill=white, inner sep=1.4pt}
+]
+
+\node[step=manualgray] (code) {
+    \includegraphics[height=9pt]{logos/docker.png}\\[-1pt]
+    \textbf{Kode Aplikasi}
+};
+
+\node[step=gitopsblue, right=of code] (manifest) {
+    \includegraphics[height=9pt]{logos/helm.png}\\[-1pt]
+    \textbf{Manifest/Chart}
+};
+
+\node[step=warnorange, right=of manifest] (deploy) {
+    \textbf{Deployment}\\
+    Apply, sync, update
+};
+
+\node[step=okgreen, right=of deploy] (cluster) {
+    \includegraphics[height=9pt]{logos/kubernetes.png}\\[-1pt]
+    \textbf{Klaster K8s}
+};
+
+\draw[arrow, draw=manualgray] (code) -- (manifest);
+\draw[arrow, draw=manualgray] (manifest) -- (deploy);
+\draw[arrow, draw=manualgray] (deploy) -- (cluster);
+
+\node[mode=driftred] (manual) at ($(code)!0.5!(manifest)+(0,-1.75)$) {
+    \textbf{Manual}\\
+    Operator menjalankan\\
+    \texttt{kubectl} langsung
+};
+
+\node[mode=gitopsblue] (gitops) at ($(deploy)!0.5!(cluster)+(0,-1.75)$) {
+    \textbf{GitOps}\\
+    Git menyimpan desired state;\\
+    agen melakukan reconciliation
+};
+
+\draw[arrow, draw=driftred, dashed] (manual.north east) to[out=35, in=245]
+    node[label, text=driftred, pos=0.58] {perubahan cepat\\sulit dilacak}
+    (cluster.south west);
+
+\draw[arrow, draw=gitopsblue] (gitops.north east) to[out=38, in=300]
+    node[label, text=gitopsblue, pos=0.56] {sinkronisasi\\berulang}
+    (cluster.south);
+
+\end{tikzpicture}
+\end{document}

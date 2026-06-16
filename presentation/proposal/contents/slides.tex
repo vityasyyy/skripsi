@@ -45,34 +45,11 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
     \end{beamercolorbox}%
     \vspace*{0.10cm}%
 }
-\newcommand{\speakerpoints}[4]{%
-    {%
-    \usebackgroundtemplate{\backgroundcontent}%
-    \begin{frame}
-        \frametitle{Catatan Pembicara: #1}
-        \footnotesize
-        \begin{beamercolorbox}[wd=\textwidth, sep=0.15cm, rounded=true]{structure}
-            \textbf{Inti:} #2
-        \end{beamercolorbox}
-        \vspace{0.18cm}
-        \begin{columns}[T]
-            \begin{column}{0.47\textwidth}
-                \textbf{Alur bicara}
-                #3
-            \end{column}
-            \begin{column}{0.47\textwidth}
-                \textbf{Transisi}
-                #4
-            \end{column}
-        \end{columns}
-    \end{frame}
-    }%
-}
 
 \begin{document}
 
 % =============================================
-% ACT 1: PROBLEM & GAP (Slides 1-7)
+% ACT 1: CONTEXT & PROBLEM (Slides 1-8)
 % =============================================
 
 % =============================================
@@ -81,322 +58,387 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \titlepage
 \note{
-Pembuka: sampaikan salam, perkenalkan judul, dan sebutkan bahwa presentasi ini membahas evaluasi empiris deployment manual dan GitOps pada konteks configuration drift.
+Sapaan: ``Assalamualaikum, selamat pagi. Saya Muhammad Argya Vityasy, dan hari ini saya akan mempresentasikan proposal penelitian saya tentang configuration drift pada deployment Kubernetes.''
 
-Pesan utama: fokus penelitian adalah pengukuran respons operasional, bukan promosi satu alat.
+Fokus: ``Inti penelitian ini: kita ingin tahu seberapa besar perbedaan operasional yang sebenarnya terjadi ketika drift menyerang dua paradigma deployment yang berbeda, manual dan GitOps.''
 
-Transisi: mulai dari masalah operasional yang membuat penelitian ini penting.
+Transisi: ``Sebelum kita masuk ke pertanyaan penelitian, mari kita pahami konteksnya: apa itu deployment dan mengapa drift menjadi masalah?''
 }
 \end{frame}
 
 % =============================================
-% 2. Why this matters
+% 2. What is application deployment?
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Mengapa Masalah Ini Penting?}
-    \vspace{0.05cm}
-    \footnotesize
+    \frametitle{Apa Itu Deployment Aplikasi?}
+    \begin{columns}[T]
+        \begin{column}{0.44\textwidth}
+            \scriptsize
+            \textbf{Deployment} adalah proses membawa aplikasi dari kode menjadi layanan yang berjalan: membangun, mengemas, mengirim, dan menjalankan di klaster.
+            \vspace{0.04cm}
+            \textbf{Aplikasi multi-service} memiliki banyak komponen yang saling bergantung. InvenioRDM, misalnya, terdiri dari 16+ komponen: web, worker, database, search, cache, object storage, ingress, secrets, dan monitoring.
+            \vspace{0.04cm}
+            \textbf{Dua paradigma deployment:}
+            \begin{itemize}\setlength{\itemsep}{0pt}
+                \item \textbf{Manual:} operator menjalankan \texttt{kubectl} langsung ke klaster.
+                \item \textbf{GitOps:} Git menyimpan desired state; agen software melakukan reconciliation secara berkala.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.52\textwidth}
+            \centering
+            \includegraphics[width=\columnwidth,height=0.50\textheight,keepaspectratio]{deployment-context}
+        \end{column}
+    \end{columns}
+\note{
+Sapaan: ``Deployment adalah proses membawa aplikasi dari kode menjadi layanan yang berjalan di klaster. Untuk aplikasi multi-service seperti InvenioRDM, ini berarti mengelola 16+ komponen yang saling bergantung.''
+
+Paradigma: ``Ada dua cara utama: manual, di mana operator menjalankan perintah langsung ke klaster, dan GitOps, di mana Git menjadi single source of truth dan agen software menyelaraskan state klaster secara otomatis.''
+
+Transisi: ``Masalah muncul ketika apa yang berjalan di klaster tidak lagi sesuai dengan apa yang tertulis. Itulah configuration drift.''
+}
+\end{frame}
+}
+
+% =============================================
+% 3. Context: Kubernetes and the drift problem
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Konteks: Kubernetes dan Masalah Drift}
+    \begin{columns}[T]
+        \begin{column}{0.44\textwidth}
+            \scriptsize
+            \textbf{Situasi yang sering terjadi}
+            \begin{itemize}\setlength{\itemsep}{0pt}
+                \item Operator menjalankan \texttt{kubectl scale} langsung di klaster.
+                \item Dokumentasi tidak diperbarui.
+                \item Tidak ada yang tahu mengapa replika berubah.
+            \end{itemize}
+            \vspace{0.04cm}
+            \textbf{Itulah configuration drift:} \textit{desired state} $\neq$ \textit{actual state}. Dampak: inkonsistensi, pemulihan lambat, audit tidak jelas.
+        \end{column}
+        \begin{column}{0.52\textwidth}
+            \centering
+            \includegraphics[width=\columnwidth,height=0.44\textheight,keepaspectratio]{motivation-drift}
+        \end{column}
+    \end{columns}
+    \vspace{0.04cm}
+    \slidelead{Drift = klaster menyimpang dari apa yang tertulis. Tim kehilangan kepastian tentang state sistem.}
+\note{
+Sapaan: ``Bayangkan seorang operator yang harus menangani spike traffic pada pukul 2 pagi. Dia menjalankan kubectl scale langsung di klaster. Masalah terselesaikan, tapi Git tidak tahu. Besok pagi, tidak ada yang bisa menjelaskan mengapa jumlah replika berubah. Itulah configuration drift.''
+
+Definisi: ``Drift adalah celah antara desired state dan actual state. Dan bukti menunjukkan ini bukan kasus langka.''
+
+Transisi: ``Seberapa sering drift ini terjadi? Mari kita lihat buktinya.''
+}
+\end{frame}
+}
+
+% =============================================
+% 4. Evidence: drift is not theoretical
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Bukti: Drift Bukan Masalah Teoritis}
     \begin{columns}[T]
         \begin{column}{0.47\textwidth}
-            \textbf{Situasi yang mudah terjadi}
-            \begin{itemize}
-                \item Aplikasi Kubernetes punya banyak komponen.
-                \item Perubahan cepat dilakukan langsung di klaster.
-                \item Konfigurasi tertulis tidak ikut diperbarui.
+            \scriptsize
+            \textbf{Bukti empiris}
+            \begin{itemize}\setlength{\itemsep}{1pt}
+                \item 71\% dari 2.260 skrip K8s mengandung \textit{misconfiguration} bermakna {\tiny (Zhang, 2026)}.
+                \item 11 kategori \textit{security misconfiguration} berulang {\tiny (Rahman, 2023)}.
             \end{itemize}
-            \vspace{0.10cm}
-            \textbf{Dampaknya}
-            \begin{itemize}
-                \item Tim tidak yakin state mana yang benar.
-                \item Pemulihan dan analisis akar masalah melambat.
-                \item Jejak audit menjadi tidak lengkap.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.50\textwidth}
-            \centering
-            \includegraphics[width=\columnwidth,height=0.70\textheight,keepaspectratio]{motivation-drift}
-        \end{column}
-    \end{columns}
-    \vspace{0.05cm}
-    \smallnote{Masalah utamanya bukan hanya aplikasi bermasalah, tetapi hilangnya kepastian tentang state sistem.}
-\note{
-Pembuka: mulai dari situasi praktis, bukan dari definisi. Tekankan bahwa perubahan kecil yang tidak tercatat bisa membuat tim kehilangan kepercayaan pada kondisi klaster.
-
-Pesan utama: configuration drift penting karena membuat state aktual dan state yang terdokumentasi tidak lagi sama.
-
-Transisi: setelah masalah praktisnya jelas, masuk ke definisi dan bukti empiris drift.
-}
-\end{frame}
-}
-
-% =============================================
-% 3. Configuration drift: definition and evidence
-% =============================================
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Configuration Drift: Definisi dan Bukti}
-    \vspace{0.05cm}
-    \begin{columns}[T]
-        \begin{column}{0.46\textwidth}
-            \textbf{Definisi} {\small (Pohjola, 2025)}
-
-            \smallskip
-            State aktual klaster tidak lagi sesuai dengan state yang dideklarasikan.
-
-            \vspace{0.20cm}
-            \textbf{Penyebab umum}
-            \begin{enumerate}
-                \item Perubahan langsung tanpa \textit{source of truth}
-                \item Prosedur deployment tidak konsisten
-                \item Tidak ada deteksi otomatis
+            \vspace{0.04cm}
+            \textbf{Tiga penyebab utama drift} {\tiny (Pohjola, 2025)}
+            \begin{enumerate}\setlength{\itemsep}{0pt}
+                \item Perubahan langsung tanpa source of truth.
+                \item Prosedur deployment tidak konsisten.
+                \item Tidak ada mekanisme deteksi otomatis.
             \end{enumerate}
         \end{column}
-        \begin{column}{0.50\textwidth}
-            \textbf{Bukti empiris}
-            \begin{itemize}
-                \item 71\% dari 2.260 skrip K8s mengandung \textit{misconfiguration} bermakna {\small (Zhang et al., 2026)}.
-                \item 11 kategori \textit{security misconfiguration} berulang pada manifest K8s {\small (Rahman et al., 2023)}.
-                \item Drift berdampak pada keandalan, keamanan, dan proses pemulihan layanan.
-            \end{itemize}
+        \begin{column}{0.47\textwidth}
+            \scriptsize
+            \textbf{Konsekuensi nyata di klaster akademis}
+            \vspace{0.02cm}
+
+            Tim IT universitas yang mengelola repositori data penelitian harus memulihkan layanan setelah drift. Tanpa deteksi otomatis, drift menumpuk sampai insiden.
+            \vspace{0.04cm}
+
+            Saat insiden: apa yang berubah, kapan, mengapa? Tanpa audit trail, pemulihan memakan waktu dan akar masalah luput.
         \end{column}
     \end{columns}
-    \vspace{0.08cm}
-    \slidelead{Karena itu, drift perlu diukur sebagai fenomena operasional, bukan hanya dijelaskan sebagai konsep.}
+    \vspace{0.04cm}
+    \slidelead{Drift bukan masalah teoritis; ini ancaman operasional nyata terhadap keandalan dan keamanan layanan.}
 \note{
-Pembuka: berikan definisi singkat agar semua penguji memakai istilah yang sama.
+Sapaan: ``Bukti menunjukkan drift bukan masalah teoritis. Zhang et al. menemukan 71\% skrip K8s mengandung misconfiguration bermakna. Rahman et al. mengidentifikasi 11 kategori security misconfiguration yang berulang.''
 
-Pesan utama: drift bukan masalah abstrak; literatur menunjukkan misconfiguration Kubernetes sering terjadi dan berdampak nyata.
+Konsekuensi: ``Di klaster akademis, konsekuensinya nyata: tim IT universitas harus memulihkan repositori data penelitian setelah drift terjadi. Tanpa mekanisme deteksi otomatis, drift bisa menumpuk sampai insiden.''
 
-Transisi: setelah masalahnya terlihat, jelaskan respons yang umum diajukan, yaitu GitOps.
+Transisi: ``GitOps diajukan sebagai jawaban atas masalah ini. Tapi seberapa besar bukti terkontrol yang kita punya?''
 }
 \end{frame}
 }
 
 % =============================================
-% 4. GitOps as a response
+% 5. GitOps as response
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{GitOps sebagai Respons terhadap Drift}
-    \vspace{0.05cm}
+    \frametitle{GitOps Menjanjikan Jawaban}
     \begin{columns}[T]
         \begin{column}{0.42\textwidth}
-            \begin{itemize}
-                \item Git menyimpan \textit{desired state}.
-                \item Agen di klaster membandingkan Git dengan state aktual.
-                \item Saat ada drift, sistem dapat mendeteksi dan mengoreksinya.
-            \end{itemize}
+            \scriptsize
+            \textbf{Empat prinsip OpenGitOps}
+            \begin{enumerate}\setlength{\itemsep}{1pt}
+                \item Sistem dideklarasikan secara deklaratif.
+                \item Desired state tersimpan dan berversi di Git.
+                \item Perubahan ditarik secara otomatis oleh agen software.
+                \item Agen software secara kontinu mendeteksi dan mengoreksi deviasi.
+            \end{enumerate}
+            \vspace{0.04cm}
+            \textbf{Konsekuensi:} drift menjadi \textit{observable} dan dapat dipulihkan otomatis (\textit{self-heal}); audit trail terjamin lewat Git history.
         \end{column}
-        \begin{column}{0.53\textwidth}
+        \begin{column}{0.54\textwidth}
             \centering
-            \includegraphics[width=\columnwidth,height=0.50\textheight,keepaspectratio]{gitops-flow}
+            \includegraphics[width=\columnwidth,height=0.46\textheight,keepaspectratio]{gitops-flow}
         \end{column}
     \end{columns}
-    \vspace{0.08cm}
+    \vspace{0.04cm}
     \smallnote{Pertanyaan ilmiahnya bukan ``apakah GitOps populer?'', melainkan seberapa berbeda respons operasionalnya saat drift terjadi.}
 \note{
-Pembuka: posisikan GitOps sebagai respons, bukan sebagai kesimpulan penelitian.
+Sapaan: ``GitOps menjawab drift melalui empat prinsip OpenGitOps: deklaratif, Git sebagai source of truth, pull-based changes, dan continuous reconciliation. Konsekuensinya: drift menjadi observable dan dapat dipulihkan otomatis.''
 
-Pesan utama: GitOps menjanjikan reconciliation otomatis, tetapi penelitian ini ingin mengukur dampak operasionalnya secara terkontrol.
+Pertanyaan: ``Pertanyaan ilmiahnya bukan apakah GitOps populer, melainkan seberapa berbeda respons operasionalnya saat drift terjadi.''
 
-Transisi: dari klaim teknis GitOps, lanjut ke masalah bukti ilmiah di studi sebelumnya.
+Transisi: ``Lalu, seberapa kuat bukti yang mendukung klaim ini?''
 }
 \end{frame}
 }
 
 % =============================================
-% 5. Industry claims vs. scientific evidence
+% 6. Industry claims vs scientific evidence
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Klaim Industri vs.\ Bukti Ilmiah}
-    \vspace{0.10cm}
+    \vspace{0.05cm}
     \centering
-    \includegraphics[width=0.96\textwidth,height=0.57\textheight,keepaspectratio]{industry-claim}
-    \vspace{0.12cm}
-    \slidelead{Klaimnya kuat di praktik, tetapi bukti terkontrol tentang dampak kausalnya masih terbatas.}
+    \includegraphics[width=0.96\textwidth,height=0.56\textheight,keepaspectratio]{industry-claim}
+    \vspace{0.10cm}
+    \slidelead{Klaim diterima luas. Bukti terkontrol masih lemah. Dampak kausal paradigma deployment belum jelas.}
 \note{
-Pembuka: akui bahwa GitOps memang populer dan banyak diklaim membantu operasi.
+Sapaan: ``Sekilas masalah tampak terselesaikan. Banyak studi melaporkan manfaat GitOps. Namun, saat meninjau literatur, saya menemukan kelemahan berulang: metrik kualitatif, tanpa control group, tanpa analisis statistik formal.''
 
-Pesan utama: popularitas dan studi deskriptif belum cukup untuk menunjukkan efek kausal paradigma deployment.
+Inti: ``Jadi kita masih kurang bukti terkontrol yang mengukur dampak operasional paradigma deployment. Ini kalimat yang saya ingin audiens ingat.''
 
-Transisi: titik ini membawa presentasi ke research gap.
+Transisi: ``Mari kita lihat celah ini secara eksplisit.''
 }
 \end{frame}
 }
 
 % =============================================
-% 6. Research gap — CLIMAX OF ACT 1
+% 7. Research gap (CLIMAX)
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Apa yang Membedakan Penelitian Ini?}
+    \frametitle{Kesenjangan Penelitian}
     \vspace{0.05cm}
     \centering
-    \includegraphics[width=0.96\textwidth,height=0.51\textheight,keepaspectratio]{research-gap}
-    \vspace{0.10cm}
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, center, rounded=true]{structure}
-        \small\bfseries Penelitian ini mengisi empat celah: metrik yang jelas, variabel yang dikontrol, uji statistik formal, dan konteks klaster akademis.
+    \includegraphics[width=0.96\textwidth,height=0.48\textheight,keepaspectratio]{research-gap}
+    \vspace{0.08cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.18cm, center, rounded=true]{structure}
+        \small\bfseries
+        Empat kesenjangan: metrik belum teroperasionalisasi, variabel belum dikontrol, uji statistik belum dilakukan, evaluasi belum menyentuh konteks klaster akademis.
     \end{beamercolorbox}
+    \vspace{0.06cm}
+    \smallnote{Tanpa bukti terkontrol, tim IT memilih paradigma deployment berdasarkan keyakinan, bukan data.}
 \note{
-Pembuka: berhenti sebentar setelah diagram muncul, lalu jelaskan bahwa celah ini menjadi alasan penelitian.
+Sapaan: ``Diagram ini menunjukkan empat celah yang saling berkaitan. Studi sebelumnya berguna, tapi masing-masing punya kelemahan yang membuat kita tidak bisa menyimpulkan efek kausal.''
 
-Pesan utama: kontribusi bukan sekadar mencoba ArgoCD, tetapi membuat evaluasi empiris terkontrol.
+So what: ``Tanpa bukti terkontrol, tim IT yang harus memilih paradigma deployment hanya bisa mengandalkan keyakinan, bukan data. Penelitian ini mengisi keempat celah tersebut.''
 
-Transisi: setelah gap jelas, rumuskan pertanyaan penelitian.
+Transisi: ``Dari celah ini, rumuskan pertanyaan inti penelitian.''
 }
 \end{frame}
 }
 
 % =============================================
-% 7. Problem statement
+% 8. Research questions (no H0/H1)
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Rumusan Masalah}
-    \vspace{0.08cm}
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.25cm, center, rounded=true]{structure}
-        \normalsize\bfseries
-        Sejauh mana deployment manual dengan \texttt{kubectl} dan GitOps dengan ArgoCD menghasilkan respons operasional yang berbeda ketika menghadapi \textit{configuration drift} terkontrol?
+    \vspace{0.04cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \small\bfseries
+        Sejauh mana paradigma deployment manual dan GitOps menghasilkan perbedaan pada karakteristik operasional ketika \textit{configuration drift} terjadi?
     \end{beamercolorbox}
-    \vspace{0.22cm}
-    \begin{enumerate}
-        \item \textbf{R1 -- Konsistensi:} apakah deployment kembali ke state yang diharapkan?
-        \item \textbf{R2 -- Waktu:} berapa lama drift dideteksi, dipulihkan, dan diidentifikasi?
-        \item \textbf{R3 -- Traceability:} seberapa lengkap jejak perubahan dapat direkonstruksi?
-    \end{enumerate}
+    \vspace{0.10cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \small\textbf{Empat dimensi pengukuran}
+            \begin{enumerate}\setlength{\itemsep}{2pt}
+                \item \textbf{R1:} Konsistensi: apakah state klaster kembali ke yang diharapkan setelah drift?
+                \item \textbf{R2:} Waktu: berapa lama drift terdeteksi dan dipulihkan?
+                \item \textbf{R3:} Intervensi manual: berapa banyak tindakan korektif yang diperlukan?
+                \item \textbf{R4:} Traceability: dapat atau tidaknya menelusuri siapa mengubah apa dan kapan.
+            \end{enumerate}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \small\textbf{Skenario pengujian}
+            \vspace{0.04cm}
+            \scriptsize
+            Tujuh skenario drift terkontrol (A--G) yang merepresentasikan kesalahan operasional umum pada Kubernetes: perubahan replika, image, ConfigMap, resource deletion, patch manual, drift lintas namespace, dan perubahan Secret.
+            \vspace{0.08cm}
+            \small\textbf{Pendekatan analisis}
+            \vspace{0.04cm}
+            \scriptsize
+            Eksploratif-komparatif: mengkarakterisasi perbedaan dan mengukur besarnya efek, bukan menguji hipotesis nol secara formal.
+        \end{column}
+    \end{columns}
 \note{
-Pembuka: bacakan pertanyaan utama secara pelan karena ini pusat proposal.
+Sapaan: ``Ini pertanyaan inti penelitian. Bacakan perlahan.'' Lalu: ``Untuk menjawabnya, kita ukur empat hal: konsistensi, waktu respons, jumlah intervensi manual, dan traceability.''
 
-Pesan utama: ada tiga dimensi yang diukur: konsistensi, waktu respons, dan traceability.
+Skenario: ``Kedua lingkungan diuji terhadap tujuh skenario drift yang merepresentasikan kesalahan operasional umum di Kubernetes.''
 
-Transisi: setelah pertanyaan jelas, batasi ruang lingkup agar klaim penelitian tidak terlalu luas.
+Analisis: ``Pendekatan kita eksploratif-komparatif: mengkarakterisasi perbedaan dan mengukur besarnya efek, bukan menguji hipotesis nol secara formal.''
+
+Transisi: ``Tapi sebelum kita bahas metodenya, mari kita batasi ruang lingkup agar klaim kita proporsional.''
 }
 \end{frame}
 }
 
 % =============================================
-% ACT 2: RESEARCH DESIGN (Slides 8-14)
+% ACT 2: RESEARCH DESIGN (Slides 9-16)
 % =============================================
 
 % =============================================
-% 8. Scope and limitations
+% 9. Scope and limitations
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Batasan Masalah}
-    \vspace{0.05cm}
+    \vspace{0.02cm}
+    \slidelead{Kita menguji satu pertanyaan dalam satu konteks yang terdefinisi:}
+    \vspace{0.06cm}
     \small
     \begin{enumerate}
         \item Satu klaster Kubernetes Rancher: 3 node, 24 inti CPU, $\sim$23 Gi memori.
-        \item InvenioRDM sebagai subjek uji, bukan objek penelitian.
+        \item InvenioRDM (16+ komponen) sebagai subjek uji, bukan objek penelitian.
         \item Tujuh skenario \textit{drift} terkontrol (A--G).
         \item Dua paradigma: deployment manual (\texttt{kubectl}) dan GitOps (ArgoCD).
-        \item Analisis: \textit{Mann--Whitney U}, $\alpha = 0{,}05$, dan ukuran efek.
+        \item Analisis: Shapiro-Wilk, \textit{t-test}/\textit{Mann--Whitney U}, $\alpha = 0{,}05$, ukuran efek.
         \item Di luar lingkup: \textit{multi-cluster} dan Git tanpa agen \textit{reconciliation}.
     \end{enumerate}
+    \vspace{0.04cm}
+    \smallnote{Skenario F menguji batas deteksi ArgoCD pada resource di luar Application boundary, bukan drift pada resource yang dikelola.}
 \note{
-Pembuka: tekankan bahwa batasan ini menjaga eksperimen tetap terukur dan dapat direplikasi.
+Sapaan: ``Batasan ini bukan kelemahan, ini menjaga eksperimen tetap terukur dan dapat direplikasi. Kita hanya mengklaim hasil pada konteks yang didefinisikan di sini, bukan semua lingkungan Kubernetes.''
 
-Pesan utama: penelitian hanya mengklaim hasil pada konteks yang didefinisikan, bukan semua lingkungan Kubernetes.
+Skenario F: ``Satu catatan: skenario F menguji batas deteksi ArgoCD, bukan drift pada resource yang dikelola. Ini kita akui secara eksplisit.''
 
-Transisi: setelah batasan, jelaskan apa yang ingin dicapai dan manfaatnya.
+Transisi: ``Dengan batasan ini, apa yang ingin kita capai dan siapa yang diuntungkan?''
 }
 \end{frame}
 }
 
 % =============================================
-% 9. Objectives and benefits
+% 10. Objectives and benefits
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Tujuan dan Manfaat Penelitian}
-    \vspace{0.05cm}
+    \vspace{0.04cm}
     \begin{columns}[T]
         \begin{column}{0.47\textwidth}
-            \textbf{Tujuan}
-            \begin{enumerate}
-                \item Membandingkan konsistensi deployment.
-                \item Membandingkan waktu deteksi, pemulihan, dan identifikasi akar masalah.
-                \item Mendokumentasikan \textit{traceability} operasional.
+            \small\textbf{Tujuan}
+            \begin{enumerate}\setlength{\itemsep}{2pt}
+                \item Mengukur konsistensi deployment setelah drift (R1).
+                \item Mengukur \textit{detection time} dan \textit{recovery time} (R2).
+                \item Mengukur jumlah intervensi manual (R3).
+                \item Mengukur \textit{audit trail}/traceability (R4).
             \end{enumerate}
         \end{column}
         \begin{column}{0.47\textwidth}
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.12cm, center, rounded=true]{frametitle}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{frametitle}
                 \small\bfseries Teoritis
             \end{beamercolorbox}
-            \vspace{0.05cm}
-            \scriptsize Bukti empiris tentang dampak drift pada dua paradigma deployment.
-            \vspace{0.12cm}
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.12cm, center, rounded=true]{structure}
+            \vspace{0.03cm}
+            \scriptsize Bukti empiris terkontrol tentang dampak drift pada dua paradigma, bukan klaim vendor.
+            \vspace{0.10cm}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{structure}
                 \small\bfseries Metodologis
             \end{beamercolorbox}
-            \vspace{0.05cm}
-            \scriptsize Protokol yang dapat direplikasi: skenario, metrik, dan analisis.
-            \vspace{0.12cm}
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.12cm, center, rounded=true]{frametitle}
+            \vspace{0.03cm}
+            \scriptsize Protokol yang dapat direplikasi: skenario, metrik, dan analisis statistik.
+            \vspace{0.10cm}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{frametitle}
                 \small\bfseries Praktis
             \end{beamercolorbox}
-            \vspace{0.05cm}
-            \scriptsize Masukan operasional bagi pengelola klaster Kubernetes.
+            \vspace{0.03cm}
+            \scriptsize Data untuk tim IT memilih paradigma deployment dan mengetahui skenario drift mana yang paling rentan.
         \end{column}
     \end{columns}
     \vspace{0.08cm}
-    \slidelead{Kontribusi utama: mengukur dampak operasional pilihan paradigma deployment, bukan membuktikan satu teknologi selalu unggul.}
+    \slidelead{Kontribusi utama: mengukur seberapa besar dampak operasional pilihan paradigma, bukan membuktikan satu teknologi selalu menang.}
 \note{
-Pembuka: hubungkan tujuan dengan R1, R2, dan R3 agar struktur penelitian terlihat konsisten.
+Sapaan: ``Setiap tujuan langsung menjawab satu dimensi dari pertanyaan penelitian. R1 menjawab konsistensi, R2 menjawab waktu, R3 menjawab intervensi manual, R4 menjawab traceability.''
 
-Pesan utama: manfaatnya ada pada bukti, protokol, dan masukan praktis.
+Manfaat: ``Secara teoritis, ini memberikan bukti empiris terkontrol, bukan klaim vendor. Secara metodologis, protokolnya dapat direplikasi. Secara praktis, tim IT mendapat data untuk memilih paradigma deployment.''
 
-Transisi: untuk menunjukkan posisi penelitian, masuk ke penelitian terkait.
+Transisi: ``Bagaimana posisi penelitian ini terhadap studi sebelumnya?''
 }
 \end{frame}
 }
 
 % =============================================
-% 10. Literature review with differentiation
+% 11. Literature review with differentiation
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Penelitian Terkait dan Pembeda}
-    \vspace{0.05cm}
+    \vspace{0.04cm}
     \scriptsize
-    \begin{tabular}{>{\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}p{4.0cm} >{\raggedright\arraybackslash}p{4.5cm}}
+    Studi sebelumnya mendukung potensi GitOps, tapi belum ada yang mengisolasi efek paradigma dari variabel:
+    \vspace{0.04cm}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}p{4.8cm}}
         \toprule
         \textbf{Sumber} & \textbf{Temuan Utama} & \textbf{Kelemahan Metodologis} \\
         \midrule
-        Shrestha (2024) & GitOps membantu deteksi drift & Kualitatif; tanpa statistik formal \\
+        Shrestha (2024) & GitOps membantu deteksi drift & Penilaian kualitatif; tanpa statistik \\
         Kaggantinataraja (2025) & Deklaratif lebih cepat dan aman & Variabel pengganggu tidak dikontrol \\
-        Matubber (2025) & Reconciliation time dapat diukur & Tanpa \textit{control group} manual \\
+        Matubber (2025) & Reconciliation time dapat diukur & Tanpa \textit{control group} \\
         Paavola (2021) & ArgoCD cocok untuk banyak aplikasi & Komparatif deskriptif; tanpa metrik kuantitatif \\
+        Damore (2021) & ArgoCD pada hybrid cloud & Studi implementasi; tanpa evaluasi metrik \\
         \bottomrule
     \end{tabular}
-    \vspace{0.15cm}
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.18cm, center, rounded=true]{structure}
-        \small\bfseries Pembeda: eksperimen terkontrol, variabel pengganggu dikendalikan, analisis statistik formal, dan metrik didefinisikan sebelum eksperimen.
+    \vspace{0.12cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.16cm, center, rounded=true]{structure}
+        \small\bfseries Pembeda: eksperimen terkontrol, variabel dikendalikan, uji statistik formal, metrik didefinisikan sebelum eksperimen.
     \end{beamercolorbox}
 \note{
-Pembuka: jangan membaca tabel baris per baris; sebutkan polanya.
+Sapaan: ``Jangan baca tabel baris per baris. Sebutkan polanya: studi sebelumnya mendukung potensi GitOps, tapi kelemahannya konsisten, tidak ada yang mengontrol variabel pengganggu atau menerapkan uji statistik formal pada perbandingan terkontrol.''
 
-Pesan utama: literatur mendukung potensi GitOps, tetapi belum cukup kuat untuk atribusi kausal.
+Pembeda: ``Itulah yang membedakan penelitian ini: kita mengendalikan variabel, mendefinisikan metrik sebelum eksperimen, dan menerapkan analisis statistik komparatif.''
 
-Transisi: dari pembeda literatur, masuk ke rancangan eksperimen yang menjawab celah tersebut.
+Transisi: ``Bagaimana rancangan eksperimen ini?''
 }
 \end{frame}
 }
 
 % =============================================
-% 11. Experimental design — CRITICAL SLIDE
+% 12. Experimental architecture
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -404,206 +446,230 @@ Transisi: dari pembeda literatur, masuk ke rancangan eksperimen yang menjawab ce
     \frametitle{Arsitektur Eksperimen}
     \vspace{0.02cm}
     \centering
-    \fullslidediagram[0.49\textheight]{./diagrams/architecture-overview.pdf}
-    \vspace{0.06cm}
+    \fullslidediagram[0.46\textheight]{./diagrams/architecture-overview.pdf}
+    \vspace{0.02cm}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.12cm, rounded=true]{structure}
-                \scriptsize\bfseries Variabel kontrol
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, rounded=true]{structure}
+                \scriptsize\bfseries Yang disamakan
             \end{beamercolorbox}
-            \vspace{0.05cm}
-            \scriptsize Workload, drift, klaster, dan prosedur pengukuran dibuat sama. Variabel yang dibedakan hanya paradigma deployment.
+            \vspace{0.03cm}
+            \scriptsize Workload, skenario drift, klaster, dan prosedur pengukuran identik. Satu-satunya yang dibedakan: paradigma deployment.
         \end{column}
         \begin{column}{0.48\textwidth}
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.12cm, rounded=true]{frametitle}
-                \scriptsize\bfseries Justifikasi workload
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, rounded=true]{frametitle}
+                \scriptsize\bfseries Mengapa InvenioRDM
             \end{beamercolorbox}
-            \vspace{0.05cm}
-            \scriptsize InvenioRDM dipakai karena dependensinya kompleks, komponen infrastrukturnya luas, dan \textit{open-source}. Ia adalah workload uji, bukan objek penelitian.
+            \vspace{0.03cm}
+            \scriptsize 16+ komponen yang saling bergantung, infrastruktur luas (database, search, cache, ingress, secrets), dan \textit{open-source} dari CERN. Subjek uji, bukan objek penelitian.
         \end{column}
     \end{columns}
 \note{
-Pembuka: jelaskan bahwa dua lingkungan menerima perlakuan drift yang sama.
+Sapaan: ``Dua lingkungan paralel menerima perlakuan drift yang sama. Kalimat kunci validitas internal: satu-satunya yang dibedakan adalah paradigma deployment.''
 
-Pesan utama: kalimat kunci validitas internal adalah hanya paradigma deployment yang dibedakan.
+InvenioRDM: ``InvenioRDM dipilih karena kompleksitas dependensinya, 16+ komponen dengan urutan deployment. Ini membuat drift lebih mungkin berdampak, sehingga perbedaan antara paradigma lebih terlihat.''
 
-Transisi: setelah desain umum, tunjukkan skenario drift yang diinjeksi.
+Transisi: ``Drift apa yang kita suntikkan ke kedua lingkungan?''
 }
 \end{frame}
 }
 
 % =============================================
-% 12. Drift scenarios
+% 13. Drift scenarios
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Skenario Configuration Drift Terkontrol}
+    \frametitle{Tujuh Skenario Drift yang Sama Disuntikkan ke Dua Lingkungan}
     \vspace{0.02cm}
     \centering
-    \fullslidediagram[0.59\textheight]{./diagrams/drift-scenarios.pdf}
-    \vspace{0.06cm}
-    \smallnote{Setiap skenario diinjeksi secara identik pada lingkungan manual dan GitOps, lalu respons operasionalnya diukur.}
+    \fullslidediagram[0.55\textheight]{./diagrams/drift-scenarios.pdf}
+    \vspace{0.04cm}
+    \smallnote{Kita menyuntikkan drift yang sama, lalu membandingkan bagaimana masing-masing paradigma merespons. Itulah variabel dependen kita.}
 \note{
-Pembuka: sebutkan bahwa skenario A sampai G mewakili kesalahan operasional umum di Kubernetes.
+Sapaan: ``Skenario A sampai G mewakili kesalahan operasional yang umum terjadi di Kubernetes: dari perubahan replika, image, ConfigMap, sampai perubahan Secret. Setiap skenario diinjeksi secara identik pada kedua lingkungan.''
 
-Pesan utama: perlakuan drift dibuat identik agar perbedaan respons dapat dibandingkan.
+Inti: ``Perlakuan drift dibuat identik agar perbedaan respons dapat diatribusikan kepada perbedaan paradigma, bukan kepada perbedaan perlakuan.''
 
-Transisi: setelah skenario, jelaskan metrik yang dipakai untuk mengukurnya.
+Transisi: ``Setelah drift disuntikkan, apa yang kita ukur?''
 }
 \end{frame}
 }
 
 % =============================================
-% 13. Metrics and operationalization
+% 14. Metrics and operationalization (R1-R4)
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Metrik Pengukuran dan Operasionalisasi}
+    \frametitle{Metrik Pengukuran: Apa yang Kita Ukur dan Bagaimana}
     \vspace{0.02cm}
     \centering
-    \fullslidediagram[0.53\textheight]{./diagrams/operationalization-validity.pdf}
+    \fullslidediagram[0.52\textheight]{./diagrams/operationalization-validity.pdf}
     \vspace{0.06cm}
-    \smallnote{Root Cause Identification Time selesai ketika kategori drift dan sumber daya terdampak disebutkan dengan benar.}
+    \smallnote{R1, R2, R3 diuji statistik. R4: rubrik oleh dua penilai independen (Cohen's $\kappa$), MTTI dan audit log completeness sebagai metrik kuantitatif pendamping.}
 \note{
-Pembuka: tekankan bahwa metrik didefinisikan sebelum eksperimen, bukan setelah melihat hasil.
+Sapaan: ``Empat metrik didefinisikan sebelum eksperimen, bukan setelah melihat hasil. R1 mengukur konsistensi, R2 mengukur waktu respons, R3 mengukur jumlah intervensi manual, R4 mengukur traceability.''
 
-Pesan utama: R1 mengukur konsistensi, R2 mengukur waktu respons, dan R3 menjelaskan traceability.
+R4: ``Mengapa R4 menggunakan rubrik? Karena traceability memiliki aspek kualitatif. Tapi kita juga mengukur MTTI dan audit log completeness sebagai metrik kuantitatif pendamping, dan menggunakan dua penilai independen dengan Cohen's kappa untuk reliabilitas.''
 
-Transisi: setelah metrik, jelaskan ancaman validitas dan mitigasinya.
+Transisi: ``Bagaimana satu run eksperimen berjalan dari awal sampai akhir?''
 }
 \end{frame}
 }
 
 % =============================================
-% 14. Threats to validity
+% 15. Experimental procedure
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Prosedur Eksperimen: Dari Drift Injection sampai Pemulihan}
+    \vspace{0.02cm}
+    \centering
+    \includegraphics[width=0.96\textwidth,height=0.68\textheight,keepaspectratio]{experiment-procedure}
+\note{
+Sapaan: ``Inilah yang terjadi dalam satu run eksperimen, dari drift injection sampai pemulihan, pada kedua lingkungan secara paralel.''
+
+Detail: ``Di Lingkungan A, operator mendeteksi drift secara manual dengan kubectl get/describe, mengidentifikasi akar masalah lewat log, dan memulihkan via recovery runbook. Di Lingkungan B, ArgoCD mendeteksi drift lewat polling setiap 60 detik, menampilkan diff untuk identifikasi akar masalah, dan memulihkan lewat self-heal.''
+
+Inti: ``Injeksi identik, tapi mekanisme deteksi dan pemulihan berbeda secara inheren. Itulah yang kita ukur.''
+
+Transisi: ``Setelah data terkumpul, bagaimana kita menganalisisnya?''
+}
+\end{frame}
+}
+
+% =============================================
+% 16. Statistical analysis & sample size
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Analisis Statistik dan Ukuran Sampel}
+    \vspace{0.02cm}
+    \scriptsize
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Metode analisis}
+            \begin{itemize}\setlength{\itemsep}{1pt}
+                \item Uji normalitas: Shapiro-Wilk.
+                \item Jika normal: \textit{independent samples t-test}; jika tidak: \textit{Mann--Whitney U}, $\alpha = 0{,}05$.
+                \item Ukuran efek: Cohen's $d$ atau Cliff's $\delta$.
+                \item Pendekatan: eksploratif-komparatif, mengkarakterisasi perbedaan dan besarnya efek.
+            \end{itemize}
+            \vspace{0.06cm}
+            \textbf{Mengapa non-parametrik aman?}
+            \begin{itemize}\setlength{\itemsep}{1pt}
+                \item Data waktu sistem sering \textit{skewed}.
+                \item Uji non-parametrik lebih konservatif.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Ukuran sampel dan power}
+            \begin{itemize}\setlength{\itemsep}{1pt}
+                \item Power = 0,80, $\alpha = 0{,}05$, target efek besar ($d = 1{,}0$).
+                \item Minimum $n = 17$ per grup secara total.
+                \item \textbf{R2:} $7 \times 10 = 70$ observasi per lingkungan (4$\times$ lipat minimum).
+                \item \textbf{R1, R3, R4:} $7 \times 5 = 35$ observasi per lingkungan (2$\times$ lipat minimum).
+                \item Jika efek sedang teramati, pengulangan ditambah.
+            \end{itemize}
+            \vspace{0.06cm}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, rounded=true]{structure}
+                \scriptsize\bfseries Analisis eksploratif-komparatif, bukan pengujian konfirmatoris
+            \end{beamercolorbox}
+        \end{column}
+    \end{columns}
+\note{
+Sapaan: ``Analisis dan ukuran sampel dipilih sebelum pengumpulan data. Shapiro-Wilk untuk normalitas, lalu t-test atau Mann--Whitney U untuk perbandingan.''
+
+Power: ``Untuk R2, kita punya 70 observasi per lingkungan, empat kali lipat minimum 17. Untuk R1, R3, R4, 35 observasi, dua kali lipat. Jika efek yang teramati ternyata sedang, kita bisa menambah pengulangan.''
+
+Transisi: ``Setelah analisis, kita perlu mengakui ancaman terhadap validitas dan menjelaskan mitigasinya.''
+}
+\end{frame}
+}
+
+% =============================================
+% 17. Threats to validity
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Ancaman terhadap Validitas dan Mitigasi}
-    \vspace{0.05cm}
+    \vspace{0.02cm}
     \scriptsize
-    \begin{tabular}{>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{6.2cm}}
+    Kita mengakui ancaman dan mengontrol yang bisa dikontrol:
+    \vspace{0.04cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.12cm, rounded=true]{structure}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{4.0cm} >{\raggedright\arraybackslash}p{6.4cm}}
         \toprule
         \textbf{Ancaman} & \textbf{Mitigasi dalam rancangan} \\
         \midrule
         Operator tunggal & Recovery runbook dan timestamp otomatis \\
         Efek pembelajaran & Urutan skenario diacak dan ada practice run \\
         Instrumentasi berubah & Versi Kubernetes, ArgoCD, dan workload dikunci \\
-        Satu workload & InvenioRDM dipilih sebagai workload multi-service realistis \\
-        Satu alat GitOps & ArgoCD digunakan sebagai implementasi GitOps yang umum \\
+        Satu workload & InvenioRDM mewakili kelas workload multi-service \\
+        Satu alat GitOps & ArgoCD adalah implementasi GitOps yang paling umum \\
         \bottomrule
     \end{tabular}
-    \vspace{0.15cm}
-    \slidelead{Klaim penelitian dibatasi pada evaluasi empiris terkontrol dalam konteks yang didefinisikan.}
+    \end{beamercolorbox}
+    \vspace{0.08cm}
+    \slidelead{Klaim dibatasi pada konteks yang didefinisikan. Ini bukan studi tentang semua klaster Kubernetes, tapi tentang satu pertanyaan di satu konteks terkontrol.}
 \note{
-Pembuka: akui ancaman validitas secara langsung; ini menunjukkan rancangan penelitian realistis.
+Sapaan: ``Kita mengakui ancaman secara langsung. Operator tunggal, kita mitigasi dengan recovery runbook dan timestamp otomatis. Efek pembelajaran, kita acak urutan skenario. Instrumentasi berubah, versi software dikunci sepanjang eksperimen.''
 
-Pesan utama: ancaman tidak diabaikan, tetapi dikendalikan lewat runbook, randomisasi, versi terkunci, dan batasan klaim.
+Inti: ``Ini bukan studi tentang semua klaster Kubernetes. Ini tentang satu pertanyaan di satu konteks terkontrol. Klaim kita dibatasi pada konteks itu.''
 
-Transisi: setelah validitas, jelaskan bagaimana data akan dianalisis.
+Transisi: ``Berapa lama penelitian ini berlangsung?''
 }
 \end{frame}
 }
 
 % =============================================
-% ACT 3: IMPLICATIONS (Slides 15-17)
-% =============================================
-
-% =============================================
-% 15. Statistical analysis
+% 18. Timeline
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Analisis Statistik}
+    \frametitle{Jadwal Penelitian}
     \vspace{0.05cm}
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Metode analisis}
-            \begin{itemize}
-                \item Statistik deskriptif per metrik.
-                \item \textit{Mann--Whitney U}, $\alpha = 0{,}05$.
-                \item Ukuran efek: Cohen's $d$ atau Cliff's $\delta$.
-                \item R3 dianalisis secara deskriptif.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Justifikasi}
-            \begin{itemize}
-                \item \textit{Mann--Whitney}: data waktu belum tentu normal dan sampel per skenario relatif kecil.
-                \item $n = 10$ per skenario: total $7 \times 10 = 70$ observasi per lingkungan untuk R2.
-            \end{itemize}
-        \end{column}
-    \end{columns}
+    \centering
+    \includegraphics[width=0.96\textwidth,height=0.60\textheight,keepaspectratio]{jadwal}
+    \vspace{0.08cm}
+    \smallnote{8 bulan: Juni 2026 sampai Januari 2027. Eksperimen inti berlangsung selama Oktober dan November.}
 \note{
-Pembuka: jelaskan bahwa analisis dipilih sebelum pengumpulan data.
+Sapaan: ``Jadwal ini terukur. Dua bulan pertama untuk studi literatur dan perancangan. Dua bulan berikutnya untuk implementasi dan skrip otomasi. Dua bulan inti, Oktober dan November, untuk eksperimen dan pengumpulan data. Sisanya untuk analisis dan penulisan.''
 
-Pesan utama: uji non-parametrik dipilih karena data waktu sistem dapat tidak normal; ukuran efek tetap dilaporkan agar hasil punya makna praktis.
-
-Transisi: setelah metode analisis, jelaskan bahwa semua kemungkinan hasil tetap informatif.
+Transisi: ``Mari kita tutup dengan kontribusi yang diharapkan.''
 }
 \end{frame}
 }
 
 % =============================================
-% 16. Possible outcomes
+% 19. Closing: "so what" + stakeholder
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Hasil yang Mungkin dan Maknanya}
-    \vspace{0.05cm}
-    \begin{columns}[T]
-        \begin{column}{0.31\textwidth}
-            \textbf{GitOps lebih baik}
-
-            \small Klaim industri mendapat dukungan empiris pada konteks terkontrol.
-        \end{column}
-        \begin{column}{0.31\textwidth}
-            \textbf{Tidak berbeda bermakna}
-
-            \small Klaim keunggulan otomatis GitOps perlu dibatasi pada konteks ini.
-        \end{column}
-        \begin{column}{0.31\textwidth}
-            \textbf{Manual unggul pada metrik tertentu}
-
-            \small Hasil menunjukkan batas praktis otomatisasi GitOps pada metrik tertentu.
-        \end{column}
-    \end{columns}
-    \vspace{0.22cm}
-    \slidelead{Apa pun arahnya, kontribusi penelitian adalah bukti yang dapat diperiksa, bukan opini adopsi teknologi.}
+    \frametitle{Kontribusi yang Diharapkan}
+    \vspace{0.10cm}
+    \begin{enumerate}\setlength{\itemsep}{6pt}
+        \item \textbf{Bukti empiris terkontrol:} kita akan tahu seberapa besar perbedaan sebenarnya ketika drift terjadi pada dua paradigma deployment, bukan hanya klaim vendor.
+        \item \textbf{Protokol yang dapat direplikasi:} tujuh skenario drift terstandarisasi, empat metrik teroperasionalisasi, dan prosedur analisis yang sudah ditetapkan sebelum eksperimen.
+        \item \textbf{Masukan operasional berbasis data:} tim IT universitas yang harus memilih antara melatih operator pada prosedur manual atau menginvestasikan waktu membangun GitOps akan punya data untuk memutuskan, berdasarkan skenario drift mana yang paling berdampak pada masing-masing paradigma.
+    \end{enumerate}
+    \vspace{0.20cm}
+    \centering
+    \begin{beamercolorbox}[wd=0.88\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \normalsize\bfseries Tanpa bukti terkontrol, keputusan deployment hanya berdasarkan keyakinan. Dengan bukti, berdasarkan data.
+    \end{beamercolorbox}
 \note{
-Pembuka: tekankan bahwa penelitian tidak bergantung pada hasil yang harus memenangkan GitOps.
+Sapaan: ``Tiga kontribusi: pertama, bukti empiris terkontrol. Kedua, protokol yang dapat direplikasi. Ketiga, masukan operasional berbasis data untuk tim IT universitas.''
 
-Pesan utama: hasil signifikan, tidak signifikan, atau campuran tetap menjawab pertanyaan penelitian karena ukuran efek dan konteks dilaporkan.
+So what: ``Tanpa bukti terkontrol, tim IT hanya bisa memilih paradigma deployment berdasarkan keyakinan. Penelitian ini menyediakan data, sehingga keputusan berdasarkan bukti, bukan opini.''
 
-Transisi: tutup dengan posisi kontribusi penelitian.
-}
-\end{frame}
-}
-
-% =============================================
-% 17. Closing
-% =============================================
-{
-\usebackgroundtemplate{\backgroundquote}
-\begin{frame}
-    \begin{tikzpicture}[remember picture, overlay]
-        \draw (current page.south west) +(4.5, 8) node[anchor=north west] {\usebeamerfont{quote final}\usebeamercolor[fg]{quote final}
-        \begin{minipage}[c]{6.5cm}
-        \centering ``Penelitian ini mengukur bagaimana pilihan paradigma deployment mengubah respons operasional terhadap configuration drift, bukan membuktikan bahwa satu teknologi selalu menang.''
-        \end{minipage}
-        };
-    \end{tikzpicture}
-\note{
-Pembuka: jadikan ini kalimat penutup utama.
-
-Pesan utama: penelitian ini adalah eksperimen terkontrol tentang dampak operasional paradigma deployment.
-
-Transisi: masuk ke sesi tanya jawab dan gunakan backup slides jika diperlukan.
+Penutup: ``Terima kasih. Silakan bertanya.''
 }
 \end{frame}
 }
@@ -614,39 +680,22 @@ Transisi: masuk ke sesi tanya jawab dan gunakan backup slides jika diperlukan.
 \appendix
 
 % ---------------------------------------------
-% B1: Key concepts
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Kunci Konsep}
-    \vspace{0.25cm}
-    \begin{itemize}
-        \item \textbf{Deployment:} mengelola siklus hidup aplikasi pada infrastruktur, termasuk konfigurasi, \textit{scaling}, dan pembaruan.
-        \item \textbf{Kubernetes:} platform \textit{container orchestration} untuk menjalankan aplikasi \textit{distributed} {\small (Burns et al., 2016)}.
-        \item \textbf{GitOps:} paradigma deployment deklaratif dengan Git sebagai \textit{single source of truth} dan agen \textit{software} yang melakukan \textit{reconciliation} secara kontinu {\small (CNCF GitOps WG, 2021)}.
-        \item \textbf{Configuration Drift:} situasi di mana \textit{state} aktual menyimpang dari \textit{state} yang dideklarasikan {\small (Pohjola, 2025)}.
-    \end{itemize}
-\end{frame}
-}
-
-% ---------------------------------------------
-% B2: ArgoCD and reconciliation
+% B1: ArgoCD and reconciliation
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: ArgoCD dan Mekanisme Reconciliation}
-    \vspace{0.25cm}
+    \vspace{0.20cm}
     \begin{columns}
         \begin{column}{0.42\textwidth}
-            \begin{itemize}
+            \begin{itemize}\setlength{\itemsep}{3pt}
                 \item Git sebagai \textit{single source of truth}
                 \item Konfigurasi dideklarasikan secara deklaratif
                 \item Agen \textit{software} melakukan \textit{reconciliation}
                 \item Drift menjadi \textit{observable} dan dapat dipulihkan otomatis
             \end{itemize}
-            \vspace{0.15cm}
+            \vspace{0.12cm}
             \small ArgoCD terdiri dari tiga komponen: \textit{application controller}, \textit{repo server}, dan \textit{Redis cache}.
         \end{column}
         \begin{column}{0.55\textwidth}
@@ -658,184 +707,63 @@ Transisi: masuk ke sesi tanya jawab dan gunakan backup slides jika diperlukan.
 }
 
 % ---------------------------------------------
-% B3: Drift scenario details
+% B2: Root Cause Identification Time defense
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Detail Skenario Drift}
-    \vspace{0.20cm}
-    \small
-    \begin{tabular}{>{\raggedright\arraybackslash}p{1.0cm} >{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{6.2cm}}
-        \toprule
-        \textbf{ID} & \textbf{Skenario} & \textbf{Contoh perintah} \\
-        \midrule
-        A & Perubahan replika & \texttt{kubectl scale deployment --replicas=5} \\
-        B & Perubahan image & \texttt{kubectl edit deployment} \\
-        C & Perubahan ConfigMap & \texttt{kubectl edit configmap} \\
-        D & Resource deletion & \texttt{kubectl delete deployment} \\
-        E & Patch manual & \texttt{kubectl patch} \\
-        F & Namespace salah & \texttt{kubectl apply -f ... -n wrong-ns} \\
-        G & Perubahan Secret & \texttt{kubectl patch secret} \\
-        \bottomrule
-    \end{tabular}
-\end{frame}
-}
-
-% ---------------------------------------------
-% B4: Experiment flow
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Bagan Alir Eksperimen}
-    \vspace{0.10cm}
-    \centering
-    \fullslidediagram[0.60\textheight]{experiment-flow-presentation}
-    \vspace{0.10cm}
-    \smallnote{Tahapan mengikuti pre-test -- treatment -- post-test: baseline, injeksi drift, pengukuran, analisis, interpretasi.}
-\end{frame}
-}
-
-% ---------------------------------------------
-% B5: Statistical analysis detail
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Analisis Statistik dan Ukuran Sampel}
+    \frametitle{Backup: Bagaimana Kita Menentukan Akar Masalah Secara Objektif?}
     \vspace{0.02cm}
     \scriptsize
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Analisis}
-            \begin{itemize}
-                \item Statistik deskriptif per metrik.
-                \item Mann--Whitney U, $\alpha = 0{,}05$.
-                \item Ukuran efek: Cohen's $d$ atau Cliff's $\delta$.
-                \item R3 dianalisis secara deskriptif.
-            \end{itemize}
-            \vspace{0.10cm}
-            \textbf{Mengapa Mann--Whitney?}
-            \begin{itemize}
-                \item Data waktu sistem belum tentu normal.
-                \item Sampel per skenario relatif kecil.
-                \item Uji non-parametrik tidak mensyaratkan normalitas.
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Justifikasi ukuran sampel}
-            \begin{itemize}
-                \item Power = 0.80, $\alpha = 0{,}05$, target efek besar ($d = 1{,}0$).
-                \item Minimum $n = 17$ per grup secara total.
-                \item R2: $7 \times 10 = 70$ observasi per lingkungan.
-                \item R1: $7 \times 5 = 35$ observasi per lingkungan.
-                \item R3: deskriptif, tidak memerlukan ukuran sampel statistik.
-            \end{itemize}
-            \vspace{0.06cm}
-            \textbf{Mengapa $n = 10$ per skenario?}
-            \begin{itemize}
-                \item Studi sistem berulang dan layak dalam batasan eksperimen.
-            \end{itemize}
-        \end{column}
-    \end{columns}
-\end{frame}
-}
-
-% ---------------------------------------------
-% B6: Threats to validity detail
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Ancaman terhadap Validitas (Detail)}
-    \vspace{0.15cm}
-    \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \textbf{Validitas internal}
-            \begin{itemize}
-                \item Seleksi lingkungan
-                \item Operator tunggal
-                \item Efek pembelajaran
-                \item Perubahan instrumentasi
-            \end{itemize}
-            \textbf{Validitas konstruk}
-            \begin{itemize}
-                \item Definisi drift dibatasi tujuh skenario
-                \item Traceability bersifat deskriptif
-            \end{itemize}
-        \end{column}
-        \begin{column}{0.48\textwidth}
-            \textbf{Mitigasi}
-            \begin{itemize}
-                \item Klaster dan workload disamakan
-                \item Runbook dan timestamp otomatis
-                \item Urutan skenario diacak
-                \item Versi software dikunci
-            \end{itemize}
-            \textbf{Validitas eksternal}
-            \begin{itemize}
-                \item Hasil dibatasi pada konteks workload dan klaster yang dijelaskan.
-            \end{itemize}
-        \end{column}
-    \end{columns}
-\end{frame}
-}
-
-% ---------------------------------------------
-% B7: Defense — Root Cause Identification Time
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Definisi Operasional Root Cause Identification Time}
-    \vspace{0.02cm}
-    \scriptsize
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Bagaimana Anda menentukan secara objektif kapan akar masalah telah diidentifikasi?
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \small\bfseries Pertanyaan penguji: Bagaimana Anda tahu kapan akar masalah telah diidentifikasi?
     \end{beamercolorbox}
-    \vspace{0.10cm}
+    \vspace{0.08cm}
     \textbf{Definisi operasional:}
     \begin{itemize}
-        \item Selesai ketika operator menyebutkan \textbf{(1)} kategori drift dan \textbf{(2)} sumber daya terdampak, lalu jawaban diverifikasi terhadap skenario injeksi yang diketahui.
+        \item \textit{Root cause identification time} berakhir ketika operator menyebutkan \textbf{(1)} kategori drift dan \textbf{(2)} sumber daya terdampak, lalu jawaban diverifikasi terhadap skenario injeksi yang diketahui.
     \end{itemize}
-    \vspace{0.08cm}
+    \vspace{0.06cm}
     \textbf{Mengapa ini objektif:}
     \begin{itemize}
-        \item Skenario sudah didefinisikan sebelum eksperimen.
-        \item Lingkungan B: ArgoCD menampilkan \textit{diff}.
-        \item Lingkungan A: operator memakai \texttt{kubectl describe} dan log.
-        \item \textit{Timestamp} dicatat saat kategori dan sumber daya benar disebutkan.
-        \item Prinsipnya mirip verifikasi \textit{known-answer}.
+        \item Skenario sudah didefinisikan sebelum eksperimen, prinsipnya seperti verifikasi \textit{known-answer}.
+        \item Lingkungan B: ArgoCD menampilkan \textit{diff}, akar masalah langsung terlihat.
+        \item Lingkungan A: operator memakai \texttt{kubectl describe} dan log, memerlukan pencarian manual.
+        \item \textit{Timestamp} dicatat secara otomatis oleh skrip saat jawaban benar disebutkan.
     \end{itemize}
 \end{frame}
 }
 
 % ---------------------------------------------
-% B8: Defense — Traceability (R3)
+% B3: R3/R4 traceability and manual intervention defense
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Mengapa Traceability (R3) Dideskripsikan, Bukan Diuji Statistik?}
+    \frametitle{Backup: Mengapa R3 dan R4 Dianalisis Berbeda dari R1 dan R2?}
     \vspace{0.02cm}
     \small
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Jika Anda sudah tahu jawabannya, mengapa mengukur R3?
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \small\bfseries Pertanyaan penguji: Mengapa R3 dan R4 tidak diuji sama seperti R1 dan R2?
     \end{beamercolorbox}
-    \vspace{0.10cm}
-    \textbf{Jawaban:}
+    \vspace{0.08cm}
+    \textbf{R3 (Intervensi Manual):}
     \begin{itemize}
-        \item Tujuan R3 bukan \textit{hypothesis testing}.
-        \item R3 mendokumentasikan karakteristik operasional yang menjelaskan hasil R1 dan R2.
-        \item GitOps menyediakan \textit{commit history} dan \textit{diff}; manual deployment bergantung pada log yang lebih parsial.
-        \item Karena perbedaannya bersifat struktural, R3 dipakai untuk interpretasi, bukan uji hipotesis terpisah.
+        \item Data diskrit (hitungan perintah kubectl); Mann--Whitney U tetap dapat diterapkan.
+        \item Pada Lingkungan B, self-heal dinonaktifkan sementara agar perbandingan setara.
+    \end{itemize}
+    \vspace{0.06cm}
+    \textbf{R4 (Traceability):}
+    \begin{itemize}
+        \item Memiliki aspek kualitatif (rubrik 1--5) dan kuantitatif (MTTI, audit log completeness).
+        \item Dua penilai independen dengan Cohen's $\kappa$ untuk reliabilitas.
+        \item R4 menjelaskan konteks operasional: mengapa R1 dan R2 berbeda, yaitu karena audit trail GitOps terjamin secara struktural oleh desain sistem.
     \end{itemize}
 \end{frame}
 }
 
 % ---------------------------------------------
-% B9: Defense — Why InvenioRDM?
+% B4: Why InvenioRDM
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -843,334 +771,66 @@ Transisi: masuk ke sesi tanya jawab dan gunakan backup slides jika diperlukan.
     \frametitle{Backup: Mengapa InvenioRDM, Bukan Workload Lain?}
     \vspace{0.02cm}
     \small
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Mengapa tidak Online Boutique, Sock Shop, atau WordPress?
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \small\bfseries Pertanyaan penguji: Mengapa tidak Online Boutique, Sock Shop, atau WordPress?
     \end{beamercolorbox}
     \vspace{0.08cm}
     \textbf{Tiga kriteria pemilihan:}
     \begin{enumerate}
-        \item \textbf{Dependensi kompleks:} 16+ komponen yang saling bergantung dan memiliki urutan deployment.
+        \item \textbf{Dependensi kompleks:} 16+ komponen yang saling bergantung dan memiliki urutan deployment, drift pada satu komponen bisa merambat.
         \item \textbf{Infrastruktur luas:} database, \textit{search}, \textit{cache}, \textit{object storage}, \textit{ingress}, TLS, \textit{secrets}, monitoring, dan backup.
         \item \textbf{Reprodusibilitas akademis:} \textit{open-source}, dikembangkan CERN, dan digunakan di institusi akademis.
     \end{enumerate}
-    \vspace{0.10cm}
-    \smallnote{InvenioRDM adalah workload uji; klaim penelitian tetap dibatasi pada workload multi-service dengan karakteristik serupa.}
+    \vspace{0.08cm}
+    \smallnote{InvenioRDM adalah workload uji; klaim penelitian dibatasi pada workload multi-service dengan karakteristik serupa.}
 \end{frame}
 }
 
 % ---------------------------------------------
-% B10: Defense — Single operator
+% B5: Single operator defense
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Ancaman Operator Tunggal dan Mitigasinya}
-    \vspace{0.25cm}
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Operator Anda juga penelitinya. Mengapa ini bukan ancaman serius?
+    \frametitle{Backup: Operator Anda Juga Penelitinya, Bukan Ancaman Serius?}
+    \vspace{0.20cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \small\bfseries Pertanyaan penguji: Operator Anda juga penelitinya. Mengapa ini bukan ancaman serius?
     \end{beamercolorbox}
-    \vspace{0.15cm}
+    \vspace{0.12cm}
     \textbf{Empat mitigasi:}
     \begin{enumerate}
-        \item Operator mengikuti \textit{recovery runbook} yang telah ditentukan sebelumnya --- tidak ada keputusan subjektif selama \textit{recovery}.
+        \item Operator mengikuti \textit{recovery runbook} yang telah ditentukan sebelumnya, tidak ada keputusan subjektif selama \textit{recovery}.
         \item Seluruh \textit{timestamp} direkam oleh skrip otomasi, bukan oleh penilaian manusia.
         \item Metrik yang tidak bergantung pada operator (R1 konsistensi, R2 deteksi otomatis ArgoCD) memberikan pengukuran objektif.
         \item Operator tunggal justru \textbf{mengurangi} varians antar-\textit{run}, sehingga memperkuat validitas internal perbandingan antar paradigma.
     \end{enumerate}
-    \vspace{0.10cm}
-    \smallnote{Batasan ini diakui secara eksplisit sebagai ancaman validitas eksternal dan direkomendasikan untuk replikasi dengan operator berbeda.}
+    \vspace{0.08cm}
+    \smallnote{Batasan ini diakui sebagai ancaman validitas eksternal dan direkomendasikan untuk replikasi dengan operator berbeda.}
 \end{frame}
 }
 
 % ---------------------------------------------
-% B11: Defense — What if no significant difference?
+% B6: What if no significant difference
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Backup: Apa Jika Tidak Ada Perbedaan Bermakna?}
-    \vspace{0.25cm}
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Jika hasil menunjukkan tidak ada perbedaan signifikan secara statistik, apakah itu berarti GitOps tidak memberikan nilai operasional?
+    \vspace{0.20cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \small\bfseries Pertanyaan penguji: Jika R1, R2, R3 tidak signifikan, apakah penelitian ini gagal?
     \end{beamercolorbox}
-    \vspace{0.15cm}
-    \textbf{Tiga interpretasi:}
+    \vspace{0.12cm}
+    \textbf{Tiga interpretasi, semua informatif:}
     \begin{enumerate}
-        \item \textbf{Hasil tidak signifikan dengan efek kecil:} Kedua paradigma menghasilkan hasil yang sebanding dalam konteks terkontrol ini. Ini sendiri adalah temuan yang layak dilaporkan.
-        \item \textbf{Hasil tidak signifikan dengan efek sedang/besar:} Efek ada tetapi varians tinggi; diperlukan lebih banyak pengulangan. Ukuran efek tetap memberikan informasi praktis.
-        \item \textbf{R3 tetap memberikan nilai struktural:} Meskipun R1 dan R2 tidak menunjukkan perbedaan signifikan, \textit{traceability} (R3) memberikan nilai operasional yang terjamin secara struktural oleh GitOps.
+        \item \textbf{Efek kecil:} Kedua paradigma sebanding dalam konteks terkontrol ini. Ini temuan berharga, berarti otomatisasi GitOps bukan keuntungan mutlak di semua skenario.
+        \item \textbf{Efek sedang/besar tapi tidak signifikan:} Efek ada tapi varians tinggi. Ukuran efek tetap memberikan informasi praktis. Tambah pengulangan.
+        \item \textbf{R4 tetap memberikan nilai:} Traceability terjamin secara struktural oleh GitOps, terlepas dari hasil R1, R2, R3.
     \end{enumerate}
-    \vspace{0.10cm}
+    \vspace{0.08cm}
     \slidelead{Kontribusi penelitian adalah bukti yang dapat diperiksa, apa pun arah hasilnya.}
 \end{frame}
 }
-
-% ---------------------------------------------
-% B12: Defense — Isn't GitOps obviously better?
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Bukankah GitOps Jelas Lebih Baik?}
-    \vspace{0.02cm}
-    \small
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Bukankah sudah jelas bahwa GitOps mempercepat pemulihan drift?
-    \end{beamercolorbox}
-    \vspace{0.08cm}
-    \textbf{Jawaban:}
-    \begin{itemize}
-        \item Klaim bahwa GitOps membantu drift memang kuat, tetapi tetap perlu bukti terkontrol.
-        \item Studi sebelumnya cenderung observasional, kualitatif, atau tanpa \textit{control group}.
-        \item Penelitian ini menanyakan \textbf{seberapa besar} perbedaannya dan dalam kondisi apa.
-        \item Tanpa kontrol, efek bisa berasal dari operator, workload, atau konfigurasi klaster.
-        \item Eksperimen ini mengisolasi variabel paradigma deployment.
-    \end{itemize}
-\end{frame}
-}
-
-% ---------------------------------------------
-% B13: Defense — Are you measuring human attention?
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Apakah Anda Hanya Mengukur Perhatian Manusia?}
-    \vspace{0.02cm}
-    \small
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Apakah perbedaan yang Anda ukur berasal dari GitOps atau dari keahlian operator?
-    \end{beamercolorbox}
-    \vspace{0.08cm}
-    \textbf{Jawaban:}
-    \begin{itemize}
-        \item Kemampuan deteksi adalah bagian dari paradigma deployment dan sengaja dimasukkan.
-        \item Pada \textit{manual deployment}, operator \textbf{adalah} mekanisme deteksi.
-        \item Pada GitOps, ArgoCD \textbf{adalah} mekanisme deteksi.
-        \item Keduanya adalah properti inheren dari paradigma masing-masing.
-        \item Eksperimen membandingkan paradigma lengkap, bukan hanya kecepatan operator.
-        \item Operator mengikuti runbook dengan \textit{timestamp} otomatis.
-    \end{itemize}
-\end{frame}
-}
-
-% ---------------------------------------------
-% B14: Defense — Seven scenarios and weighting
-% ---------------------------------------------
-{
-\usebackgroundtemplate{\backgroundcontent}
-\begin{frame}
-    \frametitle{Backup: Mengapa Tujuh Skenario dan Pembobotan Sama?}
-    \vspace{0.02cm}
-    \scriptsize
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.22cm, rounded=true]{structure}
-        \small\bfseries Pertanyaan: Mengapa tujuh skenario cukup? Mengapa dibobot sama?
-    \end{beamercolorbox}
-    \vspace{0.08cm}
-    \textbf{Mengapa tujuh skenario:}
-    \begin{itemize}
-        \item Skenario diturunkan dari taksonomi Zhang et al.\ (2026) dan pola operasional Pohjola (2025).
-        \item Kategori mencakup \textit{scaling}, \textit{image}, konfigurasi, penghapusan, \textit{patching}, \textit{namespace}, dan \textit{secret}.
-        \item Tidak mengklaim menutupi seluruh ruang drift, tetapi mewakili kategori operasional umum.
-    \end{itemize}
-    \vspace{0.06cm}
-    \textbf{Mengapa pembobotan sama:}
-    \begin{itemize}
-        \item Pembobotan sama adalah asumsi awal yang konservatif.
-        \item Analisis per skenario tetap menangkap perbedaan tingkat kesulitan.
-        \item Frekuensi drift nyata belum terdokumentasi baik, sehingga bobot sama menghindari bias tambahan.
-    \end{itemize}
-\end{frame}
-}
-
-% ---------------------------------------------
-% Speaker note backup slides
-% ---------------------------------------------
-\speakerpoints{Judul}
-{Penelitian ini mengevaluasi dampak operasional pilihan paradigma deployment saat terjadi configuration drift.}
-{\begin{itemize}
-    \item Buka dengan salam dan perkenalan singkat.
-    \item Sebutkan bahwa fokusnya adalah evaluasi empiris, bukan promosi GitOps.
-    \item Tekankan konteks: Kubernetes, InvenioRDM, manual vs GitOps.
-\end{itemize}}
-{\begin{itemize}
-    \item Lanjutkan ke alasan masalah ini penting secara operasional.
-\end{itemize}}
-
-\speakerpoints{Mengapa Masalah Ini Penting}
-{Configuration drift membuat tim kehilangan kepastian tentang state aktual sistem.}
-{\begin{itemize}
-    \item Mulai dari contoh perubahan cepat langsung di klaster.
-    \item Jelaskan bahwa masalah muncul ketika dokumentasi tidak ikut berubah.
-    \item Tekankan dampak: pemulihan lambat, akar masalah kabur, audit lemah.
-\end{itemize}}
-{\begin{itemize}
-    \item Masuk ke definisi formal dan bukti empiris.
-\end{itemize}}
-
-\speakerpoints{Definisi dan Bukti Drift}
-{Drift adalah deviasi antara state aktual dan state deklaratif, dan kasusnya nyata pada Kubernetes.}
-{\begin{itemize}
-    \item Definisikan drift secara singkat.
-    \item Sebutkan tiga penyebab umum.
-    \item Gunakan angka 71\% sebagai bukti bahwa misconfiguration bukan kasus langka.
-\end{itemize}}
-{\begin{itemize}
-    \item Jelaskan bahwa GitOps hadir sebagai respons terhadap masalah ini.
-\end{itemize}}
-
-\speakerpoints{GitOps sebagai Respons}
-{GitOps menjanjikan reconciliation otomatis antara Git dan state klaster.}
-{\begin{itemize}
-    \item Terangkan Git sebagai desired state.
-    \item Jelaskan agen reconciliation tanpa masuk terlalu dalam ke ArgoCD.
-    \item Tekankan pertanyaan riset: seberapa besar dampak operasionalnya?
-\end{itemize}}
-{\begin{itemize}
-    \item Tunjukkan bahwa klaim praktik belum sama dengan bukti terkontrol.
-\end{itemize}}
-
-\speakerpoints{Klaim Industri vs Bukti}
-{Klaim GitOps kuat, tetapi bukti kausal terkontrol masih terbatas.}
-{\begin{itemize}
-    \item Akui bahwa klaim GitOps masuk akal.
-    \item Jelaskan kelemahan umum studi sebelumnya: kualitatif, observasional, atau tanpa kontrol.
-    \item Hindari terdengar menolak GitOps; posisikan sebagai kebutuhan pengukuran.
-\end{itemize}}
-{\begin{itemize}
-    \item Bawa audiens ke research gap.
-\end{itemize}}
-
-\speakerpoints{Research Gap}
-{Penelitian ini mengisi celah metrik, kontrol variabel, analisis statistik, dan konteks akademis.}
-{\begin{itemize}
-    \item Jangan membaca semua kotak diagram; jelaskan polanya.
-    \item Tekankan bahwa gap ini langsung membentuk desain eksperimen.
-    \item Sebutkan kontribusi: controlled systems experiment.
-\end{itemize}}
-{\begin{itemize}
-    \item Setelah gap, nyatakan rumusan masalah.
-\end{itemize}}
-
-\speakerpoints{Rumusan Masalah}
-{Tiga dimensi utama penelitian adalah konsistensi, waktu respons, dan traceability.}
-{\begin{itemize}
-    \item Bacakan pertanyaan utama secara perlahan.
-    \item Hubungkan R1, R2, R3 dengan metrik yang akan dijelaskan kemudian.
-    \item Tegaskan bahwa drift-nya terkontrol.
-\end{itemize}}
-{\begin{itemize}
-    \item Batasi ruang lingkup agar klaim tetap proporsional.
-\end{itemize}}
-
-\speakerpoints{Batasan Masalah}
-{Batasan menjaga penelitian tetap terukur, dapat direplikasi, dan tidak overclaim.}
-{\begin{itemize}
-    \item Sebutkan satu klaster, dua paradigma, tujuh skenario.
-    \item Tekankan InvenioRDM sebagai workload uji.
-    \item Jelaskan bahwa multi-cluster dan paradigma perantara tidak dibahas.
-\end{itemize}}
-{\begin{itemize}
-    \item Lanjut ke tujuan dan manfaat yang mengikuti batasan tersebut.
-\end{itemize}}
-
-\speakerpoints{Tujuan dan Manfaat}
-{Tujuan penelitian mengikuti langsung dari R1, R2, dan R3.}
-{\begin{itemize}
-    \item Jelaskan tujuan sebagai tiga keluaran pengukuran.
-    \item Manfaat teoritis: bukti empiris.
-    \item Manfaat metodologis dan praktis: protokol dan masukan operasional.
-\end{itemize}}
-{\begin{itemize}
-    \item Posisikan penelitian terhadap studi sebelumnya.
-\end{itemize}}
-
-\speakerpoints{Penelitian Terkait}
-{Studi sebelumnya berguna, tetapi belum cukup untuk atribusi kausal.}
-{\begin{itemize}
-    \item Ringkas tabel sebagai pola, bukan daftar panjang.
-    \item Tekankan kelemahan: tanpa statistik, tanpa kontrol, atau deskriptif.
-    \item Kaitkan langsung dengan pembeda penelitian.
-\end{itemize}}
-{\begin{itemize}
-    \item Masuk ke rancangan eksperimen yang mengatasi kelemahan itu.
-\end{itemize}}
-
-\speakerpoints{Arsitektur Eksperimen}
-{Validitas internal bertumpu pada kontrol: workload sama, drift sama, klaster sama, metrik sama.}
-{\begin{itemize}
-    \item Jelaskan dua lingkungan paralel.
-    \item Katakan kalimat kunci: satu-satunya perbedaan adalah paradigma deployment.
-    \item Jelaskan singkat mengapa InvenioRDM dipilih.
-\end{itemize}}
-{\begin{itemize}
-    \item Tunjukkan perlakuan drift yang diberikan ke dua lingkungan.
-\end{itemize}}
-
-\speakerpoints{Skenario Drift}
-{Skenario A-G merepresentasikan kesalahan operasional umum di Kubernetes.}
-{\begin{itemize}
-    \item Jelaskan bahwa setiap skenario diinjeksi identik.
-    \item Tekankan randomisasi dan pengulangan bila ditanya.
-    \item Jangan terlalu lama di setiap skenario; detail ada di backup.
-\end{itemize}}
-{\begin{itemize}
-    \item Lanjut ke cara respons operasional diukur.
-\end{itemize}}
-
-\speakerpoints{Metrik}
-{Metrik didefinisikan sebelum eksperimen agar hasil dapat direplikasi dan diperiksa.}
-{\begin{itemize}
-    \item R1: kembali atau tidak ke desired state.
-    \item R2: waktu deteksi, pemulihan, dan identifikasi.
-    \item R3: kelengkapan jejak perubahan.
-\end{itemize}}
-{\begin{itemize}
-    \item Setelah metrik, akui ancaman validitas dan mitigasinya.
-\end{itemize}}
-
-\speakerpoints{Validitas}
-{Ancaman validitas tidak dihilangkan sepenuhnya, tetapi dikendalikan dan dibatasi klaimnya.}
-{\begin{itemize}
-    \item Jelaskan operator tunggal dan efek pembelajaran secara terbuka.
-    \item Tekankan runbook, timestamp otomatis, randomisasi, dan versi terkunci.
-    \item Sebutkan bahwa hasil berlaku pada konteks yang dijelaskan.
-\end{itemize}}
-{\begin{itemize}
-    \item Lanjut ke analisis statistik untuk data yang dikumpulkan.
-\end{itemize}}
-
-\speakerpoints{Analisis Statistik}
-{Mann--Whitney dipilih karena data waktu sistem belum tentu berdistribusi normal.}
-{\begin{itemize}
-    \item Sebutkan statistik deskriptif, uji signifikansi, dan ukuran efek.
-    \item Jelaskan n=10 sebagai pengulangan sistem, bukan jumlah responden manusia.
-    \item R3 tetap deskriptif karena sifatnya struktural.
-\end{itemize}}
-{\begin{itemize}
-    \item Tutup dengan kemungkinan hasil dan maknanya.
-\end{itemize}}
-
-\speakerpoints{Kemungkinan Hasil}
-{Semua arah hasil tetap menjawab pertanyaan penelitian.}
-{\begin{itemize}
-    \item Jika GitOps lebih baik: klaim praktik mendapat dukungan.
-    \item Jika tidak berbeda: klaim perlu dibatasi.
-    \item Jika manual unggul pada metrik tertentu: ada batas praktis otomatisasi.
-\end{itemize}}
-{\begin{itemize}
-    \item Masuk ke kalimat penutup utama.
-\end{itemize}}
-
-\speakerpoints{Penutup}
-{Penelitian ini mengukur dampak operasional paradigma deployment, bukan membuktikan satu teknologi selalu menang.}
-{\begin{itemize}
-    \item Ulangi kontribusi: controlled empirical evidence.
-    \item Akhiri dengan tenang dan siap masuk tanya jawab.
-    \item Gunakan backup slides sesuai pertanyaan penguji.
-\end{itemize}}
-{\begin{itemize}
-    \item Buka sesi diskusi.
-\end{itemize}}
 
 \end{document}

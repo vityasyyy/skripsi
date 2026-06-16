@@ -1,0 +1,68 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{driftred}{RGB}{229,115,115}
+\definecolor{okgreen}{RGB}{76,175,80}
+\definecolor{warnorange}{RGB}{255,167,38}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.70cm and 1.00cm,
+    state/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8,
+                  minimum width=3.60cm, minimum height=1.12cm, align=center,
+                  line width=0.9pt, font=\scriptsize},
+    term/.style={rectangle, rounded corners=3pt, draw=#1, fill=white,
+                 minimum width=2.95cm, minimum height=0.75cm, align=center,
+                 line width=0.8pt, font=\scriptsize},
+    arrow/.style={->, >=Stealth, line width=0.9pt},
+    label/.style={font=\scriptsize, align=center, fill=white, inner sep=1.3pt}
+]
+
+\node[state=gitopsblue] (desired) {
+    \includegraphics[height=9pt]{logos/git.png}\\[-1pt]
+    \textbf{Desired State}\\
+    manifest/konfigurasi di Git
+};
+
+\node[state=okgreen, right=1.70cm of desired] (actual) {
+    \includegraphics[height=9pt]{logos/kubernetes.png}\\[-1pt]
+    \textbf{Actual State}\\
+    kondisi aktual klaster
+};
+
+\node[font=\Large\bfseries, text=driftred] (neq) at ($(desired)!0.5!(actual)$) {$\neq$};
+\node[term=driftred, below=0.50cm of neq] (drift) {
+    \textbf{Configuration Drift}\\
+    kedua state tidak sama
+};
+
+\draw[arrow, draw=driftred, dashed] (desired.south east) to[out=-35, in=160]
+    node[label, text=driftred, pos=0.48] {deviasi}
+    (drift.west);
+\draw[arrow, draw=driftred, dashed] (actual.south west) to[out=-145, in=20]
+    (drift.east);
+
+\node[term=gitopsblue, above=0.75cm of neq] (recon) {
+    \textbf{Reconciliation}\\
+    membandingkan dan menyelaraskan
+};
+
+\draw[arrow, draw=gitopsblue] (desired.north east) to[out=35, in=145]
+    node[label, text=gitopsblue, pos=0.50] {sync}
+    (actual.north west);
+\draw[arrow, draw=gitopsblue] (recon.south) -- (neq.north);
+
+\node[term=warnorange, below=0.75cm of drift] (gitops) {
+    \textbf{GitOps}\\
+    Git sebagai source of truth
+};
+
+\draw[arrow, draw=warnorange] (gitops.north) -- (drift.south);
+
+\end{tikzpicture}
+\end{document}
