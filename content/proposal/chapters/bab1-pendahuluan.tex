@@ -10,11 +10,11 @@ Penelitian empiris oleh \citet{zhang2026configuration} menunjukkan bahwa 71\% da
 
 GitOps telah muncul sebagai paradigma yang diajukan sebagai alternatif untuk mengatasi masalah ini dengan menjadikan repositori Git sebagai \textit{single source of truth} dan mengandalkan agen \textit{software} untuk menyelaraskan \textit{state} klaster secara otomatis \citep{opengitops2021}. Beberapa penelitian mendukung klaim ini secara kualitatif: \citet{kaggantinataraja2025security} menemukan bahwa pendekatan deklaratif menghasilkan \textit{drift correction} yang lebih cepat dan paparan kerentanan yang lebih rendah; \citet{shrestha2024configuration} melaporkan karakteristik GitOps pada aspek \textit{drift detection}; dan \citet{matubber2025managing} mengukur \textit{reconciliation time} GitOps terhadap \textit{self-healing}. Namun, temuan-temuan ini mengandung kelemahan metodologis, yakni tidak ada yang mengisolasi efek paradigma deployment dari variabel pengganggu, dan tidak ada yang menerapkan uji statistik formal pada perbandingan terkontrol \citep{shrestha2024configuration, kaggantinataraja2025security, matubber2025managing}.
 
-Kesenjangan ini menjadi landasan penelitian ini: terdapat kebutuhan untuk mengevaluasi secara empiris seberapa besar dampak \textit{configuration drift} terhadap karakteristik operasional deployment (konsistensi, \textit{detection time}/\textit{recovery time}, dan \textit{traceability}) ketika berbagai skenario drift terjadi pada dua paradigma manajemen deployment yang berbeda, yaitu manual dan GitOps, melalui evaluasi empiris terkontrol pada sebuah \textit{workload} multi-service (InvenioRDM) di klaster Kubernetes.
+Kesenjangan ini menjadi landasan penelitian ini: terdapat kebutuhan untuk mengevaluasi secara empiris seberapa besar dampak \textit{configuration drift} terhadap karakteristik operasional deployment (konsistensi, \textit{recovery time}, intervensi manual, dan \textit{audit trail}) ketika berbagai skenario drift terjadi pada dua paradigma manajemen deployment yang berbeda, yaitu manual dan GitOps, melalui desain eksperimental terkontrol pada sebuah \textit{workload} multi-service (InvenioRDM) di klaster Kubernetes.
 
 \section{Rumusan Masalah}
 
-Berdasarkan latar belakang di atas, penelitian ini merumuskan permasalahan utama sebagai berikut: sejauh mana paradigma manajemen deployment yang berbeda, yaitu pendekatan manual menggunakan \texttt{kubectl} dan pendekatan GitOps menggunakan ArgoCD, menghasilkan perbedaan pada karakteristik operasional ketika menghadapi \textit{configuration drift} yang terkontrol? Permasalahan ini diuraikan ke dalam tiga dimensi pengukuran. Pertama, sejauh mana konsistensi deployment berbeda antara kedua paradigma setelah terjadinya drift? Kedua, seberapa besar perbedaan \textit{detection time}, \textit{recovery time}, dan \textit{root cause identification time} antara lingkungan yang mendeteksi dan memulihkan secara otomatis dan lingkungan yang bergantung pada intervensi manual? Ketiga, sejauh mana perbedaan \textit{traceability} operasional antara paradigma yang mencatat setiap perubahan secara otomatis melalui Git dan paradigma yang mengandalkan \textit{manual logging}?
+Berdasarkan latar belakang di atas, penelitian ini merumuskan permasalahan utama sebagai berikut: sejauh mana paradigma manajemen deployment yang berbeda, yaitu pendekatan manual menggunakan \texttt{kubectl} dan pendekatan GitOps menggunakan ArgoCD, menghasilkan perbedaan pada karakteristik operasional ketika menghadapi \textit{configuration drift} yang terkontrol? Permasalahan ini diuraikan ke dalam empat dimensi pengukuran. Pertama, sejauh mana konsistensi deployment berbeda antara kedua paradigma setelah terjadinya drift? Kedua, seberapa besar perbedaan \textit{detection time} dan \textit{drift recovery time} antara lingkungan yang mendeteksi secara otomatis dan lingkungan yang bergantung pada intervensi manual? Ketiga, berapa banyak intervensi manual yang diperlukan untuk memulihkan \textit{state} klaster pada masing-masing paradigma setelah insiden drift? Keempat, sejauh mana perbedaan \textit{audit trail} (\textit{traceability}) antara paradigma yang mencatat setiap perubahan secara otomatis dan paradigma yang mengandalkan \textit{manual logging}?
 
 Untuk menjawab pertanyaan-pertanyaan tersebut, kedua lingkungan diuji terhadap tujuh skenario \textit{configuration drift} yang merepresentasikan kesalahan operasional umum pada Kubernetes: (A)~perubahan replika yang melewati deklarasi Git, (B)~perubahan \textit{image} kontainer langsung pada klaster, (C)~modifikasi ConfigMap tanpa pembaruan \textit{source of truth}, (D)~\textit{resource deletion} secara manual, (E)~\textit{patch} yang tidak sah pada sumber daya yang dikelola, (F)~aplikasi sumber daya pada \textit{namespace} yang salah, dan (G)~perubahan Secret di luar Git.
 
@@ -31,9 +31,7 @@ Agar penelitian ini tetap fokus dan terukur, batasan masalah yang ditetapkan ada
   
   \item Dua paradigma manajemen deployment dibandingkan: (a)~deployment manual menggunakan \texttt{kubectl}, dan (b)~deployment GitOps menggunakan ArgoCD.
   
-  \item Analisis statistik menggunakan \textit{Mann--Whitney U test} untuk uji signifikansi perbedaan antara kedua lingkungan, dengan tingkat signifikansi $\alpha = 0{,}05$ dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$).
-  
-  \item Paradigma perantara (Git sebagai \textit{source of truth} tanpa agen \textit{reconciliation} otomatis) tidak termasuk dalam ruang lingkup penelitian ini.
+  \item Analisis statistik menggunakan uji Shapiro-Wilk untuk normalitas, dilanjutkan dengan \textit{independent samples t-test} (jika data normal) atau \textit{Mann--Whitney U test} (jika data tidak normal), dengan tingkat signifikansi $\alpha = 0{,}05$ dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$).
 \end{enumerate}
 
 \section{Tujuan Penelitian}
@@ -43,9 +41,11 @@ Tujuan dari penelitian ini adalah:
 \begin{enumerate}
   \item Mengukur dan membandingkan konsistensi deployment pada lingkungan GitOps dan lingkungan manual setelah skenario \textit{configuration drift} terkontrol.
   
-  \item Mengukur dan membandingkan \textit{detection time}, \textit{recovery time}, dan \textit{root cause identification time} antara kedua lingkungan.
+  \item Mengukur dan membandingkan \textit{detection time} dan \textit{drift recovery time} antara kedua lingkungan.
   
-  \item Mendokumentasikan dan membandingkan \textit{traceability} operasional antara lingkungan GitOps dan manual secara deskriptif.
+  \item Mengukur dan membandingkan jumlah intervensi manual yang diperlukan untuk memulihkan \textit{state} klaster setelah insiden drift pada masing-masing lingkungan.
+  
+  \item Mengukur dan membandingkan \textit{audit trail} (\textit{traceability}) antara lingkungan GitOps dan manual.
 \end{enumerate}
 
 \section{Manfaat Penelitian}
@@ -67,6 +67,6 @@ Sistematika penulisan proposal tugas akhir ini adalah sebagai berikut:
 \begin{itemize}
   \item \textbf{Bab I:} Pendahuluan, berisi latar belakang, rumusan masalah, batasan masalah, tujuan penelitian, manfaat penelitian, dan sistematika penulisan.
   \item \textbf{Bab II:} Penelitian Terkait, membahas studi empiris terkait \textit{configuration drift} pada Kubernetes, evaluasi GitOps, dasar teori \textit{reconciliation} dan \textit{convergence}, metode eksperimental pada riset sistem, serta \textit{research gap} yang menjadi landasan penelitian.
-  \item \textbf{Bab III:} Metode dan Rancangan Penelitian, menjelaskan metodologi evaluasi empiris terkontrol, definisi variabel dan intervensi, tujuh skenario drift, protokol pengukuran, analisis statistik komparatif, ancaman terhadap validitas, dan lingkungan eksperimen.
+  \item \textbf{Bab III:} Metode dan Rancangan Penelitian, menjelaskan metodologi studi eksperimental terkontrol, definisi variabel dan intervensi, tujuh skenario drift, protokol pengukuran, analisis statistik komparatif, ancaman terhadap validitas, dan lingkungan eksperimen.
   \item \textbf{Bab IV:} Jadwal Penelitian, memuat Gantt Chart berbasis bulan untuk perencanaan waktu penelitian selama 8 bulan.
 \end{itemize}

@@ -5,18 +5,14 @@ on:
     branches: [ main, master ]
     paths:
       - 'content/proposal/**'
-      - 'presentation/proposal/**'
       - 'docker/Dockerfile'
       - '.github/workflows/compile-latex.yml'
-      - 'Makefile'
   pull_request:
     branches: [ main, master ]
     paths:
       - 'content/proposal/**'
-      - 'presentation/proposal/**'
       - 'docker/Dockerfile'
       - '.github/workflows/compile-latex.yml'
-      - 'Makefile'
   workflow_dispatch:
 
 permissions:
@@ -40,54 +36,23 @@ jobs:
           path: content/proposal/main.pdf
           retention-days: 90
 
-  compile-presentation:
+  release-proposal:
+    needs: compile-proposal
     runs-on: ubuntu-latest
-    name: Compile Presentation
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Compile presentation with Docker
-        run: make presentation-docker
-
-      - name: Upload presentation PDF
-        uses: actions/upload-artifact@v4
-        with:
-          name: presentation-pdf
-          path: presentation/proposal/build/main.pdf
-          retention-days: 90
-
-  release:
-    needs: [compile-proposal, compile-presentation]
-    runs-on: ubuntu-latest
-    name: Create Release
+    name: Create Proposal Release
     if: github.event_name == 'push'
     steps:
       - name: Download proposal PDF
         uses: actions/download-artifact@v4
         with:
           name: proposal-pdf
-          path: proposal-artifact
-
-      - name: Download presentation PDF
-        uses: actions/download-artifact@v4
-        with:
-          name: presentation-pdf
-          path: presentation-artifact
-
-      - name: Rename PDFs for release
-        run: |
-          cp proposal-artifact/main.pdf proposal.pdf
-          cp presentation-artifact/main.pdf presentation.pdf
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: proposal-v${{ github.run_number }}
-          name: Proposal #${{ github.run_number }}
-          files: |
-            proposal.pdf
-            presentation.pdf
+          name: Proposal PDF #${{ github.run_number }}
+          files: main.pdf
 
   compile-skripsi:
     runs-on: ubuntu-latest
