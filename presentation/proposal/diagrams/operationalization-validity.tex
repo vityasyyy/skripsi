@@ -39,16 +39,12 @@
 \node[cell, right=of m3] (o3) {$t_2 - t_0$};
 \node[cell, right=of o3] (u3) {Waktu dari injeksi\\hingga state kembali baseline};
 
-\node[cell, below=of m3] (m4) {R3\\Intervensi manual};
-\node[cell, right=of m4] (o4) {Jumlah perintah\\kubectl korektif};
-\node[cell, right=of o4] (u4) {Hitung setiap aksi\\korektif manual};
+\node[cell, below=of m3] (m4) {R3\\MTTI};
+\node[cell, right=of m4] (o4) {$t_{id} - t_d$};
+\node[cell, right=of o4] (u4) {Waktu dari deteksi\\hingga identifikasi\\akar masalah};
 
-\node[cell, below=of m4] (m5) {R4\\Traceability};
-\node[cell, right=of m5] (o5) {Rubrik 1--5 +\\MTTI + audit log \%};
-\node[cell, right=of o5] (u5) {Skor rekonstruksi\\who/what/when/how};
-
-\node[note, below=0.36cm of o5] (n1)
-      {R1, R2, R3 diuji statistik. R4: rubrik oleh dua penilai independen (Cohen's $\kappa$), MTTI dan audit log sebagai metrik kuantitatif pendamping.};
+\node[note, below=0.36cm of o4] (n1)
+      {R1, R2, R3: metrik kuantitatif berbasis \textit{timestamp}. Utama: effect size dan confidence interval. Pendukung: uji statistik ($t$-test / Mann--Whitney U).};
 
 \end{tikzpicture}
 \end{document}

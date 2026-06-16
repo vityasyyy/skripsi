@@ -45,16 +45,16 @@
 \node[gapbox, below=0.48cm of $(s5.south)!0.5!(e5.south)$, text width=9.3cm, align=center, font=\large\bfseries, text=driftred!80!black] (gap) {
     Klaim diterima luas.\\
     Bukti terkontrol masih lemah.\\[4pt]
-    \normalfont\normalsize Dampak kausal paradigma deployment belum jelas
+    \normalfont\normalsize Besar perbedaan operasional paradigma deployment belum terkuantifikasi
 };
 
 \draw[->, >=stealth, line width=1.2pt, draw=driftred] ($(s5.south)!0.5!(e5.south)$) -- (gap);
 
 \node[rectangle, rounded corners=5pt, draw=okgreen, fill=okgreen!10,
       inner sep=10pt, line width=1.5pt, below=0.45cm of gap,
-      text width=9.3cm, align=center, font=\large\bfseries, text=okgreen!80!black] (ours) {
-    Penelitian ini:\\
-    Evaluasi empiris terkontrol + analisis statistik komparatif
+       text width=9.3cm, align=center, font=\large\bfseries, text=okgreen!80!black] (ours) {
+     Penelitian ini:\\
+     Eksperimen sistem terkontrol + pengukuran besar perbedaan operasional
 };
 
 \draw[->, >=stealth, line width=1.2pt, draw=okgreen] (gap) -- (ours);

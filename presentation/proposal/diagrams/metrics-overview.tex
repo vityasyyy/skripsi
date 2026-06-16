@@ -47,24 +47,23 @@
     terdeteksi \& dipulihkan?\\[6pt]
     \textbf{Sub-metrik:}\\
     Detection Time ($t_d - t_0$)\\
-    Recovery Time ($t_2 - t_0$)\\
-    Root Cause ID ($t_{rci} - t_d$)\\[4pt]
+    Recovery Time ($t_2 - t_0$)\\[4pt]
     \textbf{Pengulangan:}\\
     $n = 10$ per skenario
 };
 
 % R3
-\node[metriclabel=metricpurple, right=0.62cm of r2label] (r3label) {R3: Traceability};
+\node[metriclabel=metricpurple, right=0.62cm of r2label] (r3label) {R3: MTTI (detik)};
 \node[metricbox=metricpurple, below=0pt of r3label] (r3box) {};
 \node[metricdesc, anchor=north west] at ($(r3box.north west)+(0.2,-0.2)$) {
     \textbf{Pertanyaan:}\\
-    Apakah perubahan dapat\\
-    direkonstruksi?\\[6pt]
+    Seberapa cepat sumber\\
+    drift dapat diidentifikasi?\\[6pt]
     \textbf{Cara Ukur:}\\
-    \% \textit{audit log} yang\\
-    dapat direkonstruksi\\[6pt]
-    \textbf{Catatan:}\\
-    Deskriptif, bukan statistik
+    MTTI ($t_{id} - t_d$)\\
+    Waktu deteksi $\to$ identifikasi\\[6pt]
+    \textbf{Pengulangan:}\\
+    $n = 5$ per skenario
 };
 
 \end{tikzpicture}

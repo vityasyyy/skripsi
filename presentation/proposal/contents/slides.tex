@@ -60,7 +60,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \note{
 Sapaan: ``Assalamualaikum, selamat pagi. Saya Muhammad Argya Vityasy, dan hari ini saya akan mempresentasikan proposal penelitian saya tentang configuration drift pada deployment Kubernetes.''
 
-Fokus: ``Inti penelitian ini: kita ingin tahu seberapa besar perbedaan operasional yang sebenarnya terjadi ketika drift menyerang dua paradigma deployment yang berbeda, manual dan GitOps.''
+Fokus: ``Inti penelitian ini: kita ingin tahu seberapa besar perbedaan operasional yang sebenarnya terjadi ketika drift menyerang dua paradigma deployment yang berbeda, manual dan GitOps. Kontribusinya mengkuantifikasi besar perbedaan, bukan membuktikan arahnya.''
 
 Transisi: ``Sebelum kita masuk ke pertanyaan penelitian, mari kita pahami konteksnya: apa itu deployment dan mengapa drift menjadi masalah?''
 }
@@ -209,11 +209,11 @@ Transisi: ``GitOps diajukan sebagai jawaban atas masalah ini. Tapi seberapa besa
         \end{column}
     \end{columns}
     \vspace{0.04cm}
-    \smallnote{Pertanyaan ilmiahnya bukan ``apakah GitOps populer?'', melainkan seberapa berbeda respons operasionalnya saat drift terjadi.}
+    \smallnote{Pertanyaan ilmiahnya bukan ``apakah GitOps populer?'', melainkan seberapa besar perbedaan operasionalnya saat drift terjadi.}
 \note{
 Sapaan: ``GitOps menjawab drift melalui empat prinsip OpenGitOps: deklaratif, Git sebagai source of truth, pull-based changes, dan continuous reconciliation. Konsekuensinya: drift menjadi observable dan dapat dipulihkan otomatis.''
 
-Pertanyaan: ``Pertanyaan ilmiahnya bukan apakah GitOps populer, melainkan seberapa berbeda respons operasionalnya saat drift terjadi.''
+Pertanyaan: ``Pertanyaan ilmiahnya bukan apakah GitOps populer, melainkan seberapa besar perbedaan operasionalnya saat drift terjadi.''
 
 Transisi: ``Lalu, seberapa kuat bukti yang mendukung klaim ini?''
 }
@@ -231,11 +231,11 @@ Transisi: ``Lalu, seberapa kuat bukti yang mendukung klaim ini?''
     \centering
     \includegraphics[width=0.96\textwidth,height=0.56\textheight,keepaspectratio]{industry-claim}
     \vspace{0.10cm}
-    \slidelead{Klaim diterima luas. Bukti terkontrol masih lemah. Dampak kausal paradigma deployment belum jelas.}
+    \slidelead{Klaim diterima luas. Bukti terkontrol masih lemah. Besar perbedaan operasional paradigma deployment belum terkuantifikasi secara empiris.}
 \note{
 Sapaan: ``Sekilas masalah tampak terselesaikan. Banyak studi melaporkan manfaat GitOps. Namun, saat meninjau literatur, saya menemukan kelemahan berulang: metrik kualitatif, tanpa control group, tanpa analisis statistik formal.''
 
-Inti: ``Jadi kita masih kurang bukti terkontrol yang mengukur dampak operasional paradigma deployment. Ini kalimat yang saya ingin audiens ingat.''
+Inti: ``Jadi kita masih kurang bukti terkontrol yang mengukur besar perbedaan operasional antara paradigma deployment. Ini kalimat yang saya ingin audiens ingat.''
 
 Transisi: ``Mari kita lihat celah ini secara eksplisit.''
 }
@@ -258,11 +258,11 @@ Transisi: ``Mari kita lihat celah ini secara eksplisit.''
         Empat kesenjangan: metrik belum teroperasionalisasi, variabel belum dikontrol, uji statistik belum dilakukan, evaluasi belum menyentuh konteks klaster akademis.
     \end{beamercolorbox}
     \vspace{0.06cm}
-    \smallnote{Tanpa bukti terkontrol, tim IT memilih paradigma deployment berdasarkan keyakinan, bukan data.}
+    \smallnote{Tanpa bukti terkontrol, tim IT memilih paradigma deployment berdasarkan keyakinan, bukan data tentang besar perbedaan operasional.}
 \note{
-Sapaan: ``Diagram ini menunjukkan empat celah yang saling berkaitan. Studi sebelumnya berguna, tapi masing-masing punya kelemahan yang membuat kita tidak bisa menyimpulkan efek kausal.''
+Sapaan: ``Diagram ini menunjukkan empat celah yang saling berkaitan. Studi sebelumnya berguna, tapi masing-masing punya kelemahan yang membuat kita tidak bisa menyimpulkan besar perbedaan operasional.''
 
-So what: ``Tanpa bukti terkontrol, tim IT yang harus memilih paradigma deployment hanya bisa mengandalkan keyakinan, bukan data. Penelitian ini mengisi keempat celah tersebut.''
+So what: ``Tanpa bukti terkontrol, tim IT yang harus memilih paradigma deployment hanya bisa mengandalkan keyakinan, bukan data tentang seberapa besar perbedaan sebenarnya. Penelitian ini mengisi keempat celah tersebut.''
 
 Transisi: ``Dari celah ini, rumuskan pertanyaan inti penelitian.''
 }
@@ -284,12 +284,11 @@ Transisi: ``Dari celah ini, rumuskan pertanyaan inti penelitian.''
     \vspace{0.10cm}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
-            \small\textbf{Empat dimensi pengukuran}
+            \small\textbf{Tiga dimensi pengukuran}
             \begin{enumerate}\setlength{\itemsep}{2pt}
                 \item \textbf{R1:} Konsistensi: apakah state klaster kembali ke yang diharapkan setelah drift?
                 \item \textbf{R2:} Waktu: berapa lama drift terdeteksi dan dipulihkan?
-                \item \textbf{R3:} Intervensi manual: berapa banyak tindakan korektif yang diperlukan?
-                \item \textbf{R4:} Traceability: dapat atau tidaknya menelusuri siapa mengubah apa dan kapan.
+                \item \textbf{R3:} Identifikasi: berapa lama sumber drift dapat diidentifikasi?
             \end{enumerate}
         \end{column}
         \begin{column}{0.48\textwidth}
@@ -301,15 +300,15 @@ Transisi: ``Dari celah ini, rumuskan pertanyaan inti penelitian.''
             \small\textbf{Pendekatan analisis}
             \vspace{0.04cm}
             \scriptsize
-            Eksploratif-komparatif: mengkarakterisasi perbedaan dan mengukur besarnya efek, bukan menguji hipotesis nol secara formal.
+            Eksperimen sistem terkontrol: mengukur besar perbedaan operasional melalui effect size dan confidence interval, dengan uji statistik sebagai analisis pendukung.
         \end{column}
     \end{columns}
 \note{
-Sapaan: ``Ini pertanyaan inti penelitian. Bacakan perlahan.'' Lalu: ``Untuk menjawabnya, kita ukur empat hal: konsistensi, waktu respons, jumlah intervensi manual, dan traceability.''
+Sapaan: ``Ini pertanyaan inti penelitian. Bacakan perlahan.'' Lalu: ``Untuk menjawabnya, kita ukur tiga hal: konsistensi, waktu respons, dan waktu identifikasi.''
 
 Skenario: ``Kedua lingkungan diuji terhadap tujuh skenario drift yang merepresentasikan kesalahan operasional umum di Kubernetes.''
 
-Analisis: ``Pendekatan kita eksploratif-komparatif: mengkarakterisasi perbedaan dan mengukur besarnya efek, bukan menguji hipotesis nol secara formal.''
+Analisis: ``Pendekatan kita eksperimen sistem terkontrol: mengukur seberapa besar perbedaan operasionalnya, dilaporkan melalui effect size dan confidence interval, dengan uji statistik sebagai analisis pendukung.''
 
 Transisi: ``Tapi sebelum kita bahas metodenya, mari kita batasi ruang lingkup agar klaim kita proporsional.''
 }
@@ -336,15 +335,15 @@ Transisi: ``Tapi sebelum kita bahas metodenya, mari kita batasi ruang lingkup ag
         \item InvenioRDM (16+ komponen) sebagai subjek uji, bukan objek penelitian.
         \item Tujuh skenario \textit{drift} terkontrol (A--G).
         \item Dua paradigma: deployment manual (\texttt{kubectl}) dan GitOps (ArgoCD).
-        \item Analisis: Shapiro-Wilk, \textit{t-test}/\textit{Mann--Whitney U}, $\alpha = 0{,}05$, ukuran efek.
+        \item Analisis: Shapiro-Wilk, \textit{t-test}/\textit{Mann--Whitney U}, $\alpha = 0{,}05$, effect size (Cohen's $d$ / Cliff's $\delta$), confidence interval 95\%.
         \item Di luar lingkup: \textit{multi-cluster} dan Git tanpa agen \textit{reconciliation}.
     \end{enumerate}
     \vspace{0.04cm}
-    \smallnote{Skenario F menguji batas deteksi ArgoCD pada resource di luar Application boundary, bukan drift pada resource yang dikelola.}
+    \smallnote{Skenario F bukan skenario drift konvensional; ia menguji batas visibilitas GitOps pada resource di luar Application boundary.}
 \note{
 Sapaan: ``Batasan ini bukan kelemahan, ini menjaga eksperimen tetap terukur dan dapat direplikasi. Kita hanya mengklaim hasil pada konteks yang didefinisikan di sini, bukan semua lingkungan Kubernetes.''
 
-Skenario F: ``Satu catatan: skenario F menguji batas deteksi ArgoCD, bukan drift pada resource yang dikelola. Ini kita akui secara eksplisit.''
+Skenario F: ``Satu catatan penting: skenario F bukan skenario drift konvensional. Ia menguji batas visibilitas GitOps pada resource di luar Application boundary. Ini kita akui secara eksplisit.''
 
 Transisi: ``Dengan batasan ini, apa yang ingin kita capai dan siapa yang diuntungkan?''
 }
@@ -365,8 +364,7 @@ Transisi: ``Dengan batasan ini, apa yang ingin kita capai dan siapa yang diuntun
             \begin{enumerate}\setlength{\itemsep}{2pt}
                 \item Mengukur konsistensi deployment setelah drift (R1).
                 \item Mengukur \textit{detection time} dan \textit{recovery time} (R2).
-                \item Mengukur jumlah intervensi manual (R3).
-                \item Mengukur \textit{audit trail}/traceability (R4).
+                \item Mengukur \textit{Mean Time To Identify} --- waktu identifikasi sumber drift (R3).
             \end{enumerate}
         \end{column}
         \begin{column}{0.47\textwidth}
@@ -374,7 +372,7 @@ Transisi: ``Dengan batasan ini, apa yang ingin kita capai dan siapa yang diuntun
                 \small\bfseries Teoritis
             \end{beamercolorbox}
             \vspace{0.03cm}
-            \scriptsize Bukti empiris terkontrol tentang dampak drift pada dua paradigma, bukan klaim vendor.
+            \scriptsize Bukti empiris terkontrol tentang besar perbedaan operasional antara dua paradigma, bukan klaim vendor.
             \vspace{0.10cm}
             \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{structure}
                 \small\bfseries Metodologis
@@ -390,9 +388,9 @@ Transisi: ``Dengan batasan ini, apa yang ingin kita capai dan siapa yang diuntun
         \end{column}
     \end{columns}
     \vspace{0.08cm}
-    \slidelead{Kontribusi utama: mengukur seberapa besar dampak operasional pilihan paradigma, bukan membuktikan satu teknologi selalu menang.}
+    \slidelead{Kontribusi utama: mengkuantifikasi besar perbedaan operasional pilihan paradigma, bukan membuktikan satu teknologi selalu menang.}
 \note{
-Sapaan: ``Setiap tujuan langsung menjawab satu dimensi dari pertanyaan penelitian. R1 menjawab konsistensi, R2 menjawab waktu, R3 menjawab intervensi manual, R4 menjawab traceability.''
+Sapaan: ``Setiap tujuan langsung menjawab satu dimensi dari pertanyaan penelitian. R1 menjawab konsistensi, R2 menjawab waktu, R3 menjawab identifikasi.''
 
 Manfaat: ``Secara teoritis, ini memberikan bukti empiris terkontrol, bukan klaim vendor. Secara metodologis, protokolnya dapat direplikasi. Secara praktis, tim IT mendapat data untuk memilih paradigma deployment.''
 
@@ -507,11 +505,11 @@ Transisi: ``Setelah drift disuntikkan, apa yang kita ukur?''
     \centering
     \fullslidediagram[0.52\textheight]{./diagrams/operationalization-validity.pdf}
     \vspace{0.06cm}
-    \smallnote{R1, R2, R3 diuji statistik. R4: rubrik oleh dua penilai independen (Cohen's $\kappa$), MTTI dan audit log completeness sebagai metrik kuantitatif pendamping.}
+    \smallnote{R1, R2, R3: metrik kuantitatif berbasis \textit{timestamp}. Utama: effect size dan confidence interval. Pendukung: uji statistik ($t$-test / Mann--Whitney U).}
 \note{
-Sapaan: ``Empat metrik didefinisikan sebelum eksperimen, bukan setelah melihat hasil. R1 mengukur konsistensi, R2 mengukur waktu respons, R3 mengukur jumlah intervensi manual, R4 mengukur traceability.''
+Sapaan: ``Tiga metrik didefinisikan sebelum eksperimen, bukan setelah melihat hasil. R1 mengukur konsistensi, R2 mengukur waktu respons, R3 mengukur waktu identifikasi sumber drift.''
 
-R4: ``Mengapa R4 menggunakan rubrik? Karena traceability memiliki aspek kualitatif. Tapi kita juga mengukur MTTI dan audit log completeness sebagai metrik kuantitatif pendamping, dan menggunakan dua penilai independen dengan Cohen's kappa untuk reliabilitas.''
+R3: ``R3 menggunakan MTTI --- Mean Time To Identify --- yaitu waktu dari deteksi hingga operator atau sistem berhasil mengidentifikasi sumber drift. Metrik ini mengukur usaha diagnostik operasional secara objektif melalui \textit{timestamp}.''
 
 Transisi: ``Bagaimana satu run eksperimen berjalan dari awal sampai akhir?''
 }
@@ -551,19 +549,20 @@ Transisi: ``Setelah data terkumpul, bagaimana kita menganalisisnya?''
     \scriptsize
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
-            \textbf{Metode analisis}
-            \begin{itemize}\setlength{\itemsep}{1pt}
-                \item Uji normalitas: Shapiro-Wilk.
-                \item Jika normal: \textit{independent samples t-test}; jika tidak: \textit{Mann--Whitney U}, $\alpha = 0{,}05$.
-                \item Ukuran efek: Cohen's $d$ atau Cliff's $\delta$.
-                \item Pendekatan: eksploratif-komparatif, mengkarakterisasi perbedaan dan besarnya efek.
-            \end{itemize}
+            \textbf{Hierarki interpretasi}
+            \begin{enumerate}\setlength{\itemsep}{1pt}
+                \item[\textbf{1.}] \textbf{Effect size} (Cohen's $d$ / Cliff's $\delta$) $\rightarrow$ \textbf{utama}
+                \item[\textbf{2.}] \textbf{Confidence interval 95\%} $\rightarrow$ \textbf{utama}
+                \item[\textbf{3.}] \textit{p}-value ($t$-test / Mann--Whitney U) $\rightarrow$ pendukung
+            \end{enumerate}
             \vspace{0.06cm}
-            \textbf{Mengapa non-parametrik aman?}
+            \textbf{Mengapa effect size di atas?}
             \begin{itemize}\setlength{\itemsep}{1pt}
-                \item Data waktu sistem sering \textit{skewed}.
-                \item Uji non-parametrik lebih konservatif.
+                \item[$\Rightarrow$] Keputusan deployment bergantung pada \textit{significance praktis}, bukan semata \textit{p}-value.
+                \item[$\Rightarrow$] ``Seberapa besar perbedaan operasionalnya?'' bukan ``Apakah perbedaannya signifikan?''
             \end{itemize}
+            \vspace{0.04cm}
+            \textbf{Uji normalitas:} Shapiro-Wilk.
         \end{column}
         \begin{column}{0.48\textwidth}
             \textbf{Ukuran sampel dan power}
@@ -571,19 +570,19 @@ Transisi: ``Setelah data terkumpul, bagaimana kita menganalisisnya?''
                 \item Power = 0,80, $\alpha = 0{,}05$, target efek besar ($d = 1{,}0$).
                 \item Minimum $n = 17$ per grup secara total.
                 \item \textbf{R2:} $7 \times 10 = 70$ observasi per lingkungan (4$\times$ lipat minimum).
-                \item \textbf{R1, R3, R4:} $7 \times 5 = 35$ observasi per lingkungan (2$\times$ lipat minimum).
+                \item \textbf{R1, R3:} $7 \times 5 = 35$ observasi per lingkungan (2$\times$ lipat minimum).
                 \item Jika efek sedang teramati, pengulangan ditambah.
             \end{itemize}
             \vspace{0.06cm}
             \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, rounded=true]{structure}
-                \scriptsize\bfseries Analisis eksploratif-komparatif, bukan pengujian konfirmatoris
+                \scriptsize\bfseries Kontribusi utama: besar efek dan significance praktis, bukan semata p-value
             \end{beamercolorbox}
         \end{column}
     \end{columns}
 \note{
-Sapaan: ``Analisis dan ukuran sampel dipilih sebelum pengumpulan data. Shapiro-Wilk untuk normalitas, lalu t-test atau Mann--Whitney U untuk perbandingan.''
+Sapaan: ``Hierarki interpretasi kita: effect size dan confidence interval sebagai utama, p-value sebagai pendukung. Keputusan deployment bergantung pada significance praktis --- seberapa besar perbedaan operasionalnya --- bukan semata apakah p-value di bawah 0,05.''
 
-Power: ``Untuk R2, kita punya 70 observasi per lingkungan, empat kali lipat minimum 17. Untuk R1, R3, R4, 35 observasi, dua kali lipat. Jika efek yang teramati ternyata sedang, kita bisa menambah pengulangan.''
+Power: ``Untuk R2, kita punya 70 observasi per lingkungan, empat kali lipat minimum 17. Untuk R1 dan R3, 35 observasi, dua kali lipat. Jika efek yang teramati ternyata sedang, kita bisa menambah pengulangan.''
 
 Transisi: ``Setelah analisis, kita perlu mengakui ancaman terhadap validitas dan menjelaskan mitigasinya.''
 }
@@ -607,7 +606,7 @@ Transisi: ``Setelah analisis, kita perlu mengakui ancaman terhadap validitas dan
         \textbf{Ancaman} & \textbf{Mitigasi dalam rancangan} \\
         \midrule
         Operator tunggal & Recovery runbook dan timestamp otomatis \\
-        Efek pembelajaran & Urutan skenario diacak dan ada practice run \\
+        Efek pembelajaran & Urutan \textit{eksekusi} skenario diacak (A--F--C--B--G--A--D--\ldots), bukan jenis drift, paradigma, atau prosedur recovery \\
         Instrumentasi berubah & Versi Kubernetes, ArgoCD, dan workload dikunci \\
         Satu workload & InvenioRDM mewakili kelas workload multi-service \\
         Satu alat GitOps & ArgoCD adalah implementasi GitOps yang paling umum \\
@@ -655,19 +654,19 @@ Transisi: ``Mari kita tutup dengan kontribusi yang diharapkan.''
     \frametitle{Kontribusi yang Diharapkan}
     \vspace{0.10cm}
     \begin{enumerate}\setlength{\itemsep}{6pt}
-        \item \textbf{Bukti empiris terkontrol:} kita akan tahu seberapa besar perbedaan sebenarnya ketika drift terjadi pada dua paradigma deployment, bukan hanya klaim vendor.
-        \item \textbf{Protokol yang dapat direplikasi:} tujuh skenario drift terstandarisasi, empat metrik teroperasionalisasi, dan prosedur analisis yang sudah ditetapkan sebelum eksperimen.
-        \item \textbf{Masukan operasional berbasis data:} tim IT universitas yang harus memilih antara melatih operator pada prosedur manual atau menginvestasikan waktu membangun GitOps akan punya data untuk memutuskan, berdasarkan skenario drift mana yang paling berdampak pada masing-masing paradigma.
+        \item \textbf{Bukti empiris terkontrol:} kita akan tahu \textit{seberapa besar} perbedaan operasional ketika drift terjadi pada dua paradigma deployment --- seberapa cepat, seberapa konsisten, seberapa mudah didiagnosis --- bukan hanya arah perbedaan.
+        \item \textbf{Protokol yang dapat direplikasi:} tujuh skenario drift terstandarisasi, tiga metrik teroperasionalisasi, dan prosedur analisis yang sudah ditetapkan sebelum eksperimen.
+        \item \textbf{Masukan operasional berbasis data:} tim IT universitas yang harus memilih antara melatih operator pada prosedur manual atau menginvestasikan waktu membangun GitOps akan punya data tentang \textit{besar perbedaan} berdasarkan skenario drift mana yang paling berdampak pada masing-masing paradigma.
     \end{enumerate}
     \vspace{0.20cm}
     \centering
     \begin{beamercolorbox}[wd=0.88\textwidth, sep=0.20cm, center, rounded=true]{structure}
-        \normalsize\bfseries Tanpa bukti terkontrol, keputusan deployment hanya berdasarkan keyakinan. Dengan bukti, berdasarkan data.
+        \normalsize\bfseries Tanpa kuantifikasi terkontrol, keputusan deployment hanya berdasarkan keyakinan. Dengan effect size yang terukur, berdasarkan data.
     \end{beamercolorbox}
 \note{
-Sapaan: ``Tiga kontribusi: pertama, bukti empiris terkontrol. Kedua, protokol yang dapat direplikasi. Ketiga, masukan operasional berbasis data untuk tim IT universitas.''
+Sapaan: ``Tiga kontribusi: pertama, bukti empiris terkontrol yang mengkuantifikasi besar perbedaan. Kedua, protokol yang dapat direplikasi. Ketiga, masukan operasional berbasis data untuk tim IT universitas.''
 
-So what: ``Tanpa bukti terkontrol, tim IT hanya bisa memilih paradigma deployment berdasarkan keyakinan. Penelitian ini menyediakan data, sehingga keputusan berdasarkan bukti, bukan opini.''
+So what: ``Tanpa kuantifikasi terkontrol, tim IT hanya bisa memilih paradigma deployment berdasarkan keyakinan. Penelitian ini menyediakan data tentang seberapa besar perbedaan sebenarnya, sehingga keputusan berdasarkan bukti, bukan opini.''
 
 Penutup: ``Terima kasih. Silakan bertanya.''
 }
@@ -707,57 +706,72 @@ Penutup: ``Terima kasih. Silakan bertanya.''
 }
 
 % ---------------------------------------------
-% B2: Root Cause Identification Time defense
+% B2: MTTI definition
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Bagaimana Kita Menentukan Akar Masalah Secara Objektif?}
+    \frametitle{Backup: MTTI --- Mean Time To Identify}
     \vspace{0.02cm}
     \scriptsize
     \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
-        \small\bfseries Pertanyaan penguji: Bagaimana Anda tahu kapan akar masalah telah diidentifikasi?
+        \small\bfseries Pertanyaan penguji: Bagaimana Anda mengukur waktu identifikasi secara objektif?
     \end{beamercolorbox}
     \vspace{0.08cm}
-    \textbf{Definisi operasional:}
+    \textbf{Definisi operasional MTTI:}
     \begin{itemize}
-        \item \textit{Root cause identification time} berakhir ketika operator menyebutkan \textbf{(1)} kategori drift dan \textbf{(2)} sumber daya terdampak, lalu jawaban diverifikasi terhadap skenario injeksi yang diketahui.
+        \item MTTI = $t_{id} - t_d$: waktu dari deteksi drift hingga sumber drift berhasil diidentifikasi.
+        \item Identifikasi dianggap selesai ketika operator menyebutkan \textbf{(1)} kategori drift dan \textbf{(2)} sumber daya terdampak, lalu jawaban diverifikasi terhadap skenario injeksi yang diketahui.
     \end{itemize}
     \vspace{0.06cm}
-    \textbf{Mengapa ini objektif:}
+    \textbf{Mengapa MTTI menggantikan rubrik traceability:}
     \begin{itemize}
-        \item Skenario sudah didefinisikan sebelum eksperimen, prinsipnya seperti verifikasi \textit{known-answer}.
-        \item Lingkungan B: ArgoCD menampilkan \textit{diff}, akar masalah langsung terlihat.
-        \item Lingkungan A: operator memakai \texttt{kubectl describe} dan log, memerlukan pencarian manual.
+        \item Menghasilkan \textit{timestamp} objektif, bukan penilaian subjektif.
+        \item Langsung mengukur usaha diagnostik operasional.
+        \item Terkait langsung dengan \textit{incident response}.
+        \item Mudah dijelaskan dan mudah dipertahankan.
+    \end{itemize}
+    \vspace{0.06cm}
+    \textbf{Perbedaan antar-paradigma:}
+    \begin{itemize}
+        \item Lingkungan B (GitOps): ArgoCD menampilkan \textit{diff}, akar masalah langsung terlihat.
+        \item Lingkungan A (Manual): operator memakai \texttt{kubectl describe} dan log, memerlukan pencarian manual.
         \item \textit{Timestamp} dicatat secara otomatis oleh skrip saat jawaban benar disebutkan.
     \end{itemize}
 \end{frame}
 }
 
 % ---------------------------------------------
-% B3: R3/R4 traceability and manual intervention defense
+% B3: Why MTTI replaces rubric and manual intervention count
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Mengapa R3 dan R4 Dianalisis Berbeda dari R1 dan R2?}
+    \frametitle{Backup: Mengapa MTTI Menggantikan Rubrik dan Intervensi Manual?}
     \vspace{0.02cm}
     \small
     \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
-        \small\bfseries Pertanyaan penguji: Mengapa R3 dan R4 tidak diuji sama seperti R1 dan R2?
+        \small\bfseries Pertanyaan penguji: Mengapa tidak mempertahankan rubrik traceability dan hitungan intervensi manual?
     \end{beamercolorbox}
     \vspace{0.08cm}
-    \textbf{R3 (Intervensi Manual):}
+    \textbf{Intervensi manual (dihapus):}
     \begin{itemize}
-        \item Data diskrit (hitungan perintah kubectl); Mann--Whitney U tetap dapat diterapkan.
-        \item Pada Lingkungan B, self-heal dinonaktifkan sementara agar perbandingan setara.
+        \item Hasilnya sebagian besar sudah ditentukan: manual $> 0$, GitOps $\approx 0$.
+        \item Memberikan sedikit informasi baru di luar apa yang sudah diketahui dari desain paradigma.
+        \item Menghapusnya membuat desain penelitian lebih bersih dan fokus.
     \end{itemize}
     \vspace{0.06cm}
-    \textbf{R4 (Traceability):}
+    \textbf{Rubrik traceability (dihapus):}
     \begin{itemize}
-        \item Memiliki aspek kualitatif (rubrik 1--5) dan kuantitatif (MTTI, audit log completeness).
-        \item Dua penilai independen dengan Cohen's $\kappa$ untuk reliabilitas.
-        \item R4 menjelaskan konteks operasional: mengapa R1 dan R2 berbeda, yaitu karena audit trail GitOps terjamin secara struktural oleh desain sistem.
+        \item Skala 1--5 rentan terhadap pertanyaan: mengapa skala ini? apakah rubrik benar-benar mengukur traceability?
+        \item Cohen's $\kappa$ menambah kompleksitas tanpa menambah kejelasan substantif.
+    \end{itemize}
+    \vspace{0.06cm}
+    \textbf{MTTI menggantikan keduanya:}
+    \begin{itemize}
+        \item Mengukur aspek yang paling penting dari traceability: \textit{berapa lama} sumber drift bisa diidentifikasi.
+        \item Menghasilkan \textit{timestamp} objektif, tidak memerlukan penilaian subjektif.
+        \item Terkait langsung dengan \textit{incident response}: MTTI adalah metrik yang digunakan di operasional nyata.
     \end{itemize}
 \end{frame}
 }
@@ -806,30 +820,30 @@ Penutup: ``Terima kasih. Silakan bertanya.''
         \item Operator tunggal justru \textbf{mengurangi} varians antar-\textit{run}, sehingga memperkuat validitas internal perbandingan antar paradigma.
     \end{enumerate}
     \vspace{0.08cm}
-    \smallnote{Batasan ini diakui sebagai ancaman validitas eksternal dan direkomendasikan untuk replikasi dengan operator berbeda.}
+    \smallnote{Keterampilan operator memengaruhi kedua paradigma secara sama: operator, runbook, klaster, dan skenario yang sama. Oleh karena itu, perbandingan tetap bermakna.}
 \end{frame}
 }
 
 % ---------------------------------------------
-% B6: What if no significant difference
+% B6: What if effect size is small
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Backup: Apa Jika Tidak Ada Perbedaan Bermakna?}
+    \frametitle{Backup: Apa Jika Effect Size Kecil?}
     \vspace{0.20cm}
     \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
-        \small\bfseries Pertanyaan penguji: Jika R1, R2, R3 tidak signifikan, apakah penelitian ini gagal?
+        \small\bfseries Pertanyaan penguji: Jika R1, R2, R3 menunjukkan effect size kecil, apakah penelitian ini gagal?
     \end{beamercolorbox}
     \vspace{0.12cm}
     \textbf{Tiga interpretasi, semua informatif:}
     \begin{enumerate}
-        \item \textbf{Efek kecil:} Kedua paradigma sebanding dalam konteks terkontrol ini. Ini temuan berharga, berarti otomatisasi GitOps bukan keuntungan mutlak di semua skenario.
-        \item \textbf{Efek sedang/besar tapi tidak signifikan:} Efek ada tapi varians tinggi. Ukuran efek tetap memberikan informasi praktis. Tambah pengulangan.
-        \item \textbf{R4 tetap memberikan nilai:} Traceability terjamin secara struktural oleh GitOps, terlepas dari hasil R1, R2, R3.
+        \item \textbf{Effect kecil:} Kedua paradigma sebanding dalam konteks terkontrol ini. Ini temuan berharga, berarti otomatisasi GitOps bukan keuntungan mutlak di semua skenario.
+        \item \textbf{Effect sedang/besar tapi confidence interval lebar:} Effect ada tapi varians tinggi. Tambah pengulangan untuk mempersempit interval.
+        \item \textbf{R3 (MTTI) tetap memberikan nilai:} Waktu identifikasi sumber drift terjamin secara struktural oleh desain GitOps, terlepas dari besar effect R1 dan R2.
     \end{enumerate}
     \vspace{0.08cm}
-    \slidelead{Kontribusi penelitian adalah bukti yang dapat diperiksa, apa pun arah hasilnya.}
+    \slidelead{Kontribusi penelitian adalah kuantifikasi yang dapat diperiksa, apa pun besar effect yang teramati.}
 \end{frame}
 }
 
