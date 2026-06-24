@@ -2,13 +2,13 @@
 
 \section{Deskripsi Umum Penelitian}
 
-Penelitian ini mengevaluasi secara empiris dampak skenario \textit{configuration drift} terhadap karakteristik operasional deployment pada dua paradigma manajemen yang berbeda, yaitu manual dan GitOps, pada sebuah klaster Kubernetes. Evaluasi dilakukan dengan membandingkan dua lingkungan paralel: Lingkungan A (deployment manual menggunakan \texttt{kubectl}) dan Lingkungan B (deployment GitOps menggunakan ArgoCD). Pada kedua lingkungan, \textit{configuration drift} di-\textit{inject} secara terkontrol melalui tujuh skenario yang dirancang untuk merepresentasikan kesalahan operasional yang umum terjadi. Hasil pengukuran terhadap tiga metrik utama (konsistensi deployment, \textit{detection time}/\textit{recovery time}/\textit{root cause identification time}, dan \textit{traceability}) dianalisis menggunakan uji statistik komparatif untuk mengkarakterisasi perbedaan antara kedua paradigma.
+Penelitian yang diuraikan dalam proposal ini mengevaluasi secara empiris dampak skenario penyimpangan konfigurasi terhadap karakteristik operasional \textit{deployment} pada dua paradigma manajemen yang berbeda, yaitu manual dan GitOps, pada sebuah klaster Kubernetes. Evaluasi dilakukan dengan membandingkan dua lingkungan paralel: Lingkungan A (\textit{deployment} manual menggunakan \texttt{kubectl}) dan Lingkungan B (\textit{deployment} GitOps menggunakan ArgoCD). Pada kedua lingkungan, penyimpangan konfigurasi di-\textit{inject} secara terkontrol melalui tujuh skenario yang dirancang untuk merepresentasikan kesalahan operasional yang umum terjadi. Hasil pengukuran terhadap tiga metrik utama (konsistensi \textit{deployment}, waktu deteksi/pemulihan/identifikasi akar masalah, dan \textit{traceability}) dianalisis menggunakan uji statistik komparatif untuk mengkarakterisasi perbedaan antara kedua paradigma. Hasil evaluasi tersebut selanjutnya menjadi dasar rekomendasi paradigma manajemen \textit{deployment} bagi praktisi industri.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.95\textwidth]{architecture-overview}
   \setlength{\abovecaptionskip}{5pt}
-  \caption{Arsitektur eksperimen: perbandingan Lingkungan A (deployment manual dengan \texttt{kubectl}) dan Lingkungan B (deployment GitOps dengan ArgoCD). \textit{Drift injection} dilakukan pada kedua lingkungan, dan metrik R1--R3 dikumpulkan dari masing-masing lingkungan.}
+  \caption{Arsitektur eksperimen: perbandingan Lingkungan A (\textit{deployment} manual dengan \texttt{kubectl}) dan Lingkungan B (\textit{deployment} GitOps dengan ArgoCD). Injeksi penyimpangan dilakukan pada kedua lingkungan, dan metrik R1--R3 dikumpulkan dari masing-masing lingkungan.}
   \label{fig:arsitektur-eksperimen}
 \end{figure}
 
@@ -16,35 +16,35 @@ Penelitian ini mengevaluasi secara empiris dampak skenario \textit{configuration
   \centering
   \includegraphics[width=\textwidth]{drift-scenarios}
   \setlength{\abovecaptionskip}{5pt}
-  \caption{Skenario drift terkontrol (A--G): alur \textit{injection} pada kedua lingkungan, mekanisme \textit{detection} dan \textit{recovery} pada Lingkungan A (manual) dan Lingkungan B (GitOps/ArgoCD), serta tiga metrik yang dikumpulkan.}
+  \caption{Skenario penyimpangan terkontrol (A--G): alur injeksi pada kedua lingkungan, mekanisme deteksi dan pemulihan pada Lingkungan A (manual) dan Lingkungan B (GitOps/ArgoCD), serta tiga metrik yang dikumpulkan.}
   \label{fig:drift-scenarios}
 \end{figure}
 
 \section{Metodologi}
 
-Metode penelitian yang digunakan adalah \textbf{Evaluasi Empiris Terkontrol}. Dalam desain ini, dua lingkungan paralel dibangun pada klaster Kubernetes yang identik: Lingkungan A (deployment manual) dan Lingkungan B (deployment GitOps). Kedua lingkungan menerima perlakuan identik berupa \textit{drift injection} melalui skenario yang sama, sehingga satu-satunya variabel yang berbeda adalah paradigma deployment. Perbedaan hasil pengukuran antara kedua lingkungan dapat diatribusikan kepada perbedaan paradigma deployment. Urutan skenario diacak untuk menghindari efek urutan (\textit{order effect}), dan variabel pengganggu dikendalikan melalui konfigurasi klaster yang disamakan \citep{wohlin2012experimentation}.
+Metode penelitian yang digunakan adalah Evaluasi Empiris Terkontrol. Dalam desain ini, dua lingkungan paralel dibangun pada klaster Kubernetes yang identik: Lingkungan A (\textit{deployment} manual) dan Lingkungan B (\textit{deployment} GitOps). Kedua lingkungan menerima perlakuan identik berupa injeksi penyimpangan melalui skenario yang sama, sehingga satu-satunya variabel yang berbeda adalah paradigma \textit{deployment}. Perbedaan hasil pengukuran antara kedua lingkungan dapat diatribusikan kepada perbedaan paradigma \textit{deployment}. Urutan skenario diacak untuk menghindari efek urutan (\textit{order effect}), dan variabel pengganggu dikendalikan melalui konfigurasi klaster yang disamakan \citep{wohlin2012experimentation}.
 
-Tahapan eksperimen dalam penelitian ini mengikuti rancangan \textit{pre-test -- treatment -- post-test}:
+Tahapan eksperimen mengikuti rancangan \textit{pre-test -- treatment -- post-test}:
 
 \begin{enumerate}
-    \item \textbf{Tahap 1: Persiapan Lingkungan:} Pembangunan Lingkungan A (manual) dan Lingkungan B (GitOps) pada klaster Kubernetes yang identik. Konfigurasi klaster, versi ArgoCD, dan spesifikasi node disamakan untuk mengendalikan variabel pengganggu.
+    \item Tahap 1: Persiapan Lingkungan. Pembangunan Lingkungan A (manual) dan Lingkungan B (GitOps) pada klaster Kubernetes yang identik. Konfigurasi klaster, versi ArgoCD, dan spesifikasi \textit{node} disamakan untuk mengendalikan variabel pengganggu.
     
-    \item \textbf{Tahap 2: Kalibrasi Baseline (O1):} Pengukuran \textit{baseline} pada keadaan bersih sebelum \textit{drift injection}. Mencakup verifikasi status deployment, pengukuran awal konsistensi, dan \textit{logging} metrik lingkungan (penggunaan CPU/memori, latensi jaringan).
+    \item Tahap 2: Kalibrasi \textit{Baseline} (O1). Pengukuran \textit{baseline} pada keadaan bersih sebelum injeksi penyimpangan. Mencakup verifikasi status \textit{deployment}, pengukuran awal konsistensi, dan pencatatan metrik lingkungan (penggunaan CPU/memori, latensi jaringan).
     
-    \item \textbf{Tahap 3: \textit{Drift Injection} (X):} \textit{Controlled configuration drift injection} pada kedua lingkungan menggunakan perintah identik (mis. \texttt{kubectl edit}, \texttt{kubectl scale}, \texttt{kubectl patch}). Urutan skenario diacak untuk menghindari efek urutan (\textit{order effect}).
+    \item Tahap 3: Injeksi Penyimpangan (X). Injeksi penyimpangan konfigurasi terkontrol pada kedua lingkungan menggunakan perintah identik (mis. \texttt{kubectl edit}, \texttt{kubectl scale}, \texttt{kubectl patch}). Urutan skenario diacak untuk menghindari efek urutan (\textit{order effect}).
     
-    \item \textbf{Tahap 4: Pengukuran Pasca-Perlakuan (O2):} Pengumpulan data metrik pasca-\textit{injection}, termasuk \textit{detection time}, \textit{recovery time}, \textit{root cause identification time}, dan dokumentasi \textit{traceability}.
+    \item Tahap 4: Pengukuran Pasca-Perlakuan (O2). Pengumpulan data metrik pasca-injeksi, termasuk waktu deteksi, waktu pemulihan, waktu identifikasi akar masalah, dan dokumentasi \textit{traceability}.
     
-    \item \textbf{Tahap 5: Analisis Statistik Komparatif:} Penerapan uji \textit{Mann--Whitney U} serta perhitungan ukuran efek (Cohen's \textit{d} atau Cliff's $\delta$) untuk mengkarakterisasi perbedaan antara kedua paradigma.
+    \item Tahap 5: Analisis Statistik Komparatif. Penerapan uji \textit{Mann--Whitney U} serta perhitungan ukuran efek (Cohen's \textit{d} atau Cliff's $\delta$) untuk mengkarakterisasi perbedaan antara kedua paradigma.
     
-    \item \textbf{Tahap 6: Interpretasi dan Kesimpulan:} Pembahasan hasil statistik dalam konteks literatur dan praktik operasional.
+    \item Tahap 6: Interpretasi dan Kesimpulan. Pembahasan hasil statistik dalam konteks literatur dan praktik operasional, serta perumusan rekomendasi paradigma.
 \end{enumerate}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\textwidth]{experiment-flow}
   \setlength{\abovecaptionskip}{5pt}
-  \caption{Bagan alir eksperimen: tahapan penelitian dari persiapan hingga interpretasi. Iterasi per skenario menunjukkan pengulangan acak dari baseline hingga pengukuran untuk setiap skenario drift.}
+  \caption{Bagan alir eksperimen: tahapan penelitian dari persiapan hingga interpretasi. Iterasi per skenario menunjukkan pengulangan acak dari \textit{baseline} hingga pengukuran untuk setiap skenario penyimpangan.}
   \label{fig:bagan-alir-eksperimen}
 \end{figure}
 
@@ -52,16 +52,16 @@ Tahapan eksperimen dalam penelitian ini mengikuti rancangan \textit{pre-test -- 
 
 \subsection{Intervensi (Perlakuan)}
 
-Intervensi dalam penelitian ini adalah \textbf{drift injection \textit{controlled}} melalui tujuh skenario (A--G). Intervensi ini bersifat \textit{identik pada kedua lingkungan}, yakni perintah \texttt{kubectl} yang sama digunakan untuk \textit{inject} drift pada Lingkungan A dan Lingkungan B. Yang membedakan kedua lingkungan bukanlah perlakuannya, melainkan paradigma manajemen deployment yang menentukan bagaimana sistem merespons terhadap drift yang terjadi.
+Intervensi dalam penelitian yang diuraikan dalam proposal ini adalah injeksi penyimpangan terkontrol melalui tujuh skenario (A--G). Intervensi bersifat identik pada kedua lingkungan, yakni perintah \texttt{kubectl} yang sama digunakan untuk menginjeksi penyimpangan pada Lingkungan A dan Lingkungan B. Yang membedakan kedua lingkungan bukanlah perlakuannya, melainkan paradigma manajemen \textit{deployment} yang menentukan bagaimana sistem merespons terhadap penyimpangan yang terjadi.
 
 \subsection{Variabel Independen (Variabel Bebas)}
 
-Variabel independen adalah \textbf{paradigma manajemen deployment} dengan dua level:
+Variabel independen adalah paradigma manajemen \textit{deployment} dengan dua level:
 
 \begin{enumerate}
-    \item \textbf{Lingkungan A, Deployment Manual:} Deployment dan modifikasi dilakukan langsung pada klaster menggunakan \texttt{kubectl apply}, \texttt{kubectl edit}, \texttt{kubectl scale}, dan perintah imperatif lainnya tanpa repositori Git sebagai \textit{source of truth}.
+    \item Lingkungan A, \textit{Deployment} Manual: \textit{Deployment} dan modifikasi dilakukan langsung pada klaster menggunakan \texttt{kubectl apply}, \texttt{kubectl edit}, \texttt{kubectl scale}, dan perintah imperatif lainnya tanpa repositori Git sebagai \textit{source of truth}.
     
-    \item \textbf{Lingkungan B, Deployment GitOps (ArgoCD):} Deployment dikelola secara deklaratif melalui repositori Git; ArgoCD berjalan di dalam klaster sebagai agen \textit{reconciliation} yang secara kontinu menyelaraskan \textit{state} klaster dengan \textit{state} di Git.
+    \item Lingkungan B, \textit{Deployment} GitOps (ArgoCD): \textit{Deployment} dikelola secara deklaratif melalui repositori Git; ArgoCD berjalan di dalam klaster sebagai agen \textit{reconciliation} yang secara kontinu menyelaraskan \textit{state} klaster dengan \textit{state} di Git.
 \end{enumerate}
 
 \subsection{Variabel Dependen (Variabel Terikat)}
@@ -69,99 +69,136 @@ Variabel independen adalah \textbf{paradigma manajemen deployment} dengan dua le
 Tiga metrik utama diukur sebagai variabel dependen:
 
 \subsubsection{Metrik R1: Konsistensi Deployment}
-\textbf{Definisi:} Persentase sumber daya klaster (\textit{Pod}, \textit{Deployment}, \textit{ConfigMap}, \textit{Service}) yang cocok dengan \textit{desired declarative state} setelah skenario drift.
+Definisi: Persentase sumber daya klaster (\textit{Pod}, \textit{Deployment}, \textit{ConfigMap}, \textit{Service}) yang cocok dengan \textit{desired declarative state} setelah skenario penyimpangan.
 
-\textbf{Cara Ukur:}
+Cara Ukur:
 \[
 \text{Konsistensi (\%)} = \frac{\text{Jumlah sumber daya dengan status Healthy/Synced}}{\text{Total sumber daya yang diharapkan}} \times 100
 \]
 
-Untuk Lingkungan B, status diambil dari ArgoCD Application status. Untuk Lingkungan A, status diverifikasi menggunakan \texttt{kubectl get} dan \texttt{kubectl describe}. Konsistensi diukur pada $t_0$ (sebelum drift), $t_1$ (sebelum \textit{recovery}), dan $t_2$ (setelah \textit{recovery}).
+Untuk Lingkungan B, status diambil dari ArgoCD \textit{Application status}. Untuk Lingkungan A, status diverifikasi menggunakan \texttt{kubectl get} dan \texttt{kubectl describe}. Konsistensi diukur pada $t_0$ (sebelum penyimpangan), $t_1$ (sebelum pemulihan), dan $t_2$ (setelah pemulihan).
 
 \subsubsection{Metrik R2: Waktu Deteksi, Pemulihan, dan Identifikasi Akar Masalah}
-\textbf{Definisi:} Tiga sub-metrik waktu (dalam detik) yang mengukur kecepatan respons terhadap \textit{configuration drift}.
+Definisi: Tiga sub-metrik waktu (dalam detik) yang mengukur kecepatan respons terhadap penyimpangan konfigurasi.
 
 \begin{itemize}
-    \item \textbf{\textit{Detection Time} ($t_d - t_0$):} Waktu dari \textit{drift injection} hingga drift terdeteksi. Untuk Lingkungan B, ArgoCD menunjukkan status \textit{OutOfSync} pada aplikasi yang terkena drift (dipantau menggunakan \texttt{argocd app get} dan log ArgoCD). Untuk Lingkungan A, operator mendeteksi deviasi secara manual melalui \texttt{kubectl get} atau \textit{monitoring}.
+    \item Waktu Deteksi (\textit{Detection Time}, $t_d - t_0$): Waktu dari injeksi penyimpangan hingga penyimpangan terdeteksi. Untuk Lingkungan B, ArgoCD menunjukkan status \textit{OutOfSync} pada aplikasi yang terkena penyimpangan (dipantau menggunakan \texttt{argocd app get} dan log ArgoCD). Untuk Lingkungan A, \textit{operator} mendeteksi deviasi secara manual melalui \texttt{kubectl get} atau \textit{monitoring}.
     
-    \item \textbf{\textit{Recovery Time} ($t_2 - t_0$):} Waktu dari \textit{drift injection} hingga \textit{state} klaster kembali ke \textit{baseline}. Untuk Lingkungan B, ArgoCD menyelesaikan \textit{automatic reconciliation} (\textit{self-heal}) dan menunjukkan status \textit{Synced/Healthy}. Untuk Lingkungan A, operator menyelesaikan seluruh perintah \texttt{kubectl} manual yang diperlukan untuk mengembalikan \textit{state} ke \textit{baseline}.
+    \item Waktu Pemulihan (\textit{Recovery Time}, $t_2 - t_0$): Waktu dari injeksi penyimpangan hingga \textit{state} klaster kembali ke \textit{baseline}. Untuk Lingkungan B, ArgoCD menyelesaikan \textit{automatic reconciliation} (\textit{self-heal}) dan menunjukkan status \textit{Synced/Healthy}. Untuk Lingkungan A, \textit{operator} menyelesaikan seluruh perintah \texttt{kubectl} manual yang diperlukan untuk mengembalikan \textit{state} ke \textit{baseline}.
     
-    \item \textbf{\textit{Root Cause Identification Time} ($t_{rci} - t_d$):} Waktu dari deteksi drift hingga penyebab drift teridentifikasi. Untuk Lingkungan B, ArgoCD menampilkan \textit{diff} antara \textit{state} Git dan \textit{state} klaster, sehingga akar masalah dapat langsung diidentifikasi. Untuk Lingkungan A, operator harus memeriksa log, menjalankan \texttt{kubectl describe}, dan menganalisis perubahan secara manual untuk menentukan penyebab drift.
+    \item Waktu Identifikasi Akar Masalah (\textit{Root Cause Identification Time}, $t_{rci} - t_d$): Waktu dari deteksi penyimpangan hingga penyebab penyimpangan teridentifikasi. Untuk Lingkungan B, ArgoCD menampilkan \textit{diff} antara \textit{state} Git dan \textit{state} klaster, sehingga akar masalah dapat langsung diidentifikasi. Untuk Lingkungan A, \textit{operator} harus memeriksa log, menjalankan \texttt{kubectl describe}, dan menganalisis perubahan secara manual untuk menentukan penyebab penyimpangan.
 \end{itemize}
 
-\textbf{Pengamatan Tambahan:} Jumlah perintah \texttt{kubectl} yang diperlukan untuk pemulihan pada Lingkungan A dicatat sebagai pengamatan pelengkap, bukan sebagai metrik independen, karena waktu pemulihan (\textit{recovery time}) secara inheren sudah mencerminkan kompleksitas pemulihan.
+Pengamatan Tambahan: Jumlah perintah \texttt{kubectl} yang diperlukan untuk pemulihan pada Lingkungan A dicatat sebagai pengamatan pelengkap, bukan sebagai metrik independen, karena waktu pemulihan (\textit{recovery time}) secara inheren sudah mencerminkan kompleksitas pemulihan.
 
-\textbf{Pengulangan:} Setiap skenario diulang $n = 10$ kali per lingkungan untuk menghasilkan distribusi waktu yang memadai untuk analisis statistik.
+Pengulangan: Setiap skenario diulang $n = 10$ kali per lingkungan untuk menghasilkan distribusi waktu yang memadai untuk analisis statistik.
 
 \subsubsection{Metrik R3: \textit{Traceability} Operasional (Deskriptif)}
-\textbf{Definisi:} Kemampuan untuk merekonstruksi siapa yang mengubah \textit{state}, apa yang berubah, kapan perubahan terjadi, dan bagaimana \textit{recovery} dilakukan.
+Definisi: Kemampuan untuk merekonstruksi siapa yang mengubah \textit{state}, apa yang berubah, kapan perubahan terjadi, dan bagaimana pemulihan dilakukan.
 
-\textbf{Cara Ukur:} Metrik ini dinilai secara deskriptif, bukan diuji secara statistik. Untuk setiap skenario drift, aspek \textit{traceability} berikut didokumentasikan untuk kedua lingkungan:
+Cara Ukur: Metrik ini dinilai secara deskriptif, bukan diuji secara statistik. Untuk setiap skenario penyimpangan, aspek \textit{traceability} berikut didokumentasikan untuk kedua lingkungan:
 
 \begin{itemize}
-    \item \textbf{Lingkungan B (GitOps):} Setiap perubahan direkam secara otomatis melalui Git \textit{commit history} (penulis, \textit{timestamp}, \textit{diff}) dan ArgoCD \textit{notifications}. Kelengkapan \textit{audit log} dihitung sebagai persentase perubahan yang dapat direkonstruksi dari Git \textit{commit history}.
+    \item Lingkungan B (GitOps): Setiap perubahan direkam secara otomatis melalui Git \textit{commit history} (penulis, \textit{timestamp}, \textit{diff}) dan ArgoCD \textit{notifications}. Kelengkapan \textit{audit log} dihitung sebagai persentase perubahan yang dapat direkonstruksi dari Git \textit{commit history}.
     
-    \item \textbf{Lingkungan A (Manual):} \textit{Traceability} bergantung pada Kubernetes \textit{audit logs} dan \textit{manual logging}. Kelengkapan \textit{audit log} dihitung sebagai persentase perubahan yang dapat direkonstruksi dari \textit{audit logs}.
+    \item Lingkungan A (Manual): \textit{Traceability} bergantung pada Kubernetes \textit{audit logs} dan pencatatan manual. Kelengkapan \textit{audit log} dihitung sebagai persentase perubahan yang dapat direkonstruksi dari \textit{audit logs}.
 \end{itemize}
 
-\textbf{Penjelasan Metodologis:} Metrik \textit{traceability} ini tidak diuji secara statistik karena perbedaan struktural antara kedua paradigma sudah terjamin oleh desain sistem: Git secara inheren menyediakan \textit{audit trail} lengkap (\textit{commit hash}, \textit{author}, \textit{timestamp}, \textit{diff}), sementara \textit{manual deployment} bergantung pada \textit{audit logs} yang parsial. Perbandingan kuantitatif pada dimensi ini bersifat \textit{predetermined}. Sebagai gantinya, \textit{traceability} dideskripsikan secara kualitatif dalam pembahasan hasil, mencakup: kelengkapan jejak perubahan, kemudahan identifikasi akar masalah, dan keterkaitan dengan \textit{root cause identification time} (R2).
+Penjelasan Metodologis: Metrik \textit{traceability} tidak diuji secara statistik karena perbedaan struktural antara kedua paradigma sudah terjamin oleh desain sistem: Git secara inheren menyediakan \textit{audit trail} lengkap (\textit{commit hash}, penulis, \textit{timestamp}, \textit{diff}), sementara \textit{manual deployment} bergantung pada \textit{audit logs} yang parsial. Perbandingan kuantitatif pada dimensi ini bersifat \textit{predetermined}. Sebagai gantinya, \textit{traceability} dideskripsikan secara kualitatif dalam pembahasan hasil, mencakup: kelengkapan jejak perubahan, kemudahan identifikasi akar masalah, dan keterkaitan dengan waktu identifikasi akar masalah (R2).
+
+\section{Justifikasi Ekuitas Perbandingan (\textit{Apple-to-Apple})}
+
+Untuk memastikan bahwa perbandingan antara paradigma manual dan GitOps bersifat setara (\textit{apple-to-apple}), dirumuskan kerangka argumentatif berikut yang menjelaskan bagaimana variabel dikendalikan sehingga perbedaan hasil pengukuran dapat diatribusikan secara kausal kepada perbedaan paradigma \textit{deployment} \citep{wohlin2012experimentation}:
+
+\begin{enumerate}
+    \item Identitas Klaster: Kedua lingkungan dibangun pada klaster Kubernetes yang identik dengan spesifikasi \textit{hardware}, versi Kubernetes, \textit{container runtime}, dan sistem operasi \textit{node} yang sama. Hal ini mengeliminasi perbedaan akibat infrastruktur fisik.
+    
+    \item Identitas \textit{Workload}: Kedua lingkungan menjalankan \textit{deployment} yang sama (InvenioRDM sebagai instans kelas \textit{workload} komposit multi-service) dengan konfigurasi manifest yang identik. Hal ini mengeliminasi perbedaan akibat kompleksitas atau jenis aplikasi.
+    
+    \item Identitas Intervensi: Injeksi penyimpangan dilakukan menggunakan perintah \texttt{kubectl} yang sama pada kedua lingkungan, sehingga jenis dan magnitudo penyimpangan identik. Yang membedakan adalah bagaimana masing-masing paradigma merespons, bukan apa yang diinjeksi.
+    
+    \item Standarisasi \textit{Operator}: Pada Lingkungan A, \textit{operator} mengikuti \textit{recovery runbook} terstandarisasi yang mengeliminasi keputusan subjektif. Seluruh \textit{timestamp} direkam oleh skrip otomasi, bukan oleh penilaian manusia. Hal ini mengontrol variabel pengganggu berupa keahlian \textit{operator} (dibahas lebih lanjut pada \S~\ref{sec:keahlian-operator}).
+    
+    \item Kontrol Lingkungan: Variabel pengganggu seperti tekanan sumber daya \textit{node}, latensi jaringan, dan interval \textit{sync} ArgoCD dikendalikan dan dipantau secara kontinu (dibahas pada \S~\ref{sec:kontrol-variabel}).
+    
+    \item Isolasi Variabel Independen: Satu-satunya perbedaan antara kedua lingkungan adalah paradigma manajemen \textit{deployment} (variabel independen). Semua variabel lain disamakan, sehingga perbedaan hasil pengukuran dapat diatribusikan kepada perbedaan paradigma.
+\end{enumerate}
+
+Kerangka tersebut memenuhi kriteria desain eksperimental terkontrol sebagaimana dijelaskan oleh \citet{wohlin2012experimentation}, di mana variabel independen dimanipulasi sementara variabel pengganggu dikendalikan.
 
 \section{Peran Peneliti dan Standarisasi Prosedur}
 
-Dalam penelitian ini, peneliti berperan sebagai \textbf{instrumen pengukuran yang terstandarisasi}, bukan sebagai variabel subjek. Hal ini penting untuk menjaga validitas internal mengingat peneliti juga bertindak sebagai operator pada Lingkungan A. Peran dan batasan peneliti didefinisikan sebagai berikut:
+Dalam penelitian yang diuraikan dalam proposal ini, peneliti berperan sebagai instrumen pengukuran yang terstandarisasi, bukan sebagai variabel subjek. Hal tersebut penting untuk menjaga validitas internal mengingat peneliti juga bertindak sebagai \textit{operator} pada Lingkungan A. Peran dan batasan peneliti didefinisikan sebagai berikut:
 
 \begin{enumerate}
-    \item \textbf{Pada Lingkungan A (Manual):} Peneliti mengeksekusi prosedur \textit{recovery} berdasarkan \textit{recovery runbook} yang telah ditentukan sebelumnya (\textit{pre-defined}). Operator tidak membuat keputusan subjektif selama \textit{recovery}, sehingga setiap langkah korektif mengikuti skrip yang telah ditulis. Seluruh \textit{timestamp} (awal dan akhir setiap perintah) direkam secara otomatis oleh skrip otomasi, bukan oleh \textit{manual logging}.
+    \item Pada Lingkungan A (Manual): Peneliti mengeksekusi prosedur pemulihan berdasarkan \textit{recovery runbook} yang telah ditentukan sebelumnya (\textit{pre-defined}). \textit{Operator} tidak membuat keputusan subjektif selama pemulihan, sehingga setiap langkah korektif mengikuti skrip yang telah ditulis. Seluruh \textit{timestamp} (awal dan akhir setiap perintah) direkam secara otomatis oleh skrip otomasi, bukan oleh pencatatan manual.
     
-    \item \textbf{Pada Lingkungan B (GitOps):} ArgoCD beroperasi secara otomatis; peneliti hanya memantau dan merekam data. Tidak ada keputusan operasional yang dibuat oleh peneliti pada lingkungan ini.
+    \item Pada Lingkungan B (GitOps): ArgoCD beroperasi secara otomatis; peneliti hanya memantau dan merekam data. Tidak ada keputusan operasional yang dibuat oleh peneliti pada lingkungan tersebut.
     
-    \item \textbf{Pencatatan data:} Seluruh pengukuran waktu (R2) dan konsistensi (R1) direkam oleh skrip otomasi, bukan oleh penilaian manusia. \textit{Traceability} (R3) didokumentasikan berdasarkan bukti objektif (log dan Git history) tanpa penilaian subjektif.
+    \item Pencatatan data: Seluruh pengukuran waktu (R2) dan konsistensi (R1) direkam oleh skrip otomasi, bukan oleh penilaian manusia. \textit{Traceability} (R3) didokumentasikan berdasarkan bukti objektif (log dan Git \textit{history}) tanpa penilaian subjektif.
 \end{enumerate}
 
-Batasan penggunaan operator tunggal diakui secara eksplisit sebagai ancaman terhadap validitas eksternal (dibahas pada \S~\ref{sec:ancaman-validitas}) dan direkomendasikan untuk replikasi dengan tim operator yang berbeda.
+Batasan penggunaan \textit{operator} tunggal diakui secara eksplisit sebagai ancaman terhadap validitas eksternal (dibahas pada \S~\ref{sec:ancaman-validitas}) dan direkomendasikan untuk replikasi dengan tim \textit{operator} yang berbeda.
+
+\subsection{Mitigasi Bias Keahlian \textit{Operator} pada Waktu Identifikasi Akar Masalah}
+\label{sec:keahlian-operator}
+
+Waktu identifikasi akar masalah (\textit{root cause identification time}, R2) pada Lingkungan A bergantung pada keahlian \textit{operator} dalam memeriksa log dan menganalisis perubahan. Perbedaan keahlian \textit{operator} dapat memengaruhi waktu yang terukur, yang berpotensi menjadi bias. Metodologi berikut diterapkan untuk memitigasi bias tersebut:
+
+\begin{enumerate}
+    \item \textit{Recovery runbook} terstandarisasi: Setiap langkah identifikasi akar masalah di-\textit{encode} dalam \textit{runbook} sebagai urutan pemeriksaan yang deterministik (mis. periksa \texttt{kubectl describe}, lalu \texttt{kubectl logs}, lalu \texttt{kubectl get events}), sehingga keahlian subjektif diminimalkan \citep{schlette2024playbook}.
+    
+    \item \textit{Practice run} sebelum pengumpulan data: \textit{Operator} melakukan pengulangan latihan hingga mencapai \textit{plateau} waktu identifikasi, memastikan efek pembelajaran (\textit{maturation}) telah stabil sebelum data resmi dikumpulkan.
+    
+    \item Pencatatan profil keahlian: Profil keahlian \textit{operator} (pengalaman Kubernetes, jumlah tahun, sertifikasi) didokumentasikan secara transparan untuk kontekstualisasi hasil.
+    
+    \item Rekomendasi replikasi multi-\textit{operator}: Batasan \textit{operator} tunggal diakui secara eksplisit, dan replikasi dengan \textit{operator} yang berbeda tingkat keahlian direkomendasikan sebagai penelitian lanjutan untuk mengvalidasi generalisasi temuan.
+\end{enumerate}
+
+Pada Lingkungan B, waktu identifikasi akar masalah tidak bergantung pada keahlian \textit{operator} karena ArgoCD menampilkan \textit{diff} antara \textit{state} Git dan \textit{state} klaster secara otomatis, sehingga akar masalah dapat langsung diidentifikasi tanpa analisis manual. Perbedaan struktural ini merupakan salah satu karakteristik paradigma yang dievaluasi, bukan bias yang perlu dieliminasi.
 
 \section{Skrip Otomasi Eksperimen}
 
 Untuk memastikan konsistensi prosedural dan mengurangi bias eksperimenter, empat kategori skrip otomasi dikembangkan:
 
-\subsection{Skrip \textit{Drift Injection} (\texttt{drift-inject.sh})}
+\subsection{Skrip Injeksi Penyimpangan (\texttt{drift-inject.sh})}
 
-Skrip ini mengotomasi \textit{injection} skenario drift pada kedua lingkungan:
+Skrip ini mengotomasi injeksi skenario penyimpangan pada kedua lingkungan:
 \begin{itemize}
     \item Memilih skenario secara acak dari himpunan \{A, B, C, D, E, F, G\}.
     \item Mengeksekusi perintah \texttt{kubectl} yang sesuai pada kedua lingkungan secara paralel.
-    \item Merekam \textit{timestamp} $t_0$ (waktu \textit{injection}) ke log terstruktur (JSON/CSV).
-    \item Memverifikasi bahwa drift berhasil diterapkan sebelum melanjutkan ke tahap pengukuran.
+    \item Merekam \textit{timestamp} $t_0$ (waktu injeksi) ke log terstruktur (JSON/CSV).
+    \item Memverifikasi bahwa penyimpangan berhasil diterapkan sebelum melanjutkan ke tahap pengukuran.
 \end{itemize}
 
 \subsection{Skrip Pengumpulan Metrik (\texttt{metrics-collect.sh})}
 
-Skrip ini melakukan polling berkala terhadap kedua lingkungan:
+Skrip ini melakukan \textit{polling} berkala terhadap kedua lingkungan:
 \begin{itemize}
-    \item \textbf{Lingkungan B:} Memanggil ArgoCD API (\texttt{argocd app get}) setiap 5 detik untuk mendeteksi perubahan status (\textit{Synced} $\rightarrow$ \textit{OutOfSync} $\rightarrow$ \textit{Synced}).
-    \item \textbf{Lingkungan A:} Menjalankan \texttt{kubectl get} dan \texttt{kubectl describe} secara berkala untuk memantau status sumber daya.
-    \item Merekam semua \textit{timestamp} secara otomatis (\textit{detection time} $t_d$, \textit{recovery time} $t_2$).
+    \item Lingkungan B: Memanggil ArgoCD API (\texttt{argocd app get}) setiap 5 detik untuk mendeteksi perubahan status (\textit{Synced} $\rightarrow$ \textit{OutOfSync} $\rightarrow$ \textit{Synced}).
+    \item Lingkungan A: Menjalankan \texttt{kubectl get} dan \texttt{kubectl describe} secara berkala untuk memantau status sumber daya.
+    \item Merekam semua \textit{timestamp} secara otomatis (waktu deteksi $t_d$, waktu pemulihan $t_2$).
     \item Menghitung skor konsistensi (R1) secara otomatis berdasarkan perbandingan \textit{state} aktual dengan \textit{desired state}.
 \end{itemize}
 
-\subsection{Skrip Verifikasi Baseline (\texttt{baseline-check.sh})}
+\subsection{Skrip Verifikasi \textit{Baseline} (\texttt{baseline-check.sh})}
 
 Skrip ini memverifikasi kondisi klaster sebelum setiap \textit{run} eksperimental:
 \begin{itemize}
-    \item Memeriksa bahwa semua \textit{pod} dalam status \textit{Running} dan \textit{healthy}.
-    \item Memastikan penggunaan CPU/memori node di bawah 70\% kapasitas.
+    \item Memeriksa bahwa semua \textit{pod} dalam status \textit{Running} dan sehat.
+    \item Memastikan penggunaan CPU/memori \textit{node} di bawah 70\% kapasitas.
     \item Memverifikasi bahwa ArgoCD menunjukkan status \textit{Synced/Healthy} pada Lingkungan B.
-    \item Menolak memulai eksperimen jika syarat baseline tidak terpenuhi; mencatat pelanggaran ke log.
+    \item Menolak memulai eksperimen jika syarat \textit{baseline} tidak terpenuhi; mencatat pelanggaran ke log.
 \end{itemize}
 
-\subsection{Skrip Recovery Runbook (\texttt{recovery-runbook.sh})}
+\subsection{Skrip \textit{Recovery Runbook} (\texttt{recovery-runbook.sh})}
 
-Skrip ini memandu operator pada Lingkungan A melalui prosedur \textit{recovery} yang terstandarisasi:
+Skrip ini memandu \textit{operator} pada Lingkungan A melalui prosedur pemulihan yang terstandarisasi:
 \begin{itemize}
-    \item Menampilkan langkah-langkah korektif secara berurutan sesuai jenis drift yang terjadi.
+    \item Menampilkan langkah-langkah korektif secara berurutan sesuai jenis penyimpangan yang terjadi.
     \item Merekam \textit{timestamp} awal dan akhir untuk setiap perintah \texttt{kubectl} yang dieksekusi.
     \item Menghitung jumlah perintah \texttt{kubectl} yang dieksekusi sebagai pengamatan pelengkap.
-    \item Memastikan operator tidak melompati langkah atau membuat keputusan di luar prosedur.
+    \item Memastikan \textit{operator} tidak melompati langkah atau membuat keputusan di luar prosedur.
 \end{itemize}
 
 Seluruh skrip akan dipublikasikan sebagai \textit{artifact} pendamping untuk mendukung reprodusibilitas penelitian.
@@ -170,62 +207,75 @@ Seluruh skrip akan dipublikasikan sebagai \textit{artifact} pendamping untuk men
 
 \subsection{Klaster Kubernetes}
 
-Penelitian menggunakan klaster Kubernetes yang dikelola Rancher dengan spesifikasi hardware sebagai berikut:
+Penelitian menggunakan klaster Kubernetes yang dikelola Rancher dengan spesifikasi \textit{hardware} berikut:
 
 \begin{itemize}
-    \item \textbf{Jumlah Node:} 3 node
-    \item \textbf{Total CPU:} 24 inti
-    \item \textbf{Total Memori:} $\sim$23 Gi
-    \item \textbf{Versi Kubernetes:} v1.29+
-    \item \textbf{\textit{Container Runtime}:} containerd
-    \item \textbf{Sistem Operasi Node:} Ubuntu 22.04 LTS
+    \item Jumlah \textit{Node}: 3 \textit{node}
+    \item Total CPU: 24 inti
+    \item Total Memori: $\sim$23 Gi
+    \item Versi Kubernetes: v1.29+
+    \item \textit{Container Runtime}: containerd
+    \item Sistem Operasi \textit{Node}: Ubuntu 22.04 LTS
 \end{itemize}
 
 \subsection{ArgoCD (Lingkungan B)}
 
 \begin{itemize}
-    \item \textbf{Versi ArgoCD:} v2.12+
-    \item \textbf{Konfigurasi \textit{Sync}:} \textit{Auto-sync} diaktifkan. Interval \textit{sync} ditetapkan pada 60 detik untuk konsistensi \textit{detection time}.
-    \item \textbf{Konfigurasi \textit{Self-Heal}:} Diaktifkan untuk seluruh eksperimen, sehingga ArgoCD secara otomatis mendeteksi dan mengoreksi drift.
-    \item \textbf{Konfigurasi \textit{Prune}:} \textit{Pruning} diaktifkan agar sumber daya yang dihapus secara manual (Skenario D) dapat dideteksi dan diciptakan kembali oleh ArgoCD.
+    \item Versi ArgoCD: v2.12+
+    \item Konfigurasi \textit{Sync}: \textit{Auto-sync} diaktifkan. Interval \textit{sync} ditetapkan pada 60 detik untuk konsistensi waktu deteksi.
+    \item Konfigurasi \textit{Self-Heal}: Diaktifkan untuk seluruh eksperimen, sehingga ArgoCD secara otomatis mendeteksi dan mengoreksi penyimpangan.
+    \item Konfigurasi \textit{Prune}: \textit{Pruning} diaktifkan agar sumber daya yang dihapus secara manual (Skenario D) dapat dideteksi dan diciptakan kembali oleh ArgoCD.
 \end{itemize}
 
-\subsection{Beban Uji (Workload)}
+\subsection{Beban Uji (\textit{Workload})}
 
-Deployment InvenioRDM dengan 16+ komponen: \textit{web}, \textit{worker}, PostgreSQL, OpenSearch, Redis, MinIO, Traefik, Cert-manager, Sealed Secrets, monitoring, \textit{backup}, dan kebijakan keamanan. InvenioRDM merupakan subjek uji, bukan objek penelitian.
+\textit{Workload} yang digunakan adalah kelas \textit{workload} komposit multi-service, direpresentasikan oleh deployment InvenioRDM dengan 16+ komponen: \textit{web}, \textit{worker}, PostgreSQL, OpenSearch, Redis, MinIO, Traefik, Cert-manager, Sealed Secrets, \textit{monitoring}, \textit{backup}, dan kebijakan keamanan. InvenioRDM berfungsi sebagai subjek uji, bukan objek penelitian.
+
+\subsection{Dataset dan Struktur Konfigurasi}
+
+Dataset dan struktur konfigurasi yang digunakan selama evaluasi mencakup:
+
+\begin{itemize}
+    \item Manifest Kubernetes deklaratif untuk seluruh komponen InvenioRDM (Helm \textit{chart} atau Kustomize \textit{manifests}), disimpan dalam repositori Git sebagai \textit{source of truth} untuk Lingkungan B.
+    \item Konfigurasi \textit{baseline} yang disamakan untuk kedua lingkungan: jumlah replika, versi \textit{image}, isi ConfigMap, dan Secret yang identik pada awal setiap \textit{run}.
+    \item Log terstruktur (JSON/CSV) yang merekam \textit{timestamp} $t_0$, $t_d$, $t_{rci}$, dan $t_2$ untuk setiap skenario dan pengulangan.
+    \item Snapshot status klaster (\texttt{kubectl get all}) sebelum dan setelah setiap skenario sebagai bukti konsistensi (R1).
+    \item Git \textit{commit history} (Lingkungan B) dan Kubernetes \textit{audit logs} (Lingkungan A) sebagai data \textit{traceability} (R3).
+\end{itemize}
 
 \subsection{Kontrol Variabel Pengganggu}
+\label{sec:kontrol-variabel}
 
 Agar validitas internal tetap tinggi, variabel berikut dikendalikan secara sistematis:
 
 \begin{enumerate}
-    \item \textbf{Interval \textit{Sync} ArgoCD:} Ditetapkan pada 60 detik (bukan default 180 detik) agar \textit{detection time} konsisten.
+    \item Interval \textit{Sync} ArgoCD: Ditetapkan pada 60 detik (bukan \textit{default} 180 detik) agar waktu deteksi konsisten.
     
-    \item \textbf{Tekanan Sumber Daya Node:} Rekam penggunaan CPU/memori klaster sebelum setiap pengujian. Hanya jalankan eksperimen jika node berada di bawah 70\% kapasitas.
+    \item Tekanan Sumber Daya \textit{Node}: Merekam penggunaan CPU/memori klaster sebelum setiap pengujian. Eksperimen hanya dijalankan jika \textit{node} berada di bawah 70\% kapasitas.
     
-    \item \textbf{Latensi Jaringan:} Gunakan klaster \textit{on-premise} dengan latensi stabil. Catat RTT antar-node.
+    \item Latensi Jaringan: Menggunakan klaster \textit{on-premise} dengan latensi stabil. RTT antar-\textit{node} dicatat.
     
-    \item \textbf{\textit{Drift Injection Time}:} \textit{Injection} selalu dilakukan pada interval \textit{sync} ArgoCD untuk menghindari \textit{edge case} waktu tunggu yang tidak dapat diprediksi.
+    \item Waktu Injeksi Penyimpangan: Injeksi selalu dilakukan pada interval \textit{sync} ArgoCD untuk menghindari \textit{edge case} waktu tunggu yang tidak dapat diprediksi.
     
-    \item \textbf{Versi ArgoCD:} Gunakan satu versi ArgoCD (v2.12+) sepanjang eksperimen.
+    \item Versi ArgoCD: Menggunakan satu versi ArgoCD (v2.12+) sepanjang eksperimen.
 \end{enumerate}
 
 \subsection{Protokol \textit{Monitoring} Variabel Terkontrol}
 
-Variabel pengganggu dipantau secara kontinu selama eksperimen menggunakan \texttt{baseline-check.sh} yang mencatat metrik sistem setiap 10 detik. Jika selama eksperimen terjadi pelanggaran batas (misalnya penggunaan CPU melebihi 70\%), eksperimen dihentikan, data dari \textit{run} tersebut dibuang, lingkungan dikalibrasi ulang ke baseline, dan \textit{run} diulang. Seluruh kejadian pelanggaran dicatat dalam log eksperimen untuk transparansi.
+Variabel pengganggu dipantau secara kontinu selama eksperimen menggunakan \texttt{baseline-check.sh} yang mencatat metrik sistem setiap 10 detik. Jika selama eksperimen terjadi pelanggaran batas (misalnya penggunaan CPU melebihi 70\%), eksperimen dihentikan, data dari \textit{run} tersebut dibuang, lingkungan dikalibrasi ulang ke \textit{baseline}, dan \textit{run} diulang. Seluruh kejadian pelanggaran dicatat dalam log eksperimen untuk transparansi.
 
 \section{Analisis Power dan Justifikasi Ukuran Sampel}
 
-Ukuran sampel ditentukan berdasarkan analisis \textit{power} \textit{a priori} menggunakan pendekatan berikut:
+Ukuran sampel ditentukan berdasarkan analisis \textit{power a priori} menggunakan pendekatan berikut:
 
 \begin{enumerate}
-    \item \textbf{Ukuran efek target:} Berdasarkan temuan \citet{kaggantinataraja2025security} yang melaporkan perbedaan substansial antara pendekatan deklaratif dan imperatif, ukuran efek besar ($d = 1{,}0$, Cohen's convention) digunakan sebagai estimasi konservatif.
+    \item Ukuran efek target: Berdasarkan temuan \citet{kaggantinataraja2025security} yang melaporkan perbedaan substansial antara pendekatan deklaratif dan imperatif, ukuran efek besar ($d = 1{,}0$, konvensi Cohen) digunakan sebagai estimasi konservatif.
     
-    \item \textbf{Power dan signifikansi:} \textit{Statistical power} ditetapkan pada $1 - \beta = 0{,}80$ dan $\alpha = 0{,}05$ (two-tailed).
+    \item \textit{Power} dan signifikansi: \textit{Statistical power} ditetapkan pada $1 - \beta = 0{,}80$ dan $\alpha = 0{,}05$ (\textit{two-tailed}).
     
-    \item \textbf{Ukuran sampel minimum (per grup):} Berdasarkan Cohen's convention untuk ukuran efek besar ($d = 1{,}0$), $\alpha = 0{,}05$, dan $\mathit{power} = 0{,}80$, ukuran sampel minimum per grup adalah $n = 17$ secara total per metrik \citep{cohen1988statistical}. Namun, karena setiap skenario diulang secara independen (7 skenario $\times$ $n$ pengulangan per skenario), jumlah total observasi per metrik per lingkungan adalah $7 \times n$.
+    \item Ukuran sampel minimum (per grup): Berdasarkan konvensi Cohen untuk ukuran efek besar ($d = 1{,}0$), $\alpha = 0{,}05$, dan \textit{power} $= 0{,}80$, ukuran sampel minimum per grup adalah $n = 17$ secara total per metrik \citep{cohen1988statistical}. Namun, karena setiap skenario diulang secara independen (7 skenario $\times$ $n$ pengulangan per skenario), jumlah total observasi per metrik per lingkungan adalah $7 \times n$.
     
-    \item \textbf{Pemilihan $n$ per skenario:} Untuk R2 (\textit{detection time}, \textit{recovery time}, dan \textit{root cause identification time}, metrik utama), dipilih $n = 10$ per skenario per lingkungan, menghasilkan $7 \times 10 = 70$ observasi per lingkungan, jauh melampaui minimum $n = 17$ secara total. Untuk R1 (konsistensi), dipilih $n = 5$ per skenario per lingkungan, menghasilkan $7 \times 5 = 35$ observasi per lingkungan, masih memadai untuk mendeteksi efek besar. R3 (\textit{traceability}) bersifat deskriptif dan tidak memerlukan ukuran sampel statistik. Jika hasil menunjukkan efek sedang ($d = 0{,}5$), pengulangan dapat ditambah pada tahap pengumpulan data tambahan.
+    \item Pemilihan $n$ per skenario: Untuk R2 (waktu deteksi, waktu pemulihan, dan waktu identifikasi akar masalah, metrik utama), dipilih $n = 10$ per skenario per lingkungan, menghasilkan $7 \times 10 = 70$ observasi per lingkungan, jauh melampaui minimum $n = 17$ secara total. Untuk R1 (konsistensi), dipilih $n = 5$ per skenario per lingkungan, menghasilkan $7 \times 5 = 35$ observasi per lingkungan, masih memadai untuk mendeteksi efek besar. R3 (\textit{traceability}) bersifat deskriptif dan tidak memerlukan ukuran sampel statistik. Jika hasil menunjukkan efek sedang ($d = 0{,}5$), pengulangan dapat ditambah pada tahap pengumpulan data tambahan.
 \end{enumerate}
 
 \section{Matriks Eksperimen}
@@ -239,45 +289,45 @@ Tabel~\ref{tab:matriks-eksperimen} menunjukkan rancangan eksperimental secara ke
   \label{tab:matriks-eksperimen}
   \begin{tabular}{|>{\raggedright\arraybackslash}p{2.2cm}|>{\raggedright\arraybackslash}p{5.3cm}|>{\raggedright\arraybackslash}p{5.3cm}|}
     \hline
-    \textbf{Dimensi} & \textbf{Lingkungan A (Manual)} & \textbf{Lingkungan B (GitOps)} \\
+    Dimensi & Lingkungan A (Manual) & Lingkungan B (GitOps) \\
     \hline
-    \textbf{Paradigma} & \texttt{kubectl} imperatif & ArgoCD deklaratif + Git \\
+    Paradigma & \texttt{kubectl} imperatif & ArgoCD deklaratif + Git \\
     \hline
-    \textbf{Intervensi} & Skenario drift A--G (identik) & Skenario drift A--G (identik) \\
+    Intervensi & Skenario penyimpangan A--G (identik) & Skenario penyimpangan A--G (identik) \\
     \hline
-    \textbf{Pengulangan} & n = 5 per skenario (R1); n = 10 per skenario (R2); R3 deskriptif & n = 5 per skenario (R1); n = 10 per skenario (R2); R3 deskriptif \\
+    Pengulangan & $n = 5$ per skenario (R1); $n = 10$ per skenario (R2); R3 deskriptif & $n = 5$ per skenario (R1); $n = 10$ per skenario (R2); R3 deskriptif \\
     \hline
-    \textbf{Metrik} & R1, R2, R3 & R1, R2, R3 \\
+    Metrik & R1, R2, R3 & R1, R2, R3 \\
     \hline
-    \textbf{Baseline} & \texttt{kubectl get} semua sumber daya sebelum drift & ArgoCD \textit{App status} sebelum drift \\
+    \textit{Baseline} & \texttt{kubectl get} semua sumber daya sebelum penyimpangan & ArgoCD \textit{App status} sebelum penyimpangan \\
     \hline
   \end{tabular}
 \end{table}
 
-\section{Skenario Drift Terkontrol}
+\section{Skenario Penyimpangan Terkontrol}
 
-Tujuh skenario drift dirancang untuk merepresentasikan kesalahan operasional yang umum. Setiap skenario dieksekusi secara identik pada kedua lingkungan. Untuk Lingkungan A, operator kemudian memulihkan secara manual mengikuti \textit{recovery runbook}. Untuk Lingkungan B, ArgoCD secara otomatis mendeteksi dan memulihkan \textit{drift} (\textit{self-heal} aktif).
+Tujuh skenario penyimpangan dirancang untuk merepresentasikan kesalahan operasional yang umum. Pemilihan skenario didasarkan pada taksonomi \textit{defect} konfigurasi Kubernetes oleh \citet{zhang2026configuration} dan praktik operasional yang dilaporkan oleh \citet{pohjola2025mitigating}, yang mengidentifikasi kategori kesalahan operasional berulang pada platform berbasis konfigurasi deklaratif. Setiap skenario dieksekusi secara identik pada kedua lingkungan. Untuk Lingkungan A, \textit{operator} kemudian memulihkan secara manual mengikuti \textit{recovery runbook}. Untuk Lingkungan B, ArgoCD secara otomatis mendeteksi dan memulihkan penyimpangan (\textit{self-heal} aktif).
 
-\subsection{Skenario A: Perubahan Replika (Replica Drift)}
-Secara manual mengubah jumlah replika Deployment menggunakan \texttt{kubectl\allowbreak{} scale\allowbreak{} deployment/nama-deployment\allowbreak{} --replicas=5} ketika \textit{desired} adalah 3. Perubahan ini melewati Git pada Lingkungan B.
+\subsection{Skenario A: Perubahan Replika (\textit{Replica Drift})}
+Secara manual mengubah jumlah replika \textit{Deployment} menggunakan \texttt{kubectl\allowbreak{} scale\allowbreak{} deployment/nama-deployment\allowbreak{} --replicas=5} ketika \textit{desired} adalah 3. Perubahan tersebut melewati Git pada Lingkungan B.
 
-\subsection{Skenario B: Perubahan Image (Image Drift)}
-Secara manual mengganti versi image kontainer pada Deployment menggunakan \texttt{kubectl\allowbreak{} edit\allowbreak{} deployment/nama-deployment} dan mengubah kolom \texttt{image} ke versi yang berbeda.
+\subsection{Skenario B: Perubahan \textit{Image} (\textit{Image Drift})}
+Secara manual mengganti versi \textit{image} kontainer pada \textit{Deployment} menggunakan \texttt{kubectl\allowbreak{} edit\allowbreak{} deployment/nama-deployment} dan mengubah kolom \texttt{image} ke versi yang berbeda.
 
-\subsection{Skenario C: Perubahan ConfigMap (ConfigMap Drift)}
+\subsection{Skenario C: Perubahan ConfigMap (\textit{ConfigMap Drift})}
 Mengubah isi ConfigMap langsung di dalam klaster menggunakan \texttt{kubectl\allowbreak{} edit\allowbreak{} configmap/nama-configmap}. Memodifikasi parameter konfigurasi seperti \texttt{DATABASE\_URL} atau \texttt{LOG\_LEVEL}.
 
-\subsection{Skenario D: \textit{Resource Deletion}}
-Menghapus Deployment atau Service secara manual menggunakan \texttt{kubectl\allowbreak{} delete\allowbreak{} deployment/nama-deployment}. Untuk Lingkungan B, ArgoCD dengan \textit{prune} aktif akan mendeteksi sumber daya yang hilang dan menciptakan ulang dari manifest Git.
+\subsection{Skenario D: Penghapusan Sumber Daya (\textit{Resource Deletion})}
+Menghapus \textit{Deployment} atau \textit{Service} secara manual menggunakan \texttt{kubectl\allowbreak{} delete\allowbreak{} deployment/nama-deployment}. Untuk Lingkungan B, ArgoCD dengan \textit{prune} aktif akan mendeteksi sumber daya yang hilang dan menciptakan ulang dari manifest Git.
 
-\subsection{Skenario E: Patch Manual Tidak Sah (Unauthorized Manual Patch)}
-Menerapkan \texttt{kubectl patch} langsung terhadap sumber daya yang dikelola, mis. mengubah \textit{resource limits} pada sebuah Pod menggunakan patch JSON.
+\subsection{Skenario E: \textit{Patch} Manual Tidak Sah (\textit{Unauthorized Manual Patch})}
+Menerapkan \texttt{kubectl patch} langsung terhadap sumber daya yang dikelola, mis. mengubah \textit{resource limits} pada sebuah \textit{Pod} menggunakan \textit{patch} JSON.
 
-\subsection{Skenario F: Drift Lintas Namespace (Cross-namespace Drift)}
-Menerapkan sumber daya ke namespace yang salah secara manual. Mengukur apakah GitOps membatasi propagasi atau mendeteksi kesalahan namespace secara otomatis. Contoh: \texttt{kubectl\allowbreak{} apply\allowbreak{} -f\allowbreak{} deployment.yaml\allowbreak{} --namespace=wrong-namespace}.
+\subsection{Skenario F: Penyimpangan Lintas \textit{Namespace} (\textit{Cross-namespace Drift})}
+Menerapkan sumber daya ke \textit{namespace} yang salah secara manual. Mengukur apakah GitOps membatasi propagasi atau mendeteksi kesalahan \textit{namespace} secara otomatis. Contoh: \texttt{kubectl\allowbreak{} apply\allowbreak{} -f\allowbreak{} deployment.yaml\allowbreak{} --namespace=wrong-namespace}.
 
-\subsection{Skenario G: Perubahan Secret (Secret Drift)}
-Mengubah secret secara manual di luar Git. Skenario ini sangat umum dalam praktik produksi. Contoh perintah:
+\subsection{Skenario G: Perubahan Secret (\textit{Secret Drift})}
+Mengubah \textit{secret} secara manual di luar Git. Skenario tersebut umum dalam praktik produksi. Contoh perintah:
 
 \begin{lstlisting}[language=bash, caption={Contoh perubahan Secret}]
 kubectl patch secret my-secret \
@@ -286,28 +336,28 @@ kubectl patch secret my-secret \
 
 \section{Protokol Pengukuran}
 
-\subsection{Protokol Pengukuran Baseline (O1)}
+\subsection{Protokol Pengukuran \textit{Baseline} (O1)}
 Sebelum setiap \textit{run}:
 \begin{enumerate}
   \item Jalankan \texttt{baseline-check.sh} untuk memverifikasi kondisi klaster.
-  \item Verifikasi semua \textit{pod} dalam status \textit{Running} dan \textit{healthy}.
+  \item Verifikasi semua \textit{pod} dalam status \textit{Running} dan sehat.
   \item Catat \textit{timestamp} awal.
-  \item Simpan output \texttt{kubectl get all -n <namespace>} (Lingkungan A) atau \texttt{argocd app list} (Lingkungan B) sebagai baseline.
+  \item Simpan output \texttt{kubectl get all -n <namespace>} (Lingkungan A) atau \texttt{argocd app list} (Lingkungan B) sebagai \textit{baseline}.
   \item Verifikasi variabel pengganggu berada dalam batas (CPU $< 70\%$, RTT stabil).
 \end{enumerate}
 
-\subsection{Protokol \textit{Drift Injection} (X)}
+\subsection{Protokol Injeksi Penyimpangan (X)}
 \begin{enumerate}
   \item Jalankan \texttt{drift-inject.sh} yang memilih skenario secara acak dari daftar \{A, B, C, D, E, F, G\}.
-  \item Skrip mengeksekusi perintah \textit{drift injection} pada kedua lingkungan secara paralel.
-  \item Skrip mencatat \textit{timestamp} $t_0$ (waktu eksekusi perintah \textit{injection}) secara otomatis.
+  \item Skrip mengeksekusi perintah injeksi penyimpangan pada kedua lingkungan secara paralel.
+  \item Skrip mencatat \textit{timestamp} $t_0$ (waktu eksekusi perintah injeksi) secara otomatis.
 \end{enumerate}
 
-\subsection{Protokol Pengukuran Pasca-\textit{Injection} (O2)}
+\subsection{Protokol Pengukuran Pasca-Injeksi (O2)}
 \begin{enumerate}
-  \item \textbf{Untuk Lingkungan B (GitOps):} \texttt{metrics-collect.sh} memantau status ArgoCD setiap 5 detik. Catat: (a) waktu ArgoCD menunjukkan \textit{OutOfSync} (\textit{detection}); (b) waktu ArgoCD menunjukkan \textit{Synced} setelah \textit{auto-heal} (\textit{recovery}); (c) waktu yang diperlukan untuk mengidentifikasi akar masalah dari \textit{diff} yang ditampilkan ArgoCD (\textit{root cause identification}). Hitung $t_d - t_0$ (\textit{detection time}), $t_2 - t_0$ (\textit{total recovery time}), dan $t_{rci} - t_d$ (\textit{root cause identification time}).
+  \item Untuk Lingkungan B (GitOps): \texttt{metrics-collect.sh} memantau status ArgoCD setiap 5 detik. Catat: (a) waktu ArgoCD menunjukkan \textit{OutOfSync} (deteksi); (b) waktu ArgoCD menunjukkan \textit{Synced} setelah \textit{auto-heal} (pemulihan); (c) waktu yang diperlukan untuk mengidentifikasi akar masalah dari \textit{diff} yang ditampilkan ArgoCD (identifikasi akar masalah). Hitung $t_d - t_0$ (waktu deteksi), $t_2 - t_0$ (total waktu pemulihan), dan $t_{rci} - t_d$ (waktu identifikasi akar masalah).
   
-  \item \textbf{Untuk Lingkungan A (Manual):} Operator menjalankan \texttt{recovery-runbook.sh} yang memandu \textit{recovery} berdasarkan jenis drift. \texttt{metrics-collect.sh} mencatat waktu eksekusi setiap perintah korektif. Catat: (a) waktu operator mendeteksi deviasi (\textit{detection}); (b) waktu operator menyelesaikan seluruh perintah korektif (\textit{recovery}); (c) waktu operator mengidentifikasi penyebab drift melalui pemeriksaan log dan \texttt{kubectl describe} (\textit{root cause identification}). Hitung $t_d - t_0$, $t_2 - t_0$, dan $t_{rci} - t_d$.
+  \item Untuk Lingkungan A (Manual): \textit{Operator} menjalankan \texttt{recovery-runbook.sh} yang memandu pemulihan berdasarkan jenis penyimpangan. \texttt{metrics-collect.sh} mencatat waktu eksekusi setiap perintah korektif. Catat: (a) waktu \textit{operator} mendeteksi deviasi (deteksi); (b) waktu \textit{operator} menyelesaikan seluruh perintah korektif (pemulihan); (c) waktu \textit{operator} mengidentifikasi penyebab penyimpangan melalui pemeriksaan log dan \texttt{kubectl describe} (identifikasi akar masalah). Hitung $t_d - t_0$, $t_2 - t_0$, dan $t_{rci} - t_d$.
   
   \item Catat jumlah perintah \texttt{kubectl} yang diperlukan sebagai pengamatan pelengkap, direkam otomatis oleh \texttt{recovery-runbook.sh}.
   
@@ -325,15 +375,15 @@ Sebelum setiap \textit{run}:
   \label{tab:e1}
   \begin{tabular}{|l|p{9cm}|}
     \hline
-    \textbf{Parameter} & \textbf{Deskripsi} \\
+    Parameter & Deskripsi \\
     \hline
     Metrik & Persentase sumber daya yang cocok dengan \textit{desired declarative state} \\
     \hline
-    Cara Ukur & Hitung jumlah sumber daya Healthy/Synced dibagi total \textit{expected resources} \\
+    Cara Ukur & Hitung jumlah sumber daya \textit{Healthy/Synced} dibagi total \textit{expected resources} \\
     \hline
     Paradigma & (a) Manual/\texttt{kubectl}, (b) GitOps/ArgoCD \\
     \hline
-    Pengulangan & n = 5 per skenario per lingkungan \\
+    Pengulangan & $n = 5$ per skenario per lingkungan \\
     \hline
   \end{tabular}
 \end{table}
@@ -347,15 +397,15 @@ Sebelum setiap \textit{run}:
   \label{tab:e2}
   \begin{tabular}{|l|p{9cm}|}
     \hline
-    \textbf{Parameter} & \textbf{Deskripsi} \\
+    Parameter & Deskripsi \\
     \hline
-    Metrik & \textit{Detection time} ($t_d - t_0$), \textit{Recovery time} ($t_2 - t_0$), \textit{Root cause identification time} ($t_{rci} - t_d$) \\
+    Metrik & Waktu deteksi ($t_d - t_0$), Waktu pemulihan ($t_2 - t_0$), Waktu identifikasi akar masalah ($t_{rci} - t_d$) \\
     \hline
-    Cara Ukur & Lingkungan B: ArgoCD API \textit{polling} setiap 5 detik; Lingkungan A: \texttt{kubectl commands} + \textit{operator runbook} \\
+    Cara Ukur & Lingkungan B: ArgoCD API \textit{polling} setiap 5 detik; Lingkungan A: perintah \texttt{kubectl} + \textit{operator runbook} \\
     \hline
     Paradigma & (a) Manual/\texttt{kubectl}, (b) GitOps/ArgoCD (\textit{self-heal} aktif) \\
     \hline
-    Pengulangan & n = 10 per skenario per lingkungan \\
+    Pengulangan & $n = 10$ per skenario per lingkungan \\
     \hline
   \end{tabular}
 \end{table}
@@ -369,7 +419,7 @@ Sebelum setiap \textit{run}:
   \label{tab:e3}
   \begin{tabular}{|l|p{9cm}|}
     \hline
-    \textbf{Parameter} & \textbf{Deskripsi} \\
+    Parameter & Deskripsi \\
     \hline
     Metrik & Kelengkapan \textit{audit log} (\%), kemudahan identifikasi akar masalah (deskriptif) \\
     \hline
@@ -384,19 +434,19 @@ Sebelum setiap \textit{run}:
 
 \section{Analisis Statistik Komparatif}
 
-Analisis ini bersifat eksploratif-komparatif, bukan konfirmatoris. Tujuannya adalah mengkarakterisasi perbedaan antara kedua paradigma deployment dan mengukur besarnya efek yang teramati, bukan menguji hipotesis nol secara formal.
+Analisis ini bersifat eksploratif-komparatif, bukan konfirmatoris. Tujuannya adalah mengkarakterisasi perbedaan antara kedua paradigma \textit{deployment} dan mengukur besarnya efek yang teramati, bukan menguji hipotesis nol secara formal.
 
 Setelah pengumpulan data selesai, analisis statistik dilakukan dengan langkah berikut:
 
 \begin{enumerate}
-    \item \textbf{Statistik Deskriptif:} Hitung mean, median, rentang, dan deviasi standar untuk setiap metrik per lingkungan per skenario. Presentasikan dalam bentuk \textit{box plot} per skenario dan per metrik.
+    \item Statistik Deskriptif: Hitung \textit{mean}, median, rentang, dan deviasi standar untuk setiap metrik per lingkungan per skenario. Presentasikan dalam bentuk \textit{box plot} per skenario dan per metrik.
     
-    \item \textbf{Uji Perbandingan:} Terapkan \textit{Mann--Whitney U test} untuk membandingkan setiap metrik antara Lingkungan A dan Lingkungan B. Uji ini dipilih karena tidak mengasumsikan distribusi normal dan cocok untuk ukuran sampel yang digunakan dalam penelitian ini. Tingkat signifikansi ditetapkan pada $\alpha = 0{,}05$.
+    \item Uji Perbandingan: Terapkan \textit{Mann--Whitney U test} untuk membandingkan setiap metrik antara Lingkungan A dan Lingkungan B. Uji tersebut dipilih karena tidak mengasumsikan distribusi normal dan cocok untuk ukuran sampel yang digunakan. Tingkat signifikansi ditetapkan pada $\alpha = 0{,}05$.
     
-    \item \textbf{Ukuran Efek:} Hitung Cohen's $d$ sebagai ukuran efek standar yang menunjukkan besarnya perbedaan praktis antara kedua kelompok. Interpretasi mengikuti konvensi Cohen: $|d| < 0{,}2$ (efek kecil), $|d| \approx 0{,}5$ (efek sedang), $|d| > 0{,}8$ (efek besar).
+    \item Ukuran Efek: Hitung Cohen's $d$ sebagai ukuran efek standar yang menunjukkan besarnya perbedaan praktis antara kedua kelompok. Interpretasi mengikuti konvensi Cohen: $|d| < 0{,}2$ (efek kecil), $|d| \approx 0{,}5$ (efek sedang), $|d| > 0{,}8$ (efek besar).
 \end{enumerate}
 
-Metrik R3 (\textit{Traceability}) dinilai secara deskriptif dan tidak diuji secara statistik.
+Metrik R3 (\textit{traceability}) dinilai secara deskriptif dan tidak diuji secara statistik.
 
 \section{Ancaman terhadap Validitas}
 \label{sec:ancaman-validitas}
@@ -406,41 +456,41 @@ Berikut adalah identifikasi ancaman terhadap validitas beserta strategi mitigasi
 \subsection{Validitas Internal}
 
 \begin{enumerate}
-    \item \textbf{Seleksi (\textit{Selection Bias}):} Kedua lingkungan tidak ditugaskan secara acak dari populasi, melainkan peneliti membangun keduanya secara deliberatif. \textit{Mitigasi:} Lingkungan A dan B dibangun pada klaster identik dengan konfigurasi yang disamakan; satu-satunya perbedaan adalah paradigma deployment (variabel independen).
+    \item Seleksi (\textit{Selection Bias}): Kedua lingkungan tidak ditugaskan secara acak dari populasi, melainkan peneliti membangun keduanya secara deliberatif. Mitigasi: Lingkungan A dan B dibangun pada klaster identik dengan konfigurasi yang disamakan; satu-satunya perbedaan adalah paradigma \textit{deployment} (variabel independen).
     
-    \item \textbf{Operator Tunggal (\textit{Single Operator Bias}):} Peneliti bertindak sebagai satu-satunya operator pada Lingkungan A, yang dapat membatasi generalisasi. \textit{Mitigasi:} (a)~Operator mengikuti \textit{recovery runbook} yang terstandarisasi, sehingga keputusan subjektif diminimalkan; (b)~seluruh \textit{timestamp} direkam oleh skrip otomasi, bukan oleh manusia; (c)~metrik yang tidak bergantung pada operator (R1 konsistensi, R2 deteksi otomatis ArgoCD) memberikan pengukuran objektif; (d)~batasan ini diakui secara eksplisit dan direkomendasikan untuk replikasi dengan operator berbeda.
+    \item \textit{Operator} Tunggal (\textit{Single Operator Bias}): Peneliti bertindak sebagai satu-satunya \textit{operator} pada Lingkungan A, yang dapat membatasi generalisasi. Mitigasi: (a)~\textit{Operator} mengikuti \textit{recovery runbook} yang terstandarisasi, sehingga keputusan subjektif diminimalkan; (b)~seluruh \textit{timestamp} direkam oleh skrip otomasi, bukan oleh manusia; (c)~metrik yang tidak bergantung pada \textit{operator} (R1 konsistensi, R2 deteksi otomatis ArgoCD) memberikan pengukuran objektif; (d)~batasan ini diakui secara eksplisit dan direkomendasikan untuk replikasi dengan \textit{operator} berbeda.
     
-    \item \textbf{Maturasi (\textit{Maturation}):} Kinerja operator dapat membaik sepanjang eksperimen karena pembelajaran. \textit{Mitigasi:} Urutan skenario diacak; data pembelajaran operator dicatat; \textit{practice run} dilakukan sebelum pengumpulan data resmi.
+    \item Maturasi (\textit{Maturation}): Kinerja \textit{operator} dapat membaik sepanjang eksperimen karena pembelajaran. Mitigasi: Urutan skenario diacak; data pembelajaran \textit{operator} dicatat; \textit{practice run} dilakukan sebelum pengumpulan data resmi.
     
-    \item \textbf{Instrumentasi:} Perubahan pada alat ukur selama eksperimen (mis. pembaruan ArgoCD). \textit{Mitigasi:} Seluruh versi software (ArgoCD, Kubernetes, InvenioRDM) dikunci sebelum eksperimen dimulai dan tidak diperbarui selama pengumpulan data.
+    \item Instrumentasi: Perubahan pada alat ukur selama eksperimen (mis. pembaruan ArgoCD). Mitigasi: Seluruh versi \textit{software} (ArgoCD, Kubernetes, InvenioRDM) dikunci sebelum eksperimen dimulai dan tidak diperbarui selama pengumpulan data.
     
-    \item \textbf{Efek Pengujian (\textit{Testing}):} Operator mungkin berubah perilakunya karena sadar sedang diobservasi (\textit{Hawthorne effect}). \textit{Mitigasi:} Operator mengikuti \textit{recovery runbook} terstandarisasi; waktu reaksi direkam oleh skrip, bukan oleh penilaian manusia.
+    \item Efek Pengujian (\textit{Testing}): \textit{Operator} mungkin berubah perilakunya karena sadar sedang diobservasi (\textit{Hawthorne effect}). Mitigasi: \textit{Operator} mengikuti \textit{recovery runbook} terstandarisasi; waktu reaksi direkam oleh skrip, bukan oleh penilaian manusia.
 \end{enumerate}
 
 \subsection{Validitas Eksternal}
 
 \begin{enumerate}
-    \item \textbf{Kekhususan Konteks:} Hasil mungkin tidak generalisasi ke klaster berukuran besar, \textit{workload} yang berbeda, atau tim operator yang lebih besar. \textit{Mitigasi:} Dokumentasikan seluruh karakteristik klaster, \textit{workload}, dan operator secara transparan; gunakan InvenioRDM yang mewakili kelas \textit{workload} multi-service umum.
+    \item Kekhususan Konteks: Hasil mungkin tidak generalisasi ke klaster berukuran besar, \textit{workload} yang berbeda, atau tim \textit{operator} yang lebih besar. Mitigasi: Dokumentasikan seluruh karakteristik klaster, \textit{workload}, dan \textit{operator} secara transparan; gunakan InvenioRDM yang mewakili kelas \textit{workload} komposit multi-service.
     
-    \item \textbf{Interaksi Seleksi dan Perlakuan:} Efek paradigma deployment mungkin spesifik untuk tingkat keahlian operator dalam penelitian ini. \textit{Mitigasi:} Catat profil keahlian operator; rekomendasikan replikasi dengan tim yang berbeda.
+    \item Interaksi Seleksi dan Perlakuan: Efek paradigma \textit{deployment} mungkin spesifik untuk tingkat keahlian \textit{operator} dalam penelitian. Mitigasi: Catat profil keahlian \textit{operator}; rekomendasikan replikasi dengan tim yang berbeda.
     
-    \item \textbf{Operator Tunggal:} Penggunaan satu operator membatasi generalisasi ke konteks tim yang beragam. \textit{Mitigasi:} Standarisasi prosedur melalui runbook dan skrip otomasi; dokumentasikan batasan secara eksplisit; rekomendasikan replikasi multi-operator sebagai penelitian lanjutan.
+    \item \textit{Operator} Tunggal: Penggunaan satu \textit{operator} membatasi generalisasi ke konteks tim yang beragam. Mitigasi: Standarisasi prosedur melalui \textit{runbook} dan skrip otomasi; dokumentasikan batasan secara eksplisit; rekomendasikan replikasi multi-\textit{operator} sebagai penelitian lanjutan.
 \end{enumerate}
 
 \subsection{Validitas Konstruk}
 
 \begin{enumerate}
-    \item \textbf{Bias Operasi Tunggal (\textit{Mono-operation Bias}):} Menggunakan satu \textit{workload} (InvenioRDM) dan satu alat GitOps (ArgoCD). \textit{Mitigasi:} InvenioRDM dipilih karena kompleksitas yang mewakili kelas \textit{workload} multi-service; ArgoCD merupakan implementasi GitOps yang paling banyak digunakan.
+    \item Bias Operasi Tunggal (\textit{Mono-operation Bias}): Menggunakan satu \textit{workload} (InvenioRDM sebagai instans kelas \textit{workload} komposit multi-service) dan satu alat GitOps (ArgoCD). Mitigasi: InvenioRDM dipilih karena kompleksitas yang mewakili kelas \textit{workload} komposit multi-service; ArgoCD merupakan implementasi GitOps yang paling banyak digunakan.
     
-    \item \textbf{Bias Metode Tunggal (\textit{Mono-method Bias}):} Metrik R1 dan R2 diukur secara otomatis oleh skrip otomasi; R3 bersifat deskriptif dan didokumentasikan berdasarkan bukti objektif (log dan Git history). \textit{Mitigasi:} Seluruh metrik kuantitatif menggunakan pengukuran objektif berbasis \textit{timestamp}; R3 dideskripsikan berdasarkan data yang dapat diverifikasi secara independen.
+    \item Bias Metode Tunggal (\textit{Mono-method Bias}): Metrik R1 dan R2 diukur secara otomatis oleh skrip otomasi; R3 bersifat deskriptif dan didokumentasikan berdasarkan bukti objektif (log dan Git \textit{history}). Mitigasi: Seluruh metrik kuantitatif menggunakan pengukuran objektif berbasis \textit{timestamp}; R3 dideskripsikan berdasarkan data yang dapat diverifikasi secara independen.
     
-    \item \textbf{Operasionalisasi Konstruk:} Definisi ``drift'' dibatasi pada 7 skenario yang merepresentasikan kesalahan operasional umum. \textit{Mitigasi:} Skenario dirancang berdasarkan taksonomi \citet{zhang2026configuration} dan praktik yang dilaporkan oleh \citet{pohjola2025mitigating}; batasan ini diakui secara eksplisit.
+    \item Operasionalisasi Konstruk: Definisi ``penyimpangan konfigurasi'' dibatasi pada 7 skenario yang merepresentasikan kesalahan operasional umum. Mitigasi: Skenario dirancang berdasarkan taksonomi \citet{zhang2026configuration} dan praktik yang dilaporkan oleh \citet{pohjola2025mitigating}; batasan ini diakui secara eksplisit.
 \end{enumerate}
 
 \subsection{Reliabilitas}
 
 \begin{enumerate}
-    \item \textbf{Reliabilitas Pengukuran:} Pengukuran waktu (R2) bergantung pada presisi \textit{logging} \textit{timestamp}. \textit{Mitigasi:} Semua \textit{timestamp} direkam secara otomatis oleh skrip otomasi; akurasi diverifikasi dengan Clock \textit{synchronization} (NTP).
+    \item Reliabilitas Pengukuran: Pengukuran waktu (R2) bergantung pada presisi pencatatan \textit{timestamp}. Mitigasi: Semua \textit{timestamp} direkam secara otomatis oleh skrip otomasi; akurasi diverifikasi dengan sinkronisasi jam (NTP).
     
-    \item \textbf{Reliabilitas Replikasi:} Pihak lain harus dapat mereplikasi eksperimen. \textit{Mitigasi:} Protokol eksperimen didokumentasikan secara rinci; konfigurasi klaster, versi software, dan seluruh skrip otomasi (\texttt{drift-inject.sh}, \texttt{metrics-collect.sh}, \texttt{baseline-check.sh}, \texttt{recovery-runbook.sh}) akan dipublikasikan sebagai \textit{artifact} pendamping.
+    \item Reliabilitas Replikasi: Pihak lain harus dapat mereplikasi eksperimen. Mitigasi: Protokol eksperimen didokumentasikan secara rinci; konfigurasi klaster, versi \textit{software}, dan seluruh skrip otomasi (\texttt{drift-inject.sh}, \texttt{metrics-collect.sh}, \texttt{baseline-check.sh}, \texttt{recovery-runbook.sh}) akan dipublikasikan sebagai \textit{artifact} pendamping.
 \end{enumerate}
