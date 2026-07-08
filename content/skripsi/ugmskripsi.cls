@@ -31,7 +31,7 @@
 \ExecuteOptions{skripsi,satusetengahspasi,indonesia}
 \ProcessOptions
 \LoadClass[a4paper,12pt]{report}
-\RequirePackage{natbib}
+\RequirePackage[authoryear,round]{natbib}
 \bibliographystyle{plainnat}
 \RequirePackage{nomencl}%
 \renewcommand{\nomname}{\nomenclaturename}%
