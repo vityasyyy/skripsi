@@ -2,7 +2,7 @@
 
 \section{Deskripsi Umum Penelitian}
 
-Penelitian yang diuraikan dalam proposal ini mengevaluasi secara empiris dampak skenario penyimpangan konfigurasi terhadap karakteristik operasional \textit{deployment} pada dua paradigma manajemen yang berbeda, yaitu manual dan GitOps, pada sebuah klaster Kubernetes. Evaluasi dilakukan dengan membandingkan dua lingkungan paralel: Lingkungan A (\textit{deployment} manual menggunakan \texttt{kubectl}) dan Lingkungan B (\textit{deployment} GitOps menggunakan ArgoCD). Pada kedua lingkungan, penyimpangan konfigurasi di-\textit{inject} secara terkontrol melalui tujuh skenario yang dirancang untuk merepresentasikan kesalahan operasional yang umum terjadi. Hasil pengukuran terhadap tiga metrik utama (konsistensi \textit{deployment}, waktu deteksi/pemulihan/identifikasi akar masalah, dan \textit{traceability}) dianalisis menggunakan uji statistik komparatif untuk mengkarakterisasi perbedaan antara kedua paradigma. Hasil evaluasi tersebut selanjutnya menjadi dasar rekomendasi paradigma manajemen \textit{deployment} bagi praktisi industri.
+Penelitian yang diuraikan dalam proposal ini mengevaluasi secara empiris dampak skenario penyimpangan konfigurasi terhadap karakteristik operasional \textit{deployment} pada dua paradigma manajemen yang berbeda, yaitu manual dan GitOps, pada sebuah klaster Kubernetes. Evaluasi dilakukan dengan membandingkan dua lingkungan paralel: Lingkungan A (\textit{deployment} manual menggunakan \texttt{kubectl}) dan Lingkungan B (\textit{deployment} GitOps menggunakan ArgoCD). Pada kedua lingkungan, penyimpangan konfigurasi di-\textit{inject} secara terkontrol melalui tujuh skenario yang dirancang untuk merepresentasikan kesalahan operasional yang umum terjadi. Hasil pengukuran terhadap tiga metrik utama (konsistensi \textit{deployment}, waktu deteksi/pemulihan/identifikasi akar masalah, dan \textit{traceability}) dianalisis menggunakan uji statistik komparatif untuk mengkarakterisasi perbedaan antara kedua paradigma. Hasil evaluasi tersebut mengkarakterisasi besarnya dan kondisi perbedaan antara kedua paradigma, yang selanjutnya menjadi dasar rekomendasi pemilihan paradigma \textit{deployment} bagi praktisi industri.
 
 \begin{figure}[H]
   \centering
@@ -113,7 +113,7 @@ Untuk memastikan bahwa perbandingan antara paradigma manual dan GitOps bersifat 
 \begin{enumerate}
     \item Identitas Klaster: Kedua lingkungan dibangun pada klaster Kubernetes yang identik dengan spesifikasi \textit{hardware}, versi Kubernetes, \textit{container runtime}, dan sistem operasi \textit{node} yang sama. Hal ini mengeliminasi perbedaan akibat infrastruktur fisik.
     
-    \item Identitas \textit{Workload}: Kedua lingkungan menjalankan \textit{deployment} yang sama (InvenioRDM sebagai instans kelas \textit{workload} komposit multi-service) dengan konfigurasi manifest yang identik. Hal ini mengeliminasi perbedaan akibat kompleksitas atau jenis aplikasi.
+    \item Identitas \textit{Workload}: Kedua lingkungan menjalankan \textit{deployment} yang sama (beban uji kelas \textit{workload} komposit multi-service) dengan konfigurasi manifest yang identik. Hal ini mengeliminasi perbedaan akibat kompleksitas atau jenis aplikasi.
     
     \item Identitas Intervensi: Injeksi penyimpangan dilakukan menggunakan perintah \texttt{kubectl} yang sama pada kedua lingkungan, sehingga jenis dan magnitudo penyimpangan identik. Yang membedakan adalah bagaimana masing-masing paradigma merespons, bukan apa yang diinjeksi.
     
@@ -150,7 +150,11 @@ Waktu identifikasi akar masalah (\textit{root cause identification time}, R2) pa
     
     \item \textit{Practice run} sebelum pengumpulan data: \textit{Operator} melakukan pengulangan latihan hingga mencapai \textit{plateau} waktu identifikasi, memastikan efek pembelajaran (\textit{maturation}) telah stabil sebelum data resmi dikumpulkan.
     
-    \item Pencatatan profil keahlian: Profil keahlian \textit{operator} (pengalaman Kubernetes, jumlah tahun, sertifikasi) didokumentasikan secara transparan untuk kontekstualisasi hasil.
+    \item Profil keahlian \textit{operator}: Sebelum eksperimen, profil keahlian \textit{operator} didokumentasikan secara transparan, mencakup: (a)~pengalaman Kubernetes dalam tahun; (b)~sertifikasi yang dimiliki (CKA, CKAD, atau setara); (c)~frekuensi penggunaan \texttt{kubectl} dalam praktik sehari-hari; dan (d)~pengalaman sebelumnya dengan \textit{incident response}. Profil ini berfungsi untuk kontekstualisasi hasil, bukan sebagai variabel independen.
+    
+    \item Survei beban kognitif NASA-TLX: Setelah setiap skenario pada Lingkungan A, \textit{operator} mengisi kuesioner NASA-TLX (\textit{Task Load Index}) \citep{nasatlx} untuk mengukur beban kognitif yang dirasakan selama proses pemulihan. Survei ini mencakup enam dimensi: \textit{mental demand}, \textit{physical demand}, \textit{temporal demand}, \textit{performance}, \textit{effort}, dan \textit{frustration}. Data NASA-TLX digunakan sebagai \textit{measured confound} untuk mengkontekstualisasi hasil R2, bukan sebagai metrik independen.
+    
+    \item Survei kesulitan pasca-eksperimen: Pada akhir eksperimen, \textit{operator} menilai tingkat kesulitan setiap skenario pada skala Likert 1--5, memberikan data persepsional yang melengkapi pengukuran waktu objektif (R2).
     
     \item Rekomendasi replikasi multi-\textit{operator}: Batasan \textit{operator} tunggal diakui secara eksplisit, dan replikasi dengan \textit{operator} yang berbeda tingkat keahlian direkomendasikan sebagai penelitian lanjutan untuk mengvalidasi generalisasi temuan.
 \end{enumerate}
@@ -229,14 +233,14 @@ Penelitian menggunakan klaster Kubernetes yang dikelola Rancher dengan spesifika
 
 \subsection{Beban Uji (\textit{Workload})}
 
-\textit{Workload} yang digunakan adalah kelas \textit{workload} komposit multi-service, direpresentasikan oleh deployment InvenioRDM dengan 16+ komponen: \textit{web}, \textit{worker}, PostgreSQL, OpenSearch, Redis, MinIO, Traefik, Cert-manager, Sealed Secrets, \textit{monitoring}, \textit{backup}, dan kebijakan keamanan. InvenioRDM berfungsi sebagai subjek uji, bukan objek penelitian.
+\textit{Workload} yang digunakan adalah kelas \textit{workload} komposit multi-service, yang mencakup setidaknya 16 komponen infrastruktur dan dependensi, termasuk \textit{web application}, \textit{worker} asinkron, \textit{database} relasional, \textit{search engine}, \textit{cache}, \textit{object storage}, \textit{ingress controller}, \textit{certificate manager}, \textit{secret encryption}, \textit{monitoring system}, \textit{backup}, dan kebijakan keamanan. Beban uji berfungsi sebagai subjek uji, bukan objek penelitian; temuan berlaku untuk kelas \textit{workload} komposit multi-service secara umum.
 
 \subsection{Dataset dan Struktur Konfigurasi}
 
 Dataset dan struktur konfigurasi yang digunakan selama evaluasi mencakup:
 
 \begin{itemize}
-    \item Manifest Kubernetes deklaratif untuk seluruh komponen InvenioRDM (Helm \textit{chart} atau Kustomize \textit{manifests}), disimpan dalam repositori Git sebagai \textit{source of truth} untuk Lingkungan B.
+    \item Manifest Kubernetes deklaratif untuk seluruh komponen beban uji (Helm \textit{chart} atau Kustomize \textit{manifests}), disimpan dalam repositori Git sebagai \textit{source of truth} untuk Lingkungan B.
     \item Konfigurasi \textit{baseline} yang disamakan untuk kedua lingkungan: jumlah replika, versi \textit{image}, isi ConfigMap, dan Secret yang identik pada awal setiap \textit{run}.
     \item Log terstruktur (JSON/CSV) yang merekam \textit{timestamp} $t_0$, $t_d$, $t_{rci}$, dan $t_2$ untuk setiap skenario dan pengulangan.
     \item Snapshot status klaster (\texttt{kubectl get all}) sebelum dan setelah setiap skenario sebagai bukti konsistensi (R1).
@@ -462,7 +466,7 @@ Berikut adalah identifikasi ancaman terhadap validitas beserta strategi mitigasi
     
     \item Maturasi (\textit{Maturation}): Kinerja \textit{operator} dapat membaik sepanjang eksperimen karena pembelajaran. Mitigasi: Urutan skenario diacak; data pembelajaran \textit{operator} dicatat; \textit{practice run} dilakukan sebelum pengumpulan data resmi.
     
-    \item Instrumentasi: Perubahan pada alat ukur selama eksperimen (mis. pembaruan ArgoCD). Mitigasi: Seluruh versi \textit{software} (ArgoCD, Kubernetes, InvenioRDM) dikunci sebelum eksperimen dimulai dan tidak diperbarui selama pengumpulan data.
+    \item Instrumentasi: Perubahan pada alat ukur selama eksperimen (mis. pembaruan ArgoCD). Mitigasi: Seluruh versi \textit{software} (ArgoCD, Kubernetes, komponen beban uji) dikunci sebelum eksperimen dimulai dan tidak diperbarui selama pengumpulan data.
     
     \item Efek Pengujian (\textit{Testing}): \textit{Operator} mungkin berubah perilakunya karena sadar sedang diobservasi (\textit{Hawthorne effect}). Mitigasi: \textit{Operator} mengikuti \textit{recovery runbook} terstandarisasi; waktu reaksi direkam oleh skrip, bukan oleh penilaian manusia.
 \end{enumerate}
@@ -470,7 +474,7 @@ Berikut adalah identifikasi ancaman terhadap validitas beserta strategi mitigasi
 \subsection{Validitas Eksternal}
 
 \begin{enumerate}
-    \item Kekhususan Konteks: Hasil mungkin tidak generalisasi ke klaster berukuran besar, \textit{workload} yang berbeda, atau tim \textit{operator} yang lebih besar. Mitigasi: Dokumentasikan seluruh karakteristik klaster, \textit{workload}, dan \textit{operator} secara transparan; gunakan InvenioRDM yang mewakili kelas \textit{workload} komposit multi-service.
+    \item Kekhususan Konteks: Hasil mungkin tidak generalisasi ke klaster berukuran besar, \textit{workload} yang berbeda, atau tim \textit{operator} yang lebih besar. Mitigasi: Dokumentasikan seluruh karakteristik klaster, \textit{workload}, dan \textit{operator} secara transparan; gunakan beban uji yang mewakili kelas \textit{workload} komposit multi-service.
     
     \item Interaksi Seleksi dan Perlakuan: Efek paradigma \textit{deployment} mungkin spesifik untuk tingkat keahlian \textit{operator} dalam penelitian. Mitigasi: Catat profil keahlian \textit{operator}; rekomendasikan replikasi dengan tim yang berbeda.
     
@@ -480,11 +484,13 @@ Berikut adalah identifikasi ancaman terhadap validitas beserta strategi mitigasi
 \subsection{Validitas Konstruk}
 
 \begin{enumerate}
-    \item Bias Operasi Tunggal (\textit{Mono-operation Bias}): Menggunakan satu \textit{workload} (InvenioRDM sebagai instans kelas \textit{workload} komposit multi-service) dan satu alat GitOps (ArgoCD). Mitigasi: InvenioRDM dipilih karena kompleksitas yang mewakili kelas \textit{workload} komposit multi-service; ArgoCD merupakan implementasi GitOps yang paling banyak digunakan.
+    \item Bias Operasi Tunggal (\textit{Mono-operation Bias}): Menggunakan satu beban uji (instans kelas \textit{workload} komposit multi-service) dan satu alat GitOps (ArgoCD). Mitigasi: Beban uji dipilih karena kompleksitas yang mewakili kelas \textit{workload} komposit multi-service; ArgoCD merupakan implementasi GitOps yang paling banyak digunakan.
     
     \item Bias Metode Tunggal (\textit{Mono-method Bias}): Metrik R1 dan R2 diukur secara otomatis oleh skrip otomasi; R3 bersifat deskriptif dan didokumentasikan berdasarkan bukti objektif (log dan Git \textit{history}). Mitigasi: Seluruh metrik kuantitatif menggunakan pengukuran objektif berbasis \textit{timestamp}; R3 dideskripsikan berdasarkan data yang dapat diverifikasi secara independen.
     
     \item Operasionalisasi Konstruk: Definisi ``penyimpangan konfigurasi'' dibatasi pada 7 skenario yang merepresentasikan kesalahan operasional umum. Mitigasi: Skenario dirancang berdasarkan taksonomi \citet{zhang2026configuration} dan praktik yang dilaporkan oleh \citet{pohjola2025mitigating}; batasan ini diakui secara eksplisit.
+    
+    \item Kelemahan Perbandingan (\textit{Obvious Comparison}): Perbandingan antara paradigma manual dan GitOps dapat dipandang sebagai perbandingan yang hasilnya sudah intuitif --- GitOps, dengan \textit{automated reconciliation} dan \textit{audit trail} bawaan, seharusnya lebih unggul. Namun, penelitian ini bukan dimaksudkan untuk membuktikan arah perbedaan, melainkan untuk mengkarakterisasi \textit{magnitude} dan \textit{kondisi} perbedaan tersebut. Tanpa evaluasi terkontrol, praktisi tidak memiliki informasi kuantitatif mengenai seberapa besar perbedaan pada setiap skenario penyimpangan, pada kondisi apa perbedaan tersebut paling signifikan, dan apakah terdapat skenario di mana perbedaan tersebut tidak bermakna secara praktis. Mitigasi: analisis ukuran efek (Cohen's \textit{d}) digunakan untuk mengkarakterisasi besarnya perbedaan, bukan hanya arahnya; temuan yang menunjukkan efek kecil pada skenario tertentu sama informatifnya dengan temuan yang menunjukkan efek besar.
 \end{enumerate}
 
 \subsection{Reliabilitas}
