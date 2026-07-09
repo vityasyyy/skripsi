@@ -235,17 +235,13 @@ Penelitian menggunakan klaster Kubernetes yang dikelola Rancher dengan spesifika
 
 \textit{Workload} yang digunakan adalah kelas \textit{workload} komposit multi-service, yang mencakup setidaknya 16 komponen infrastruktur dan dependensi, termasuk \textit{web application}, \textit{worker} asinkron, \textit{database} relasional, \textit{search engine}, \textit{cache}, \textit{object storage}, \textit{ingress controller}, \textit{certificate manager}, \textit{secret encryption}, \textit{monitoring system}, \textit{backup}, dan kebijakan keamanan. Beban uji berfungsi sebagai subjek uji, bukan objek penelitian; temuan berlaku untuk kelas \textit{workload} komposit multi-service secara umum.
 
-\subsection{Dataset dan Struktur Konfigurasi}
+\subsection{Konfigurasi dan Dataset}
 
-Dataset dan struktur konfigurasi yang digunakan selama evaluasi mencakup:
+Eksperimen melibatkan dua kategori artefak yang perlu dibedakan secara eksplisit: konfigurasi dan dataset.
 
-\begin{itemize}
-    \item Manifest Kubernetes deklaratif untuk seluruh komponen beban uji (Helm \textit{chart} atau Kustomize \textit{manifests}), disimpan dalam repositori Git sebagai \textit{source of truth} untuk Lingkungan B.
-    \item Konfigurasi \textit{baseline} yang disamakan untuk kedua lingkungan: jumlah replika, versi \textit{image}, isi ConfigMap, dan Secret yang identik pada awal setiap \textit{run}.
-    \item Log terstruktur (JSON/CSV) yang merekam \textit{timestamp} $t_0$, $t_d$, $t_{rci}$, dan $t_2$ untuk setiap skenario dan pengulangan.
-    \item Snapshot status klaster (\texttt{kubectl get all}) sebelum dan setelah setiap skenario sebagai bukti konsistensi (R1).
-    \item Git \textit{commit history} (Lingkungan B) dan Kubernetes \textit{audit logs} (Lingkungan A) sebagai data \textit{traceability} (R3).
-\end{itemize}
+\textbf{Konfigurasi} adalah artefak yang mendefinisikan \textit{desired state} dan tata kelola lingkungan eksperimen, meliputi: (1)~Manifest Kubernetes deklaratif untuk seluruh komponen beban uji (Helm \textit{chart} atau Kustomize \textit{manifests}), disimpan dalam repositori Git sebagai \textit{source of truth} untuk Lingkungan B; (2)~konfigurasi \textit{baseline} yang disamakan untuk kedua lingkungan, mencakup jumlah replika, versi \textit{image}, isi ConfigMap, dan Secret yang identik pada awal setiap \textit{run}; serta (3)~konfigurasi ArgoCD (\textit{sync policy}, \textit{self-heal}, \textit{prune}) yang menentukan perilaku \textit{reconciliation} pada Lingkungan B.
+
+\textbf{Dataset} adalah data empiris yang dikumpulkan selama eksperimen, meliputi: (1)~log terstruktur (JSON/CSV) yang merekam \textit{timestamp} $t_0$, $t_d$, $t_{rci}$, dan $t_2$ untuk setiap skenario dan pengulangan; (2)~snapshot status klaster (\texttt{kubectl get all}) sebelum dan setelah setiap skenario sebagai bukti konsistensi (R1); serta (3)~data \textit{traceability}, yaitu Git \textit{commit history} pada Lingkungan B dan Kubernetes \textit{audit logs} pada Lingkungan A, sebagai sumber bukti untuk metrik R3.
 
 \subsection{Kontrol Variabel Pengganggu}
 \label{sec:kontrol-variabel}
