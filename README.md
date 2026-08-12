@@ -1,8 +1,8 @@
-# Skripsi: Evaluasi GitOps menggunakan ArgoCD terhadap Configuration Drift pada Deployment Aplikasi Multi-Service di Klaster Kubernetes
+# Skripsi: Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes
 
 > Studi Kasus InvenioRDM | Departemen Ilmu Komputer dan Elektronika, FMIPA UGM
 
-Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang evaluasi GitOps (ArgoCD) dalam mengurangi *configuration drift* pada deployment multi-service di klaster Kubernetes, dengan studi kasus InvenioRDM.
+Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma *deployment* manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM.
 
 > **Sumber kebenaran:** Proposal Tugas Akhir (`content/proposal/`) sudah diterima dan direview dosen pembimbing. Seluruh konten repo (termasuk struktur skripsi) harus selaras dengan proposal tersebut.
 
@@ -94,7 +94,7 @@ Setiap push ke `main`/`master` yang mengubah file `.tex`, `.bib`, atau `.cls` ak
 
 ## Topik Penelitian
 
-- **Judul:** Evaluasi GitOps menggunakan ArgoCD terhadap Configuration Drift pada Deployment Aplikasi Multi-Service di Klaster Kubernetes: Studi Kasus InvenioRDM
+- **Judul:** Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes: Studi Kasus InvenioRDM
 - **Pendekatan:** Studi empiris terkontrol (*quasi-experiment*) dengan dua lingkungan paralel
 - **Metrik:** R1 konsistensi deployment, R2 waktu deteksi & pemulihan drift, R3 traceability (audit trail)
 - **Teknologi:** Kubernetes, ArgoCD, InvenioRDM, Helm, kubectl
