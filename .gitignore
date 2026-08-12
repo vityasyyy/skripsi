@@ -11,11 +11,17 @@
 **/*.bbl
 **/*.blg
 **/*.glo
+**/*.gls
+**/*.nlo
+**/*.nls
 **/*.idx
 **/*.ind
 **/*.ilg
 **/*.ist
 **/*.loa
+
+# Local reference PDFs (pedoman & contoh)
+examples/
 
 # OS & Editor files
 .DS_Store

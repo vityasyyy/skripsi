@@ -33,6 +33,7 @@ skripsi:
 	cd content/skripsi && \
 		pdflatex -interaction=nonstopmode main.tex && \
 		bibtex main && \
+		makeindex -s nomencl.ist -o main.nls main.nlo && \
 		pdflatex -interaction=nonstopmode main.tex && \
 		pdflatex -interaction=nonstopmode main.tex
 
@@ -50,7 +51,7 @@ clean-proposal:
 	cd content/proposal && rm -f *.aux *.log *.out *.toc *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz *.bbl *.blg *.glo || true
 
 clean-skripsi:
-	cd content/skripsi && rm -f *.aux *.log *.out *.toc *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz *.bbl *.blg *.glo || true
+	cd content/skripsi && rm -f *.aux *.log *.out *.toc *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz *.bbl *.blg *.glo *.gls *.nlo *.nls *.ist || true
 
 clean-presentation:
 	cd presentation/proposal/diagrams && rm -f *.aux *.log *.out *.fls *.fdb_latexmk *.synctex.gz || true
@@ -66,7 +67,7 @@ proposal-docker: build-docker
 	docker run --rm -v $(PWD)/content:/workspace/content $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c "cd /workspace/content/proposal && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex"
 
 skripsi-docker: build-docker
-	docker run --rm -v $(PWD)/content:/workspace/content $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c "cd /workspace/content/skripsi && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex"
+	docker run --rm -v $(PWD)/content:/workspace/content $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c "cd /workspace/content/skripsi && pdflatex -interaction=nonstopmode main.tex && bibtex main && makeindex -s nomencl.ist -o main.nls main.nlo && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex"
 
 presentation-diagrams-docker: build-docker
 	docker run --rm -v $(PWD)/presentation:/workspace/presentation $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c 'cd /workspace/presentation/proposal/diagrams && for f in *.tex; do xelatex -interaction=nonstopmode "$$f"; done'

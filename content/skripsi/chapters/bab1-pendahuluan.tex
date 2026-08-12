@@ -2,10 +2,68 @@
 
 \section{Latar Belakang}
 
-\section{Perumusan Produk}
+Kubernetes telah menjadi platform \textit{container orchestration} yang dominan di industri maupun akademisi, digunakan oleh lebih dari 5,6 juta \textit{developer} secara global \citep{cncf2024}. Kemampuan Kubernetes dalam mengelola \textit{deployment}, \textit{scaling}, dan \textit{self-healing} menjadikannya pilihan utama untuk menjalankan aplikasi yang memerlukan \textit{availability} tinggi \citep{burns2016borg}. Namun, seiring bertambahnya jumlah layanan yang di-\textit{deploy} pada sebuah klaster, kompleksitas operasional meningkat secara drastis. Aplikasi yang dijalankan pada Kubernetes mencakup berbagai kelas \textit{workload} dengan karakteristik yang berbeda, antara lain: (1)~\textit{workload} web tanpa state (\textit{stateless web microservice}), (2)~\textit{workload} berbasis data yang menyimpan state (\textit{stateful data service}), serta (3)~\textit{workload} komposit multi-service yang terdiri atas banyak komponen yang saling bergantung \citep{siddiqui2023microservices, aghili2024workload}. Kelas terakhir, seperti platform data repositori skala besar, dapat terdiri dari 16 atau lebih komponen: layanan \textit{web}, \textit{worker} asinkron, \textit{database} relasional, \textit{search engine}, \textit{cache}, \textit{object storage}, \textit{ingress controller}, \textit{certificate manager}, enkripsi \textit{secret}, \textit{tunnel} jaringan, kebijakan keamanan, \textit{monitoring system}, dan \textit{backup}.
 
-\section{Batasan Produk}
+Pengelolaan \textit{deployment} aplikasi multi-service menggunakan pendekatan manual, yakni melalui perintah \texttt{kubectl apply}, \textit{manual scaling}, atau \textit{patching} langsung pada klaster, sering menghasilkan inkonsistensi operasional. Praktik ini rentan terhadap penyimpangan konfigurasi (\textit{configuration drift}), yaitu situasi di mana \textit{state} aktual klaster menyimpang dari \textit{state} yang didefinisikan secara deklaratif \citep{zhang2026configuration}. Penyimpangan konfigurasi dapat timbul akibat tiga penyebab utama: (1)~perubahan langsung pada klaster yang tidak tercatat dalam sistem \textit{version control}; (2)~prosedur \textit{deployment} yang tidak konsisten antar \textit{operator}; dan (3)~ketiadaan mekanisme deteksi otomatis yang dapat mengidentifikasi deviasi sebelum menimbulkan insiden.
 
-\section{Tujuan}
+Penelitian empiris oleh \citet{zhang2026configuration} menunjukkan bahwa 533 dari 719 \textit{defect} (74,1\%) menyebabkan \textit{crash}, operasi yang salah, atau \textit{outage}. \citet{rahman2023security} menambahkan bahwa \textit{security misconfiguration} pada manifest Kubernetes mencakup 11 kategori yang berulang, termasuk \textit{container} yang berjalan sebagai \textit{root} dan tanpa \textit{resource limits}. Studi-studi tersebut mengonfirmasi bahwa penyimpangan konfigurasi bukan sekadar masalah estetika konfigurasi, melainkan ancaman nyata terhadap keandalan dan keamanan layanan.
 
-\section{Manfaat}
+GitOps telah muncul sebagai paradigma yang diajukan sebagai alternatif untuk mengatasi masalah tersebut dengan menjadikan repositori Git sebagai \textit{single source of truth} dan mengandalkan agen \textit{software} untuk menyelaraskan \textit{state} klaster secara otomatis \citep{opengitops2021}. Beberapa penelitian mendukung klaim ini secara kualitatif: \citet{kaggantinataraja2025security} menemukan bahwa pendekatan deklaratif menghasilkan koreksi penyimpangan yang lebih cepat dan paparan kerentanan yang lebih rendah; \citet{shrestha2024configuration} melaporkan karakteristik GitOps pada aspek deteksi penyimpangan; dan \citet{matubber2025managing} mengukur waktu \textit{reconciliation} GitOps terhadap \textit{self-healing}. Namun, temuan-temuan tersebut mengandung kelemahan metodologis, yakni tidak ada yang mengisolasi efek paradigma \textit{deployment} dari variabel pengganggu, dan tidak ada yang menerapkan uji statistik formal pada perbandingan terkontrol \citep{shrestha2024configuration, kaggantinataraja2025security, matubber2025managing}.
+
+Walaupun secara intuitif paradigma GitOps diyakini lebih unggul, perbandingan terkontrol tetap bermakna karena tiga alasan. Pertama, tanpa bukti empiris terkontrol, klaim unggulnya GitOps tidak dapat diatribusikan secara kausal kepada paradigma itu sendiri; temuan-temuan yang ada mungkin disebabkan oleh variabel pengganggu seperti keahlian \textit{operator}, karakteristik klaster, atau kompleksitas \textit{workload}. Kedua, \textit{magnitude} perbedaan antara kedua paradigma belum terkuantifikasi, mengetahui bahwa GitOps lebih baik secara kualitatif tidak memberikan informasi tentang seberapa jauh lebih baik, pada skenario apa, dan dalam kondisi apa. Ketiga, pemahaman tentang kondisi di mana \textit{manual deployment} tetap memadai (misalnya, pada klaster kecil dengan perubahan jarang) memerlukan data komparatif yang terukur \citep{forsgren2018accelerate}.
+
+Kesenjangan tersebut menjadi landasan penelitian ini: terdapat kebutuhan untuk mengevaluasi secara empiris seberapa besar dampak penyimpangan konfigurasi terhadap karakteristik operasional \textit{deployment} (konsistensi, waktu deteksi/pemulihan, dan \textit{traceability}) ketika berbagai skenario penyimpangan terjadi pada dua paradigma manajemen \textit{deployment} yang berbeda, yaitu manual dan GitOps, melalui evaluasi empiris terkontrol pada \textit{workload} multi-service di klaster Kubernetes. Hasil evaluasi tersebut mengkarakterisasi besarnya dan kondisi perbedaan antara kedua paradigma, yang selanjutnya menjadi dasar rekomendasi pemilihan paradigma \textit{deployment} bagi praktisi industri.
+
+\section{Rumusan Masalah}
+
+Pengelolaan \textit{deployment} aplikasi multi-service pada klaster Kubernetes menghadapi tiga permasalahan praktis yang mendorong perlunya evaluasi paradigma \textit{deployment}. Pertama, inkonsistensi konfigurasi: perubahan langsung pada klaster yang tidak tercatat dalam \textit{version control}, prosedur \textit{deployment} yang tidak konsisten antar \textit{operator}, dan ketiadaan mekanisme deteksi otomatis menyebabkan \textit{state} aktual klaster menyimpang dari \textit{state} yang dideklarasikan, dengan konsekuensi yang meliputi \textit{crash}, operasi yang salah, atau \textit{outage} \citep{zhang2026configuration, rahman2023security}. Kedua, lamanya waktu yang diperlukan untuk mendeteksi dan mengidentifikasi akar masalah: tanpa mekanisme \textit{reconciliation} otomatis, \textit{operator} harus memeriksa log dan manifest secara manual, sehingga interval antara terjadinya penyimpangan dan pemulihannya bergantung sepenuhnya pada kewaspadaan dan keahlian \textit{operator} \citep{pohjola2025mitigating}. Ketiga, minimnya \textit{traceability} operasional: \textit{deployment} manual tidak menyediakan jejak perubahan yang terpusat, sehingga rekonstruksi siapa yang mengubah \textit{state}, apa yang berubah, dan kapan perubahan terjadi menjadi sulit atau tidak mungkin dilakukan.
+
+Paradigma GitOps diajukan sebagai alternatif yang berpotensi mengatasi permasalahan-permasalahan tersebut melalui \textit{reconciliation} otomatis dan \textit{audit trail} bawaan. Namun, studi-studi terdahulu yang mendukung GitOps tidak mengisolasi efek paradigma \textit{deployment} dari variabel pengganggu seperti keahlian \textit{operator}, karakteristik klaster, dan jenis \textit{workload}, sehingga klaim unggulnya GitOps belum dapat diatribusikan secara kausal kepada paradigma itu sendiri \citep{shrestha2024configuration, kaggantinataraja2025security, matubber2025managing}. Akibatnya, praktisi industri belum memiliki dasar berbasis bukti untuk memilih paradigma \textit{deployment} yang sesuai. Kesenjangan ini menjadi landasan bagi penelitian ini: terdapat kebutuhan untuk mengevaluasi secara empiris seberapa besar dampak penyimpangan konfigurasi terhadap karakteristik operasional \textit{deployment} ketika berbagai skenario penyimpangan terjadi pada dua paradigma manajemen \textit{deployment} yang berbeda, yaitu manual dan GitOps, melalui evaluasi empiris terkontrol pada \textit{workload} multi-service di klaster Kubernetes.
+
+Evaluasi tersebut mencakup tiga dimensi pengukuran. Pertama, sejauh mana konsistensi \textit{deployment} berbeda antara kedua paradigma setelah terjadinya penyimpangan konfigurasi. Kedua, seberapa besar perbedaan waktu deteksi, waktu pemulihan, dan waktu identifikasi akar masalah antara lingkungan yang mendeteksi dan memulihkan secara otomatis dan lingkungan yang bergantung pada intervensi manual. Ketiga, sejauh mana perbedaan \textit{traceability} operasional antara paradigma yang mencatat setiap perubahan secara otomatis melalui Git dan paradigma yang mengandalkan pencatatan manual. Ketiga dimensi diuji terhadap tujuh skenario penyimpangan konfigurasi yang merepresentasikan kesalahan operasional umum pada Kubernetes: (A)~perubahan replika yang melewati deklarasi Git, (B)~perubahan \textit{image} kontainer langsung pada klaster, (C)~modifikasi ConfigMap tanpa pembaruan \textit{source of truth}, (D)~penghapusan sumber daya secara manual, (E)~\textit{patch} yang tidak sah pada sumber daya yang dikelola, (F)~aplikasi sumber daya pada \textit{namespace} yang salah, dan (G)~perubahan Secret di luar Git.
+
+\section{Batasan Masalah}
+
+Agar penelitian tetap fokus dan terukur, batasan masalah yang ditetapkan adalah:
+
+\begin{enumerate}
+  \item Penelitian dilakukan pada klaster Kubernetes tunggal yang dikelola Rancher dengan spesifikasi 3 \textit{node}, 24 total inti CPU, dan $\sim$23 Gi total memori; skenario \textit{multi-cluster} tidak termasuk dalam ruang lingkup.
+  
+  \item Kelas \textit{workload} yang digunakan adalah \textit{workload} komposit multi-service, yang mencakup setidaknya 16 komponen infrastruktur dan dependensi termasuk layanan \textit{web}, \textit{worker} asinkron, \textit{database} relasional, \textit{search engine}, \textit{cache}, \textit{object storage}, \textit{ingress controller}, \textit{certificate manager}, dan \textit{monitoring system}. Temuan berlaku untuk kelas \textit{workload} multi-service secara umum.
+  
+  \item Skenario penyimpangan konfigurasi yang diuji terbatas pada tujuh kategori: (A)~perubahan replika, (B)~perubahan \textit{image}, (C)~modifikasi ConfigMap, (D)~\textit{resource deletion}, (E)~\textit{patch} manual tidak sah, (F)~penyimpangan lintas \textit{namespace}, dan (G)~perubahan Secret.
+  
+  \item Dua paradigma manajemen \textit{deployment} dibandingkan: (a)~\textit{deployment} manual menggunakan \texttt{kubectl}, dan (b)~\textit{deployment} GitOps menggunakan ArgoCD sebagai salah satu implementasi paradigma GitOps.
+  
+  \item Analisis statistik menggunakan \textit{Mann--Whitney U test} untuk uji signifikansi perbedaan antara kedua lingkungan, dengan tingkat signifikansi $\alpha = 0{,}05$ dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$).
+  
+  \item Paradigma perantara (Git sebagai \textit{source of truth} tanpa agen \textit{reconciliation} otomatis) dan paradigma \textit{push-based} (seperti Jenkins CI/CD atau Ansible yang mendorong perubahan ke klaster dari luar) tidak termasuk dalam ruang lingkup. Paradigma perantara tidak memiliki mekanisme koreksi otomatis sehingga tidak memenuhi prinsip GitOps \textit{continuous reconciliation}, sementara paradigma \textit{push-based} memerlukan kredensial klaster yang terekspos dan tidak memiliki \textit{feedback loop} bawaan \citep{utami2021analysis, shrestha2024configuration}. Keduanya merepresentasikan titik yang berbeda pada spektrum deklaratif-imperatif dan dapat dievaluasi pada penelitian lanjutan.
+\end{enumerate}
+
+\section{Tujuan Penelitian}
+
+Tujuan penelitian ini adalah mengusulkan pendekatan berbasis GitOps untuk menghadapi penyimpangan konfigurasi pada \textit{deployment} multi-service di klaster Kubernetes, dengan pencapaiannya didemonstrasikan melalui pengukuran kinerja terkontrol yang mencakup: (1)~konsistensi \textit{deployment} setelah skenario penyimpangan terkontrol, (2)~waktu deteksi, waktu pemulihan, dan waktu identifikasi akar masalah, serta (3)~\textit{traceability} operasional.
+
+\section{Manfaat Penelitian}
+
+Penelitian ini diharapkan memberikan manfaat berikut:
+
+\begin{enumerate}
+  \item Teoritis: Memberikan bukti empiris terukur mengenai dampak operasional skenario penyimpangan konfigurasi pada dua paradigma \textit{deployment}, yang selama ini banyak didasarkan pada klaim \textit{vendor} atau studi kasus deskriptif. Hasil tersebut melengkapi literatur akademis dengan data eksperimental yang dapat direproduksi dan diverifikasi.
+  
+  \item Metodologis: Menawarkan protokol eksperimental yang dapat direplikasi, termasuk skenario penyimpangan terstandarisasi, metrik operasional, dan prosedur analisis statistik, sehingga penelitian selanjutnya dapat mereplikasi, memperluas, atau mengkritik temuan pada konteks dan platform yang berbeda.
+  
+  \item Praktis: Menyediakan bukti empiris terkontrol yang mengkarakterisasi perbedaan operasional antara kedua paradigma \textit{deployment} pada berbagai skenario penyimpangan, serta menyoroti skenario penyimpangan yang paling rentan pada masing-masing paradigma, sehingga membantu praktisi industri dalam memilih paradigma \textit{deployment} yang sesuai.
+\end{enumerate}
+
+\section{Sistematika Penulisan}
+
+Sistematika penulisan skripsi ini adalah sebagai berikut:
+
+\begin{itemize}
+  \item Bab I: Pendahuluan, berisi latar belakang, rumusan masalah, batasan masalah, tujuan penelitian, manfaat penelitian, dan sistematika penulisan.
+  \item Bab II: Tinjauan Pustaka, membahas studi empiris terkait penyimpangan konfigurasi pada Kubernetes, terminologi dasar, manajemen konfigurasi infrastruktur, paradigma \textit{deployment} alternatif, evaluasi GitOps dan ArgoCD, metode eksperimental pada riset sistem, serta \textit{research gap} yang menjadi landasan penelitian.
+  \item Bab III: Metode Penelitian, menjelaskan metodologi evaluasi empiris terkontrol, definisi variabel dan intervensi, tujuh skenario penyimpangan, protokol pengukuran, analisis statistik komparatif, ancaman terhadap validitas, dan lingkungan eksperimen.
+  \item Bab IV: Hasil dan Analisis, menyajikan hasil eksperimen untuk setiap metrik (konsistensi, waktu deteksi/pemulihan/identifikasi akar masalah, dan \textit{traceability}), analisis statistik komparatif, serta interpretasi hasil dalam konteks literatur dan praktik operasional.
+  \item Bab V: Kesimpulan dan Saran, merumuskan kesimpulan penelitian, keterbatasan, dan saran untuk penelitian lanjutan.
+\end{itemize}

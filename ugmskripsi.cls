@@ -2,7 +2,7 @@
 %Created by Pekik Nurwantoro, Universitas Gadjah Mada, Yogyakarta, Indonesia
 \ProvidesClass{ugmskripsi}[2010/16/01 v2.0 The University of Gadjah Mada Skripsi Class]
 
-\RequirePackage[english,bahasa]{babel}
+\RequirePackage[english,indonesian]{babel}
 \RequirePackage{indentfirst}
 \RequirePackage{setspace}
 \RequirePackage[T1]{fontenc}
@@ -31,11 +31,11 @@
 \ExecuteOptions{skripsi,satusetengahspasi,indonesia}
 \ProcessOptions
 \LoadClass[a4paper,12pt]{report}
-\RequirePackage{natbib}
+\RequirePackage[authoryear,round]{natbib}
 \bibliographystyle{plainnat}
 \RequirePackage{nomencl}%
 \renewcommand{\nomname}{\nomenclaturename}%
-\makeglossary%
+\makenomenclature%
 
 %------------------------------------------------------------
 %Layout
@@ -137,7 +137,7 @@
 %------------------------------------------------------------
 %Redefine caption names
 %------------------------------------------------------------
-\def\captionsbahasa{%
+\def\captionsindonesian{%
 \def\prefacename{PRAKATA}%
 \def\contentsname{DAFTAR ISI}%
 \def\listfigurename{DAFTAR GAMBAR}%
@@ -221,6 +221,7 @@
   \thispagestyle{empty}%
   \pagenumbering{roman}
   \setcounter{page}{1}
+  \sloppy
     \begin{center}
       \begin{singlespace}
       \if@msproposal%
@@ -229,9 +230,13 @@
         \MakeUppercase{\normalfont\bfseries Skripsi}\\
       \fi
       \vspace{1.5cm}	
-      \MakeUppercase{\normalfont\bfseries\@titleind}\par\nobreak
+      \begin{minipage}{0.95\textwidth}\centering
+        \sloppy\MakeUppercase{\normalfont\bfseries\@titleind}\par
+      \end{minipage}\par\nobreak
       \vspace{1.0cm}
-      \MakeUppercase{\normalfont\slshape\bfseries\@titleeng}\par\nobreak
+      \begin{minipage}{0.95\textwidth}\centering
+        \sloppy\MakeUppercase{\normalfont\slshape\bfseries\@titleeng}\par
+      \end{minipage}\par\nobreak
        \vfill
         \includegraphics[width=4cm]{logougm}
         \vfill
@@ -258,6 +263,7 @@
   \thispagestyle{empty}%
   \pagenumbering{roman}
   \setcounter{page}{1}
+  \sloppy
     \begin{center}
       \begin{singlespace}
       \if@msproposal%
@@ -266,9 +272,13 @@
         \MakeUppercase{\normalfont\bfseries Skripsi}\\
       \fi
       \vspace{1.5cm}	
-      \MakeUppercase{\normalfont\bfseries\@titleind}\par\nobreak
+      \begin{minipage}{0.95\textwidth}\centering
+        \sloppy\MakeUppercase{\normalfont\bfseries\@titleind}\par
+      \end{minipage}\par\nobreak
       \vspace{1.0cm}
-      \MakeUppercase{\normalfont\slshape\bfseries\@titleeng}\par\nobreak
+      \begin{minipage}{0.95\textwidth}\centering
+        \sloppy\MakeUppercase{\normalfont\slshape\bfseries\@titleeng}\par
+      \end{minipage}\par\nobreak
       \vspace{1.5cm}
        \if@msthesis%
         {\normalfont Diajukan untuk memenuhi salah satu syarat memperoleh derajat\\
@@ -301,6 +311,7 @@
 %------------------------------------------------------------
 \def\approvalpage{%
   \newpage\thispagestyle{empty}%
+  \sloppy
   \begin{center}
   \begin{singlespace}
   \phantomsection
@@ -313,7 +324,9 @@
     \MakeUppercase{\normalfont\large\bfseries\expandafter{Skripsi}}\\
   \fi
   \vspace{0.5cm}
-      \MakeUppercase{\normalfont\bfseries\@titleind}\par\nobreak
+      \begin{minipage}{0.95\textwidth}\centering
+        \sloppy\MakeUppercase{\normalfont\large\bfseries\@titleind}\par
+      \end{minipage}\par\nobreak
   \vspace{1.0cm}
 Telah dipersiapkan dan disusun oleh\\
 \vspace{0.5cm}
@@ -326,14 +339,14 @@ pada tanggal \expandafter{\@examdate}\\
 Susunan Tim Penguji\\
 
 \vspace{4.0cm}
-\begin{tabular}{p{7cm}p{7cm}}
+\begin{tabular}{p{6.5cm}p{6.5cm}}
 \@firstsupervisor&\@firstexaminer\\
 Pembimbing & Ketua Penguji
 \end{tabular}
 
 \bigskip
 \vspace{3.0cm}
-\begin{tabular}{p{7cm}p{7cm}}
+\begin{tabular}{p{6.5cm}p{6.5cm}}
 &\@secondexaminer\\
 &Anggota Penguji
 \end{tabular}
@@ -403,7 +416,7 @@ dalam naskah ini dan disebutkan dalam daftar pustaka.
 %------------------------------------------------------------
 \def\lambang{%
   \clearpage\thispagestyle{chapterheading}%
-  \printglossary%
+  \printnomenclature%
 \addcontentsline{toc}{chapter}{\nomenclaturename}
 }
 
@@ -419,7 +432,9 @@ dalam naskah ini dan disebutkan dalam daftar pustaka.
   {\large\textbf{\abstractname}} \\
 
   \vspace{1.0cm}
-   {\large\textbf{\@titleind}}
+   \begin{minipage}{0.95\textwidth}\centering
+     \sloppy{\large\textbf{\@titleind}}
+   \end{minipage}
         \par\nobreak
         \vskip 12\p@
     \interlinepenalty\@M
@@ -448,7 +463,9 @@ dalam naskah ini dan disebutkan dalam daftar pustaka.
   {\large\textbf{\abstractname}}\\
   
   \vspace{1.0cm}
-   {\large\textbf{\@titleeng}}
+   \begin{minipage}{0.95\textwidth}\centering
+     \sloppy{\large\textbf{\@titleeng}}
+   \end{minipage}
         \par\nobreak
         \vskip 12\p@
     \interlinepenalty\@M
@@ -463,7 +480,7 @@ dalam naskah ini dan disebutkan dalam daftar pustaka.
   \vskip 20\p@
   }
 \def\endabstracteng{\par\vfil\null\end{singlespace}%
-\selectlanguage{bahasa}\clearpage\pagenumbering{arabic}\setcounter{page}{1}}
+\selectlanguage{indonesian}\clearpage\pagenumbering{arabic}\setcounter{page}{1}}
 
 
 \AtBeginDocument{%
@@ -479,7 +496,7 @@ dalam naskah ini dan disebutkan dalam daftar pustaka.
 
 \AtBeginDocument{%
 \if@langindo%
-\selectlanguage{bahasa}%
+\selectlanguage{indonesian}%
 \else
 \selectlanguage{english}%
 \fi

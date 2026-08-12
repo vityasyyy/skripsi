@@ -1,0 +1,64 @@
+\chapter{HASIL DAN ANALISIS}
+
+% TODO: Isi bab ini setelah eksperimen (jadwal: September--Oktober 2026) selesai
+% dan data dianalisis. Setiap subbab di bawah merupakan kerangka yang
+% disusun berdasarkan desain eksperimen pada Bab III.
+
+\section{Deskripsi Lingkungan Eksperimen}
+
+% TODO: Dokumentasikan kondisi aktual saat eksperimen berjalan:
+% - Spesifikasi klaster (3 node, 24 inti CPU, ~23 Gi memori, Kubernetes v1.29+)
+% - Versi ArgoCD, interval sync (60 detik), self-heal dan prune aktif
+% - Beban uji workload komposit multi-service (>= 16 komponen)
+% - Profil operator dan hasil practice run
+% - Variabel pengganggu yang terpantau (CPU < 70%, RTT, dsb.)
+
+\section{Hasil E1: Konsistensi \textit{Deployment} (R1)}
+
+% TODO: Sajikan hasil pengukuran persentase sumber daya yang cocok dengan
+% desired declarative state pada t0, t1, dan t2 untuk setiap skenario (A--G)
+% pada kedua lingkungan. Gunakan tabel dan/atau box plot per skenario.
+
+\section{Hasil E2: Waktu Deteksi, Pemulihan, dan Identifikasi Akar Masalah (R2)}
+
+% TODO: Sajikan hasil pengukuran waktu deteksi (td - t0), waktu pemulihan
+% (t2 - t0), dan waktu identifikasi akar masalah (trci - td) untuk setiap
+% skenario pada kedua lingkungan (n = 10 per skenario). Sertakan juga
+% jumlah perintah kubectl pada Lingkungan A sebagai pengamatan pelengkap.
+
+\section{Hasil E3: \textit{Traceability} Operasional (R3)}
+
+% TODO: Dokumentasikan secara deskriptif kelengkapan audit log untuk kedua
+% lingkungan: Git commit history + ArgoCD notifications (Lingkungan B) versus
+% Kubernetes audit logs (Lingkungan A), serta kemudahan identifikasi akar
+% masalah dan keterkaitannya dengan R2.
+
+\section{Statistik Deskriptif}
+
+% TODO: Sajikan mean, median, rentang, dan deviasi standar untuk setiap
+% metrik per lingkungan per skenario, dalam bentuk tabel ringkasan.
+
+\section{Uji Perbandingan \textit{Mann--Whitney U}}
+
+% TODO: Sajikan hasil uji Mann--Whitney U untuk setiap metrik antara
+% Lingkungan A dan Lingkungan B pada tingkat signifikansi alpha = 0,05.
+% Sertakan nilai p untuk setiap skenario.
+
+\section{Ukuran Efek}
+
+% TODO: Sajikan nilai Cohen's d (atau Cliff's delta) untuk setiap metrik dan
+% interpretasikan mengikuti konvensi Cohen: |d| < 0,2 (kecil), ~0,5 (sedang),
+% > 0,8 (besar). Identifikasi skenario dengan efek terbesar dan terkecil.
+
+\section{Interpretasi Hasil}
+
+% TODO: Interpretasikan hasil statistik dalam konteks literatur (Bab II) dan
+% praktik operasional. Jawab dimensi evaluasi pada Bab I: konsistensi,
+% waktu deteksi/pemulihan/identifikasi akar masalah, dan traceability.
+
+\section{Pembahasan}
+
+% TODO: Bahas skenario penyimpangan yang paling berdampak, faktor yang
+% memengaruhi hasil, kondisi di mana manual deployment tetap memadai, dan
+% implikasi praktis bagi pemilihan paradigma deployment. Kaitkan dengan
+% ancaman validitas yang diidentifikasi pada Bab III.

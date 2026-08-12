@@ -7,26 +7,26 @@
 %------------------------------------------------------------
 % Metadata Skripsi
 %------------------------------------------------------------
-% TODO: Ganti metadata di bawah ini dengan data Anda sendiri
-\titleind{JUDUL BAHASA INDONESIA}
-\titleeng{JUDUL BAHASA INGGRIS}
-\fullname{NAMA LENGKAP}
-\idnum{NIM}
-\degree{JENJANG}
-\gelar{GELAR}
-\yearsubmit{TAHUN}
-\program{PROGRAM STUDI}
-\dept{DEPARTEMEN}
-\firstsupervisor{NAMA DOSEN PEMBIMBING}
-\firstexaminer{NAMA DOSEN PENGUJI 1}
-\secondexaminer{NAMA DOSEN PENGUJI 2}
+\titleind{Perbandingan Terkontrol Paradigma \textit{Deployment} Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}
+\titleeng{A Controlled Comparison of Manual and GitOps Deployment Paradigms in Responding to Configuration Drift on Kubernetes Clusters}
+\fullname{Muhammad Argya Vityasy}
+\idnum{23/522547/PA/22475}
+\degree{Sarjana}
+\gelar{S.Kom.}
+\yearsubmit{2026}
+\program{Ilmu Komputer}
+\dept{Ilmu Komputer dan Elektronika}
+\firstsupervisor{Guntur Budi Herwanto, S.Kom., M.Cs.}
+\firstexaminer{Dr. techn. Kabul Kurniawan, S.Kom., M.Cs.}
+\secondexaminer{Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
+\examdate{17 Juni 2026}
 
 %------------------------------------------------------------
 % Packages
 %------------------------------------------------------------
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
-\graphicspath{{figures/}}
+\graphicspath{{figures/}{diagrams/}}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
@@ -38,7 +38,10 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{url}
+\usepackage{xurl}
 \usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
 
 % Code listing style
 \lstset{
@@ -78,6 +81,19 @@
 % Document Body
 %------------------------------------------------------------
 \begin{document}
+\sloppy
+
+%------------------------------------------------------------
+% Daftar Lambang dan Singkatan (DAFTAR SIMBOL)
+%------------------------------------------------------------
+\nomenclature{GitOps}{Paradigma manajemen \textit{deployment} yang menggunakan repositori Git sebagai \textit{single source of truth} dengan agen \textit{reconciliation} otomatis}
+\nomenclature{IaC}{\textit{Infrastructure-as-Code}: praktik mendefinisikan dan mengelola infrastruktur melalui berkas konfigurasi yang diberi versi}
+\nomenclature{ArgoCD}{Alat GitOps \textit{pull-based} yang melakukan \textit{continuous reconciliation} terhadap \textit{state} klaster Kubernetes}
+\nomenclature{R1}{Metrik konsistensi \textit{deployment}}
+\nomenclature{R2}{Metrik waktu deteksi, waktu pemulihan, dan waktu identifikasi akar masalah}
+\nomenclature{R3}{Metrik \textit{traceability} operasional (deskriptif)}
+\nomenclature{MTTI}{\textit{Mean Time To Identify} drift: waktu rata-rata dari penyimpangan terjadi hingga terdeteksi dan teridentifikasi}
+\nomenclature{NASA-TLX}{\textit{Task Load Index}: instrumen survei beban kognitif \textit{operator}}
 
 % Preliminary Pages (Skripsi: lengkap)
 \cover
@@ -88,37 +104,37 @@
 \acknowledment
 
 \preface
-\addcontentsline{toc}{chapter}{\prefacename}
 Isi Prakata di sini...
 
 \tableofcontents
+\addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
+\addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
-% \lambang  % Uncomment when you have nomenclature entries defined
+\lambang
 
 \abstractind
-% TODO: Tulis intisari dalam Bahasa Indonesia di sini (150-250 kata).
-% Jelaskan latar belakang, tujuan, metode, dan hasil penelitian.
+Penyimpangan konfigurasi (\textit{configuration drift}) pada klaster Kubernetes merupakan masalah operasional yang signifikan: \textit{state} aktual klaster menyimpang dari \textit{state} yang didefinisikan secara deklaratif, mengakibatkan inkonsistensi, \textit{audit trail} yang buruk, dan waktu pemulihan yang lama. Walaupun paradigma GitOps secara intuitif diyakini lebih unggul dalam menghadapi penyimpangan, bukti empiris terkontrol yang mengkarakterisasi besarnya dan kondisi perbedaan antara paradigma manual dan GitOps belum tersedia. Penelitian ini mengevaluasi secara empiris dampak skenario penyimpangan konfigurasi terhadap karakteristik operasional \textit{deployment} pada dua paradigma manajemen yang berbeda, yaitu manual dan GitOps, pada sebuah klaster Kubernetes. Evaluasi dilakukan menggunakan desain eksperimental dengan dua lingkungan paralel: Lingkungan A (\textit{deployment} manual) dan Lingkungan B (\textit{deployment} GitOps). Pada kedua lingkungan, penyimpangan konfigurasi di-\textit{inject} secara terkontrol melalui tujuh skenario (perubahan replika, perubahan \textit{image}, modifikasi ConfigMap, \textit{resource deletion}, \textit{patch} manual, penyimpangan lintas \textit{namespace}, dan perubahan Secret). Pengukuran dilakukan terhadap tiga metrik utama: (1)~konsistensi \textit{deployment}; (2)~waktu deteksi, waktu pemulihan, dan waktu identifikasi akar masalah; dan (3)~\textit{traceability} operasional, serta beban kognitif \textit{operator} (NASA-TLX) sebagai \textit{measured confound}. Setiap skenario diulang minimal lima kali per lingkungan untuk menghasilkan data yang memadai. Hasil dianalisis menggunakan uji statistik komparatif (\textit{Mann--Whitney U}) dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$) untuk mengkarakterisasi besarnya perbedaan antara kedua paradigma pada berbagai skenario penyimpangan. % TODO: tambahkan ringkasan hasil eksperimen setelah pengumpulan data selesai.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+\vspace{0.5cm}
+\noindent\textbf{Kata Kunci:} penyimpangan konfigurasi, Kubernetes, GitOps, \textit{deployment} manual, evaluasi empiris terkontrol
 \endabstractind
 
 \abstracteng
-% TODO: Write abstract in English here (150-250 words).
-% Explain background, objectives, methods, and results.
+Configuration drift on Kubernetes clusters is a significant operational problem: the actual cluster state deviates from the declaratively defined state, resulting in inconsistency, poor audit trails, and lengthy recovery times. Although GitOps is intuitively believed to be superior in handling drift, controlled empirical evidence characterizing the magnitude and conditions of the difference between manual and GitOps paradigms is lacking. This research empirically evaluates the impact of configuration drift scenarios on the operational characteristics of deployment under two different management paradigms, manual and GitOps, on a Kubernetes cluster. The evaluation adopts a controlled experimental design with two parallel environments: Environment A (manual deployment) and Environment B (GitOps deployment). On both environments, controlled configuration drift is injected through seven scenarios (replica change, image change, ConfigMap modification, resource deletion, manual patch, cross-namespace drift, and Secret change). Measurements are taken across three primary metrics: (1)~deployment consistency; (2)~detection time, recovery time, and root cause identification time; and (3)~operational traceability, with operator cognitive load (NASA-TLX) as a measured confound. Each scenario is repeated at least five times per environment to yield sufficient data. Results are analyzed using comparative statistical tests (Mann--Whitney U) and effect sizes (Cohen's d or Cliff's delta) to characterize the magnitude of differences between the two paradigms across various drift scenarios. % TODO: add experiment result summary once data collection is complete.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+\vspace{0.5cm}
+\noindent\textbf{Keywords:} configuration drift, Kubernetes, GitOps, manual deployment, controlled empirical evaluation
 \endabstracteng
 
 %------------------------------------------------------------
 % Chapters
 %------------------------------------------------------------
 \include{chapters/bab1-pendahuluan}
-\include{chapters/bab2-identifikasi-masalah}
-\include{chapters/bab3-kajian-ilmiah}
-\include{chapters/bab4-perancangan}
-\include{chapters/bab5-pembuatan}
-\include{chapters/bab6-pengujian}
+\include{chapters/bab2-tinjauan-pustaka}
+\include{chapters/bab3-metodologi}
+\include{chapters/bab4-hasil-analisis}
+\include{chapters/bab5-kesimpulan-saran}
 
 %------------------------------------------------------------
 % Bibliography

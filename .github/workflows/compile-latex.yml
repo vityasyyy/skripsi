@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
     paths:
       - 'content/proposal/**'
+      - 'content/skripsi/**'
       - 'presentation/proposal/**'
       - 'docker/Dockerfile'
       - '.github/workflows/compile-latex.yml'
@@ -13,6 +14,7 @@ on:
     branches: [ main, master ]
     paths:
       - 'content/proposal/**'
+      - 'content/skripsi/**'
       - 'presentation/proposal/**'
       - 'docker/Dockerfile'
       - '.github/workflows/compile-latex.yml'
@@ -57,42 +59,9 @@ jobs:
           path: presentation/proposal/build/main.pdf
           retention-days: 90
 
-  release:
-    needs: [compile-proposal, compile-presentation]
-    runs-on: ubuntu-latest
-    name: Create Release
-    if: github.event_name == 'push'
-    steps:
-      - name: Download proposal PDF
-        uses: actions/download-artifact@v4
-        with:
-          name: proposal-pdf
-          path: proposal-artifact
-
-      - name: Download presentation PDF
-        uses: actions/download-artifact@v4
-        with:
-          name: presentation-pdf
-          path: presentation-artifact
-
-      - name: Rename PDFs for release
-        run: |
-          cp proposal-artifact/main.pdf proposal.pdf
-          cp presentation-artifact/main.pdf presentation.pdf
-
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: proposal-v${{ github.run_number }}
-          name: Proposal #${{ github.run_number }}
-          files: |
-            proposal.pdf
-            presentation.pdf
-
   compile-skripsi:
     runs-on: ubuntu-latest
     name: Compile Skripsi
-    if: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -106,3 +75,43 @@ jobs:
           name: skripsi-pdf
           path: content/skripsi/main.pdf
           retention-days: 90
+
+  release:
+    needs: [compile-proposal, compile-skripsi, compile-presentation]
+    runs-on: ubuntu-latest
+    name: Create Release
+    if: github.event_name == 'push'
+    steps:
+      - name: Download proposal PDF
+        uses: actions/download-artifact@v4
+        with:
+          name: proposal-pdf
+          path: proposal-artifact
+
+      - name: Download skripsi PDF
+        uses: actions/download-artifact@v4
+        with:
+          name: skripsi-pdf
+          path: skripsi-artifact
+
+      - name: Download presentation PDF
+        uses: actions/download-artifact@v4
+        with:
+          name: presentation-pdf
+          path: presentation-artifact
+
+      - name: Rename PDFs for release
+        run: |
+          cp proposal-artifact/main.pdf proposal.pdf
+          cp skripsi-artifact/main.pdf skripsi.pdf
+          cp presentation-artifact/main.pdf presentation.pdf
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: proposal-v${{ github.run_number }}
+          name: Proposal #${{ github.run_number }}
+          files: |
+            proposal.pdf
+            skripsi.pdf
+            presentation.pdf

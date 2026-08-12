@@ -4,6 +4,8 @@
 
 Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang evaluasi GitOps (ArgoCD) dalam mengurangi *configuration drift* pada deployment multi-service di klaster Kubernetes, dengan studi kasus InvenioRDM.
 
+> **Sumber kebenaran:** Proposal Tugas Akhir (`content/proposal/`) sudah diterima dan direview dosen pembimbing. Seluruh konten repo (termasuk struktur skripsi) harus selaras dengan proposal tersebut.
+
 ---
 
 ## Quick Start
@@ -61,14 +63,14 @@ skripsi/
 │   └── skripsi/
 │       ├── main.tex                # Metadata & struktur skripsi
 │       ├── ugmskripsi.cls
-│       ├── chapters/                # BAB 1-6 (Inovasi Produk)
+│       ├── chapters/                # BAB 1-5 (Studi Empiris)
 │       │   ├── bab1-pendahuluan.tex
-│       │   ├── bab2-identifikasi-masalah.tex
-│       │   ├── bab3-kajian-ilmiah.tex
-│       │   ├── bab4-perancangan.tex
-│       │   ├── bab5-pembuatan.tex
-│       │   └── bab6-pengujian.tex
+│       │   ├── bab2-tinjauan-pustaka.tex
+│       │   ├── bab3-metodologi.tex
+│       │   ├── bab4-hasil-analisis.tex
+│       │   └── bab5-kesimpulan-saran.tex
 │       ├── figures/
+│       ├── diagrams/                # Diagram TikZ dari proposal
 │       ├── lampiran/
 │       └── references.bib
 │
@@ -93,8 +95,8 @@ Setiap push ke `main`/`master` yang mengubah file `.tex`, `.bib`, atau `.cls` ak
 ## Topik Penelitian
 
 - **Judul:** Evaluasi GitOps menggunakan ArgoCD terhadap Configuration Drift pada Deployment Aplikasi Multi-Service di Klaster Kubernetes: Studi Kasus InvenioRDM
-- **Pendekatan:** Studi eksperimen terkontrol (*controlled experiment*) dengan dua lingkungan paralel
-- **Metrik:** Konsistensi deployment, waktu deteksi & pemulihan drift, jumlah intervensi manual, audit trail
+- **Pendekatan:** Studi empiris terkontrol (*quasi-experiment*) dengan dua lingkungan paralel
+- **Metrik:** R1 konsistensi deployment, R2 waktu deteksi & pemulihan drift, R3 traceability (audit trail)
 - **Teknologi:** Kubernetes, ArgoCD, InvenioRDM, Helm, kubectl
 
 ---

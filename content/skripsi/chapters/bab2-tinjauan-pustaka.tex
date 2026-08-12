@@ -1,0 +1,154 @@
+\chapter{TINJAUAN PUSTAKA}
+
+\section{Penyimpangan Konfigurasi (\textit{Configuration Drift})}
+
+Penyimpangan konfigurasi (\textit{configuration drift}) adalah situasi di mana \textit{state} aktual sebuah sistem menyimpang dari \textit{state} yang didefinisikan secara deklaratif \citep{pohjola2025mitigating}. Dalam konteks Kubernetes, penyimpangan terjadi ketika \textit{operator}, baik secara langsung maupun tidak sengaja, mengubah manifest klaster tanpa memperbarui \textit{source of truth} deklaratif, sehingga \textit{state} aktual dan \textit{desired state} menjadi tidak konsisten.
+
+Penelitian empiris oleh \citet{zhang2026configuration} melakukan studi terhadap 719 \textit{defect} konfigurasi dari 2.260 skrip Kubernetes dan mengidentifikasi 15 kategori \textit{defect}, di mana 533 dari 719 \textit{defect} (74,1\%) menyebabkan \textit{crash}, operasi yang salah, atau \textit{outage}. Studi tersebut menegaskan bahwa \textit{misconfiguration} merupakan risiko operasional utama pada Kubernetes. \citet{rahman2023security} menambahkan bahwa \textit{security misconfiguration} pada manifest Kubernetes \textit{open-source} mencakup 11 kategori yang berulang, termasuk \textit{container} yang berjalan sebagai \textit{root}, tanpa \textit{drop capabilities}, dan tanpa \textit{resource limits}. Penelitian menunjukkan bahwa penyimpangan konfigurasi bukan hanya masalah estetika konfigurasi, tetapi ancaman nyata terhadap keandalan dan keamanan layanan.
+
+\citet{pohjola2025mitigating} memberikan kerangka konseptual untuk memahami sumber dan dampak penyimpangan pada sistem \textit{Infrastructure-as-Code} (IaC). Penelitian tersebut mengidentifikasi tiga faktor pendorong utama penyimpangan: (1)~keahlian manusia (\textit{human expertise}) yang tidak konsisten; (2)~tekanan waktu (\textit{time pressure}) yang memicu perubahan cepat dan tidak didokumentasikan; dan (3)~ketiadaan mekanisme deteksi otomatis pada \textit{pipeline deployment}. Meskipun penelitian tersebut tidak beroperasi pada Kubernetes secara eksklusif, prinsip-prinsip yang dikemukakan berlaku umum untuk platform orkestrasi berbasis konfigurasi deklaratif.
+
+\subsection{Faktor yang Menimbulkan Penyimpangan Konfigurasi}
+
+Berdasarkan literatur, faktor-faktor utama yang memperburuk penyimpangan konfigurasi pada Kubernetes meliputi:
+
+\begin{enumerate}
+  \item Perubahan langsung pada klaster: Penggunaan \texttt{kubectl\allowbreak{} edit}, \texttt{kubectl\allowbreak{} patch}, atau \texttt{kubectl\allowbreak{} scale} secara langsung tanpa memperbarui repositori \textit{source of truth} \citep{zhang2026configuration}.
+  
+  \item Prosedur \textit{deployment} yang tidak terdokumentasi: Setiap \textit{operator} dapat memiliki urutan perintah yang berbeda, yang mengakibatkan \textit{state} klaster tidak deterministik \citep{pohjola2025mitigating}.
+  
+  \item Kurangnya mekanisme \textit{rollback} yang terintegrasi: \textit{Deployment} manual seringkali tidak memiliki mekanisme \textit{rollback} otomatis; \textit{operator} harus mengingat konfigurasi sebelumnya atau mengandalkan \textit{backup} yang mungkin tidak konsisten \citep{rahman2023security}.
+  
+  \item Ketiadaan mekanisme deteksi penyimpangan otomatis: Tanpa pemeriksaan berkala antara \textit{state} aktual dan \textit{desired state}, penyimpangan dapat terakumulasi selama periode lama tanpa terdeteksi \citep{zhang2026configuration}.
+\end{enumerate}
+
+\section{Terminologi Dasar}
+
+Bagian ini mendefinisikan terminologi kunci yang digunakan dalam penelitian, dengan tujuan membangun dasar konseptual yang konsisten sebelum pembahasan lebih lanjut.
+
+\subsection{Kubernetes dan Orkestrasi Kontainer}
+Kubernetes adalah platform \textit{container orchestration} \textit{open-source} yang mengotomasi \textit{deployment}, \textit{scaling}, dan manajemen aplikasi terkemas (\textit{containerized}) \citep{burns2016borg}. Kubernetes awalnya dikembangkan oleh Google berdasarkan pengalaman mengelola sistem \textit{workload} berskala besar di Borg dan Omega, dan kini menjadi standar de facto untuk orkestrasi kontainer di industri \citep{verma2015borg}. Pada Kubernetes, \textit{state} yang diinginkan (\textit{desired state}) dideklarasikan melalui berkas konfigurasi (\textit{manifest}), dan \textit{control plane} bertanggung jawab mencapai dan mempertahankan \textit{state} tersebut.
+
+\subsection{Git dan \textit{Version Control}}
+Git adalah sistem \textit{version control} terdistribusi yang merekam setiap perubahan pada berkas beserta metadata (penulis, \textit{timestamp}, pesan \textit{commit}) \citep{chacon2014git}. Dalam konteks GitOps, Git berfungsi sebagai \textit{single source of truth} yang menyimpan deklarasi \textit{state} infrastruktur dan aplikasi, sehingga setiap perubahan dapat dilacak, di-\textit{review}, dan dikembalikan (\textit{rollback}) secara andal.
+
+\subsection{\textit{Continuous Integration} dan \textit{Continuous Deployment}}
+\textit{Continuous Integration} (CI) adalah praktik di mana perubahan kode secara otomatis diuji dan digabungkan ke \textit{branch} utama, sementara \textit{Continuous Deployment} (CD) adalah perluasan CI di mana perubahan yang lulus pengujian secara otomatis di-\textit{deploy} ke lingkungan produksi tanpa intervensi manual eksplisit \citep{humble2010continuous}. GitOps merupakan paradigma spesifik di dalam CD yang menggunakan repositori Git sebagai \textit{single source of truth}.
+
+\subsection{\textit{Infrastructure-as-Code} (IaC)}
+\textit{Infrastructure-as-Code} (IaC) adalah praktik mendefinisikan dan mengelola infrastruktur melalui berkas konfigurasi yang diberi versi (\textit{versioned}), bukan melalui proses manual \citep{morris2020iac}. IaC memungkinkan \textit{version control}, \textit{code review}, dan reprodusibilitas lingkungan. Dalam konteks Kubernetes, IaC diimplementasikan melalui \textit{manifest} deklaratif (YAML) yang mendefinisikan \textit{desired state} klaster.
+
+\subsection{Paradigma Deklaratif vs Imperatif}
+Dalam paradigma imperatif, \textit{operator} memberikan serangkaian perintah langkah demi langkah yang mengubah \textit{state} sistem secara langsung (\textit{how to achieve the state}). Dalam paradigma deklaratif, \textit{operator} mendefinisikan \textit{desired state} dan sistem bertanggung jawab mencapai serta mempertahankan \textit{state} tersebut (\textit{what state to achieve}) \citep{scott2015plp}. Perbedaan fundamental ini memiliki implikasi langsung terhadap bagaimana sistem merespons deviasi konfigurasi: paradigma deklaratif mendukung \textit{convergence} otomatis, sementara paradigma imperatif memerlukan intervensi manual eksplisit untuk setiap deviasi.
+
+\section{Manajemen Konfigurasi Infrastruktur}
+
+\textit{Infrastructure state management} adalah disiplin yang mengatur bagaimana \textit{state} sebuah sistem infrastruktur didefinisikan, diterapkan, dan dipertahankan. Dalam paradigma deklaratif, \textit{operator} mendefinisikan \textit{desired state} melalui konfigurasi yang telah dibakukan (\textit{Infrastructure-as-Code}), dan sistem bertanggung jawab untuk mencapai serta mempertahankan \textit{state} tersebut \citep{morris2020iac}. Dalam paradigma imperatif, \textit{operator} memberikan serangkaian perintah langkah demi langkah yang mengubah \textit{state} sistem secara langsung \citep{limoncelli2018}. Perbedaan fundamental ini memiliki implikasi langsung terhadap bagaimana sistem merespons deviasi konfigurasi: paradigma deklaratif mendukung \textit{convergence} otomatis, sementara paradigma imperatif memerlukan intervensi manual untuk setiap deviasi.
+
+\section{\textit{Continuous Deployment} dan Paradigma GitOps}
+
+\textit{Continuous Deployment} (CD) adalah praktik dalam ranah DevOps di mana setiap perubahan kode yang lulus pengujian secara otomatis di-\textit{deploy} ke lingkungan produksi tanpa intervensi manual eksplisit \citep{limoncelli2018}. CD merupakan perluasan dari \textit{Continuous Integration} (CI) dan bertujuan meminimalkan waktu antara penulisan kode dan ketersediaannya bagi pengguna akhir. Dalam ekosistem Kubernetes, CD memerlukan mekanisme yang dapat secara andal menyelaraskan perubahan konfigurasi dengan \textit{state} klaster.
+
+GitOps adalah paradigma spesifik di dalam CD yang menggunakan repositori Git sebagai \textit{single source of truth} untuk mendefinisikan \textit{state} infrastruktur dan aplikasi. CNCF GitOps Working Group mendefinisikan empat prinsip OpenGitOps: (1)~sistem dideklarasikan secara deklaratif; (2)~\textit{state} sistem yang diinginkan tersimpan dan diberi versi (\textit{versioned}) dalam Git; (3)~perubahan \textit{state} ditarik (\textit{pulled}) secara otomatis oleh agen \textit{software}; dan (4)~agen \textit{software} secara kontinu mendeteksi dan mengoreksi deviasi dari \textit{state} yang diinginkan \citep{opengitops2021}.
+
+Karakteristik GitOps yang berbeda dari pendekatan imperatif tradisional meliputi: \textit{audit trail} lengkap melalui Git \textit{history}, penerapan \textit{code review} pada perubahan infrastruktur, \textit{rollback} yang sederhana melalui \texttt{git revert}, dan reprodusibilitas konfigurasi di berbagai lingkungan \citep{yuen2021gitops}. Dalam model \textit{pull-based} GitOps, agen yang berjalan di dalam klaster secara periodik membandingkan \textit{state} Git dengan \textit{state} klaster dan menyelaraskan keduanya, menghilangkan kebutuhan akan akses kredensial klaster dari luar \citep{utami2021analysis}.
+
+\subsection{Performa \textit{Deployment} dan \textit{Anti-Pattern}}
+
+Forsgren dkk. \citep{forsgren2018accelerate} mengidentifikasi empat metrik kunci yang mengkarakterisasi performa \textit{deployment} pada organisasi teknologi: (1)~\textit{deployment frequency}, (2)~\textit{lead time for changes}, (3)~\textit{time to restore service}, dan (4)~\textit{change failure rate}. Metrik-metrik tersebut menunjukkan bahwa organisasi yang mengadopsi praktik \textit{continuous deployment} dan \textit{Infrastructure-as-Code} secara konsisten mengungguli organisasi yang bergantung pada proses manual. Lebih lanjut, praktik \textit{deployment} manual yang mengabaikan \textit{version control} dan \textit{automated reconciliation} merupakan \textit{anti-pattern} yang berkontribusi terhadap penyimpangan konfigurasi \citep{beyer2016sre}. Dalam konteks penelitian ini, metrik \textit{time to restore service} dan \textit{change failure rate} berelasi langsung dengan metrik R2 (waktu deteksi/pemulihan) dan R1 (konsistensi \textit{deployment}) yang digunakan dalam eksperimen.
+
+ArgoCD mengimplementasikan prinsip-prinsip GitOps melalui \textit{reconciliation loop} yang berjalan di dalam klaster. ArgoCD terdiri dari tiga komponen utama: (1)~\textit{application controller} yang secara periodik membandingkan \textit{state} Git dengan \textit{state} aktual dan melakukan tindakan korektif; (2)~\textit{repo server} yang mengelola koneksi ke repositori Git; dan (3)~\textit{Redis cache} yang menyimpan \textit{state} sementara untuk performa \citep{argocd2024}. ArgoCD berperan sebagai \textit{negative feedback controller}: setiap deviasi (penyimpangan) bersifat \textit{transien}, yaitu sistem secara otomatis kembali ke \textit{desired state} tanpa memerlukan intervensi manusia, sepanjang \textit{self-heal} diaktifkan.
+
+\section{Dasar Teori: \textit{Reconciliation} dan \textit{Convergence} pada Sistem Deklaratif}
+
+Karakteristik GitOps yang berbeda dari pendekatan imperatif dapat dijelaskan melalui dua prinsip teoretis yang saling berkaitan.
+
+\subsection{\textit{Convergence} Menuju \textit{Desired State}}
+
+Dalam teori sistem, konsep \textit{negative feedback controller} menjelaskan bagaimana sistem yang menyimpan \textit{desired state} dan secara kontinu berupaya mencapainya dikatakan bersifat \textit{convergent} \citep{limoncelli2018}. ArgoCD mengimplementasikan prinsip ini melalui \textit{reconciliation loop}: secara periodik (1)~membaca \textit{desired state} dari repositori Git, (2)~membandingkannya dengan \textit{state} aktual di klaster, dan (3)~melakukan tindakan korektif jika terdapat deviasi \citep{argocd2024}. Mekanisme ini menjamin bahwa setiap deviasi (penyimpangan) bersifat \textit{transien}, yakni sistem secara otomatis kembali ke \textit{desired state} tanpa memerlukan intervensi manusia, sepanjang \textit{self-heal} diaktifkan.
+
+Sebaliknya, pendekatan manual/imperatif tidak memiliki \textit{feedback loop} bawaan. Setiap deviasi bersifat \textit{persisten} sampai \textit{operator} secara manual mendeteksi dan mengoreksinya. Tanpa mekanisme otomatis, interval antara penyimpangan dan pemulihan bergantung sepenuhnya pada kewaspadaan dan ketersediaan \textit{operator}, yang bervariasi secara tidak deterministik \citep{pohjola2025mitigating}.
+
+\subsection{\textit{Audit Trail} sebagai \textit{Social Control Mechanism}}
+
+GitOps memanfaatkan Git sebagai \textit{append-only log} yang merekam setiap perubahan konfigurasi beserta metadata (penulis, waktu, pesan \textit{commit}). Prinsip keempat OpenGitOps, yaitu \textit{continuous reconciliation}, bergantung pada kemampuan Git untuk merekonstruksi keputusan konfigurasi secara retroaktif \citep{opengitops2021}. Hal tersebut tidak hanya meningkatkan \textit{traceability}, tetapi juga berfungsi sebagai \textit{social control mechanism}: setiap perubahan tunduk pada \textit{code review}, sehingga mengurangi kemungkinan perubahan yang tidak terverifikasi masuk ke produksi.
+
+\section{\textit{Runbook} sebagai Standarisasi Prosedur Pemulihan}
+
+\textit{Runbook} adalah dokumen terstandarisasi yang berisi prosedur operasional untuk menanggapi insiden atau melakukan pemulihan (\textit{recovery}) pada sebuah sistem. Dalam ranah operasi TI, \textit{runbook} berfungsi sebagai \textit{playbook} yang mendefinisikan langkah-langkah korektif berurutan berdasarkan jenis insiden, sehingga setiap \textit{operator} yang berbeda mengikuti urutan tindakan yang sama \citep{schlette2024playbook}. Penggunaan \textit{runbook} mengurangi variabilitas akibat keahlian \textit{operator} yang berbeda-beda dan memastikan bahwa keputusan subjektif diminimalkan selama pemulihan.
+
+Dalam konteks penelitian ini, \textit{runbook} direpresentasikan sebagai skrip otomasi terstandarisasi (\texttt{recovery-runbook.sh}) yang memandu \textit{operator} pada Lingkungan A (manual) melalui prosedur pemulihan yang telah ditentukan sebelumnya (\textit{pre-defined}). Skrip tersebut menampilkan langkah-langkah korektif secara berurutan sesuai jenis penyimpangan, merekam \textit{timestamp} awal dan akhir untuk setiap perintah \texttt{kubectl} yang dieksekusi, serta memastikan \textit{operator} tidak melompati langkah atau membuat keputusan di luar prosedur. Representasi \textit{runbook} sebagai skrip otomasi memungkinkan pencatatan waktu yang objektif dan terukur, sekaligus menjaga validitas internal dengan mengontrol variabel pengganggu berupa keahlian \textit{operator}.
+
+\section{Paradigma \textit{Deployment} Alternatif}
+
+Selain paradigma manual dan GitOps yang menjadi fokus penelitian ini, terdapat paradigma \textit{deployment} lain yang menempati posisi berbeda pada spektrum deklaratif-imperatif. Pertama, paradigma \textit{push-based} \textit{Continuous Deployment} (misalnya Jenkins CI/CD) mendorong perubahan dari luar klaster ke dalam klaster melalui \textit{pipeline} otomatis. Meskipun menawarkan otomasi \textit{deployment}, paradigma ini memerlukan kredensial klaster yang terekspos pada \textit{pipeline} eksternal dan tidak memiliki mekanisme \textit{reconciliation} bawaan: ketika \textit{state} klaster menyimpang, \textit{pipeline} tidak secara aktif mendeteksi atau mengoreksi deviasi \citep{utami2021analysis}. Kedua, manajemen konfigurasi imperatif menggunakan alat seperti Ansible atau Terraform menerapkan perubahan melalui perintah imperatif yang dijalankan dari luar klaster. \citet{shrestha2024configuration} mengevaluasi Ansible sebagai alternatif GitOps dan menemukan bahwa meskipun Ansible menyediakan otomasi \textit{deployment}, ia tidak memiliki \textit{continuous reconciliation} dan \textit{audit trail} bawaan yang dimiliki GitOps. Ketiga, paradigma perantara --- Git sebagai \textit{source of truth} tanpa agen \textit{reconciliation} otomatis --- merepresentasikan titik di mana deklarasi \textit{state} disimpan dalam Git, tetapi koreksi penyimpangan tetap bergantung pada intervensi manual.
+
+Perbandingan dalam penelitian ini difokuskan pada paradigma manual dan GitOps (\textit{pull-based} dengan ArgoCD) karena keduanya merepresentasikan ujung-ujung spektrum yang paling kontras: manual sepenuhnya imperatif tanpa \textit{feedback loop}, dan GitOps sepenuhnya deklaratif dengan \textit{continuous reconciliation}. Perbandingan kedua ujung spektrum ini memungkinkan karakterisasi \textit{magnitude} perbedaan terbesar yang mungkin terjadi, sehingga memberikan batas atas (\textit{upper bound}) bagi estimasi perbedaan antara paradigma-paradigma lain yang menempati posisi antara keduanya.
+
+\section{Evaluasi Empiris GitOps dan ArgoCD}
+
+\citet{utami2021analysis} melakukan analisis perbandingan model \textit{deployment} deklaratif \textit{pull-based} (GitOps dengan ArgoCD) versus \textit{push-based} pada Kubernetes, dan menemukan bahwa model \textit{pull-based} dilaporkan lebih andal karena agen berjalan di dalam klaster dan tidak memerlukan kredensial eksternal. \citet{shrestha2024configuration} mengevaluasi GitOps versus Ansible untuk manajemen konfigurasi Kubernetes, khususnya pada aspek deteksi penyimpangan dan \textit{remedy time}; namun, studi tersebut mengandalkan penilaian kualitatif untuk menilai tingkat keparahan penyimpangan alih-alih metrik kuantitatif yang dapat direplikasi. \citet{kaggantinataraja2025security} melakukan analisis berpusat keamanan terhadap pendekatan deklaratif (GitOps/ArgoCD) dan imperatif (Jenkins/\texttt{kubectl}), menemukan bahwa pendekatan deklaratif menghasilkan koreksi penyimpangan yang lebih cepat, \textit{compliance rate} yang lebih tinggi, dan paparan kerentanan yang lebih rendah; namun, studi tersebut tidak mengisolasi efek pendekatan \textit{deployment} dari variabel pengganggu seperti ukuran klaster dan keahlian tim.
+
+\citet{paavola2021managing} membandingkan ArgoCD dan FluxCD untuk \textit{multi-application management} pada Kubernetes dan melaporkan bahwa ArgoCD lebih sesuai untuk skenario multi-application, berkat dukungan UI dan integrasi yang lebih baik. \citet{damore2021gitops} mengimplementasikan ArgoCD untuk \textit{continuous deployment} pada lingkungan \textit{hybrid cloud}, namun tidak membahas evaluasi metrik kuantitatif secara eksplisit. \citet{matubber2025managing} mengukur \textit{reconciliation time}, \textit{scalability}, dan \textit{reliability} GitOps untuk infrastruktur K8s, termasuk \textit{self-healing} terhadap penyimpangan konfigurasi; namun, pengukuran dilakukan tanpa \textit{control group} yang menjalankan \textit{manual workflow}, sehingga tidak dapat disimpulkan apakah \textit{reconciliation time} yang terukur berbeda secara bermakna dari pemulihan manual.
+
+Tabel~\ref{tab:literatur-comparison} merangkum kelemahan metodologis kunci dari penelitian-penelitian tersebut.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Perbandingan Kelemahan Metodologis Penelitian Terdahulu}
+  \label{tab:literatur-comparison}
+  \begin{tabular}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{5.8cm}|}
+    \hline
+    Penelitian & Fokus & Kelemahan Metodologis \\
+    \hline
+    \citet{shrestha2024configuration} & GitOps vs Ansible & Penilaian kualitatif untuk tingkat keparahan penyimpangan; tidak ada analisis statistik formal \\
+    \hline
+    \citet{kaggantinataraja2025security} & Keamanan deklaratif vs imperatif & Tidak mengisolasi variabel pengganggu; desain observasional \\
+    \hline
+    \citet{matubber2025managing} & \textit{Reconciliation time} GitOps & Tanpa \textit{control group} (\textit{manual workflow}); tidak membandingkan secara terkontrol \\
+    \hline
+    \citet{paavola2021managing} & ArgoCD vs FluxCD & Komparatif deskriptif; tanpa metrik kuantitatif formal \\
+    \hline
+    \citet{damore2021gitops} & ArgoCD \textit{hybrid cloud} & Studi implementasi; tanpa evaluasi metrik \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\section{Metode Eksperimental Terkontrol pada Riset Sistem}
+
+Evaluasi empiris pada riset sistem dan infrastruktur memerlukan desain eksperimental yang memitigasi ancaman terhadap validitas \citep{wohlin2012experimentation}. \citet{limoncelli2018} menjelaskan bahwa penelitian sistem harus membangun lingkungan yang dapat direproduksi, mengendalikan variabel pengganggu, dan mendefinisikan metrik yang jelas sebelum menyimpulkan hubungan kausal.
+
+Desain eksperimental yang digunakan dalam penelitian ini membandingkan dua lingkungan yang menerima perlakuan identik (skenario penyimpangan yang sama) dalam kondisi terkontrol: Lingkungan A (\textit{deployment} manual dengan \texttt{kubectl}) dan Lingkungan B (\textit{deployment} GitOps dengan ArgoCD). Kedua lingkungan dibangun pada klaster identik dengan konfigurasi yang disamakan; satu-satunya perbedaan adalah paradigma \textit{deployment} (variabel independen), sehingga perbedaan hasil pengukuran dapat diatribusikan kepada perbedaan paradigma \citep{wohlin2012experimentation}.
+
+Analisis data menggunakan uji \textit{Mann--Whitney U} untuk membandingkan setiap metrik antara kedua lingkungan, disertai perhitungan ukuran efek (Cohen's \textit{d} atau Cliff's $\delta$) untuk mengkarakterisasi besarnya perbedaan yang teramati \citep{wohlin2012experimentation}. Prinsip-prinsip rigor yang diterapkan meliputi: (1)~pengulangan (\textit{replication}) untuk memastikan reliabilitas; (2)~kontrol variabel pengganggu untuk menjaga validitas internal; (3)~ukuran efek (\textit{effect size}) untuk menilai signifikansi praktis; dan (4)~analisis \textit{power} untuk memastikan ukuran sampel memadai.
+
+\section{Klasifikasi Beban Uji (\textit{Workload})}
+
+Aplikasi yang dijalankan pada klaster Kubernetes dapat dikelompokkan ke dalam beberapa kelas \textit{workload} berdasarkan karakteristik arsitektur dan manajemen \textit{state} \citep{siddiqui2023microservices, aghili2024workload}:
+
+\begin{enumerate}
+  \item \textit{Workload} web tanpa state (\textit{stateless web microservice}): Layanan yang tidak menyimpan \textit{state} secara internal, sehingga setiap permintaan dapat dilayani oleh instans mana pun. Contoh: server HTTP sederhana, \textit{API gateway}.
+  
+  \item \textit{Workload} berbasis data yang menyimpan \textit{state} (\textit{stateful data service}): Layanan yang menyimpan \textit{state} secara persisten, seperti \textit{database} relasional, \textit{search engine}, atau \textit{object storage}. \textit{Workload} kelas ini memerlukan urutan \textit{deployment} dan penanganan penyimpangan yang lebih kompleks.
+  
+  \item \textit{Workload} komposit multi-service: Aplikasi yang terdiri atas banyak komponen yang saling bergantung, mencakup kombinasi kelas 1 dan 2 beserta komponen infrastruktur (\textit{ingress}, TLS, \textit{secrets}, \textit{monitoring}, \textit{backup}, kebijakan keamanan). Kelas \textit{workload} ini memiliki kompleksitas dependensi tertinggi dan paling rentan terhadap penyimpangan konfigurasi akibat banyaknya komponen yang harus diselaraskan.
+\end{enumerate}
+
+Penelitian ini menggunakan beban uji (\textit{workload}) komposit multi-service yang mencakup setidaknya 16 komponen: (1)~\textit{web application}, (2)~\textit{Celery workers} untuk pemrosesan asinkron, (3)~\textit{database} relasional (PostgreSQL), (4)~\textit{search engine} (OpenSearch), (5)~\textit{cache} dan \textit{message broker} (Redis), (6)~\textit{object storage} (MinIO/S3), serta komponen infrastruktur pendukung meliputi (7)~\textit{ingress controller}, (8)~\textit{certificate manager}, (9)~\textit{secret encryption}, (10)~\textit{network tunnel}, (11)~kebijakan keamanan, (12)~\textit{monitoring system}, dan (13)~\textit{backup}. Beban uji dipilih karena memenuhi tiga kriteria: (a)~kompleksitas dependensi yang memerlukan urutan \textit{deployment}, di mana layanan \textit{web} bergantung pada \textit{database}, \textit{cache}, dan \textit{search engine}; (b)~keberadaan komponen infrastruktur yang luas, mencakup \textit{ingress}, TLS, \textit{secrets}, \textit{monitoring}, \textit{backup}, dan kebijakan keamanan; dan (c)~ketersediaan sebagai platform \textit{open-source} yang dapat direproduksi. Dalam konteks penelitian ini, beban uji berfungsi sebagai subjek uji (\textit{test subject}), bukan objek penelitian. Segala temuan dan metrik berlaku untuk kelas \textit{workload} komposit multi-service secara umum.
+
+\section{Kesenjangan Penelitian (\textit{Research Gap})}
+
+Berdasarkan tinjauan pustaka yang telah diuraikan, terdapat empat kesenjangan yang saling berkaitan dan menjadi landasan penelitian:
+
+\begin{enumerate}
+  \item Kesenjangan Validitas Konstruk: Penelitian sebelumnya menunjukkan bahwa GitOps mengurangi penyimpangan konfigurasi, namun temuan-temuan tersebut bergantung pada metrik yang tidak teroperasionalisasi secara kuantitatif. \citet{shrestha2024configuration} menggunakan penilaian kualitatif untuk tingkat keparahan penyimpangan, sementara \citet{kaggantinataraja2025security} mengukur \textit{compliance rate} tanpa mendefinisikan protokol pengukuran yang dapat direplikasi. Tanpa operasionalisasi metrik yang tegas, klaim karakteristik GitOps tidak dapat diverifikasi secara independen.
+
+  \item Kesenjangan Validitas Internal: Studi-studi yang ada tidak mengisolasi efek paradigma \textit{deployment} dari variabel pengganggu. \citet{kaggantinataraja2025security} tidak mengendalikan ukuran klaster atau keahlian \textit{operator}; \citet{matubber2025managing} mengukur \textit{reconciliation time} GitOps tanpa \textit{control group} (\textit{manual workflow}). Akibatnya, efek yang diamati tidak dapat diatribusikan secara kausal kepada GitOps, yang mungkin disebabkan oleh keahlian \textit{operator} yang lebih tinggi, karakteristik \textit{workload} yang lebih sederhana, atau kondisi klaster yang lebih stabil.
+
+  \item Kesenjangan Metodologis: Tidak ditemukan penelitian yang menerapkan desain eksperimental terkontrol dengan analisis statistik formal (uji komparatif dan ukuran efek) pada perbandingan GitOps versus manual. Absensi rigor statistik tersebut mengakibatkan temuan yang ada tidak dapat digeneralisasi dan rentan terhadap \textit{Type I error} (menerima klaim positif yang sebenarnya palsu).
+
+  \item Kesenjangan Kontekstual: Evaluasi GitOps yang ada dilakukan pada konteks yang bervariasi tanpa standardisasi metrik dan protokol, sehingga temuan tidak dapat dibandingkan lintas studi. Belum ada evaluasi yang menggunakan desain eksperimental terkontrol pada konteks klaster yang mengelola \textit{workload} komposit multi-service dengan dependensi lintas komponen, di mana satu insiden penyimpangan dapat memengaruhi ketersediaan layanan secara keseluruhan.
+\end{enumerate}
+
+Penelitian ini mengisi keempat kesenjangan tersebut dengan: (1)~mengoperasionalisasi tiga metrik kuantitatif yang dapat direplikasi; (2)~mengendalikan variabel pengganggu melalui desain eksperimental terkontrol; (3)~menerapkan analisis statistik komparatif dengan uji signifikansi dan ukuran efek; dan (4)~mengevaluasi pada konteks \textit{workload} komposit multi-service dengan kompleksitas dependensi yang representatif.

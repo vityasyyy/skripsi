@@ -1,5 +1,272 @@
-@misc{placeholder,
-  author    = {{Placeholder}},
-  title     = {Placeholder Reference},
-  year      = {2024}
+%------------------------------------------------------------
+% Referensi untuk Proposal Evaluasi Empiris GitOps vs Manual Deployment
+%------------------------------------------------------------
+
+% === K8s & Container Orchestration ===
+
+@article{burns2016borg,
+  author    = {Brendan Burns and Brian Grant and David Oppenheimer and Eric Brewer and John Wilkes},
+  title     = {Borg, Omega, and Kubernetes},
+  journal   = {ACM Queue},
+  year      = {2016},
+  volume    = {14},
+  number    = {1},
+  pages     = {70--93}
+}
+
+@inproceedings{verma2015borg,
+  author    = {Abhishek Verma and Luis Pedrosa and Madhukar Korupolu and David Oppenheimer and Eric Tune and John Wilkes},
+  title     = {Large-Scale Cluster Management at Google with Borg},
+  booktitle = {Proceedings of the Tenth European Conference on Computer Systems (EuroSys '15)},
+  year      = {2015},
+  publisher = {ACM},
+  pages     = {1--17}
+}
+
+@misc{cncf2024,
+  author    = {{Cloud Native Computing Foundation}},
+  title     = {CNCF Cloud Native Definition v1.0},
+  year      = {2024},
+  url       = {https://www.cncf.io/about/who-we-are},
+  urldate   = {2025-05-10}
+}
+
+% === Version Control (Git) ===
+
+@book{chacon2014git,
+  author    = {Scott Chacon and Ben Straub},
+  title     = {Pro Git},
+  year      = {2014},
+  publisher = {Apress},
+  edition   = {2nd}
+}
+
+% === Continuous Integration / Continuous Deployment ===
+
+@book{humble2010continuous,
+  author    = {Jez Humble and David Farley},
+  title     = {Continuous Delivery: Reliable Software Releases Through Build, Test, and Deployment Automation},
+  year      = {2010},
+  publisher = {Addison-Wesley Professional}
+}
+
+% === Deployment Performance (DORA) ===
+
+@book{forsgren2018accelerate,
+  author    = {Nicole Forsgren and Jez Humble and Gene Kim},
+  title     = {Accelerate: The Science of Lean Software and DevOps},
+  year      = {2018},
+  publisher = {IT Revolution Press}
+}
+
+% === Infrastructure as Code ===
+
+@book{morris2020iac,
+  author    = {Kief Morris},
+  title     = {Infrastructure as Code: Dynamic Systems for the Cloud Age},
+  year      = {2020},
+  publisher = {O'Reilly Media},
+  edition   = {2nd}
+}
+
+% === Programming Paradigms ===
+
+@book{scott2015plp,
+  author    = {Michael L. Scott},
+  title     = {Programming Language Pragmatics},
+  year      = {2015},
+  publisher = {Morgan Kaufmann},
+  edition   = {4th}
+}
+
+% === Site Reliability Engineering ===
+
+@book{beyer2016sre,
+  author    = {Betsy Beyer and Chris Jones and Jennifer Petoff and Niall Richard Murphy},
+  title     = {Site Reliability Engineering: How Google Runs Production Systems},
+  year      = {2016},
+  publisher = {O'Reilly Media}
+}
+
+% === GitOps ===
+
+@misc{opengitops2021,
+  author    = {{CNCF GitOps Working Group}},
+  title     = {OpenGitOps Principles v1.0.0},
+  year      = {2021},
+  howpublished = {\url{https://opengitops.dev}},
+  urldate   = {2025-05-10}
+}
+
+@book{yuen2021gitops,
+  author    = {Billy Yuen and Alexander Matyushentsev and Jesse Suen and Thomas Ekenstam},
+  title     = {GitOps and Kubernetes: Continuous Deployment with Argo CD, Jenkins X, and Flux},
+  year      = {2021},
+  publisher = {O'Reilly Media},
+  isbn      = {978-1492094877}
+}
+
+% === ArgoCD ===
+
+@misc{argocd2024,
+  author    = {{Argo Project}},
+  title     = {ArgoCD Documentation},
+  year      = {2024},
+  url       = {https://argo-cd.readthedocs.io},
+  urldate   = {2025-05-10}
+}
+
+% === GitOps Academic Evaluation ===
+
+@inproceedings{utami2021analysis,
+  author    = {Ervina Utami and Hanif Al Fatta},
+  title     = {Analysis on the Use of Declarative and Pull-Based Deployment Models on GitOps Using Argo CD},
+  booktitle = {2021 4th International Conference on Information and Communications Technology (ICOIACT)},
+  year      = {2021},
+  publisher = {IEEE}
+}
+
+@inproceedings{shrestha2024configuration,
+  author    = {R. Shrestha and A. A. N. Ali},
+  title     = {Configuration Management in Kubernetes Environments: A GitOps Approach},
+  booktitle = {2024 IEEE/ACM 17th International Conference on Utility and Cloud Computing (UCC)},
+  year      = {2024},
+  publisher = {IEEE}
+}
+
+@mastersthesis{paavola2021managing,
+  author    = {E. Paavola},
+  title     = {Managing Multiple Applications on Kubernetes Using GitOps Principles},
+  school    = {Turku University of Applied Sciences},
+  year      = {2021}
+}
+
+@mastersthesis{damore2021gitops,
+  author    = {M. D'Amore},
+  title     = {GitOps and ArgoCD: Continuous Deployment and Maintenance of a Full Stack Application in a Hybrid Cloud Kubernetes Environment},
+  school    = {Politecnico di Torino},
+  year      = {2021}
+}
+
+@mastersthesis{matubber2025managing,
+  author    = {M. E. Matubber},
+  title     = {Managing 5G Kubernetes Infrastructures Using GitOps Principles},
+  school    = {KTH Royal Institute of Technology},
+  year      = {2025}
+}
+
+% === Configuration Drift & Reliability ===
+
+@article{zhang2026configuration,
+  author    = {Yue Zhang and Uchswas Paul and Marcelo d'Amorim and Akond Rahman},
+  title     = {Configuration Defects in Kubernetes},
+  journal   = {IEEE Transactions on Software Engineering},
+  year      = {2026},
+  publisher = {IEEE},
+  doi       = {10.48550/arXiv.2512.05062}
+}
+
+@article{rahman2023security,
+  author    = {A. Rahman and S. I. Shamim and D. B. Bose and others},
+  title     = {Security Misconfigurations in Open Source Kubernetes Manifests: An Empirical Study},
+  journal   = {ACM Transactions on Software Engineering and Methodology},
+  year      = {2023},
+  publisher = {ACM}
+}
+
+@mastersthesis{kaggantinataraja2025security,
+  author    = {P. Kagganti Nataraja},
+  title     = {A Security-Centric Analysis of Declarative and Imperative Deployment Approaches in Kubernetes-Based Application Environments},
+  school    = {National College of Ireland},
+  year      = {2025}
+}
+
+@mastersthesis{pohjola2025mitigating,
+  author    = {O. Pohjola},
+  title     = {Mitigating Configuration Drift in Infrastructure-as-Code Systems},
+  school    = {Aalto University},
+  year      = {2025}
+}
+
+% === Deployment Alternatives ===
+
+@book{limoncelli2018,
+  author    = {Thomas A. Limoncelli and Strata R. Chalup and Christina J. Hogan},
+  title     = {The Practice of Cloud System Administration: Designing and Operating Large Distributed Systems},
+  publisher = {Addison-Wesley Professional},
+  year      = {2018},
+  edition   = {2nd}
+}
+
+% === Workload Taxonomy & Microservice Classification ===
+
+@inproceedings{aghili2024workload,
+  author    = {R. Aghili and Q. Qin and H. Li and F. Khomh},
+  title     = {Understanding Web Application Workloads and Their Applications: Systematic Literature Review and Characterization},
+  booktitle = {2024 IEEE International Conference on Web Services (ICWS)},
+  year      = {2024},
+  publisher = {IEEE}
+}
+
+@article{siddiqui2023microservices,
+  author    = {H. Siddiqui and F. Khendek and M. Toeroe},
+  title     = {Microservices Based Architectures for IoT Systems---State-of-the-Art Review},
+  journal   = {Internet of Things},
+  year      = {2023},
+  publisher = {Elsevier}
+}
+
+% === Runbook / Playbook Standardization ===
+
+@inproceedings{schlette2024playbook,
+  author    = {D. Schlette and P. Empl and M. Caselli and T. Schreck and G. Pernul},
+  title     = {Do You Play It by the Books? A Study on Incident Response Playbooks and Influencing Factors},
+  booktitle = {2024 IEEE Symposium on Security and Privacy (SP)},
+  year      = {2024},
+  publisher = {IEEE}
+}
+
+% === Experimentation & Research Methodology ===
+
+@book{wohlin2012experimentation,
+  author    = {Claes Wohlin and Per Runeson and Martin H{\"o}st and Magnus C. Ohlsson and Bj{\"o}rn Regnell and Anders Wessl{\'e}n},
+  title     = {Experimentation in Software Engineering},
+  publisher = {Springer},
+  year      = {2012},
+  edition   = {2nd}
+}
+
+@book{cook1979quasi,
+  author    = {Thomas D. Cook and Donald T. Campbell},
+  title     = {Quasi-Experimentation: Design and Analysis Issues for Field Settings},
+  publisher = {Houghton Mifflin},
+  year      = {1979}
+}
+
+@book{cohen1988statistical,
+  author    = {Jacob Cohen},
+  title     = {Statistical Power Analysis for the Behavioral Sciences},
+  publisher = {Lawrence Erlbaum Associates},
+  year      = {1988},
+  edition   = {2nd}
+}
+
+@article{kitchenham2002guidelines,
+  author    = {Barbara A. Kitchenham and Shari Lawrence Pfleeger and Larry M. Pickard and Peter Jones and David C. Hoaglin and Khaled El Emam and Jerome J. Rosenberg},
+  title     = {Preliminary Guidelines for Empirical Research in Software Engineering},
+  journal   = {IEEE Transactions on Software Engineering},
+  year      = {2002},
+  volume    = {28},
+  number    = {8},
+  pages     = {721--734}
+}
+
+@article{nasatlx,
+  author    = {Sandra G. Hart and Lowell E. Staveland},
+  title     = {Development of NASA-TLX (Task Load Index): Results of Empirical and Theoretical Research},
+  journal   = {Advances in Psychology},
+  year      = {1988},
+  volume    = {52},
+  pages     = {139--183},
+  publisher = {North-Holland}
 }

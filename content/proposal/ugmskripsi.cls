@@ -35,7 +35,7 @@
 \bibliographystyle{plainnat}
 \RequirePackage{nomencl}%
 \renewcommand{\nomname}{\nomenclaturename}%
-\makeglossary%
+\makenomenclature%
 
 %------------------------------------------------------------
 %Layout
@@ -416,7 +416,7 @@ dalam naskah ini dan disebutkan dalam daftar pustaka.
 %------------------------------------------------------------
 \def\lambang{%
   \clearpage\thispagestyle{chapterheading}%
-  \printglossary%
+  \printnomenclature%
 \addcontentsline{toc}{chapter}{\nomenclaturename}
 }
 

@@ -14,9 +14,9 @@
 
 ---
 
-## Jenis TA: Skripsi Inovasi Produk
+## Jenis TA: Skripsi Studi Empiris (Kuasi-Eksperimen)
 
-Mahasiswa mengembangkan produk/aplikasi/prototipe berbasis teknologi. Dalam kasus ini: **GitOps deployment system untuk InvenioRDM pada Kubernetes**.
+Mahasiswa melakukan studi empiris terkontrol: **evaluasi perbandingan deployment manual (`kubectl`) vs GitOps (ArgoCD) terhadap configuration drift pada klaster Kubernetes** (studi kasus workload multi-service InvenioRDM). Implementasi infrastruktur hanya berfungsi sebagai **apparatus eksperimental** untuk pengukuran, bukan produk yang dikembangkan.
 
 ---
 
@@ -79,15 +79,14 @@ Mahasiswa mengembangkan produk/aplikasi/prototipe berbasis teknologi. Dalam kasu
 | Intisari | ✅ | Bahasa Indonesia |
 | Abstract | ✅ | Bahasa Inggris |
 
-### Bagian Utama (Inovasi Produk — Bab 3.2 Pedoman)
+### Bagian Utama (Studi Empiris)
 | Bab | Judul | Isi |
 |-----|-------|-----|
-| **Bab 1** | Pendahuluan | Latar Belakang, **Perumusan Produk**, Batasan Produk, Tujuan, Manfaat |
-| **Bab 2** | Identifikasi Masalah dan Ide Inovatif | Identifikasi masalah nyata + pengembangan ide inovatif |
-| **Bab 3** | Kajian Ilmiah | Tinjauan pustaka + dasar ilmiah produk (metode, algoritma, teknologi) |
-| **Bab 4** | Perancangan Prototipe/Produk | Arsitektur, UI/UX, database, rancangan teknis |
-| **Bab 5** | Proses Pembuatan Produk | Implementasi, kode, integrasi komponen |
-| **Bab 6** | Pengujian dan Evaluasi Produk | Metode pengujian, skenario, hasil, evaluasi kinerja + **Kesimpulan dan Saran** |
+| **Bab 1** | Pendahuluan | Latar Belakang, **Rumusan Masalah**, Batasan Masalah, Tujuan Penelitian, Manfaat Penelitian, Sistematika Penulisan |
+| **Bab 2** | Tinjauan Pustaka | Studi empiris terkait configuration drift, terminologi dasar, manajemen konfigurasi infrastruktur, paradigma deployment alternatif, evaluasi GitOps/ArgoCD, research gap |
+| **Bab 3** | Metode Penelitian | Evaluasi empiris terkontrol, variabel & intervensi, 7 skenario penyimpangan, protokol pengukuran, analisis statistik komparatif (Mann–Whitney U, Cohen's d), ancaman validitas, lingkungan eksperimen |
+| **Bab 4** | Hasil dan Analisis | Hasil E1–E3 (R1 konsistensi, R2 waktu deteksi/pemulihan/identifikasi akar masalah, R3 traceability), statistik deskriptif, uji perbandingan, ukuran efek, interpretasi, pembahasan |
+| **Bab 5** | Kesimpulan dan Saran | Kesimpulan per dimensi evaluasi, saran, keterbatasan |
 
 ### Bagian Akhir
 | Elemen | Ada? |
@@ -103,12 +102,11 @@ Mahasiswa mengembangkan produk/aplikasi/prototipe berbasis teknologi. Dalam kasu
 |-------|----------|---------|
 | Class option | `[proposal]` | `[skripsi]` |
 | Cover text | "PROPOSAL TUGAS AKHIR" | "SKRIPSI" |
-| Judul Bab 1 | Rumusan **Masalah** | **Perumusan Produk** |
-| Bab 2 | Penelitian Terkait | Identifikasi Masalah dan Ide Inovatif |
-| Bab 3 | Metode dan Rancangan | Kajian Ilmiah |
-| Bab 4 | Jadwal Penelitian | Perancangan Produk |
-| Bab 5 | ❌ Tidak ada | Proses Pembuatan Produk |
-| Bab 6 | ❌ Tidak ada | Pengujian dan Evaluasi Produk |
+| Bab 1 | Pendahuluan (Rumusan Masalah) | Pendahuluan (Rumusan Masalah) |
+| Bab 2 | Penelitian Terkait | Tinjauan Pustaka |
+| Bab 3 | Metode dan Rancangan | Metode Penelitian |
+| Bab 4 | Jadwal Penelitian | Hasil dan Analisis |
+| Bab 5 | ❌ Tidak ada | Kesimpulan dan Saran |
 | Preliminary pages | Minimal | Lengkap |
 | Lampiran | ❌ Tidak ada | ✅ Ada |
 

@@ -1,5 +1,53 @@
 \chapter{LAMPIRAN A}
 
-\section{Kode Sumber}
+% TODO: Lengkapi lampiran ini dengan artefak eksperimen setelah skrip
+% otomasi dan konfigurasi dikembangkan (jadwal: Juli--Agustus 2026).
+
+\section{Kode Sumber Skrip Eksperimen}
+
+Skrip otomasi yang digunakan untuk menjaga konsistensi prosedural eksperimen
+(lihat Bab III, subbab Skrip Otomasi Eksperimen):
+
+\subsection{Skrip Injeksi Penyimpangan (\texttt{drift-inject.sh})}
+
+% TODO: Sertakan listing skrip yang memilih skenario secara acak dari
+% himpunan {A, B, C, D, E, F, G}, mengeksekusi perintah kubectl pada kedua
+% lingkungan, dan merekam timestamp t0 ke log JSON/CSV.
+
+\subsection{Skrip Pengumpulan Metrik (\texttt{metrics-collect.sh})}
+
+% TODO: Sertakan listing skrip polling berkala (ArgoCD API setiap 5 detik
+% untuk Lingkungan B; kubectl get/describe untuk Lingkungan A) yang merekam
+% timestamp deteksi (td), pemulihan (t2), dan identifikasi akar masalah (trci).
+
+\subsection{Skrip Verifikasi \textit{Baseline} (\texttt{baseline-check.sh})}
+
+% TODO: Sertakan listing skrip yang memverifikasi kondisi klaster sebelum
+% setiap run (semua pod Running, penggunaan CPU/memori < 70%, ArgoCD
+% Synced/Healthy) dan menolak memulai eksperimen jika syarat tidak terpenuhi.
+
+\subsection{Skrip \textit{Recovery Runbook} (\texttt{recovery-runbook.sh})}
+
+% TODO: Sertakan listing skrip yang memandu operator Lingkungan A melalui
+% prosedur pemulihan terstandarisasi dan merekam timestamp setiap perintah
+% kubectl yang dieksekusi.
 
 \section{Konfigurasi}
+
+\subsection{Manifest Kubernetes dan GitOps}
+
+% TODO: Sertakan manifest deklaratif beban uji workload komposit multi-service
+% (Helm chart atau Kustomize manifests) yang disimpan dalam repositori Git
+% sebagai source of truth untuk Lingkungan B.
+
+\subsection{Konfigurasi ArgoCD}
+
+% TODO: Sertakan konfigurasi ArgoCD untuk Lingkungan B: sync policy
+% (auto-sync, interval 60 detik), self-heal aktif, dan prune aktif.
+
+\subsection{Dataset}
+
+% TODO: Dokumentasikan skema log terstruktur (JSON/CSV) yang merekam
+% timestamp t0, td, trci, dan t2 untuk setiap skenario dan pengulangan,
+% format snapshot status klaster (kubectl get all), serta sumber data
+% traceability (Git commit history dan Kubernetes audit logs).
