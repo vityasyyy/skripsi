@@ -134,19 +134,7 @@
   publisher = {IEEE}
 }
 
-@mastersthesis{paavola2021managing,
-  author    = {E. Paavola},
-  title     = {Managing Multiple Applications on Kubernetes Using GitOps Principles},
-  school    = {Turku University of Applied Sciences},
-  year      = {2021}
-}
-
-@mastersthesis{damore2021gitops,
-  author    = {M. D'Amore},
-  title     = {GitOps and ArgoCD: Continuous Deployment and Maintenance of a Full Stack Application in a Hybrid Cloud Kubernetes Environment},
-  school    = {Politecnico di Torino},
-  year      = {2021}
-}
+% === Configuration Drift & Reliability ===
 
 @mastersthesis{matubber2025managing,
   author    = {M. E. Matubber},
@@ -155,15 +143,16 @@
   year      = {2025}
 }
 
-% === Configuration Drift & Reliability ===
-
 @article{zhang2026configuration,
   author    = {Yue Zhang and Uchswas Paul and Marcelo d'Amorim and Akond Rahman},
   title     = {Configuration Defects in Kubernetes},
   journal   = {IEEE Transactions on Software Engineering},
   year      = {2026},
+  volume    = {52},
+  number    = {3},
+  pages     = {1125--1144},
   publisher = {IEEE},
-  doi       = {10.48550/arXiv.2512.05062}
+  doi       = {10.1109/TSE.2026.3659785}
 }
 
 @article{rahman2023security,
@@ -269,4 +258,79 @@
   volume    = {52},
   pages     = {139--183},
   publisher = {North-Holland}
+}
+
+% === IaC Defect Taxonomy & Empirical Foundations (upgrade 2026-09-15) ===
+
+@inproceedings{rahman2020gang,
+  author    = {Akond Rahman and Effat Farhana and Chris Parnin and Laurie Williams},
+  title     = {Gang of Eight: A Defect Taxonomy for Infrastructure as Code Scripts},
+  booktitle = {Proceedings of the 42nd ACM/IEEE International Conference on Software Engineering (ICSE)},
+  year      = {2020},
+  publisher = {ACM/IEEE},
+  doi       = {10.1145/3377811.3380409}
+}
+
+@article{rahman2019properties,
+  author    = {Akond Rahman and Laurie Williams},
+  title     = {Source Code Properties of Defective Infrastructure as Code Scripts},
+  journal   = {Information and Software Technology},
+  year      = {2019},
+  volume    = {112},
+  pages     = {148--163},
+  publisher = {Elsevier},
+  doi       = {10.1016/j.infsof.2019.04.013}
+}
+
+@article{hassan2024reconciliation,
+  author    = {Md Mahadi Hassan and John Salvador and Shubhra Kanti Karmaker Santu and Akond Rahman},
+  title     = {State Reconciliation Defects in Infrastructure as Code},
+  journal   = {Proceedings of the ACM on Software Engineering},
+  year      = {2024},
+  volume    = {1},
+  number    = {FSE},
+  pages     = {1865--1888},
+  publisher = {ACM},
+  doi       = {10.1145/3660790}
+}
+
+@inproceedings{rahman2019seven,
+  author    = {Akond Rahman and Chris Parnin and Laurie Williams},
+  title     = {The Seven Sins: Security Smells in Infrastructure as Code Scripts},
+  booktitle = {Proceedings of the 41st International Conference on Software Engineering (ICSE)},
+  year      = {2019},
+  pages     = {164--175},
+  publisher = {IEEE/ACM},
+  doi       = {10.1109/ICSE.2019.00033}
+}
+
+@article{ebert2016devops,
+  author    = {Christof Ebert and Gorka Gallardo and Josune Hernantes and Nicolas Serrano},
+  title     = {DevOps},
+  journal   = {IEEE Software},
+  year      = {2016},
+  volume    = {33},
+  number    = {3},
+  pages     = {94--100},
+  publisher = {IEEE},
+  doi       = {10.1109/MS.2016.68}
+}
+
+@inproceedings{sallin2021measuring,
+  author    = {Marc Sallin and Martin Kropp and Craig Anslow and James W. Quilty and Andreas Meier},
+  title     = {Measuring Software Delivery Performance Using the Four Key Metrics of DevOps},
+  booktitle = {Agile Processes in Software Engineering and Extreme Programming (XP 2021)},
+  year      = {2021},
+  pages     = {103--119},
+  publisher = {Springer},
+  doi       = {10.1007/978-3-030-78098-2_7}
+}
+
+@inproceedings{wilkes2023framework,
+  author    = {Brennan Wilkes and Alessandra Maciel Paz Milani and Margaret-Anne Storey},
+  title     = {A Framework for Automating the Measurement of DevOps Research and Assessment (DORA) Metrics},
+  booktitle = {2023 IEEE International Conference on Software Maintenance and Evolution (ICSME)},
+  year      = {2023},
+  publisher = {IEEE},
+  doi       = {10.1109/ICSME58846.2023.00018}
 }
