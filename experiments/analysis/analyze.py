@@ -14,7 +14,11 @@ Outputs in <out dir>:
   boxplot_<metric>_<skenario>.png — one per R2 sub-metric per scenario
 
 R2 sub-metrics for boxplots: t0, td, trci, t2 (timing metrics).
-Grouping pools subjects x reps per (skenario, env): n=30 per cell for mock data.
+Rep filtering per Bab-3 protocol (mockgen labels rep 1..10 as R2, 11..15 as R1):
+  R2 family (t0, td, trci, t2, kubectl_cmds): reps 1..10 only, pooled across
+    subjects S1+S2 -> n=20 per (skenario, env) cell, MW on 20-vs-20 cells.
+  R1 family (r1_t0, r1_t1, r1_t2): reps 11..15 only, pooled -> n=10 per cell,
+    MW on 10-vs-10 cells.
 """
 
 from __future__ import annotations
@@ -32,7 +36,21 @@ from scipy import stats
 
 METRICS = ["t0", "td", "trci", "t2", "r1_t0", "r1_t1", "r1_t2", "kubectl_cmds"]
 R2_METRICS = ["t0", "td", "trci", "t2"]
+R1_METRICS = ["r1_t0", "r1_t1", "r1_t2"]
+# kubectl_cmds is an operational-cost metric collected during the timed R2 runs,
+# so it belongs to the R2 family (reps 1..10) for both descriptives and MW tests.
+R2_FAMILY = ["t0", "td", "trci", "t2", "kubectl_cmds"]
 ALPHA = 0.05
+
+
+def cell_values(df, skenario: str, env: str, metric: str) -> np.ndarray:
+    """Values for one (skenario, env, metric) cell with protocol rep filtering."""
+    sel = (df["skenario"] == skenario) & (df["env"] == env)
+    if metric in R1_METRICS:
+        sel &= df["rep"] >= 11
+    else:
+        sel &= df["rep"] <= 10
+    return df[sel][metric].dropna().to_numpy(float)
 
 
 def cohens_d(a: np.ndarray, b: np.ndarray) -> float:
@@ -110,13 +128,12 @@ def main() -> None:
     scenarios = sorted(df["skenario"].unique().tolist())
     envs = ["manual", "gitops"]
 
-    # --- Descriptives ---
+    # --- Descriptives (with rep filtering per metric family) ---
     desc_rows = []
     for sk in scenarios:
         for env in envs:
-            sub = df[(df["skenario"] == sk) & (df["env"] == env)]
             for m in METRICS:
-                vals = sub[m].dropna()
+                vals = pd.Series(cell_values(df, sk, env, m))
                 n = int(len(vals))
                 if n == 0:
                     mean = med = sstd = vmin = vmax = rng = float("nan")
@@ -162,8 +179,8 @@ def main() -> None:
     eff_rows = []
     for sk in scenarios:
         for m in METRICS:
-            a = df[(df["skenario"] == sk) & (df["env"] == "manual")][m].dropna().to_numpy(float)
-            b = df[(df["skenario"] == sk) & (df["env"] == "gitops")][m].dropna().to_numpy(float)
+            a = cell_values(df, sk, "manual", m)
+            b = cell_values(df, sk, "gitops", m)
             if len(a) == 0 or len(b) == 0:
                 u = p = float("nan")
             else:
@@ -216,11 +233,11 @@ def main() -> None:
         f.write(r"\hline" + "\n")
         f.write(r"\end{tabular}" + "\n")
 
-    # --- Boxplots: one PNG per R2 sub-metric per scenario ---
+    # --- Boxplots: one PNG per R2 sub-metric per scenario (reps 1..10 only) ---
     for sk in scenarios:
         for m in R2_METRICS:
-            a = df[(df["skenario"] == sk) & (df["env"] == "manual")][m].dropna().to_numpy(float)
-            b = df[(df["skenario"] == sk) & (df["env"] == "gitops")][m].dropna().to_numpy(float)
+            a = cell_values(df, sk, "manual", m)
+            b = cell_values(df, sk, "gitops", m)
             fig, ax = plt.subplots(figsize=(4, 3))
             ax.boxplot([a, b], tick_labels=["manual", "gitops"])
             ax.set_title(f"Skenario {sk} — {m} (manual vs gitops)")
@@ -230,7 +247,14 @@ def main() -> None:
             plt.close(fig)
 
     n_png = len(scenarios) * len(R2_METRICS)
-    print(f"OK: {len(desc_rows)} descriptive cells, {len(mw_rows)} MW tests, {n_png} boxplots -> {outdir}")
+    r2_ns = sorted({r["n"] for r in desc_rows if r["metric"] in R2_FAMILY})
+    r1_ns = sorted({r["n"] for r in desc_rows if r["metric"] in R1_METRICS})
+    print(
+        f"OK: {len(desc_rows)} descriptive cells "
+        f"(R2-family cell n={r2_ns}, R1-family cell n={r1_ns}), "
+        f"{len(mw_rows)} MW tests (R2 20-vs-20 expected, R1 10-vs-10 expected), "
+        f"{n_png} boxplots (reps<=10) -> {outdir}"
+    )
 
 
 if __name__ == "__main__":

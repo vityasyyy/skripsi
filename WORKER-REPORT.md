@@ -64,3 +64,38 @@ All run in worktree root, no cluster commands used (none needed).
 ## Escalation
 
 None — no blockers. No questions requiring operator decision.
+
+## FIX NOTE (rep-filtering validity fix)
+
+**Bug:** `analyze.py` pooled ALL reps 1..15 × subjects per (`skenario`,`env`),
+giving n=30 per cell for timing metrics. Per Bab-3 protocol, R2 timing runs
+(reps 1..10) and R1 consistency replicates (reps 11..15) are distinct samples.
+
+**Change** (only `experiments/analysis/analyze.py`; `mockgen.py` unchanged — its
+`run_kind` labels already match: R2 for rep≤10, R1 for rep≥11, no conflict):
+
+- Added `cell_values()` helper: metrics in `R1_METRICS` (`r1_t0,r1_t1,r1_t2`)
+  use reps ≥11; all others use reps ≤10. Used by descriptives, Mann-Whitney U +
+  effects, and boxplots.
+- `kubectl_cmds` assigned to the R2 family (reps ≤10): it is an operational-cost
+  metric collected during the timed remediation runs, and descriptives and MW
+  tests must use the same sample per metric. Documented in code.
+- Docstring updated: R2-family cells n=20 (10 reps × 2 subjects, MW 20-vs-20);
+  R1-family cells n=10 (5 reps × 2 subjects, MW 10-vs-10).
+- Stdout now reports observed cell-n lists.
+
+**Known staleness (left untouched per scope):** `experiments/analysis/README.md`
+still states "n=30 per cell" — needs a one-line update outside this fix's scope.
+
+**Verification (rerun from unchanged `mock_runs.csv`, 420 rows, header exact):**
+
+- `python3 experiments/analysis/analyze.py --in .../mock_runs.csv --out .../outputs`
+  → `exit=0`
+  → `OK: 112 descriptive cells (R2-family cell n=[20], R1-family cell n=[10]),`
+  → `56 MW tests (R2 20-vs-20 expected, R1 10-vs-10 expected), 28 boxplots (reps<=10)`
+- `*.tex` count = 3, `*.png` count = 28 (unchanged filenames).
+- Spot checks: `descriptives.tex` shows `n=20` for `t0/td/trci/t2` cells;
+  independent pandas check on scenario A: `td` 20-vs-20, `kubectl_cmds` 20-vs-20,
+  `r1_t2` 10-vs-10.
+- `git status` shows only `analyze.py`, `outputs/`, `WORKER-REPORT.md` modified;
+  no other paths touched, no cluster commands used.
