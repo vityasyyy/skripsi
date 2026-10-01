@@ -1,0 +1,5 @@
+# Bab-3 analysis pipeline requirements (Python 3.12)
+# Pinned minimums — newer patch versions are acceptable.
+pandas>=2.2.0
+scipy>=1.13.0
+matplotlib>=3.8.0
