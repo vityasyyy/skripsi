@@ -157,3 +157,24 @@ metadata:
   operator menekan ENTER pasca-runbook sebagai t2; trci default = td. Jika operator
   menghendaki trci manual diukur dari langkah `kubectl describe/logs/events` terpisah,
   perlu spesifikasi urutan describe yang mengikat.
+
+## 6. PATCH NOTE (2026-10-01) — fix(experiments): require shuf for randomized scenario order
+- Operator decision Q1: `shuf` MANDATORY, tanpa silent fallback. `drift-inject.sh` kini
+  exit 127 + pesan INSTALL bila `--order random` tanpa `shuf` di PATH; jalur fallback
+  bash-RANDOM Fisher-Yates dihapus. `--order sequential` tetap jalan tanpa shuf.
+- `experiments/subjects/README.md` + Prerequisites: shuf (coreutils), kubectl>=1.29,
+  argocd CLI v2.12+, bash>=4.
+- Verifikasi patch (tanpa cluster writes):
+  - `bash -n experiments/scripts/drift-inject.sh` -> OK.
+  - Native `--order random` di host darwin ini -> gagal sesuai desain (shuf belum
+    terinstal): `ERROR: 'shuf' (coreutils) tidak ditemukan ... INSTALL coreutils
+    (macOS: brew install coreutils + PATH with gnubin shuf ...; Linux: apt-get
+    install coreutils).`, exit=127. Artinya runner eksperimen wajib
+    `brew install coreutils` + gnubin PATH (atau Linux coreutils) sebelum wave live.
+  - PATH-shadow negatif: `mkdir -p /tmp/noshuf && PATH=/tmp/noshuf:/usr/bin:/bin bash
+    experiments/scripts/drift-inject.sh --order random` -> exit=127 + pesan INSTALL
+    (host PATH tidak diubah permanen, override satu perintah saja).
+  - Cabang shuf positif dibuktikan via shim `shuf` sementara di /tmp (dihapus setelah
+    verifikasi): order teracak e.g. `[F D C B G A E]` + note `(urutan acak via shuf)`, exit=0.
+  - `--order sequential` tanpa shuf tetap exit=0 (A-G berurutan).
+- Q1 dinyatakan CLOSED oleh keputusan operator ini; Q2-Q5 tetap OPEN.

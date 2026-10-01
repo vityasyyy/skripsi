@@ -30,3 +30,12 @@ Namespace eksperimen yang diizinkan (jangan pakai namespace lain):
 Validasi kering (tanpa `--live`, tanpa menyentuh klaster):
 `sed 's/EXP_NS/exp-s1-manual/g' experiments/subjects/s1/manifests.yaml | kubectl apply --dry-run=client -f -`
 `sed 's/EXP_NS/exp-s2-manual/g' experiments/subjects/s2/manifests.yaml | kubectl apply --dry-run=client -f -`
+
+## Prerequisites
+
+| Tool | Versi minimum | Keterangan |
+|------|---------------|------------|
+| `shuf` (coreutils) | coreutils | **Wajib** untuk `drift-inject.sh --order random`; tanpa shuf script exit non-zero (tanpa fallback). macOS: `brew install coreutils` + PATH gnubin shuf (`export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"`); Linux: `apt-get install coreutils` |
+| `kubectl` | >= 1.29 | Klaster Kubernetes v1.29+ (Bab 3) |
+| `argocd` CLI | v2.12+ | Untuk gate baseline + polling `argocd app get/diff` (Lingkungan B) |
+| `bash` | >= 4 | Semua skrip `experiments/scripts/*.sh` (`set -euo pipefail`) |

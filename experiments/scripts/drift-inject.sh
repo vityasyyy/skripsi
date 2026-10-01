@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # drift-inject.sh — injeksi penyimpangan terkontrol skenario A-G (Bab 3).
 # Default: DRY-RUN (cetak perintah, eksekusi nol). Eksekusi nyata hanya dengan --live.
-# Urutan acak via shuf (default) untuk hindari order effect; --order sequential untuk debug.
+# Urutan acak via shuf (MANDATORY untuk --order random) untuk hindari order effect;
+# --order sequential untuk debug. shuf tidak boleh di-fallback diam-diam.
 # Mencatat t0 epoch (detik) per skenario ke stdout/log.
 set -euo pipefail
 
@@ -59,6 +60,12 @@ fi
 case "$SCENARIO" in A|B|C|D|E|F|G|all) ;; *) echo "ERROR: --scenario harus A-G/all" >&2; exit 2 ;; esac
 case "$ORDER" in random|sequential) ;; *) echo "ERROR: --order random|sequential" >&2; exit 2 ;; esac
 
+# Q1 operator decision: shuf MANDATORY untuk --order random, tanpa silent fallback.
+if [[ "$ORDER" == "random" ]] && ! command -v shuf >/dev/null 2>&1; then
+  echo "ERROR: 'shuf' (coreutils) tidak ditemukan — --order random membutuhkan shuf. INSTALL coreutils (macOS: brew install coreutils + PATH with gnubin shuf, e.g. export PATH=\"/opt/homebrew/opt/coreutils/libexec/gnubin:\$PATH\"; Linux: apt-get install coreutils)." >&2
+  exit 127
+fi
+
 WRONG_NS="${NS}-wrong"
 # Skenario F memakai quarantine namespace turunan (<NS>-wrong), BUKAN namespace
 # sistem. Pola ini tidak masuk FORBIDDEN; cleanup di recovery-runbook.sh (skenario F).
@@ -77,19 +84,10 @@ inject_cmd() { # $1 = huruf skenario -> echo perintah kubectl
 
 if [[ "$SCENARIO" == "all" ]]; then LIST="A B C D E F G"; else LIST="$SCENARIO"; fi
 if [[ "$ORDER" == "random" && "$SCENARIO" == "all" ]]; then
-  if command -v shuf >/dev/null 2>&1; then
-    # shellcheck disable=SC2206
-    LIST="$(echo $LIST | tr ' ' '\n' | shuf | tr '\n' ' ')"
-    SEED_NOTE="(urutan acak via shuf)"
-  else
-    # Fallback portabel (macOS tanpa shuf): Fisher-Yates murni-bash via $RANDOM.
-    arr=($LIST); n=${#arr[@]}
-    for ((k=n-1; k>0; k--)); do
-      j=$((RANDOM % (k+1))); tmp="${arr[k]}"; arr[k]="${arr[j]}"; arr[j]="$tmp"
-    done
-    LIST="${arr[*]}"
-    SEED_NOTE="(urutan acak via bash-RANDOM fallback, shuf tak tersedia)"
-  fi
+  # shuf sudah dijamin ada oleh gate MANDATORY di atas.
+  # shellcheck disable=SC2206
+  LIST="$(echo $LIST | tr ' ' '\n' | shuf | tr '\n' ' ')"
+  SEED_NOTE="(urutan acak via shuf)"
 else
   SEED_NOTE="(urutan sequential)"
 fi
