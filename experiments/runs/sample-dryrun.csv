@@ -1,0 +1,2 @@
+subject,env,skenario,rep,t0,td,trci,t2,r1_t0,r1_t1,r1_t2,kubectl_cmds,notes
+s1,manual,A,1,0,0,0,0,100,0,100,0,DRYRUN-sample-tidak-menyentuh-klaster
