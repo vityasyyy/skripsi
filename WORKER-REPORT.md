@@ -178,3 +178,27 @@ metadata:
     verifikasi): order teracak e.g. `[F D C B G A E]` + note `(urutan acak via shuf)`, exit=0.
   - `--order sequential` tanpa shuf tetap exit=0 (A-G berurutan).
 - Q1 dinyatakan CLOSED oleh keputusan operator ini; Q2-Q5 tetap OPEN.
+
+## PATCH NOTE (2026-10-02) — Opsi A: otomasi penuh sisi manual
+
+Operator memutuskan Opsi A: tanpa manusia dalam loop pengukuran (TLX/Likert/profil
+operator gugur secara prinsip). Diterapkan langsung oleh lead di worktree ini
+(agent panes hilang karena restart server herdr; commit worker f43fb37 + d5957f2 utuh).
+
+Perubahan (`experiments/scripts/` saja):
+- `recovery-runbook.sh` — dirombak: fase DIAGNOSE (describe→logs→events; verifikasi
+  signature per skenario, exit 5 bila signature tidak ada; trci = selesai fase) +
+  fase CORRECT (langkah lama; t2 = baseline re-check rollout pass, retry 5x5s,
+  exit 4 bila gagal) + JSON `runbook_complete` baris tunggal (stdout + --log).
+  Semua non-interaktif; DRY-RUN default tetap; safety gate tetap.
+- `metrics-collect.sh` — arg baru `--runbook-log FILE`; sisi manual LIVE: td dari
+  polling rollout, trci/t2/kubectl_cmds diambil dari JSON runbook_complete,
+  marker `mode=automated` di notes. ENTER-wait operator DIHAPUS. Header CSV tidak berubah.
+
+Verifikasi: `bash -n` keduanya OK; dry-run A (3 diagnose + 2 correct) & F tanpa
+prompt interaktif; stdout-tryanis (count capture, bug stdout-substitution ditemukan
+saat review dan diperbaiki — log fase pindah ke stderr); gate negatif `invenio` exit 3;
+grep `read -r` tersisa hanya loop `while read` baseline-check (non-interaktif, konsumsi
+output pipe); unit-test parser JSON (trci/t2/kubectl_cmds) OK.
+
+Sisa untuk live wave: pilot run --live skenario A untuk membuktikan JSON end-to-end.

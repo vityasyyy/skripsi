@@ -3,8 +3,9 @@
 # Default: DRY-RUN (cetak perintah, tulis nol baris). Tulis CSV nyata hanya dengan --live,
 # atau --live-dryrun untuk menulis satu baris contoh bertanda DRYRUN (tidak menyentuh klaster).
 # Gitops: poll `argocd app get <APP>` tiap 5 dtk (OutOfSync->td, Synced->t2, diff->trci).
-# Manual: poll `kubectl rollout status / get` tiap 5 dtk; td/trci/t2 diisi operator+runbook,
-#   script menyediakan template dan perekam timestamp.
+# Manual (Opsi A, otomatis penuh): poll rollout tiap 5 dtk -> td; trci/t2 diambil dari
+#   JSON "runbook_complete" yang ditulis recovery-runbook.sh (arg --runbook-log FILE).
+#   Tidak ada penekanan ENTER manusia di seluruh loop pengukuran.
 set -euo pipefail
 
 LIVE=0
@@ -19,13 +20,16 @@ T0=""
 TIMEOUT="600"
 OUT=""
 KUBECTL_CMDS="0"
+RUNBOOK_LOG=""
 NOTES=""
 
 usage() {
   cat <<'USAGE'
 Usage: metrics-collect.sh [--live] [--live-dryrun] [--subject s1|s2] [--env manual|gitops]
        [--scenario A-G] [--rep N] [--namespace NS] [--app APP] [--t0 EPOCH]
-       [--timeout SECS] [--output FILE.csv] [--kubectl-cmds N] [--notes TXT]
+       [--timeout SECS] [--output FILE.csv] [--runbook-log FILE] [--kubectl-cmds N] [--notes TXT]
+  Manual env + --live: --runbook-log FILE = file tempat recovery-runbook.sh menulis
+  JSON runbook_complete (sumber trci/t2/kubectl_cmds otomatis, Opsi A).
   Header CSV (EKSAK, jangan diubah):
   subject,env,skenario,rep,t0,td,trci,t2,r1_t0,r1_t1,r1_t2,kubectl_cmds,notes
 USAGE
@@ -44,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --t0) T0="${2:-}"; shift 2 ;;
     --timeout) TIMEOUT="${2:-}"; shift 2 ;;
     --output|-o) OUT="${2:-}"; shift 2 ;;
+    --runbook-log) RUNBOOK_LOG="${2:-}"; shift 2 ;;
     --kubectl-cmds) KUBECTL_CMDS="${2:-}"; shift 2 ;;
     --notes) NOTES="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -96,7 +101,8 @@ if [[ $LIVE -ne 1 && $DRYRUN_ROW -ne 1 ]]; then
   else
     echo "[DRY-RUN] would run: kubectl rollout status deployment/exp-web -n $NS     # poll tiap 5s"
     echo "[DRY-RUN] would run: kubectl get all -n $NS                               # snapshot R1 t0/t1/t2"
-    echo "[DRY-RUN] td/trci/t2 manual diisi dari timestamp recovery-runbook.sh"
+    echo "[DRY-RUN] td dari polling; trci/t2 dari JSON runbook_complete (recovery-runbook.sh, otomatis — Opsi A)"
+    echo "[DRY-RUN] berikan --runbook-log FILE yang sama dengan --log milik recovery-runbook.sh"
   fi
   echo "[DRY-RUN] would compute R1 (total_expected=$(expected_total)) at t0/t1/t2"
   echo "[DRY-RUN] would append CSV header+row to: ${OUT:-(stdout, --output FILE untuk tulis)}"
@@ -139,16 +145,22 @@ while [[ $elapsed -lt $TIMEOUT ]]; do
       t2="$(date +%s)"; break
     fi
   else
-    # Manual: deteksi via status rollout/get; pemulihan selesai ditandai operator
-    # menekan ENTER setelah runbook selesai (timestamp otomatis), atau timeout.
+    # Manual (Opsi A): deteksi otomatis via rollout polling; trci/t2/kubectl_cmds
+    # diambil dari JSON runbook_complete yang ditulis recovery-runbook.sh --live --log FILE.
     if [[ -z "$td" ]]; then
       if ! kubectl rollout status deployment/exp-web -n "$NS" --timeout=5s >/dev/null 2>&1; then
-        td="$(date +%s)"; trci="$td"; r1_t1="$(r1_manual "$NS")"
-        echo "[manual] drift terdeteksi td=$td — jalankan recovery-runbook.sh lalu tekan ENTER" >&2
+        td="$(date +%s)"; r1_t1="$(r1_manual "$NS")"
+        echo "[manual] drift terdeteksi td=$td — recovery-runbook.sh (otomatis) berjalan terpisah" >&2
       fi
     fi
-    if [[ -n "$td" ]]; then
-      read -r -t 5 _enter 2>/dev/null && { t2="$(date +%s)"; break; } || true
+    if [[ -n "$td" && -n "$RUNBOOK_LOG" && -f "$RUNBOOK_LOG" ]] && grep -q '"event":"runbook_complete"' "$RUNBOOK_LOG" 2>/dev/null; then
+      jline="$(grep '"event":"runbook_complete"' "$RUNBOOK_LOG" | tail -n 1)"
+      trci="$(echo "$jline" | grep -o '"trci":[0-9]*' | cut -d: -f2)"
+      t2="$(echo "$jline" | grep -o '"t2":[0-9]*' | cut -d: -f2)"
+      rb_cmds="$(echo "$jline" | grep -o '"kubectl_cmds":[0-9]*' | cut -d: -f2)"
+      if [[ -n "$rb_cmds" && "$KUBECTL_CMDS" == "0" ]]; then KUBECTL_CMDS="$rb_cmds"; fi
+      if [[ "$NOTES" != *mode=automated* ]]; then NOTES="${NOTES:+$NOTES }mode=automated"; fi
+      break
     fi
   fi
   sleep 5; elapsed=$((elapsed+5))
