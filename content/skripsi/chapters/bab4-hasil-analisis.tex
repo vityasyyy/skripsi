@@ -1,64 +1,69 @@
 \chapter{HASIL DAN ANALISIS}
 
-% TODO: Isi bab ini setelah eksperimen (jadwal: September--Oktober 2026) selesai
-% dan data dianalisis. Setiap subbab di bawah merupakan kerangka yang
-% disusun berdasarkan desain eksperimen pada Bab III.
+\section{Status Data dan Provenans}
 
-\section{Deskripsi Lingkungan Eksperimen}
+Pada draf ini belum tersedia dataset eksperimen formal yang tervalidasi. Apparatus belum diuji terhadap keseluruhan protokol pada Bab III dan protokol masih menunggu tinjauan pembimbing. Oleh karena itu, bagian ini mendefinisikan informasi yang perlu dilaporkan, tetapi tidak menyajikan angka, uji statistik, ukuran efek, atau kesimpulan komparatif.
 
-% TODO: Dokumentasikan kondisi aktual saat eksperimen berjalan:
-% - Spesifikasi klaster (3 node, 24 inti CPU, ~23 Gi memori, Kubernetes v1.29+)
-% - Versi ArgoCD, interval sync (60 detik), self-heal dan prune aktif
-% - Beban uji workload komposit multi-service (>= 16 komponen)
-% - Profil operator dan hasil practice run
-% - Variabel pengganggu yang terpantau (CPU < 70%, RTT, dsb.)
+Sebelum pengisian hasil, dokumentasikan konfigurasi klaster yang benar-benar digunakan, versi Kubernetes dan ArgoCD, cakupan aplikasi, kebijakan auto-sync/self-heal/prune, manifest serta inventaris formal, interval polling aktual, sinkronisasi jam, dan kriteria kesiapan. Nilai yang pernah disebut sebagai target pada draf sebelumnya bukan hasil verifikasi. Laporkan pula setiap penyimpangan protokol, kegagalan kesiapan, dan perubahan apparatus.
 
-\section{Hasil E1: Konsistensi \textit{Deployment} (R1)}
+Pengujian formal direncanakan pada workload multi-service InvenioRDM. Pilot S1/S2 hanya dapat mendukung laporan validasi instrumen dan prosedur; hasilnya tidak dipool atau ditafsirkan sebagai hasil formal. Identitas sensitif dan seluruh nilai Secret harus disanitasi dari log, tabel, gambar, serta lampiran.
 
-% TODO: Sajikan hasil pengukuran persentase sumber daya yang cocok dengan
-% desired declarative state pada t0, t1, dan t2 untuk setiap skenario (A--G)
-% pada kedua lingkungan. Gunakan tabel dan/atau box plot per skenario.
+\section{Format Pelaporan E1: Kesetaraan dan Kesehatan (R1)}
 
-\section{Hasil E2: Waktu Deteksi, Pemulihan, dan Identifikasi Akar Masalah (R2)}
+Kesetaraan inventaris dan bidang yang ditetapkan dilaporkan terpisah dari kesehatan layanan. Evaluator yang sama digunakan pada kedua lingkungan. Tabel~\ref{tab:hasil-r1} merupakan skema pelaporan, bukan hasil; isinya menunggu pengumpulan data formal.
 
-% TODO: Sajikan hasil pengukuran waktu deteksi (td - t0), waktu pemulihan
-% (t2 - t0), dan waktu identifikasi akar masalah (trci - td) untuk setiap
-% skenario pada kedua lingkungan (n = 10 per skenario). Sertakan juga
-% jumlah perintah kubectl pada Lingkungan A sebagai pengamatan pelengkap.
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Skema hasil R1 per skenario dan lingkungan}
+  \label{tab:hasil-r1}
+  \begin{tabularx}{\textwidth}{|c|c|X|X|}
+    \hline
+    Skenario & Lingkungan & Kesetaraan konfigurasi: dasar / pascainjeksi / pascapemulihan & Kesehatan layanan pada pengamatan terkait \\
+    \hline
+    A--E, G & kubectl / ArgoCD & Belum tersedia & Belum tersedia \\
+    \hline
+    F & kubectl / ArgoCD & Tidak termasuk hasil utama R1; dicatat sebagai batas cakupan & Dilaporkan terpisah jika relevan \\
+    \hline
+  \end{tabularx}
+\end{table}
 
-\section{Hasil E3: \textit{Traceability} Operasional (R3)}
+\section{Format Pelaporan E2: Waktu (R2)}
 
-% TODO: Dokumentasikan secara deskriptif kelengkapan audit log untuk kedua
-% lingkungan: Git commit history + ArgoCD notifications (Lingkungan B) versus
-% Kubernetes audit logs (Lingkungan A), serta kemudahan identifikasi akar
-% masalah dan keterkaitannya dengan R2.
+Untuk setiap skenario dan lingkungan, hasil kelak mencantumkan target run, jumlah injeksi terverifikasi, jumlah waktu teramati dan tersensor, serta durasi deteksi ($t_d-t_0$), ketersediaan bukti ($t_e-t_0$), dan pemulihan konfigurasi penuh ($t_r-t_0$). Nilai waktu dihitung dari cap waktu kolektor dan tidak diinterpolasi melewati jeda polling.
 
-\section{Statistik Deskriptif}
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Skema hasil R2 per skenario dan lingkungan}
+  \label{tab:hasil-r2}
+  \begin{tabularx}{\textwidth}{|c|c|X|X|}
+    \hline
+    Skenario & Lingkungan & Run valid / tersensor dan alasan & Distribusi durasi: deteksi / bukti / pemulihan \\
+    \hline
+    A--E, G & kubectl / ArgoCD & Belum tersedia & Belum tersedia \\
+    \hline
+    F & kubectl / ArgoCD & Dilaporkan sebagai pengamatan batas visibilitas & Tidak menjadi hasil pemulihan drift terkelola \\
+    \hline
+  \end{tabularx}
+\end{table}
 
-% TODO: Sajikan mean, median, rentang, dan deviasi standar untuk setiap
-% metrik per lingkungan per skenario, dalam bentuk tabel ringkasan.
+Run tanpa deteksi, bukti, atau pemulihan sampai batas pengamatan akan tetap tampak sebagai tersensor kanan dan disertai jumlahnya. Kegagalan injeksi dan kegagalan instrumentasi dicatat terpisah dari kejadian mekanisme tidak mendeteksi. Run dengan pemulihan tidak lengkap tidak dihilangkan hanya untuk membentuk distribusi waktu yang lebih menguntungkan.
 
-\section{Uji Perbandingan \textit{Mann--Whitney U}}
+\section{Format Pelaporan E3: Keterlacakan (R3)}
 
-% TODO: Sajikan hasil uji Mann--Whitney U untuk setiap metrik antara
-% Lingkungan A dan Lingkungan B pada tingkat signifikansi alpha = 0,05.
-% Sertakan nilai p untuk setiap skenario.
+Penilaian R3 akan disajikan berdasarkan rubrik yang sama untuk pelaku, objek/bidang perubahan, waktu/urutan, dan tindakan/hasil pemulihan. Setiap unsur diberi status ada, sebagian, atau tidak ada dengan rujukan ke bukti yang telah disanitasi. Tidak ada nilai hasil yang tersedia pada draf ini. Rubrik tidak menghasilkan waktu identifikasi akar masalah dan tidak digunakan untuk membuat klaim tentang penyebab kausal.
 
-\section{Ukuran Efek}
+\section{Rencana Analisis Komparatif}
 
-% TODO: Sajikan nilai Cohen's d (atau Cliff's delta) untuk setiap metrik dan
-% interpretasikan mengikuti konvensi Cohen: |d| < 0,2 (kecil), ~0,5 (sedang),
-% > 0,8 (besar). Identifikasi skenario dengan efek terbesar dan terkecil.
+Ringkasan dan perbandingan dilakukan per skenario, bukan dengan menggabungkan semua intervensi menjadi satu angka. Target pengulangan R1 adalah lima run per skenario dan lingkungan, sedangkan R2 sepuluh run; keduanya merupakan target deskriptif dan belum dibuktikan cukup untuk mendeteksi efek pada setiap skenario. Statistik deskriptif, jumlah run valid, kejadian tersensor, serta ukuran efek yang sesuai harus dilaporkan bersama hasil.
 
-\section{Interpretasi Hasil}
+Uji Mann--Whitney U hanya dapat dipertimbangkan secara eksploratif untuk hasil waktu yang teramati lengkap jika unit analisis dan asumsi independensi terpenuhi. Jika terdapat penyensoran, hasil uji yang mengabaikannya tidak boleh ditafsirkan sebagai perbandingan lengkap; metode untuk data tersensor harus dibakukan sebelum melihat hasil atau hasil dilaporkan deskriptif. Tidak ada nilai $p$, ukuran efek, ataupun interpretasi arah perbedaan yang dapat dituliskan sebelum pengumpulan serta analisis data formal.
 
-% TODO: Interpretasikan hasil statistik dalam konteks literatur (Bab II) dan
-% praktik operasional. Jawab dimensi evaluasi pada Bab I: konsistensi,
-% waktu deteksi/pemulihan/identifikasi akar masalah, dan traceability.
+\section{Batas Interpretasi}
 
-\section{Pembahasan}
+RQ1 hanya dapat dijawab terhadap inventaris dan bidang yang ditetapkan; kesetaraan bukan bukti bahwa konfigurasi benar secara semantik. RQ2 membedakan sinyal deteksi, tersedianya bukti yang dapat diverifikasi, dan kembalinya konfigurasi ke keadaan yang diinginkan; kesehatan layanan tetap dilaporkan sebagai dimensi terpisah. RQ3 mendeskripsikan bukti yang tersedia, bukan akar masalah.
 
-% TODO: Bahas skenario penyimpangan yang paling berdampak, faktor yang
-% memengaruhi hasil, kondisi di mana manual deployment tetap memadai, dan
-% implikasi praktis bagi pemilihan paradigma deployment. Kaitkan dengan
-% ancaman validitas yang diidentifikasi pada Bab III.
+Skenario F tidak dianggap sebagai keberhasilan self-heal maupun sebagai kegagalan ketika sumber daya berada di luar cakupan aplikasi ArgoCD. F harus dibahas sebagai pengujian batas visibilitas sumber daya tak terkelola. Kesimpulan tentangnya tidak digabungkan dengan skenario A--E dan G.
+
+Sampai data formal tersedia, tidak dapat dinyatakan prosedur mana yang lebih konsisten, lebih cepat, atau lebih terlacak. Kondisi ini merupakan batas bukti draf, bukan hasil eksperimen negatif dan bukan bukti bahwa instrumentasi gagal.
