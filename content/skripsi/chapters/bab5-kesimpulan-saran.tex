@@ -1,35 +1,26 @@
 \chapter{KESIMPULAN DAN SARAN}
 
-% TODO: Isi bab ini setelah eksperimen dan analisis selesai. Kerangka di
-% bawah disusun berdasarkan dimensi evaluasi pada Bab I dan analisis Bab IV.
-
 \section{Kesimpulan}
 
-% TODO: Rumuskan kesimpulan untuk setiap dimensi evaluasi:
-% - Konsistensi deployment: bagaimana perbedaan antara paradigma manual dan
-%   GitOps setelah skenario penyimpangan (skenario A--G)?
-% - Waktu deteksi, pemulihan, dan identifikasi akar masalah: seberapa besar
-%   perbedaan antara lingkungan otomatis (ArgoCD) dan intervensi manual?
-% - Traceability operasional: sejauh mana perbedaan kelengkapan jejak
-%   perubahan antara Git (Lingkungan B) dan audit logs (Lingkungan A)?
-% Sertakan pula kesimpulan utama mengenai skenario penyimpangan yang paling
-% berdampak dan rekomendasi pemilihan paradigma deployment.
+Naskah ini telah merumuskan rancangan untuk membandingkan prosedur imperatif terotomasi berbasis \texttt{kubectl} dengan GitOps berbasis ArgoCD pada workload formal multi-service InvenioRDM. Rancangan membedakan kesetaraan konfigurasi dari kesehatan layanan, memisahkan waktu deteksi, ketersediaan bukti, dan pemulihan konfigurasi penuh, serta menggunakan rubrik deskriptif untuk keterlacakan.
+
+Kesimpulan empiris untuk setiap pertanyaan penelitian belum dapat ditarik:
+\begin{enumerate}
+  \item \textbf{RQ1:} Perbedaan kesetaraan konfigurasi dan kesehatan layanan belum diketahui karena data formal belum tersedia.
+  \item \textbf{RQ2:} Perbedaan waktu deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi belum diketahui. Tidak ada hasil waktu yang dapat diisi dengan asumsi atau angka sintetik.
+  \item \textbf{RQ3:} Perbandingan kelengkapan bukti keterlacakan belum dapat dinilai sebelum log dan artefak formal diperiksa.
+\end{enumerate}
+
+Dengan demikian, draf ini tidak menyimpulkan efektivitas, keunggulan, atau kelayakan adopsi salah satu prosedur. Skenario F kelak harus dilaporkan terpisah sebagai batas visibilitas sumber daya tak terkelola, bukan sebagai bukti keberhasilan atau kegagalan rekonsiliasi.
 
 \section{Saran}
 
-% TODO: Rumuskan saran untuk penelitian lanjutan:
-% - Replikasi dengan operator berbeda tingkat keahlian (mitigasi batasan
-%   operator tunggal).
-% - Evaluasi paradigma perantara dan push-based pada spektrum
-%   deklaratif-imperatif.
-% - Perluasan ke klaster multi-cluster, workload lain, atau tool GitOps lain
-%   (mis. FluxCD).
-% - Saran praktis bagi praktisi industri terkait kondisi di mana manual
-%   deployment tetap memadai.
+Sebelum pengujian formal, protokol perlu ditinjau pembimbing, lalu apparatus harus divalidasi terhadap definisi penerimaan injeksi, skema inventaris dan bidang, keselamatan pencatatan Secret, interval polling, timestamp, kriteria kesehatan, batas waktu, serta mekanisme reset. Pilot S1/S2 hanya digunakan untuk memeriksa instrumen; setelah pilot, konfigurasi formal multi-service InvenioRDM tetap harus diuji sesuai rancangan dan tidak boleh digantikan oleh surrogat.
+
+Pengumpulan data berikutnya sebaiknya mencatat konfigurasi serta versi yang benar-benar digunakan, mempertahankan semua kategori kegagalan dan penyensoran, melaporkan hasil per skenario, dan menyimpan bukti yang telah disanitasi. Klaim komparatif perlu dibatasi pada prosedur, workload, klaster, dan resolusi instrumen yang diuji. Penelitian lanjutan dapat menguji workload, ukuran klaster, atau implementasi GitOps lain, tetapi perlu membakukan definisi metrik dan membedakan setiap pembanding secara eksplisit.
 
 \section{Keterbatasan Penelitian}
 
-% TODO: Dokumentasikan keterbatasan penelitian yang teridentifikasi selama
-% pelaksanaan eksperimen, mengacu pada ancaman validitas pada Bab III
-% (validitas internal, eksternal, konstruk, dan reliabilitas), serta
-% kendala operasional yang muncul selama pengumpulan data.
+Keterbatasan yang telah melekat pada rancangan ini meliputi penggunaan satu klaster, satu workload formal, dan satu implementasi GitOps; hasilnya tidak otomatis berlaku bagi konteks lain. Prosedur imperatif yang diuji adalah satu otomasi \texttt{kubectl} tertentu, sehingga tidak mewakili semua cara kerja imperatif. Interval polling membatasi ketelitian waktu kejadian, dan target pengulangan bukan jaminan daya statistik per skenario.
+
+Skenario F berada di luar cakupan sumber daya terkelola dan hanya menguji batas visibilitas. Pengukuran kesetaraan tidak menilai apakah konfigurasi yang diinginkan aman atau benar secara semantik. Selain itu, versi apparatus, inventaris formal, batas waktu pengamatan, serta kriteria kesehatan belum diverifikasi dalam draf ini. Protokol juga belum memperoleh tinjauan pembimbing dan kemampuan apparatus untuk menjalankannya belum divalidasi. Seluruh keterbatasan tersebut perlu dipertimbangkan sebelum hasil empiris tersedia atau rekomendasi praktis dirumuskan.

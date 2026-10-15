@@ -1,53 +1,17 @@
 \chapter{LAMPIRAN A}
 
-% TODO: Lengkapi lampiran ini dengan artefak eksperimen setelah skrip
-% otomasi dan konfigurasi dikembangkan (jadwal: Juli--Agustus 2026).
+Lampiran ini disiapkan untuk artefak yang akan dipublikasikan setelah protokol ditinjau, apparatus divalidasi, dan pengumpulan data formal dilakukan. Pada draf ini, skrip, konfigurasi aktual, dan dataset tervalidasi belum dilampirkan. Ketiadaan artefak tersebut tidak menunjukkan bahwa pengujian telah berhasil atau gagal.
 
-\section{Kode Sumber Skrip Eksperimen}
+\section{Artefak Eksperimen yang Direncanakan}
 
-Skrip otomasi yang digunakan untuk menjaga konsistensi prosedural eksperimen
-(lihat Bab III, subbab Skrip Otomasi Eksperimen):
+Lampiran versi akhir dapat memuat sumber pemeriksa dan korektor imperatif berbasis \texttt{kubectl}, konfigurasi aplikasi ArgoCD, manifest dan inventaris workload formal, skema kolektor, serta prosedur pemulihan nilai dasar. Setiap artefak perlu diberi versi dan dikaitkan dengan konfigurasi aktual eksperimen. Materi pilot S1/S2 harus dipisahkan dari artefak dan data pengujian formal.
 
-\subsection{Skrip Injeksi Penyimpangan (\texttt{drift-inject.sh})}
+\section{Skema Data dan Perlindungan Informasi}
 
-% TODO: Sertakan listing skrip yang memilih skenario secara acak dari
-% himpunan {A, B, C, D, E, F, G}, mengeksekusi perintah kubectl pada kedua
-% lingkungan, dan merekam timestamp t0 ke log JSON/CSV.
+Skema log formal perlu menyimpan pengenal run, lingkungan, skenario pada berkas metadata terpisah dari masukan pengendali, status penerimaan injeksi, cap waktu monotonik dalam detik dan UTC untuk $t_0$, $t_a$, $t_d$, $t_e$, dan $t_r$, interval polling aktual, hasil kesetaraan dan kesehatan, status penyensoran, kesalahan, serta alasan run tidak valid. $t_a$ menyimpan waktu penerimaan respons API injeksi. Metadata pengenal skenario tidak boleh diberikan kepada mekanisme pendeteksi atau korektor.
 
-\subsection{Skrip Pengumpulan Metrik (\texttt{metrics-collect.sh})}
+Snapshot dan bukti harus disanitasi sebelum disimpan atau dibagikan. Nilai Secret tidak dimasukkan ke listing, tangkapan layar, log, atau dataset publik. Pencocokan Secret dilakukan di memori; artefak yang dibagikan hanya memuat identitas bidang dan hasil kesetaraan, tanpa nilai rahasia atau hash yang dapat dipakai untuk menebak isinya.
 
-% TODO: Sertakan listing skrip polling berkala (ArgoCD API setiap 5 detik
-% untuk Lingkungan B; kubectl get/describe untuk Lingkungan A) yang merekam
-% timestamp deteksi (td), pemulihan (t2), dan identifikasi akar masalah (trci).
+\section{Status Lampiran}
 
-\subsection{Skrip Verifikasi \textit{Baseline} (\texttt{baseline-check.sh})}
-
-% TODO: Sertakan listing skrip yang memverifikasi kondisi klaster sebelum
-% setiap run (semua pod Running, penggunaan CPU/memori < 70%, ArgoCD
-% Synced/Healthy) dan menolak memulai eksperimen jika syarat tidak terpenuhi.
-
-\subsection{Skrip \textit{Recovery Runbook} (\texttt{recovery-runbook.sh})}
-
-% TODO: Sertakan listing skrip yang memandu operator Lingkungan A melalui
-% prosedur pemulihan terstandarisasi dan merekam timestamp setiap perintah
-% kubectl yang dieksekusi.
-
-\section{Konfigurasi}
-
-\subsection{Manifest Kubernetes dan GitOps}
-
-% TODO: Sertakan manifest deklaratif beban uji workload komposit multi-service
-% (Helm chart atau Kustomize manifests) yang disimpan dalam repositori Git
-% sebagai source of truth untuk Lingkungan B.
-
-\subsection{Konfigurasi ArgoCD}
-
-% TODO: Sertakan konfigurasi ArgoCD untuk Lingkungan B: sync policy
-% (auto-sync, interval 60 detik), self-heal aktif, dan prune aktif.
-
-\subsection{Dataset}
-
-% TODO: Dokumentasikan skema log terstruktur (JSON/CSV) yang merekam
-% timestamp t0, td, trci, dan t2 untuk setiap skenario dan pengulangan,
-% format snapshot status klaster (kubectl get all), serta sumber data
-% traceability (Git commit history dan Kubernetes audit logs).
+Seluruh item pada lampiran ini masih berupa kebutuhan artefak, bukan skrip atau konfigurasi yang telah diverifikasi. Isi lampiran hanya dapat dilengkapi berdasarkan bukti yang benar-benar dihasilkan oleh eksperimen dan telah ditinjau untuk mencegah kebocoran informasi sensitif.

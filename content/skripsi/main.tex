@@ -7,8 +7,8 @@
 %------------------------------------------------------------
 % Metadata Skripsi
 %------------------------------------------------------------
-\titleind{Perbandingan Terkontrol Paradigma \textit{Deployment} Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}
-\titleeng{A Controlled Comparison of Manual and GitOps Deployment Paradigms in Responding to Configuration Drift on Kubernetes Clusters}
+\titleind{Perbandingan Prosedur Imperatif Terotomasi Berbasis \texttt{kubectl} dan GitOps dengan ArgoCD untuk Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}
+\titleeng{A Comparison of an Automated \texttt{kubectl}-Based Imperative Procedure and ArgoCD GitOps for Addressing Configuration Drift in Kubernetes Clusters}
 \fullname{Muhammad Argya Vityasy}
 \idnum{23/522547/PA/22475}
 \degree{Sarjana}
@@ -90,10 +90,8 @@
 \nomenclature{IaC}{\textit{Infrastructure-as-Code}: praktik mendefinisikan dan mengelola infrastruktur melalui berkas konfigurasi yang diberi versi}
 \nomenclature{ArgoCD}{Alat GitOps \textit{pull-based} yang melakukan \textit{continuous reconciliation} terhadap \textit{state} klaster Kubernetes}
 \nomenclature{R1}{Metrik konsistensi \textit{deployment}}
-\nomenclature{R2}{Metrik waktu deteksi, waktu pemulihan, dan waktu identifikasi akar masalah}
+\nomenclature{R2}{Metrik waktu deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi}
 \nomenclature{R3}{Metrik \textit{traceability} operasional (deskriptif)}
-\nomenclature{MTTI}{\textit{Mean Time To Identify} drift: waktu rata-rata dari penyimpangan terjadi hingga terdeteksi dan teridentifikasi}
-\nomenclature{NASA-TLX}{\textit{Task Load Index}: instrumen survei beban kognitif \textit{operator}}
 
 % Preliminary Pages (Skripsi: lengkap)
 \cover
@@ -114,17 +112,17 @@ Isi Prakata di sini...
 \lambang
 
 \abstractind
-Penyimpangan konfigurasi (\textit{configuration drift}) pada klaster Kubernetes merupakan masalah operasional yang signifikan: \textit{state} aktual klaster menyimpang dari \textit{state} yang didefinisikan secara deklaratif, mengakibatkan inkonsistensi, \textit{audit trail} yang buruk, dan waktu pemulihan yang lama. Walaupun paradigma GitOps secara intuitif diyakini lebih unggul dalam menghadapi penyimpangan, bukti empiris terkontrol yang mengkarakterisasi besarnya dan kondisi perbedaan antara paradigma manual dan GitOps belum tersedia. Penelitian ini mengevaluasi secara empiris dampak skenario penyimpangan konfigurasi terhadap karakteristik operasional \textit{deployment} pada dua paradigma manajemen yang berbeda, yaitu manual dan GitOps, pada sebuah klaster Kubernetes. Evaluasi dilakukan menggunakan desain eksperimental dengan dua lingkungan paralel: Lingkungan A (\textit{deployment} manual) dan Lingkungan B (\textit{deployment} GitOps). Pada kedua lingkungan, penyimpangan konfigurasi di-\textit{inject} secara terkontrol melalui tujuh skenario (perubahan replika, perubahan \textit{image}, modifikasi ConfigMap, \textit{resource deletion}, \textit{patch} manual, penyimpangan lintas \textit{namespace}, dan perubahan Secret). Pengukuran dilakukan terhadap tiga metrik utama: (1)~konsistensi \textit{deployment}; (2)~waktu deteksi, waktu pemulihan, dan waktu identifikasi akar masalah; dan (3)~\textit{traceability} operasional, serta beban kognitif \textit{operator} (NASA-TLX) sebagai \textit{measured confound}. Setiap skenario diulang minimal lima kali per lingkungan untuk menghasilkan data yang memadai. Hasil dianalisis menggunakan uji statistik komparatif (\textit{Mann--Whitney U}) dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$) untuk mengkarakterisasi besarnya perbedaan antara kedua paradigma pada berbagai skenario penyimpangan. % TODO: tambahkan ringkasan hasil eksperimen setelah pengumpulan data selesai.
+Skripsi ini merancang evaluasi empiris atas prosedur imperatif terotomasi berbasis \texttt{kubectl} dan GitOps menggunakan ArgoCD dalam menghadapi penyimpangan konfigurasi pada Kubernetes. Pengujian formal direncanakan pada beban uji multi-service InvenioRDM; surrogat S1 dan S2 hanya digunakan dalam pilot validasi instrumen dan tidak digabungkan dengan data formal. Tujuh intervensi direncanakan, dengan skenario F diperlakukan terpisah sebagai batas visibilitas sumber daya di luar cakupan aplikasi. Metrik yang dirancang mencakup kesetaraan bidang konfigurasi dan kesehatan secara terpisah (R1), waktu deteksi, waktu ketersediaan bukti penyimpangan, dan waktu pemulihan konfigurasi penuh (R2), serta rubrik bukti keterlacakan (R3). Target pengulangan adalah lima run per skenario dan lingkungan untuk R1 serta sepuluh untuk R2; angka ini merupakan target deskriptif, bukan jaminan kecukupan daya. Protokol dan apparatus masih menunggu tinjauan serta validasi, dan data formal belum tersedia. Oleh sebab itu, skripsi ini belum melaporkan hasil komparatif atau kesimpulan empiris.
 
 \vspace{0.5cm}
-\noindent\textbf{Kata Kunci:} penyimpangan konfigurasi, Kubernetes, GitOps, \textit{deployment} manual, evaluasi empiris terkontrol
+\noindent\textbf{Kata Kunci:} penyimpangan konfigurasi, Kubernetes, GitOps, otomasi imperatif, evaluasi empiris terkontrol
 \endabstractind
 
 \abstracteng
-Configuration drift on Kubernetes clusters is a significant operational problem: the actual cluster state deviates from the declaratively defined state, resulting in inconsistency, poor audit trails, and lengthy recovery times. Although GitOps is intuitively believed to be superior in handling drift, controlled empirical evidence characterizing the magnitude and conditions of the difference between manual and GitOps paradigms is lacking. This research empirically evaluates the impact of configuration drift scenarios on the operational characteristics of deployment under two different management paradigms, manual and GitOps, on a Kubernetes cluster. The evaluation adopts a controlled experimental design with two parallel environments: Environment A (manual deployment) and Environment B (GitOps deployment). On both environments, controlled configuration drift is injected through seven scenarios (replica change, image change, ConfigMap modification, resource deletion, manual patch, cross-namespace drift, and Secret change). Measurements are taken across three primary metrics: (1)~deployment consistency; (2)~detection time, recovery time, and root cause identification time; and (3)~operational traceability, with operator cognitive load (NASA-TLX) as a measured confound. Each scenario is repeated at least five times per environment to yield sufficient data. Results are analyzed using comparative statistical tests (Mann--Whitney U) and effect sizes (Cohen's d or Cliff's delta) to characterize the magnitude of differences between the two paradigms across various drift scenarios. % TODO: add experiment result summary once data collection is complete.
+This thesis drafts an empirical evaluation of an automated imperative procedure based on \texttt{kubectl} and GitOps using ArgoCD for configuration drift in Kubernetes. Formal testing is planned on the InvenioRDM multi-service workload; S1 and S2 surrogates are reserved for instrument-validation pilots and will not be pooled with formal data. Seven interventions are planned, with scenario F treated separately as a visibility-boundary case for resources outside the application scope. The measures comprise configuration-field equality and health reported separately (R1), time to detection, availability of verifiable deviation evidence, and full configuration restoration (R2), and an evidence-based traceability rubric (R3). Planned sample targets are five runs per scenario and environment for R1 and ten for R2; these are descriptive targets, not guarantees of statistical power. The protocol and apparatus remain subject to review and validation, and no formal dataset is available. Accordingly, no comparative findings or empirical conclusions are reported in this draft.
 
 \vspace{0.5cm}
-\noindent\textbf{Keywords:} configuration drift, Kubernetes, GitOps, manual deployment, controlled empirical evaluation
+\noindent\textbf{Keywords:} configuration drift, Kubernetes, GitOps, automated imperative management, controlled empirical evaluation
 \endabstracteng
 
 %------------------------------------------------------------
