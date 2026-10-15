@@ -42,7 +42,7 @@ Pilot subjects S1/S2 must never become formal workload evidence even if mislabel
 - [x] **Documentation and output separation:** documented CLI, units/scales, phase/status guards, exclusions, policy format and legacy synthetic-only mode. V2 report is exclusive-create and fixture outputs are labeled synthetic. Preserved legacy artifacts and dependencies.
 - [x] **Verification:** stdlib unittest, `py_compile`, CLI subprocess checks in temporary directories, hand-derived duration/Cliff/Holm checks, and `git diff --check`. No configured lint/type-check tool was present.
 - [x] **Handoff:** untracked `WORKER-REPORT.md` records evidence, changed files, caveats, and approval gates. No commit/push.
-- [ ] **Lead integration:** review diff, rerun tests, then feed a real fixture record emitted by the apparatus implementation into the analyzer; verify types, timestamps, null/failure handling and phase isolation across the boundary. No cluster access.
+- [x] **Lead integration:** review diff, rerun tests, then feed a real fixture record emitted by the apparatus implementation into the analyzer; verify types, timestamps, null/failure handling and phase isolation across the boundary. No cluster access.
 
 ## Known baseline and limits
 
