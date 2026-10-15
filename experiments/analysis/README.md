@@ -1,67 +1,108 @@
-# Bab-3 Analysis Pipeline
+# Experiment Analysis
 
-Synthetic data generator + comparative statistics for the Bab-3 drift experiments
-(manual `kubectl` vs GitOps/ArgoCD). No cluster access needed.
+The analyzer has two isolated input modes. Schema-v2 JSON is the only path for
+structured run records. The legacy CSV path is explicitly synthetic and must
+not be used to analyze empirical runs.
 
-## Data schema (CSV header, exact)
+## Schema-v2 JSON
 
-```
-subject,env,skenario,rep,t0,td,trci,t2,r1_t0,r1_t1,r1_t2,kubectl_cmds,notes
-```
-
-| Column | Meaning |
-|---|---|
-| `subject` | Workload subject: `S1` / `S2` |
-| `env` | Deployment paradigm: `manual` / `gitops` |
-| `skenario` | Drift scenario: `A`–`G` (7 scenarios) |
-| `rep` | Replication index `1..15` per (`subject`,`env`,`skenario`); `1..10` = R2 replicates, `11..15` = R1 replicates |
-| `t0` | Drift-injection latency (s) |
-| `td` | Time to detection (s) — R2 |
-| `trci` | Time to root-cause identification (s) — R2 |
-| `t2` | Time to full recovery (s) — R2 |
-| `r1_t0` | Consistency at baseline (0–1) — R1 |
-| `r1_t1` | Consistency in drifted state (0–1) — R1 |
-| `r1_t2` | Consistency after recovery (0–1) — R1 |
-| `kubectl_cmds` | Count of imperative `kubectl` commands used in the run |
-| `notes` | Free text (`mock seed=… R1/R2` for synthetic data) |
-
-Design: 7 scenarios × (10 R2 + 5 R1) reps × 2 subjects × 2 envs = **420 rows**.
-`analyze.py` pools subjects × reps per (`skenario`, `env`) → n=30 per cell for mock data.
-
-## Commands
+Use one run-summary JSON file or a directory containing direct `.json` run
+summaries. Directory input is not recursive. Every selected file must match the
+schema in `experiments/schema-v2.md`; validation completes before any report is
+written.
 
 ```bash
-pip install -r experiments/analysis/requirements.txt
-
-python3 experiments/analysis/mockgen.py --seed 42 --out experiments/analysis/outputs/mock_runs.csv
-
-python3 experiments/analysis/analyze.py --in experiments/analysis/outputs/mock_runs.csv --out experiments/analysis/outputs
+python3 experiments/analysis/analyze.py \
+  --schema-version 2 --phase fixture \
+  --in /path/to/run.json --out /tmp/analysis-fixture
 ```
 
-Outputs in the `--out` dir:
+The required `--phase` is `fixture`, `pilot`, or `formal`, and must match every
+record. Fixture reports are labeled **SYNTHETIC FIXTURE — NOT EMPIRICAL**;
+pilot reports are pilot-only. The known surrogate subjects `s1` and `s2` are
+rejected in formal mode. Other nonempty formal subject labels are accepted as
+future input capability only: the analyzer does not establish that collection
+was authorized.
 
-- `descriptives.tex` — mean/median/std/range per metric per env per scenario
-- `mannwhitney.tex` — Mann-Whitney U (two-sided, α=0.05) manual vs gitops per metric per scenario
-- `effects.tex` — Cohen d (manual-minus-gitops) + Cliff delta with interpretation bands
-- `boxplot_<metric>_<skenario>.png` — one per R2 sub-metric (`t0,td,trci,t2`) per scenario (28 PNGs)
+The report `analysis-v2.json` contains separate subject/scenario/environment
+groups, run-status counts, event observation/censoring counts, and observed-only
+duration summaries. Detection, evidence, and recovery durations are respectively
+`td_mono_s - t0_mono_s`, `te_mono_s - t0_mono_s`, and
+`tr_mono_s - t0_mono_s`. UTC audit timestamps and API acknowledgement (`ta`)
+are not durations; a detection may precede acknowledgement. Missing events are
+never zero. Failures remain in counts, and censored/not-evaluable runs are not
+silently dropped from the report. R1 percentages use the expected inventory
+only and stay on the schema's `[0, 100]` scale; health is a separate measure.
+Scenario F is reported in a separate
+visibility-boundary section, not as managed-drift recovery.
 
-`analyze.py` exit code is 0 on success; it validates required columns and fails otherwise.
+Detection, evidence, and restoration are independently observed events: the
+analyzer imposes no order among `td`, `te`, and `tr`. Each observed `td`, `te`,
+or `tr` must still be at/after dispatch and within the observation cutoff.
+Observed evidence must link to a stored evidence item at `te`; observed
+restoration requires `r1_recovered_pct` to equal 100. A run may therefore
+retain observed restoration while detection or evidence is right-censored.
 
-Effect-size bands: Cohen `|d|<0.2` negligible, `<0.5` small, `<0.8` medium, else large;
-Cliff `|δ|<0.147` negligible, `<0.33` small, `<0.474` medium, else large.
+Validation follows the schema's failure precedence (`baseline_failed`,
+`injection_failed`, `instrumentation_failed`, `correction_failed`, then
+`timeout`). A timeout must contain at least one right-censored event;
+instrumentation failures are not censored misses; and a failed correction
+cannot claim observed recovery. Complete managed scenarios require observed
+detection, evidence, and recovery. Scenario F requires recovery to remain
+not-evaluable.
 
-## Replacing mock data with real runs
+Reports are descriptive by default and contain no figures. Output refuses to
+overwrite an existing `analysis-v2.json`. Use a temporary output directory for
+fixture checks; never treat fixture or pilot output as thesis results.
 
-1. Run the real experiment protocol (see Bab-3) and record each run as one CSV row
-   with the exact header above. Keep `rep` numbering per (`subject`,`env`,`skenario`).
-2. Save it e.g. as `experiments/analysis/outputs/real_runs.csv`
-   (do not overwrite `mock_runs.csv`; keep mock output for reproducibility checks).
-3. Re-run the analyzer unchanged:
+### Optional exploratory comparisons
+
+Comparisons require formal phase, explicit opt-in, and an approved policy:
 
 ```bash
-python3 experiments/analysis/analyze.py --in experiments/analysis/outputs/real_runs.csv --out experiments/analysis/outputs_real
+python3 experiments/analysis/analyze.py \
+  --schema-version 2 --phase formal --exploratory-comparisons \
+  --policy approved-policy.json --in /path/to/formal-runs \
+  --out /path/to/analysis
 ```
 
-No code change is needed as long as the header and value types match.
-`notes` can carry run anomalies (e.g. `pod-evicted-retry`) and `kubectl_cmds`
-should be counted from shell history / audit log for manual runs (0–2 expected for gitops).
+The policy must contain exactly these fields: `policy_id`, `approved: true`,
+`approval_reference`, `prespecified: true`, `independence_confirmed: true`,
+`independence_basis`, `collection_run_ids`, and a nonempty `holm_family` array.
+Each family entry names one `subject`, non-F `scenario`, and R2 `metric`
+(`detection`, `evidence`, or `recovery`). The listed run IDs must exactly match
+the input collection. Both arms must have only complete, observed runs for each
+listed comparison. The output reports two-sided Mann–Whitney p-values, Holm
+adjustments for that prespecified family, and Cliff's delta in the direction
+manual minus GitOps. It does not emit a significance decision. No R1, health,
+R3, censored, invalid, or F comparison is supported. An approval reference is
+an input gate, not verification of thesis or supervisor authorization.
+
+## Legacy synthetic CSV
+
+The old analyzer remains available only with an explicit synthetic opt-in:
+
+```bash
+python3 experiments/analysis/analyze.py \
+  --legacy-synthetic-csv \
+  --in experiments/analysis/outputs/mock_runs.csv \
+  --out /tmp/analysis-legacy-mock
+```
+
+All generated tables, plots, and console output are marked **SYNTHETIC — NOT
+EMPIRICAL**. This mode retains the old `rep <= 10` / `rep >= 11` family
+heuristics and pooled legacy statistics only to reproduce mock examples. It
+does not accept schema-v2 records and must not be used for empirical CSV data.
+Existing mock generator files and outputs are preserved.
+
+## Offline tests
+
+Run the stdlib suite without cluster access or generated files in the
+repository:
+
+```bash
+python3 -m unittest discover -s experiments/analysis/tests -v
+```
+
+Tests use temporary directories and fixture-labeled schema-v2 records. No
+dependencies were added.

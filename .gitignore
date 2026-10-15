@@ -20,6 +20,10 @@
 **/*.ist
 **/*.loa
 
+# Python test/build caches
+__pycache__/
+*.py[cod]
+
 # Local reference PDFs (pedoman & contoh)
 examples/
 
