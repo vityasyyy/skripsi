@@ -1,0 +1,86 @@
+name: Offline Experiment Tests
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'experiments/**'
+      - '.github/workflows/offline-experiments.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'experiments/**'
+      - '.github/workflows/offline-experiments.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-experiments-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-tests:
+    name: Offline apparatus and analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      MPLBACKEND: Agg
+      KUBECONFIG: /dev/null
+      ARGOCD_AUTH_TOKEN: ''
+      ARGOCD_OPTS: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: experiments/analysis/requirements.txt
+
+      - name: Install declared analysis dependencies
+        run: python -m pip install -r experiments/analysis/requirements.txt
+
+      - name: Deny real cluster clients
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/offline-clients"
+          cat > "$RUNNER_TEMP/offline-clients/kubectl" <<'SH'
+          #!/bin/sh
+          echo "Real cluster clients are forbidden in offline tests" >&2
+          exit 99
+          SH
+          cp "$RUNNER_TEMP/offline-clients/kubectl" "$RUNNER_TEMP/offline-clients/argocd"
+          chmod +x "$RUNNER_TEMP/offline-clients/"*
+          echo "$RUNNER_TEMP/offline-clients" >> "$GITHUB_PATH"
+
+      - name: Apparatus regressions
+        run: python -m unittest discover -s experiments/tests -v
+
+      - name: Analysis regressions
+        run: python -m unittest discover -s experiments/analysis/tests -v
+
+      - name: Producer-to-analysis integration
+        run: python -m unittest discover -s experiments/integration_tests -v
+
+      - name: Shell syntax and lint
+        shell: bash
+        run: |
+          for script in experiments/scripts/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -S warning experiments/scripts/*.sh
+
+      - name: Python syntax and whitespace
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in Path('experiments').rglob('*.py'):
+              compile(path.read_text(), str(path), 'exec')
+          PY
+          git diff --check HEAD^ HEAD

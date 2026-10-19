@@ -64,3 +64,15 @@ The worker file sets are disjoint. Their commits were integrated on a separate f
 The reviewed component suites contain 42 apparatus tests and 25 analysis tests. ShellCheck and Python syntax checks pass; original generated mock artifacts, dependencies, thesis, proposal, presentation and infrastructure are unchanged. Python caches and worker reports are excluded from the delivery. These results establish offline behavior only.
 
 This is an incremental hardening delivery, not completion of the live apparatus. The current ArgoCD field-level evidence transport is intentionally unavailable; live GitOps execution fails before any client call. The unsafe fallback of treating evaluator data as controller evidence was removed. Implement and validate that transport, verify app/server-to-context mapping, and review explicit reset and collection orchestration before any live-pilot approval. Formal execution and live F remain blocked. The draft PR must retain these limitations and must not be merged or used for live collection implicitly.
+
+## Current status update (2026-10-19)
+
+The CI and ArgoCD transport findings above are historical, as of this handoff.
+Since then, a structured ArgoCD resource-evidence adapter has been implemented
+and covered by fake-executable transport tests; unsupported CLI capability and
+resource permissions fail before baseline or injection. The new offline GitHub
+Actions workflow runs all three offline suites with read-only repository
+permissions, client-denial `PATH`, and no credential or fixture upload. This
+does not establish live compatibility, permissions, runtime cluster identity,
+cluster/workload readiness, protocol approval, or pilot authorization. Reset
+and batch orchestration, formal execution, and live F remain blocked.

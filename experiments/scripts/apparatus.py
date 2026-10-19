@@ -40,7 +40,13 @@ SAFE_ERROR_CODES = {
     "app_not_allowed_for_manual_environment", "pilot_timeout_below_command_bound", "injection_failed",
     "correction_failed", "injection_ack_not_observed", "output_already_exists",
     "injection_acceptance_unverified", "mechanism_evidence_unavailable",
-    "gitops_evidence_transport_not_validated",
+    "gitops_connection_not_allowlisted", "argocd_resource_command_unavailable",
+    "argocd_resource_payload_invalid",
+}
+
+RESOURCE_GROUPS = {
+    "ConfigMap": "", "Secret": "", "Service": "", "PersistentVolumeClaim": "",
+    "Deployment": "apps", "StatefulSet": "apps", "CronJob": "batch",
 }
 
 
@@ -224,18 +230,25 @@ def _baseline_failure(score, observation):
 
 
 class SubprocessAdapter:
-    def __init__(self, subject, env, namespace, context, app=None, command_timeout_s=SUBPROCESS_TIMEOUT_S):
+    def __init__(self, subject, env, namespace, context, app=None, command_timeout_s=SUBPROCESS_TIMEOUT_S,
+                 argocd_context=None, destination_server=None):
         self.subject = subject
         self.env = env
         self.namespace = namespace
         self.context = context
         self.app = app
         self.command_timeout_s = command_timeout_s
+        self.argocd_context = argocd_context
+        self.destination_server = destination_server
 
     def _run(self, client, args, input_text=None):
         command = [client]
         if client == "kubectl":
             command.extend(("--context", self.context))
+        elif client == "argocd":
+            if not self.argocd_context:
+                raise ApparatusError("gitops_connection_not_allowlisted")
+            command.extend(("--argocd-context", self.argocd_context))
         command.extend(args)
         try:
             result = subprocess.run(
@@ -280,10 +293,20 @@ class SubprocessAdapter:
         metrics = parse_node_cpu_percentages(self._run("kubectl", ["top", "nodes", "--no-headers"]))
         return Observation(objects, len(pods), _pod_health(pods), metrics)
 
-    def mechanism_signal(self, expected):
-        if self.env == "manual":
-            score, differences = compare_inventory(expected, self._read_inventory())
-            return differences if score != 100.0 or any(item["source"] == "unexpected-inventory" for item in differences) else []
+    def preflight(self):
+        if self.env != "gitops":
+            return
+        try:
+            help_text = self._run("argocd", ["app", "get-resource", "--help"])
+        except ApparatusError as exc:
+            raise ApparatusError("argocd_resource_command_unavailable") from exc
+        if not all(marker in help_text for marker in ("get-resource APPNAME", "--kind", "--group", "--resource-name", "--output")):
+            raise ApparatusError("argocd_resource_command_unavailable")
+        self._application_resources(expected_inventory(self.subject))
+        for spec in expected_inventory(self.subject):
+            self._controller_resource(spec)
+
+    def _application_resources(self, expected):
         if not self.app:
             raise ApparatusError("gitops_app_required")
         output = self._run("argocd", ["app", "get", self.app, "-o", "json"])
@@ -291,21 +314,55 @@ class SubprocessAdapter:
             payload = json.loads(output)
             destination = payload["spec"]["destination"]
             resources = payload["status"]["resources"]
-            if destination.get("namespace") != self.namespace or not isinstance(resources, list):
+            if (not self.destination_server or destination.get("server") != self.destination_server
+                    or destination.get("namespace") != self.namespace or not isinstance(resources, list)):
                 raise ValueError
         except (KeyError, TypeError, ValueError) as exc:
             raise ApparatusError("gitops_target_or_status_invalid") from exc
         expected_ids = {(spec.kind, spec.name) for spec in expected}
         resource_status = {}
         for item in resources:
+            if not isinstance(item, dict):
+                raise ApparatusError("gitops_target_or_status_invalid")
             if item.get("namespace", self.namespace) != self.namespace:
                 continue
             identity = (item.get("kind"), item.get("name"))
             if identity in expected_ids:
-                resource_status[identity] = item.get("status")
+                if (identity in resource_status or item.get("group", "") != RESOURCE_GROUPS[identity[0]]
+                        or item.get("status") not in ("Synced", "OutOfSync")):
+                    raise ApparatusError("gitops_target_or_status_invalid")
+                resource_status[identity] = item
         if set(resource_status) != expected_ids:
             raise ApparatusError("gitops_expected_resources_unavailable")
-        return any(status in ("OutOfSync", "Missing") for status in resource_status.values())
+        return resource_status
+
+    def mechanism_signal(self, expected):
+        if self.env == "manual":
+            score, differences = compare_inventory(expected, self._read_inventory())
+            return differences if score != 100.0 or any(item["source"] == "unexpected-inventory" for item in differences) else []
+        resources = self._application_resources(expected)
+        return any(item["status"] == "OutOfSync" or item.get("health", {}).get("status") == "Missing"
+                   for item in resources.values())
+
+    def _controller_resource(self, spec):
+        output = self._run("argocd", ["app", "get-resource", self.app, "--kind", spec.kind,
+            "--resource-name", spec.name, "--group", RESOURCE_GROUPS[spec.kind], "-o", "json"])
+        try:
+            payload = json.loads(output)
+            objects = payload if isinstance(payload, list) else (
+                payload["items"] if payload.get("kind") == "List" else [payload])
+            if not isinstance(objects, list) or len(objects) != 1:
+                raise ValueError
+            obj = objects[0]
+            metadata = obj["metadata"]
+            api_version = obj["apiVersion"]
+            group = api_version.split("/", 1)[0] if "/" in api_version else ""
+            if (obj["kind"] != spec.kind or metadata["name"] != spec.name
+                    or metadata["namespace"] != self.namespace or group != RESOURCE_GROUPS[spec.kind]):
+                raise ValueError
+            return obj
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise ApparatusError("argocd_resource_payload_invalid") from exc
 
     def inject(self, scenario):
         if scenario == "F":
@@ -359,9 +416,39 @@ class SubprocessAdapter:
     def mechanism_evidence(self, expected):
         if self.env == "manual":
             return self.mechanism_signal(expected)
-        # Controller status alone does not expose the differing field. A live
-        # ArgoCD evidence adapter must be validated before this endpoint is used.
-        return None
+        resources = self._application_resources(expected)
+        evidence = []
+        unavailable = False
+        for spec in expected:
+            status = resources[(spec.kind, spec.name)]
+            if status.get("health", {}).get("status") == "Missing":
+                evidence.append({"resource": _resource_name(spec.kind, spec.name),
+                    "field_paths": ["$identity"], "source": "argocd-resource-status"})
+                continue
+            if status["status"] != "OutOfSync":
+                continue
+            obj = self._controller_resource(spec)
+            # ArgoCD replaces Secret values. Only structural/non-data fields can
+            # establish differences; masked values must never be compared.
+            fields = tuple((path, value) for path, value in spec.fields
+                           if spec.kind != "Secret" or path[0] != "data")
+            _, differences = compare_inventory((ResourceSpec(spec.kind, spec.name, fields),), [obj])
+            if spec.kind == "Secret":
+                unavailable = True
+                data = obj.get("data")
+                if isinstance(data, dict) and data:
+                    missing = [_field_name(path) for path, _ in spec.fields
+                               if path[0] == "data" and not _path_value(obj, path)[0]]
+                    if missing:
+                        if differences:
+                            differences[0]["field_paths"].extend(missing)
+                        else:
+                            differences = [{"resource": _resource_name(spec.kind, spec.name),
+                                            "field_paths": missing}]
+            for item in differences:
+                evidence.append({"resource": item["resource"], "field_paths": item["field_paths"],
+                                 "source": "argocd-live-resource"})
+        return evidence if evidence or not unavailable else None
 
     def apply_baseline(self, expected, differences):
         if not differences:
@@ -431,6 +518,9 @@ def run_experiment(adapter, subject, env, scenario, rep=1, phase="fixture", time
                            float(timeout_s), float(poll_interval_s), started_at)
     expected = expected_inventory(subject)
     try:
+        preflight = getattr(adapter, "preflight", None)
+        if preflight is not None:
+            preflight()
         baseline = adapter.snapshot()
         baseline_score, _ = compare_inventory(expected, baseline.objects)
         record["r1_baseline_pct"] = baseline_score
@@ -498,6 +588,30 @@ def run_experiment(adapter, subject, env, scenario, rep=1, phase="fixture", time
     evidence_keys = set()
     evidence_available = True
 
+    def observe_restoration(observed_at, score, response_ready=None, ack_at=None):
+        nonlocal first_equal
+        if observed_at > deadline:
+            return
+        if response_ready is None:
+            with state_lock:
+                injection_done = injection["done"]
+                injection_error = injection["error"]
+                ack_at = injection.get("ack_at")
+                correction_done = correction["done"]
+                correction_error = correction["error"]
+            response_ready = injection_done and not injection_error and (
+                env == "gitops" or (correction_done and not correction_error)
+            )
+        if response_ready and ack_at is not None and scenario != "F" and observed_at >= ack_at:
+            if score == 100.0:
+                if first_equal is None:
+                    first_equal = (observed_at, score)
+                elif record["tr_mono_s"] is None:
+                    record["tr_mono_s"] = first_equal[0]
+                    record["r1_recovered_pct"] = first_equal[1]
+            else:
+                first_equal = None
+
     while True:
         with state_lock:
             injection_done = injection["done"]
@@ -506,42 +620,59 @@ def run_experiment(adapter, subject, env, scenario, rep=1, phase="fixture", time
             correction_done = correction["done"]
             correction_error = correction["error"]
             correction_completed_at = correction["completed_at"]
+        oracle_observed_at = None
+        score = None
         if injection_done and injection_error:
             break
         if correction_done and correction_error:
             break
         try:
             observation = adapter.snapshot()
+            oracle_observed_at = clock()
             score, differences = compare_inventory(expected, observation.objects)
+            if oracle_observed_at <= deadline:
+                record["healthy_final"] = observation.healthy
+                if differences and record["r1_post_pct"] is None:
+                    record["r1_post_pct"] = score
             signal = adapter.mechanism_signal(expected)
-            mechanism_evidence = adapter.mechanism_evidence(expected)
-            evidence_available = mechanism_evidence is not None
+            signal_observed_at = clock()
+            if signal and signal_observed_at <= deadline and record["td_mono_s"] is None:
+                record["td_mono_s"] = signal_observed_at
+            if env == "manual" and isinstance(signal, list):
+                mechanism_evidence = signal
+                evidence_observed_at = signal_observed_at
+            else:
+                mechanism_evidence = adapter.mechanism_evidence(expected)
+                evidence_observed_at = clock()
+            if mechanism_evidence is None and record["te_mono_s"] is None:
+                evidence_available = False
         except ApparatusError as exc:
+            if oracle_observed_at is not None and score is not None:
+                observe_restoration(oracle_observed_at, score)
             instrumentation_error = exc.code
             break
         except Exception:
+            if oracle_observed_at is not None and score is not None:
+                observe_restoration(oracle_observed_at, score)
             instrumentation_error = "instrumentation_failed"
             break
 
-        observed_at = clock()
+        observed_at = oracle_observed_at
         if observed_at <= deadline:
             record["healthy_final"] = observation.healthy
             if differences and record["r1_post_pct"] is None:
                 record["r1_post_pct"] = score
-            for item in mechanism_evidence or []:
+            for item in ((mechanism_evidence or []) if evidence_observed_at <= deadline else []):
                 key = (item["resource"], tuple(item["field_paths"]), item["source"])
                 if key not in evidence_keys:
                     evidence_keys.add(key)
                     record["evidence"].append({
                         **item,
-                        "observed_at_mono_s": observed_at,
+                        "observed_at_mono_s": evidence_observed_at,
                     })
                     if record["te_mono_s"] is None:
-                        record["te_mono_s"] = observed_at
-
-            detected = bool(signal)
-            if detected and record["td_mono_s"] is None:
-                record["td_mono_s"] = observed_at
+                        record["te_mono_s"] = evidence_observed_at
+                        evidence_available = True
 
             with state_lock:
                 injection_done = injection["done"]
@@ -553,7 +684,7 @@ def run_experiment(adapter, subject, env, scenario, rep=1, phase="fixture", time
                 correction_started = correction["started"]
 
             if (record["td_mono_s"] is not None and injection_done and not injection_error
-                    and env == "manual" and scenario != "F" and not correction_started):
+                    and env == "manual" and scenario != "F" and not correction_started and clock() < deadline):
                 response_differences = signal if isinstance(signal, list) else differences
                 if response_differences:
                     with state_lock:
@@ -568,17 +699,7 @@ def run_experiment(adapter, subject, env, scenario, rep=1, phase="fixture", time
             response_ready = injection_done and not injection_error and (
                 env == "gitops" or (correction_done and not correction_error)
             )
-            if response_ready and ack_at is not None and scenario != "F" and observed_at >= ack_at:
-                if score == 100.0:
-                    if first_equal is None:
-                        first_equal = (observed_at, score)
-                    else:
-                        if record["tr_mono_s"] is None:
-                            record["tr_mono_s"] = first_equal[0]
-                            record["r1_recovered_pct"] = first_equal[1]
-                        record["healthy_final"] = observation.healthy
-                else:
-                    first_equal = None
+            observe_restoration(observed_at, score, response_ready, ack_at)
 
             if all(record[name] is not None for name in ("td_mono_s", "te_mono_s", "tr_mono_s")):
                 break
@@ -656,7 +777,7 @@ def _allowed_targets():
     targets = set()
     for item in os.environ.get("APPARATUS_PILOT_TARGETS", "").split(","):
         parts = tuple(part.strip() for part in item.split("|"))
-        if len(parts) == 3 and all(parts):
+        if len(parts) in (3, 5) and all(parts):
             targets.add(parts)
     return targets
 
@@ -692,9 +813,12 @@ def _validate_cli(args):
         if not args.context or args.context not in _allowed_list("APPARATUS_PILOT_CONTEXTS"):
             raise ApparatusError("pilot_context_not_allowlisted")
         if args.env == "gitops":
-            if not args.app or (args.context, args.namespace, args.app) not in _allowed_targets():
+            target = (args.context, args.namespace, args.app)
+            if not args.app or not any(item[:3] == target for item in _allowed_targets()):
                 raise ApparatusError("pilot_target_not_allowlisted")
-            raise ApparatusError("gitops_evidence_transport_not_validated")
+            if (not args.argocd_context or not args.destination_server
+                    or (*target, args.argocd_context, args.destination_server) not in _allowed_targets()):
+                raise ApparatusError("gitops_connection_not_allowlisted")
         elif args.app:
             raise ApparatusError("app_not_allowed_for_manual_environment")
         elif (args.context, args.namespace, "manual") not in _allowed_targets():
@@ -717,6 +841,8 @@ def main(argv=None):
     parser.add_argument("--namespace")
     parser.add_argument("--context")
     parser.add_argument("--app")
+    parser.add_argument("--argocd-context", help="explicit ArgoCD CLI context for a mapped pilot target")
+    parser.add_argument("--destination-server", help="approved Application destination server address")
     parser.add_argument("--timeout-s", type=float, default=600.0)
     parser.add_argument("--poll-interval-s", type=float, default=1.0)
     parser.add_argument("--output", help="JSON output path; default is stdout")
@@ -730,7 +856,8 @@ def main(argv=None):
             return 0
         if args.output and Path(args.output).exists():
             raise ApparatusError("output_already_exists")
-        adapter = SubprocessAdapter(args.subject, args.env, args.namespace, args.context, args.app)
+        adapter = SubprocessAdapter(args.subject, args.env, args.namespace, args.context, args.app,
+                                    argocd_context=args.argocd_context, destination_server=args.destination_server)
         record = run_experiment(adapter, args.subject, args.env, args.scenario, args.rep, "pilot",
                                 args.timeout_s, args.poll_interval_s)
         data = json.dumps(record, ensure_ascii=False, allow_nan=False, sort_keys=True) + "\n"

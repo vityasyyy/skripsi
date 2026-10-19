@@ -41,14 +41,22 @@ points are preview-only. `metrics-collect.sh --live-dryrun` remains available
 only to append the old synthetic CSV example; that CSV and the checked-in
 analysis outputs remain unchanged and are not schema-v2 measurements.
 
-Run the offline regression and fake-client integration tests with:
+Run the three offline suites and static checks with:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s experiments/tests -v
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s experiments/analysis/tests -v
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s experiments/integration_tests -v
+for script in experiments/scripts/*.sh; do bash -n "$script" || exit; done
+shellcheck -S warning experiments/scripts/*.sh
+PYTHONDONTWRITEBYTECODE=1 python3 -c 'from pathlib import Path; [compile(path.read_text(), str(path), "exec") for path in Path("experiments").rglob("*.py")]'
+git diff --check
 ```
 
-Subprocess tests place explicit fake `kubectl`/`argocd` executables first (and
-the adapter integration tests use a PATH containing only those fakes). No test
+The `Offline Experiment Tests` GitHub Actions workflow runs the same suites and
+checks. It has read-only repository permissions, denies real cluster clients
+through `PATH`, and does not upload fixtures or request credentials. Tests use
+mocked transports or explicit fake `kubectl`/`argocd` executables; no test
 invokes an installed cluster client.
 
 ## Pilot gates and limitations
@@ -57,17 +65,32 @@ The runner accepts only `s1`/`s2`, one scenario `A`–`G`, a positive repetition
 number, and the exact namespace mapped to the subject/environment. Live runs
 must explicitly use `--live --phase pilot`, an allowlisted context in
 `APPARATUS_PILOT_CONTEXTS`, and a passing baseline. GitOps runs additionally
-require an exact `context|namespace|app` entry in
-`APPARATUS_PILOT_TARGETS`; the ArgoCD application must report the selected
-namespace and all expected resources. These allowlists are empty by default.
-Formal execution is unsupported.
+require an exact five-part `context|namespace|app|argocd-context|destination-server`
+entry in `APPARATUS_PILOT_TARGETS`, with matching `--argocd-context` and
+`--destination-server` flags. The ArgoCD application must report the selected
+namespace and all expected resources. The following is syntax only, not an
+approved target or instruction to configure a pilot:
 
-The live GitOps CLI path is deliberately blocked before any client command:
-the field-level ArgoCD evidence transport has not been implemented and validated.
-Status/health text is not substituted for deviation evidence. Offline adapters
-can exercise that interface; unsupported evidence is explicitly not evaluable,
-while independent detection/restoration observations are retained. This is an
-offline-tested core, not a live-pilot-ready experiment pipeline.
+```text
+<kube-context>|<namespace>|<application>|<argocd-context>|<destination-server>
+```
+
+These allowlists are empty by default. Formal execution is unsupported.
+
+As of 2026-10-19, the offline-tested GitOps adapter obtains structured
+Application status and relevant resource JSON through ArgoCD. It preflights
+`get-resource` CLI support and resource read access before baseline or injection;
+unsupported clients and denied access fail closed. Application context,
+destination server, and Kubernetes context are joined only by an explicit
+operator allowlist mapping. That configured mapping is not runtime proof that
+the endpoints share a cluster identity. This implementation has not been
+validated against a live ArgoCD server or cluster.
+
+ArgoCD server-redacted Secret values are never compared as raw evidence. A
+value-only Secret difference that cannot be established safely remains
+`not_evaluable`, including after healing; independently observed detection and
+restoration remain visible. This is an offline-tested core, not a live-pilot-
+ready experiment pipeline.
 
 Scenario F is fixture/reporting-only in this repair. It is an unmanaged
 visibility-boundary case, not something the runner may create or clean up in a
@@ -75,15 +98,18 @@ derived namespace. Live F remains blocked pending separate boundary approval;
 no namespace or arbitrary unmanaged resource is automatically deleted.
 
 No live pilot or cluster readiness was validated. Fixture tests prove only
-offline behavior. Before any separately approved pilot, validate the exact
-Kubernetes/ArgoCD client versions, application-to-context mapping, expected
-resource fields, API status behavior, metrics and pod readiness, and correction
-semantics against the approved pilot context. The coordinator bounds every
-client subprocess and records only sanitized identities/field paths; it never
-stores Secret values, hashes, full manifests, raw diffs, or command stderr.
+offline behavior. Live compatibility and permissions, runtime cluster identity,
+workload readiness, and protocol/supervisor/execution approval remain pending.
+Before any separately approved pilot, validate the exact Kubernetes/ArgoCD
+client versions, operator mapping, expected resource fields, API status behavior,
+metrics and pod readiness, and correction semantics against the approved pilot
+context. The coordinator bounds every client subprocess and records only
+sanitized identities/field paths; it never stores Secret values, hashes, full
+manifests, raw diffs, or command stderr.
 
 Before the next run, a separate approved reset must restore inventory and health.
 This single-run tool does not automate batch allocation, randomization or cleanup.
 A failed run remains recorded and the next baseline fails closed; no namespace
-is deleted to make a subsequent run pass. Live F, the GitOps evidence transport,
-context/app server mapping and formal-workload adapters remain future gates.
+is deleted to make a subsequent run pass. Live F, live ArgoCD compatibility and
+permissions, runtime context/app identity verification, and formal-workload
+adapters remain future gates.

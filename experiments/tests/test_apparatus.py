@@ -352,11 +352,11 @@ class FakeSubprocessIntegrationTests(unittest.TestCase):
         self.calls = self.root / "calls.jsonl"
         objects = _expected_objects()
         argocd_resources = [
-            {"kind": item["kind"], "name": item["metadata"]["name"],
+            {"kind": item["kind"], "group": apparatus.RESOURCE_GROUPS[item["kind"]], "name": item["metadata"]["name"],
              "namespace": "exp-s1-gitops", "status": "Synced"}
             for item in _expected_objects(namespace="exp-s1-gitops")
         ]
-        app = {"spec": {"destination": {"namespace": "exp-s1-gitops"}},
+        app = {"spec": {"destination": {"namespace": "exp-s1-gitops", "server": "https://fixture.invalid"}},
                "status": {"resources": argocd_resources}}
         fake = r'''#!__PYTHON__
 import json
@@ -397,7 +397,8 @@ elif "get" in args:
 
     def test_subprocess_adapter_uses_only_fake_client_executables(self):
         with patch.dict(os.environ, self.env):
-            adapter = apparatus.SubprocessAdapter("s1", "gitops", "exp-s1-gitops", "fixture-context", "fixture-app")
+            adapter = apparatus.SubprocessAdapter("s1", "gitops", "exp-s1-gitops", "fixture-context", "fixture-app",
+                argocd_context="fixture-argo", destination_server="https://fixture.invalid")
             observation = adapter.snapshot()
             self.assertEqual(observation.healthy, True)
             self.assertEqual(observation.node_cpu_pct, [5.0])
@@ -502,7 +503,7 @@ elif "get" in args:
         self.assertIn("scenario_f_requires_separate_boundary_approval", result.stderr)
         self.assertFalse(self.calls.exists())
 
-    def test_gitops_live_is_blocked_until_evidence_transport_is_validated(self):
+    def test_gitops_live_is_blocked_without_an_explicit_controller_mapping(self):
         env = self.env.copy()
         env.update({"APPARATUS_PILOT_CONTEXTS": "fixture-context",
                     "APPARATUS_PILOT_TARGETS": "fixture-context|exp-s1-gitops|fixture-app"})
@@ -512,7 +513,7 @@ elif "get" in args:
             env=env, text=True, capture_output=True, check=False,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("gitops_evidence_transport_not_validated", result.stderr)
+        self.assertIn("gitops_connection_not_allowlisted", result.stderr)
         self.assertFalse(self.calls.exists())
 
 

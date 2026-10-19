@@ -148,7 +148,18 @@ controller detection, evidence or correction occurred. Its recovery is always
 not evaluable. `$identity` is the safe field-path marker for missing/extra
 resource identity evidence; unexpected objects do not change the R1 denominator.
 
-The current live GitOps CLI is blocked because its field-level evidence
-transport is not validated. The schema can represent later formal subjects,
-but the runner cannot execute formal runs. No fixture or supported input shape
-establishes permission, protocol approval, or empirical validity.
+As of 2026-10-19, the offline-tested GitOps adapter obtains structured
+Application status and scoped resource JSON for field-level evidence. It checks
+`get-resource` command support and resource-read permissions before baseline or
+injection. Application destination and namespace are checked against an
+explicit operator-approved context mapping; that mapping is not runtime proof
+of shared cluster identity. No live client/server compatibility or permissions
+have been validated.
+
+ArgoCD server-redacted Secret values are never compared as raw differences. If
+a value-only Secret difference cannot be established without those values,
+evidence remains `not_evaluable` even after healing; valid detection and
+restoration observations remain independently reportable. The schema can
+represent later formal subjects, but the runner cannot execute formal runs. No
+fixture or supported input shape establishes live permission, protocol approval,
+or empirical validity.

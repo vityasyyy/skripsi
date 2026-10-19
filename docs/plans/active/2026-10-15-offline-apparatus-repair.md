@@ -59,3 +59,13 @@ The worker exceeded its time box with core regressions still failing; the lead s
 The offline core and legacy-path safety changes are delivered incrementally, not as a live-ready pipeline. The common expected inventory/field oracle and scenario-blind responder are tested offline. Live GitOps execution is blocked before client calls because the ArgoCD field-level evidence transport is not yet implemented/validated; no common-oracle data is passed off as controller evidence. Unsupported evidence is not evaluable while independently measurable detection/restoration endpoints remain visible. F remains fixture-only. Cross-run reset, batch randomization and formal-workload support are not automated by this single-run tool.
 
 The obsolete unsafe shell live paths are disabled, not silently kept compatible. Shell executable modes are retained. Original synthetic CSV examples and generated outputs remain unchanged. These compatibility and capability limits must be included in the PR and final handoff. Remaining implementation work is the explicit ArgoCD evidence adapter, context/server validation and reset/collection orchestration before any separately approved live validation.
+
+## Current status update (2026-10-19)
+
+The preceding handoff records the state at the time of this plan. Since then,
+the structured ArgoCD evidence adapter and explicit context/destination mapping
+have been implemented and tested offline with fake clients. A read-only offline
+GitHub Actions workflow is also present. Live CLI/server compatibility,
+permissions, runtime cluster identity, workload readiness, protocol approval,
+reset/batch orchestration, formal execution, and live F remain unvalidated or
+out of scope; see the current ArgoCD evidence and offline CI plan.
