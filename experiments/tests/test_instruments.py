@@ -209,6 +209,49 @@ class InstrumentsTest(unittest.TestCase):
             result = self.run_tool("metrics-collect.sh", evidence)
             self.assertNotEqual(result.returncode, 0, result.stdout)
 
+    def test_sample_run_identity_must_match_evidence_run(self):
+        for mutate in (
+            lambda e: e["samples"][0].pop("run_id", None),
+            lambda e: e["samples"][0].update(run_id="different-run"),
+        ):
+            evidence = fixture()
+            mutate(evidence)
+            result = self.run_tool("metrics-collect.sh", evidence)
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            payload = json.loads(result.stderr)
+            self.assertEqual(payload["status"], "invalid_evidence")
+            self.assertIn("sample", payload["reason"].lower())
+
+    def test_matching_sample_run_identity_is_accepted(self):
+        evidence = fixture()
+        for sample in evidence["samples"]:
+            sample["run_id"] = evidence["run_id"]
+        result = self.run_tool("metrics-collect.sh", evidence)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_measured_correction_must_finish_within_observation_window(self):
+        evidence = fixture()
+        evidence["recovery"]["commands"][0].update(started=150, finished=151)
+        for tool in ("metrics-collect.sh", "recovery-runbook.sh"):
+            result = self.run_tool(tool, evidence)
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            payload = json.loads(result.stderr)
+            self.assertEqual(payload["status"], "recovery_failed")
+            self.assertIn("observation window", payload["reason"])
+
+    def test_correction_at_observation_window_boundary_is_accepted(self):
+        evidence = fixture()
+        evidence["recovery"]["commands"][0].update(started=103, finished=110)
+        result = self.run_tool("metrics-collect.sh", evidence)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["recovery_seconds"], 4)
+
+    def test_correction_before_injection_start_is_invalid(self):
+        evidence = fixture()
+        evidence["recovery"]["commands"][0].update(started=99, finished=100)
+        result = self.run_tool("metrics-collect.sh", evidence)
+        self.assertNotEqual(result.returncode, 0)
+
     def test_recovery_propagates_failed_commands_and_incomplete_reset(self):
         mutations = [
             lambda e: e["recovery"]["commands"][0].update(returncode=1),

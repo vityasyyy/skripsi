@@ -23,13 +23,16 @@ bash experiments/scripts/drift-inject.sh --evidence experiments/tests/fixtures/c
 ### Adapter akuisisi read-only (belum siap eksperimen)
 
 `acquire-readonly.py --input FILE` memproses bundel API tersimpan tanpa menjalankan
-`kubectl`. `--read-only --contract FILE` memakai empat panggilan baca tetap
-(nodes, metrics mentah, pods namespace, dan deployments/services/HPA namespace),
-tanpa `Secret`/`ConfigMap`, shell, atau perintah dari input. Keluarannya adalah
-fragmen observasi bertanda `readiness_verified: false`; ia tidak menulis file,
-tidak membuat baseline lulus, dan tidak membuktikan revisi deployment. Panggilan
-langsung hanya dilakukan atas permintaan eksplisit pada klaster yang diizinkan.
-Ini bukan adapter polling/injeksi/reset dan tidak dijalankan oleh uji.
+`kubectl`. Bundel input wajib memuat `run_id`, atau berikan `--run-id`; nilai yang
+berbeda ditolak. `--read-only --contract FILE --run-id RUN` memakai empat panggilan
+baca tetap (nodes, metrics mentah, pods namespace, dan deployments/services/HPA
+namespace), tanpa `Secret`/`ConfigMap`, shell, atau perintah dari input. Keluarannya
+adalah fragmen observasi bertanda `readiness_verified: false` dan membawa `run_id`;
+setiap sampel lengkap yang dibangun dari fragmen itu wajib memakai `run_id` yang
+sama. Fragmen ini tidak menulis file, tidak membuat baseline lulus, dan tidak
+membuktikan revisi deployment. Panggilan langsung hanya dilakukan atas permintaan
+eksplisit pada klaster yang diizinkan. Ini bukan adapter polling/injeksi/reset dan
+tidak dijalankan oleh uji.
 
 Fixture bernilai sintetis; semua hasilnya adalah replay, bukan observasi klaster.
 Output JSON tunggal ke stdout; kegagalan bukti ke stderr dan exit nonzero. Simpan
@@ -52,9 +55,16 @@ serta peninjau. Evaluator tidak membuktikan autentisitas file JSON.
 | `checks` | Bukti prasyarat audit, SMTP, pemulihan aplikasi, sinkronisasi jam, isolasi, HPA, lifecycle, jendela beban tenang, adopsi runtime, queue, dan data; tidak boleh diasumsikan benar |
 | `injection` | Satu permintaan, waktu kirim/ack, keberhasilan API **dan** verifikasi perubahan; `effect` `value_changed`/`deleted`/`created`; gagal/tidak diketahui bukan deteksi nol |
 | `events` | Sinyal deteksi pengendali yang benar dan bukti deviasi terpisah, id run/objek/bidang serta referensi artefak tersanitasi; bukan status health atau klaim akar masalah |
-| `samples` | Pengamatan berurutan dengan waktu aktual dan bidang yang sama di kedua lengan; kegagalan pembacaan bukan nilai default; D/F memerlukan bukti keberadaan pada pengamatan pertama |
+| `samples` | Pengamatan berurutan dengan waktu aktual dan bidang yang sama di kedua lengan; setiap sampel wajib memiliki `run_id` yang sama dengan evidence run (hilang/asing ditolak); kegagalan pembacaan bukan nilai default; D/F memerlukan bukti keberadaan pada pengamatan pertama |
 | `stop_reason` | `timeout` harus menutup batas beku; `recovery` berhenti lebih awal hanya jika pemulihan dua pengamatan terkonfirmasi |
-| `recovery.commands` | Hasil tiap tindakan korektif dengan waktu mulai/akhir dan exit code; satu kegagalan menggagalkan verifikasi pemulihan |
+| `recovery.commands` | Hasil tiap tindakan korektif terukur dengan waktu mulai/akhir di dalam `[injection.started, observation_end]` dan exit code; satu kegagalan menggagalkan verifikasi. Tindakan reset setelah jendela pengamatan bukan bukti waktu pemulihan dan tidak boleh dimasukkan ke field ini |
+
+Setiap event dan sampel harus terikat pada `run_id` evidence yang sama; nilai
+hilang atau asing ditolak, bukan dianggap sebagai observasi run ini. Waktu
+pemulihan hanya dihitung dari sampel yang valid. Tindakan reset yang terjadi setelah
+`observation_end` adalah bukti postcondition terpisah, bukan tindakan koreksi
+terukur; jangan memasukkannya ke `recovery.commands` untuk “memperbaiki” waktu
+pemulihan.
 
 R1 menghitung persentase **sumber daya yang seluruh bidang terpilihnya cocok**,
 dengan penyebut inventaris yang sama. Image, resource requests/limits, ConfigMap,

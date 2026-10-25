@@ -191,8 +191,6 @@ def metrics(evidence):
     baseline(evidence, evidence["baseline"])
     spec = contract(evidence)
     start, ack = injection(evidence)
-    if "recovery" in evidence:
-        correction_results(evidence, start)
     end = number(evidence["observation_end"], "observation end")
     timeout = number(evidence["timeout_seconds"], "timeout")
     require(end > ack, "observation end must follow injection acknowledgement")
@@ -201,6 +199,8 @@ def metrics(evidence):
     require(stop_reason in ("timeout", "recovery"), "explicit stop reason required")
     if stop_reason == "timeout":
         require(end == start + timeout, "timeout run must cover the frozen observation limit")
+    if "recovery" in evidence:
+        correction_results(evidence, start, end)
     max_gap = number(evidence["max_sample_gap_seconds"], "maximum sample gap")
     require(max_gap > 0, "maximum sample gap must be positive")
     scenario = evidence["scenario"]
@@ -249,6 +249,8 @@ def metrics(evidence):
         require(previous < at <= end, "unordered/out-of-window sample")
         require(at - previous <= max_gap, "sample gap exceeds frozen coverage limit")
         previous = at
+        require("run_id" in sample, "sample run identity required")
+        require(sample["run_id"] == evidence["run_id"], "stale sample from another run")
         if scenario == "F":
             extra = sample.get("extra_resources")
             require(isinstance(extra, list), "F quarantine observation required")
@@ -298,7 +300,7 @@ def metrics(evidence):
     return result
 
 
-def correction_results(evidence, start):
+def correction_results(evidence, start, end):
     commands = evidence["recovery"]["commands"]
     require(isinstance(commands, list) and commands, "correction command results required")
     previous = start
@@ -306,16 +308,24 @@ def correction_results(evidence, start):
         require(type(command["returncode"]) is int, "command exit code required")
         if command["returncode"] != 0:
             raise RecoveryError("correction failed; reset not verified")
-        require(previous <= number(command["started"], "command start") <=
-                number(command["finished"], "command finish"), "invalid command timing")
-        previous = command["finished"]
+        started = number(command["started"], "command start")
+        finished = number(command["finished"], "command finish")
+        require(previous <= started <= finished, "invalid command timing")
+        if finished > end:
+            raise RecoveryError(
+                "measured correction command must finish within the observation window; "
+                "later reset actions are not measured recovery evidence"
+            )
+        previous = finished
     return previous, len(commands)
 
 
 def recovery(evidence):
     baseline(evidence, evidence["baseline"])
-    start, _ = injection(evidence)
-    previous, count = correction_results(evidence, start)
+    start, ack = injection(evidence)
+    end = number(evidence["observation_end"], "observation end")
+    require(end > ack, "observation end must follow injection acknowledgement")
+    previous, count = correction_results(evidence, start, end)
     baseline(evidence, evidence["reset"])
     require(evidence["reset"]["at"] >= previous, "reset snapshot predates correction")
     return {"status": "reset_verified_offline", "commands": count, "offline_only": True}

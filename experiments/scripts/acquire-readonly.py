@@ -46,7 +46,9 @@ def unique(items, identity):
     return result
 
 
-def export(bundle, namespace):
+def export(bundle, namespace, run_id):
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise ValueError("run identity required for sample binding")
     spec = bundle["contract"]
     if not re.fullmatch(r"[0-9a-f]{40}", spec["source_revision"]):
         raise ValueError("pinned reference revision required")
@@ -95,7 +97,8 @@ def export(bundle, namespace):
                           for condition in pod["status"].get("conditions", []))}
             for pod in bundle["pods"]["items"]]
     return {"status": "read_only_export", "readiness_verified": False,
-            "formal_execution_approved": False, "reference_source_revision": spec["source_revision"],
+            "formal_execution_approved": False, "run_id": run_id,
+            "reference_source_revision": spec["source_revision"],
             "memory_metric": "metrics-server-working-set/allocatable", "nodes": observations,
             "pods": pods, "resources": resources, "absent_resources": absent,
             "missing_evidence": ["deployment_revision_attestation", "render_digest_attestation",
@@ -119,9 +122,12 @@ def main():
     source.add_argument("--input", type=Path, help="offline saved API JSON bundle, no external commands")
     source.add_argument("--read-only", action="store_true", help="explicit read-only acquisition; not a formal run")
     parser.add_argument("--contract", type=Path, help="selected non-secret field contract for --read-only")
+    parser.add_argument("--run-id", help="evidence run identity stamped on the exported fragment")
     args = parser.parse_args()
     if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", args.namespace):
         parser.error("invalid namespace")
+    if args.run_id is not None and not args.run_id.strip():
+        parser.error("--run-id must be nonempty")
     start = time.monotonic()
     utc = datetime.now(timezone.utc).isoformat()
     try:
@@ -136,7 +142,11 @@ def main():
                       "metrics": kubectl_json(["get", "--raw", "/apis/metrics.k8s.io/v1beta1/nodes"]),
                       "pods": kubectl_json(["get", "pods", "-n", args.namespace]),
                       "resources": kubectl_json(["get", "deployments,services,hpa", "-n", args.namespace])}
-        result = export(bundle, args.namespace)
+        bundle_run_id = bundle.get("run_id")
+        if args.run_id and bundle_run_id and args.run_id != bundle_run_id:
+            raise ValueError("run identity mismatch between bundle and --run-id")
+        run_id = args.run_id or bundle_run_id
+        result = export(bundle, args.namespace, run_id)
         result.update(acquisition_started=start, acquisition_finished=time.monotonic(), acquired_utc=utc,
                       replay=args.input is not None)
         print(json.dumps(result, allow_nan=False, sort_keys=True))
