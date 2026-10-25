@@ -1,0 +1,25 @@
+name: Offline instruments
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/**'
+      - '.github/workflows/instruments.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'experiments/**'
+      - '.github/workflows/instruments.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run stdlib fixture tests (no cluster access or installs)
+        run: python3 -m unittest discover -s experiments/tests -v
+      - name: Check shell syntax
+        run: bash -n experiments/scripts/*.sh

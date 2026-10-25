@@ -24,7 +24,13 @@ Rep filtering per Bab-3 protocol (mockgen labels rep 1..10 as R2, 11..15 as R1):
 from __future__ import annotations
 
 import argparse
+import csv
 from pathlib import Path
+import sys
+
+# Reject measured-input use before loading optional historical plotting dependencies.
+if __name__ == "__main__" and "--historical-mock-only" not in sys.argv:
+    raise SystemExit("This is a historical mock analyzer; use --historical-mock-only or v2 summarize.py.")
 
 import matplotlib
 
@@ -113,7 +119,17 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Analyze drift experiment runs.")
     ap.add_argument("--in", dest="inp", required=True, help="Input CSV path")
     ap.add_argument("--out", dest="out", required=True, help="Output directory")
+    ap.add_argument("--historical-mock-only", action="store_true",
+                    help="Reproduce historical synthetic S1/S2 outputs only, never formal inference")
     args = ap.parse_args()
+    if not args.historical_mock_only:
+        ap.error("historical analyzer only: use --historical-mock-only; v2 evidence uses summarize.py")
+
+    with Path(args.inp).open(newline="") as source:
+        rows = list(csv.DictReader(source))
+    if not rows or any(not row.get("notes", "").startswith("mock seed=") or
+                       row.get("subject") not in ("S1", "S2") for row in rows):
+        ap.error("historical mode requires labeled synthetic S1/S2 rows, not measured runs")
 
     inp = Path(args.inp)
     outdir = Path(args.out)

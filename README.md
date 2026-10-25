@@ -4,7 +4,7 @@
 
 Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma *deployment* manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM.
 
-> **Sumber kebenaran:** Proposal Tugas Akhir (`content/proposal/`) sudah diterima dan direview dosen pembimbing. Seluruh konten repo (termasuk struktur skripsi) harus selaras dengan proposal tersebut.
+> **Status metode:** Proposal yang telah diterima tetap dapat ditelusuri melalui riwayat Git. Penyesuaian metode pada `content/proposal/` dan `content/skripsi/` adalah **draf untuk tinjauan pemilik/pembimbing**, bukan persetujuan eksperimen formal. HPA normal aktif pada kedua lengan; A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Instrumen aktif hanya memvalidasi bukti offline; lihat [`experiments/README.md`](experiments/README.md).
 
 ---
 

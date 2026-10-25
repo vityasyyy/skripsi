@@ -1,0 +1,65 @@
+{
+  "synthetic": true,
+  "run_id": "fixture-only-1",
+  "env": "gitops",
+  "scenario": "B",
+  "contract": {
+    "source_revision": "6cacea6642a7c1690243d3b54130fa08216a9595",
+    "render_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "nodes": ["fixture-node"],
+    "pods": ["fixture-web"],
+    "hpa_targets": ["app/Deployment/web"],
+    "resources": [
+      {"id": "app/Deployment/web", "fields": {"/image": "fixture@sha256:abc", "/limits/memory": "1Gi"}},
+      {"id": "app/Service/web", "fields": {"/port": 80}}
+    ]
+  },
+  "baseline": {
+    "run_id": "fixture-only-1",
+    "at": 99,
+    "hpa_states": [{"target": "app/Deployment/web", "desired": 3, "replicas": 3, "ready": 3, "generation": 1, "observed_generation": 1, "active": true, "able_to_scale": true}],
+    "source_revision": "6cacea6642a7c1690243d3b54130fa08216a9595",
+    "render_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "memory_metric": "metrics-server-working-set/allocatable",
+    "nodes": [{"name": "fixture-node", "cpu_percent": 20, "memory_percent": 69.99}],
+    "pods": [{"name": "fixture-web", "phase": "Running", "ready": true}],
+    "resources": [
+      {"id": "app/Deployment/web", "fields": {"/image": "fixture@sha256:abc", "/limits/memory": "1Gi"}},
+      {"id": "app/Service/web", "fields": {"/port": 80}}
+    ],
+    "extra_resources": [],
+    "argo": {"sync": "Synced", "health": "Healthy"},
+    "checks": {"audit": true, "smtp": true, "application_reset": true, "clock": true, "isolation": true, "hpa": true, "lifecycle": true, "quiet_window": true, "runtime_adoption": true, "queue": true, "data": true}
+  },
+  "collector_started": 99,
+  "injection": {"started": 100, "acknowledged": 100.5, "accepted": true, "verified": true, "count": 1, "changed_fields": [{"resource": "app/Deployment/web", "path": "/image", "matches_desired": false}]},
+  "timeout_seconds": 10,
+  "max_sample_gap_seconds": 5,
+  "stop_reason": "timeout",
+  "observation_end": 110,
+  "events": [
+    {"run_id": "fixture-only-1", "type": "detection", "at": 102, "controller": "argocd", "resource": "app/Deployment/web", "fields": ["/image"]},
+    {"run_id": "fixture-only-1", "type": "evidence", "at": 103, "controller": "argocd", "resource": "app/Deployment/web", "fields": ["/image"], "artifact": "sanitized-diff-1.json"}
+  ],
+  "samples": [
+    {"run_id": "fixture-only-1", "at": 101, "source_revision": "6cacea6642a7c1690243d3b54130fa08216a9595", "render_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "resources": [{"id": "app/Deployment/web", "fields": {"/image": "wrong", "/limits/memory": "1Gi"}}, {"id": "app/Service/web", "fields": {"/port": 80}}]},
+    {"run_id": "fixture-only-1", "at": 104, "source_revision": "6cacea6642a7c1690243d3b54130fa08216a9595", "render_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "resources": [{"id": "app/Deployment/web", "fields": {"/image": "fixture@sha256:abc", "/limits/memory": "1Gi"}}, {"id": "app/Service/web", "fields": {"/port": 80}}]},
+    {"run_id": "fixture-only-1", "at": 105, "source_revision": "6cacea6642a7c1690243d3b54130fa08216a9595", "render_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "resources": [{"id": "app/Deployment/web", "fields": {"/image": "fixture@sha256:abc", "/limits/memory": "1Gi"}}, {"id": "app/Service/web", "fields": {"/port": 80}}]},
+    {"run_id": "fixture-only-1", "at": 110, "source_revision": "6cacea6642a7c1690243d3b54130fa08216a9595", "render_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "resources": [{"id": "app/Deployment/web", "fields": {"/image": "fixture@sha256:abc", "/limits/memory": "1Gi"}}, {"id": "app/Service/web", "fields": {"/port": 80}}]}
+  ],
+  "recovery": {"commands": [{"id": "repair-1", "started": 103, "finished": 104, "returncode": 0}]},
+  "reset": {
+    "run_id": "fixture-only-1",
+    "at": 111,
+    "hpa_states": [{"target": "app/Deployment/web", "desired": 3, "replicas": 3, "ready": 3, "generation": 1, "observed_generation": 1, "active": true, "able_to_scale": true}],
+    "source_revision": "6cacea6642a7c1690243d3b54130fa08216a9595",
+    "render_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "memory_metric": "metrics-server-working-set/allocatable",
+    "nodes": [{"name": "fixture-node", "cpu_percent": 20, "memory_percent": 30}],
+    "pods": [{"name": "fixture-web", "phase": "Running", "ready": true}],
+    "resources": [{"id": "app/Deployment/web", "fields": {"/image": "fixture@sha256:abc", "/limits/memory": "1Gi"}}, {"id": "app/Service/web", "fields": {"/port": 80}}],
+    "extra_resources": [],
+    "argo": {"sync": "Synced", "health": "Healthy"},
+    "checks": {"audit": true, "smtp": true, "application_reset": true, "clock": true, "isolation": true, "hpa": true, "lifecycle": true, "quiet_window": true, "runtime_adoption": true, "queue": true, "data": true}
+  }
+}
