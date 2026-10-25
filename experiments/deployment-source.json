@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/vityasyyy/invenio-rdm-gitops.git",
+  "revision": "6cacea6642a7c1690243d3b54130fa08216a9595",
+  "application": "argocd/apps/invenio-bootstrap.yaml",
+  "entrypoint": "k8s/apps/invenio/kustomization.yaml",
+  "reconciliation_config": "k8s/infra/argocd/patches/argocd-cm.yaml",
+  "status": "reference_only_not_a_deployed_revision_attestation",
+  "formal_execution_approved": false
+}

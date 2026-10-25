@@ -40,3 +40,7 @@ PLAN.md
 # Secrets
 .env
 secrets/
+
+# Python offline instrument checks
+__pycache__/
+*.pyc
