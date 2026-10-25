@@ -21,7 +21,9 @@ Kesetaraan inventaris dan bidang yang ditetapkan dilaporkan terpisah dari keseha
     \hline
     Skenario & Lingkungan & Kesetaraan konfigurasi: dasar / pascainjeksi / pascapemulihan & Kesehatan layanan pada pengamatan terkait \\
     \hline
-    A--E, G & kubectl / ArgoCD & Belum tersedia & Belum tersedia \\
+    B--E, G & kubectl / ArgoCD & Belum tersedia & Belum tersedia \\
+    \hline
+    A & HPA / HPA & Kontrol HPA; replika bukan kesetaraan statis & Belum tersedia \\
     \hline
     F & kubectl / ArgoCD & Tidak termasuk hasil utama R1; dicatat sebagai batas cakupan & Dilaporkan terpisah jika relevan \\
     \hline
@@ -41,7 +43,9 @@ Untuk setiap skenario dan lingkungan, hasil kelak mencantumkan target run, jumla
     \hline
     Skenario & Lingkungan & Run valid / tersensor dan alasan & Distribusi durasi: deteksi / bukti / pemulihan \\
     \hline
-    A--E, G & kubectl / ArgoCD & Belum tersedia & Belum tersedia \\
+    B--E, G & kubectl / ArgoCD & Belum tersedia & Belum tersedia \\
+    \hline
+    A & HPA / HPA & Dilaporkan terpisah & Respons HPA, bukan efikasi ArgoCD \\
     \hline
     F & kubectl / ArgoCD & Dilaporkan sebagai pengamatan batas visibilitas & Tidak menjadi hasil pemulihan drift terkelola \\
     \hline
@@ -64,6 +68,6 @@ Uji Mann--Whitney U hanya dapat dipertimbangkan secara eksploratif untuk hasil w
 
 RQ1 hanya dapat dijawab terhadap inventaris dan bidang yang ditetapkan; kesetaraan bukan bukti bahwa konfigurasi benar secara semantik. RQ2 membedakan sinyal deteksi, tersedianya bukti yang dapat diverifikasi, dan kembalinya konfigurasi ke keadaan yang diinginkan; kesehatan layanan tetap dilaporkan sebagai dimensi terpisah. RQ3 mendeskripsikan bukti yang tersedia, bukan akar masalah.
 
-Skenario F tidak dianggap sebagai keberhasilan self-heal maupun sebagai kegagalan ketika sumber daya berada di luar cakupan aplikasi ArgoCD. F harus dibahas sebagai pengujian batas visibilitas sumber daya tak terkelola. Kesimpulan tentangnya tidak digabungkan dengan skenario A--E dan G.
+Skenario A mempertahankan HPA pada kedua lengan; respons replika bukan keberhasilan ArgoCD memulihkan bidang yang diabaikan. F merupakan pengujian batas visibilitas sumber daya tak terkelola, bukan janji prune/self-heal. A dan F dilaporkan tersendiri, tidak digabungkan ke efikasi B--E dan G. Tidak adanya OutOfSync bukan deteksi nol.
 
 Sampai data formal tersedia, tidak dapat dinyatakan prosedur mana yang lebih konsisten, lebih cepat, atau lebih terlacak. Kondisi ini merupakan batas bukti draf, bukan hasil eksperimen negatif dan bukan bukti bahwa instrumentasi gagal.
