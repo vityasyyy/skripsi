@@ -6,6 +6,9 @@ Tidak ada klien Kubernetes, eksekusi shell dari input, atau perintah pemulihan
 tersembunyi. `--live` gagal nonzero; flag lama yang tidak didukung ditolak.
 Kelulusan fixture tidak menyatakan klaster atau aplikasi siap.
 
+Harness live yang terpisah (dry-run default, belum dijalankan pada klaster) ada
+di [`live/README.md`](live/README.md).
+
 ## Dua lengan berurutan
 
 Kapasitas terverifikasi hanya satu stack InvenioRDM penuh; lengan imperatif (A) dan

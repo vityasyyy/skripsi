@@ -191,11 +191,22 @@ Jika terjadi pelanggaran keselamatan atau kondisi tak terduga, hentikan run,
 catat waktunya, dan tandai run sebagai gagal. Jangan melanjutkan ke run berikutnya
 sebelum reset lengkap terverifikasi.
 
+## Instrumen live
+
+Protokol ini diimplementasikan sebagai harness di
+[`live/README.md`](live/README.md). Harness berjalan dry-run secara default,
+memakai `kubectl` tanpa shell, dan menargetkan stack InvenioRDM nyata. Dokumen
+tersebut memuat prosedur lengan berurutan, tabel skenario, skema bukti/CSV, serta
+gerbang formal yang masih terbuka; isi protokol dan batas interpretasi tetap
+berlaku.
+
 ## Rujukan
 
 - `content/proposal/chapters/bab3-metodologi.tex` — definisi R1--R3, HPA, dan
   gerbang baseline.
 - `experiments/README.md` — kontrak bukti dan instrumen offline.
+- `experiments/live/README.md` — harness live dry-run default, prosedur lengan,
+  skenario, bukti/CSV, dan gerbang yang tersisa.
 - `experiments/deployment-source.json` — sumber deployment yang diperiksa.
 - `invenio-rdm-gitops/docs/current-state.md` — snapshot lingkungan 25 Oktober
   2026 dan gerbang kesiapan.
