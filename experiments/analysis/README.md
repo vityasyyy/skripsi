@@ -29,9 +29,9 @@ waktu akar masalah nyata. S1/S2 tidak digabungkan ke inferensi formal. R1 v1
 berupa pecahan dan semantik waktu v1 berbeda dari v2 (persen dan durasi monotonik).
 Jangan mengganti mock dengan data nyata lalu menjalankan analyzer lama.
 
-Pada protokol manual yang direncanakan, `t_rci` adalah field lembar observer untuk
-diagnosis operasional lengan manual. Nilainya dilaporkan deskriptif dan tidak
-disamakan dengan `t_e` lengan GitOps atau dengan `trci` pada CSV historis.
+Protokol v2 tidak memakai field akar masalah manusia; R2 memakai `t_d`, `t_e`, dan
+`t_r` dari kolektor. `trci` pada CSV historis tetap artefak lama dan tidak
+disamakan dengan metrik v2.
 
 Jika dependensi historis sudah terpasang, reproduksi hanya ke direktori baru:
 

@@ -18,7 +18,7 @@ Kesenjangan tersebut menjadi landasan penelitian yang diuraikan dalam proposal i
 
 Permasalahan yang dievaluasi adalah ketidaksetaraan konfigurasi terhadap acuan, keterlambatan sinyal deteksi dan bukti deviasi, serta keterbatasan jejak perubahan operasional \citep{zhang2026configuration,rahman2023security,pohjola2025mitigating}. Status rollout sehat tidak menjamin konfigurasi cocok, dan riwayat Git tidak otomatis merekam pelaku mutasi di luar Git.
 
-Pembanding manual pada rancangan ini adalah prosedur imperatif yang dijalankan operator manusia dengan \textit{runbook} tetap dan diamati oleh \textit{observer}; pemeriksa kesetaraan bersifat \textit{read-only} dan tidak menggantikan operator. Waktu manusia dicatat sebagai bagian prosedur operasional, bukan sebagai tes kinerja operator. Kedua prosedur dievaluasi pada InvenioRDM nyata dengan aturan kesetaraan yang sama dan dijalankan berurutan pada satu stack karena kapasitas tidak mendukung dua stack serentak. Kepemilikan HPA normal tetap aktif pada kedua lengan; respons replika HPA tidak dapat dijadikan bukti koreksi ArgoCD atas bidang yang diabaikannya.
+Pembanding pada rancangan ini adalah prosedur imperatif terotomasi tetap berbasis \texttt{kubectl}; pemeriksa dan \textit{runbook} otomatis membandingkan keadaan aktual dengan acuan dan menjalankan koreksi tanpa waktu reaksi manusia. Kedua prosedur dievaluasi pada InvenioRDM nyata dengan aturan kesetaraan yang sama dan dijalankan berurutan pada satu stack karena kapasitas tidak mendukung dua stack serentak. Kepemilikan HPA normal tetap aktif pada kedua lengan; respons replika HPA tidak dapat dijadikan bukti koreksi ArgoCD atas bidang yang diabaikannya.
 
 Evaluasi mencakup tiga pertanyaan: (1) bagaimana kesetaraan bidang konfigurasi berbeda setelah intervensi; (2) bagaimana waktu deteksi, ketersediaan bukti deviasi dan pemulihan konfigurasi berbeda; serta (3) bukti keterlacakan apa yang tersedia pada kedua lengan. Tujuh skenario meliputi perubahan replika (A), image (B), ConfigMap (C), penghapusan objek (D), patch requests/limits (E), namespace salah (F), dan Secret (G). A dilaporkan sebagai kontrol HPA dan F sebagai batas visibilitas objek tak terkelola, terpisah dari efikasi ArgoCD pada B--E/G. Tidak adanya OutOfSync bukan deteksi nol; diff bukan identifikasi akar masalah.
 
@@ -33,7 +33,7 @@ Agar penelitian tetap fokus dan terukur, batasan masalah yang ditetapkan adalah:
   
   \item Skenario penyimpangan konfigurasi yang diuji terbatas pada tujuh kategori: (A)~perubahan replika, (B)~perubahan \textit{image}, (C)~modifikasi ConfigMap, (D)~\textit{resource deletion}, (E)~\textit{patch} manual tidak sah, (F)~penyimpangan lintas \textit{namespace}, dan (G)~perubahan Secret.
   
-  \item Dua prosedur dibandingkan: (a)~manual menggunakan \texttt{kubectl} dengan operator dan \textit{runbook}, dan (b)~GitOps menggunakan ArgoCD. HPA normal aktif pada keduanya. Kedua lengan dijalankan berurutan pada satu stack InvenioRDM; dua stack serentak tidak didukung kapasitas terverifikasi. Perubahan metodologis tetap draf untuk tinjauan pemilik dan pembimbing; eksekusi formal dinonaktifkan sampai seluruh gerbang kesiapan disetujui.
+  \item Dua prosedur dibandingkan: (a)~imperatif terotomasi menggunakan \texttt{kubectl} dengan pemeriksa dan \textit{runbook} otomatis, dan (b)~GitOps menggunakan ArgoCD. HPA normal aktif pada keduanya. Kedua lengan dijalankan berurutan pada satu stack InvenioRDM; dua stack serentak tidak didukung kapasitas terverifikasi. Perubahan metodologis tetap draf untuk tinjauan pemilik dan pembimbing; eksekusi formal dinonaktifkan sampai seluruh gerbang kesiapan disetujui.
   
   \item Analisis statistik eksploratif menggunakan \textit{Mann--Whitney U test} untuk perbedaan antara kedua lengan pada observasi lengkap yang sesuai, dengan tingkat signifikansi $\alpha = 0{,}05$ dan ukuran efek (Cohen's $d$ atau Cliff's $\delta$). Target pengulangan bersifat deskriptif; data tersensor dilaporkan terpisah dan tidak diimputasi sebagai nol.
   
@@ -42,7 +42,7 @@ Agar penelitian tetap fokus dan terukur, batasan masalah yang ditetapkan adalah:
 
 \section{Tujuan Penelitian}
 
-Tujuan penelitian adalah mengevaluasi perbedaan prosedur manual dan GitOps pada kesetaraan konfigurasi, waktu deteksi/bukti deviasi/pemulihan, serta keterlacakan dalam konteks InvenioRDM. Hasil tidak diasumsikan mendukung salah satu prosedur; kontrol HPA dan batas visibilitas tidak digabungkan menjadi klaim efikasi ArgoCD.
+Tujuan penelitian adalah mengevaluasi perbedaan prosedur imperatif terotomasi dan GitOps pada kesetaraan konfigurasi, waktu deteksi/bukti deviasi/pemulihan, serta keterlacakan dalam konteks InvenioRDM. Hasil tidak diasumsikan mendukung salah satu prosedur; kontrol HPA dan batas visibilitas tidak digabungkan menjadi klaim efikasi ArgoCD.
 
 \section{Manfaat Penelitian}
 

@@ -8,15 +8,16 @@ Kelulusan fixture tidak menyatakan klaster atau aplikasi siap.
 
 ## Dua lengan berurutan
 
-Kapasitas terverifikasi hanya satu stack InvenioRDM penuh; lengan manual (A) dan
+Kapasitas terverifikasi hanya satu stack InvenioRDM penuh; lengan imperatif (A) dan
 GitOps (B) tidak dijalankan serentak. Satu stack aktif pada satu waktu di namespace
 eksperimen yang terpisah dari produksi `invenio`; setiap run dimulai dari seed
 bersih, dan reset diverifikasi sebelum run berikutnya. Urutan lengan diacak dan
 dicatat; kedua lengan memakai permutasi skenario yang sama.
-Lengan A adalah prosedur manual dengan operator manusia dan observer live;
-pemeriksa kesetaraan read-only mengukur, bukan mengoreksi A. Rincian protokol
-manual dan lembar observer ada di [LIVE-OBSERVER.md](LIVE-OBSERVER.md); dokumen
-itu rencana, bukan prosedur yang telah diuji.
+Lengan A adalah prosedur imperatif terotomasi tetap: pemeriksa dan runbook
+berjalan otomatis tanpa waktu reaksi manusia. Evaluator bersama mengukur R1;
+kolektor pasif merekam kedua lengan. Rincian protokol ada di
+[LIVE-OBSERVER.md](LIVE-OBSERVER.md); dokumen itu rencana, bukan prosedur yang
+telah diuji.
 
 ## Menjalankan tanpa instalasi atau akses klaster
 
@@ -93,14 +94,13 @@ Tidak adanya metrik/inventaris/bukti resource menyebabkan kegagalan tertutup.
 
 ## Kepemilikan dan waktu
 
-- A: lengan manual. Operator manusia menjalankan runbook; observer mencatat waktu
-  dan bukti; pemeriksa read-only mengukur, bukan mengoreksi. HPA tetap aktif di
-  **kedua** lengan. `/spec/replicas` tidak dinilai sebagai nilai statis Git.
-  Pemulihan dinamis HPA memerlukan bukti tersendiri, bukan R1=100. Kelompok
-  `hpa_control` tidak layak untuk klaim efikasi ArgoCD.
-- B--E/G: sinyal dari operator (A) atau ArgoCD (B) sesuai lengan; pemeriksa
-  read-only mendukung pengukuran, bukan deteksi manual. Bukti deviasi
-  mengidentifikasi bidang, bukan menyimpulkan penyebab kausal.
+- A: lengan imperatif. Pemeriksa dan runbook otomatis; tidak ada operator yang
+  menunggu atau mengetik. HPA tetap aktif di **kedua** lengan. `/spec/replicas`
+  tidak dinilai sebagai nilai statis Git. Pemulihan dinamis HPA memerlukan bukti
+  tersendiri, bukan R1=100. Kelompok `hpa_control` tidak layak untuk klaim efikasi
+  ArgoCD.
+- B--E/G: sinyal dari pemeriksa imperatif (A) atau ArgoCD (B) sesuai lengan; bukti
+  deviasi mengidentifikasi bidang, bukan menyimpulkan penyebab kausal.
 - F: batas visibilitas objek tak terkelola, dilaporkan terpisah; tidak dijanjikan
   terdeteksi atau dipangkas ArgoCD. Pemulihan mensyaratkan objek ekstra tidak ada.
 - Recovery: dua pengamatan cocok berurutan, waktu pertama dilaporkan. Adopsi
@@ -110,9 +110,9 @@ Tidak adanya metrik/inventaris/bukti resource menyebabkan kegagalan tertutup.
   sinyal tidak teramati memberi `unobserved_before_stop`, bukan sensor dan bukan nol.
   Kegagalan API/format/penerimaan injeksi memberi status kegagalan, bukan sensor.
 
-`t_rci` pada lembar observer adalah waktu diagnosis operasional lengan manual. Ia
-tidak menggantikan `t_e` pada kontrak v2, tidak diisi untuk lengan GitOps, dan
-tidak diuji sebagai metrik yang setara dengan bukti deviasi ArgoCD.
+Tidak ada field akar masalah manusia. R2 v2 memakai `t_d`, `t_e`, dan `t_r`; semua
+waktu berasal dari jam monotonik kolektor. Mekanisme koreksi berjalan otomatis
+dan tidak menerima label skenario.
 
 ## Sumber deployment dan kesiapan
 
