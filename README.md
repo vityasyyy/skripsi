@@ -4,7 +4,7 @@
 
 Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma *deployment* manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM.
 
-> **Status metode:** Proposal yang telah diterima tetap dapat ditelusuri melalui riwayat Git. Penyesuaian metode pada `content/proposal/` dan `content/skripsi/` adalah **draf untuk tinjauan pemilik/pembimbing**, bukan persetujuan eksperimen formal. HPA normal aktif pada kedua lengan; A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Instrumen aktif hanya memvalidasi bukti offline; lihat [`experiments/README.md`](experiments/README.md).
+> **Status metode:** Proposal yang telah diterima tetap dapat ditelusuri melalui riwayat Git. Penyesuaian metode pada `content/proposal/` dan `content/skripsi/` adalah **draf untuk tinjauan pemilik/pembimbing**, bukan persetujuan eksperimen formal. Lengan manual dan GitOps dijalankan berurutan pada satu stack InvenioRDM; HPA normal aktif pada kedua lengan dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Instrumen aktif hanya memvalidasi bukti offline; protokol manual dan observer ada di [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md).
 
 ---
 
@@ -95,7 +95,7 @@ Setiap push ke `main`/`master` yang mengubah file `.tex`, `.bib`, atau `.cls` ak
 ## Topik Penelitian
 
 - **Judul:** Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes: Studi Kasus InvenioRDM
-- **Pendekatan:** Studi empiris terkontrol (*quasi-experiment*) dengan dua lingkungan paralel
+- **Pendekatan:** Studi empiris terkontrol (*quasi-experiment*) dengan dua lengan berurutan (*manual* vs GitOps) pada satu *stack* InvenioRDM; kapasitas tidak mendukung dua *stack* serentak
 - **Metrik:** R1 konsistensi deployment, R2 waktu deteksi & pemulihan drift, R3 traceability (audit trail)
 - **Teknologi:** Kubernetes, ArgoCD, InvenioRDM, Helm, kubectl
 

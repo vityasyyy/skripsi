@@ -44,19 +44,19 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     
     \item Implementasi ArgoCD dan \textit{Baseline} Manual (Juli -- Agustus 2026)
     
-    Tahap implementasi meliputi konfigurasi ArgoCD pada klaster, pembuatan repositori GitOps dengan manifest deklaratif, konfigurasi \textit{baseline} manual (\textit{workflow} \texttt{kubectl}), serta konfigurasi \textit{logging} dan \textit{monitoring} (Prometheus, Grafana, Kubernetes \textit{audit logs}, ArgoCD \textit{notifications}). Pada akhir fase ini, kedua lingkungan siap untuk eksperimen.
+    Tahap implementasi meliputi konfigurasi ArgoCD pada klaster, pembuatan repositori GitOps dengan manifest deklaratif, konfigurasi \textit{baseline} manual (\textit{workflow} \texttt{kubectl}), serta konfigurasi \textit{logging} dan \textit{monitoring} (Prometheus, Grafana, Kubernetes \textit{audit logs}, ArgoCD \textit{notifications}). Pada akhir fase ini, lengan manual dan GitOps siap dijalankan berurutan; hanya satu stack InvenioRDM aktif pada satu waktu.
     
     \item Pengembangan Skrip Otomasi (Juli -- Agustus 2026)
     
-    Pengembangan empat skrip otomasi yang mendukung konsistensi prosedural eksperimen: (a)~\texttt{drift-inject.sh} untuk injeksi skenario penyimpangan secara acak dengan pencatatan \textit{timestamp}; (b)~\texttt{metrics-collect.sh} untuk pengumpulan metrik secara berkala via ArgoCD API dan \texttt{kubectl}; (c)~\texttt{baseline-check.sh} untuk verifikasi kondisi klaster sebelum setiap \textit{run}; dan (d)~\texttt{recovery-runbook.sh} untuk memandu \textit{operator} pada Lingkungan A melalui prosedur pemulihan terstandarisasi. Skrip dikembangkan secara paralel dengan implementasi lingkungan.
+    Pengembangan empat skrip otomasi yang mendukung konsistensi prosedural eksperimen: (a)~\texttt{drift-inject.sh} untuk injeksi skenario penyimpangan secara acak dengan pencatatan \textit{timestamp}; (b)~\texttt{metrics-collect.sh} untuk pengumpulan metrik secara berkala via ArgoCD API dan \texttt{kubectl}; (c)~\texttt{baseline-check.sh} untuk verifikasi kondisi klaster sebelum setiap \textit{run}; dan (d)~\texttt{recovery-runbook.sh} untuk memverifikasi hasil koreksi pada lengan manual. Skrip dikembangkan bersama implementasi lingkungan.
     
     \item Kalibrasi \textit{Baseline} dan Uji Coba (Agustus -- September 2026)
     
-    Sebelum eksperimen dimulai, fase kalibrasi dilakukan untuk memastikan validitas internal. Kegiatan meliputi: (a)~\textit{deployment} beban uji (\textit{workload}) komposit multi-service pada kedua lingkungan; (b)~verifikasi \textit{baseline} bersih; (c)~pengukuran awal konsistensi; (d)~verifikasi penggunaan sumber daya \textit{node} di bawah 70\%; dan (e)~uji coba awal untuk memvalidasi protokol pengukuran dan skrip otomasi, termasuk \textit{practice run} \textit{operator}.
+    Sebelum eksperimen dimulai, fase kalibrasi dilakukan untuk memastikan validitas internal. Kegiatan meliputi: (a)~\textit{deployment} beban uji (\textit{workload}) komposit multi-service pada lengan manual dan GitOps secara berurutan; (b)~verifikasi \textit{baseline} bersih; (c)~pengukuran awal konsistensi; (d)~verifikasi penggunaan sumber daya \textit{node} di bawah 70\%; dan (e)~uji coba awal untuk memvalidasi protokol pengukuran, protokol \textit{observer}, dan skrip otomasi, termasuk \textit{practice run} \textit{operator}.
     
     \item Eksperimen dan Pengumpulan Data (September -- Oktober 2026)
     
-    Rencana pelaksanaan tiga eksperimen menunggu tinjauan metode dan kelulusan gerbang Bab III. E1 menilai kesetaraan konfigurasi ($n=5$ per skenario); E2 waktu deteksi, bukti deviasi dan pemulihan ($n=10$); E3 bukti keterlacakan secara deskriptif. Target tersebut bukan jaminan daya uji. A dilaporkan sebagai kontrol HPA dan F sebagai batas visibilitas, terpisah dari B--E/G. Urutan diacak, satu injeksi diikuti reset lengkap; kegagalan dan hasil tersensor tetap disimpan. Eksekusi formal belum diizinkan.
+    Rencana pelaksanaan tiga eksperimen menunggu tinjauan metode dan kelulusan gerbang Bab III. E1 menilai kesetaraan konfigurasi ($n=5$ per skenario); E2 waktu deteksi, bukti deviasi dan pemulihan ($n=10$); E3 bukti keterlacakan secara deskriptif. Target tersebut bukan jaminan daya uji. Lengan manual dan GitOps dijalankan berurutan pada satu stack; urutan lengan diacak dan dicatat, sedangkan urutan skenario memakai permutasi yang sama di kedua lengan. A dilaporkan sebagai kontrol HPA dan F sebagai batas visibilitas, terpisah dari B--E/G. Satu injeksi diikuti reset lengkap; kegagalan dan hasil tersensor tetap disimpan. Eksekusi formal belum diizinkan.
     
     \item Analisis Statistik dan Interpretasi (Oktober -- November 2026)
     
