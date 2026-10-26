@@ -6,6 +6,19 @@ Tidak ada klien Kubernetes, eksekusi shell dari input, atau perintah pemulihan
 tersembunyi. `--live` gagal nonzero; flag lama yang tidak didukung ditolak.
 Kelulusan fixture tidak menyatakan klaster atau aplikasi siap.
 
+## Dua lengan berurutan
+
+Kapasitas terverifikasi hanya satu stack InvenioRDM penuh; lengan imperatif (A) dan
+GitOps (B) tidak dijalankan serentak. Satu stack aktif pada satu waktu di namespace
+eksperimen yang terpisah dari produksi `invenio`; setiap run dimulai dari seed
+bersih, dan reset diverifikasi sebelum run berikutnya. Urutan lengan diacak dan
+dicatat; kedua lengan memakai permutasi skenario yang sama.
+Lengan A adalah prosedur imperatif terotomasi tetap: pemeriksa dan runbook
+berjalan otomatis tanpa waktu reaksi manusia. Evaluator bersama mengukur R1;
+kolektor pasif merekam kedua lengan. Rincian protokol ada di
+[LIVE-OBSERVER.md](LIVE-OBSERVER.md); dokumen itu rencana, bukan prosedur yang
+telah diuji.
+
 ## Menjalankan tanpa instalasi atau akses klaster
 
 Memerlukan Python 3.9+ stdlib dan Bash 3.2+ yang telah terpasang.
@@ -81,11 +94,13 @@ Tidak adanya metrik/inventaris/bukti resource menyebabkan kegagalan tertutup.
 
 ## Kepemilikan dan waktu
 
-- A: HPA tetap aktif di **kedua** lengan. `/spec/replicas` tidak dinilai sebagai
-  nilai statis Git. Pemulihan dinamis HPA memerlukan bukti tersendiri, bukan R1=100.
-  Kelompok `hpa_control` tidak layak untuk klaim efikasi ArgoCD.
-- B--E/G: sinyal dari pemeriksa imperatif atau ArgoCD sesuai lengan; bukti deviasi
-  mengidentifikasi bidang, bukan menyimpulkan penyebab kausal.
+- A: lengan imperatif. Pemeriksa dan runbook otomatis; tidak ada operator yang
+  menunggu atau mengetik. HPA tetap aktif di **kedua** lengan. `/spec/replicas`
+  tidak dinilai sebagai nilai statis Git. Pemulihan dinamis HPA memerlukan bukti
+  tersendiri, bukan R1=100. Kelompok `hpa_control` tidak layak untuk klaim efikasi
+  ArgoCD.
+- B--E/G: sinyal dari pemeriksa imperatif (A) atau ArgoCD (B) sesuai lengan; bukti
+  deviasi mengidentifikasi bidang, bukan menyimpulkan penyebab kausal.
 - F: batas visibilitas objek tak terkelola, dilaporkan terpisah; tidak dijanjikan
   terdeteksi atau dipangkas ArgoCD. Pemulihan mensyaratkan objek ekstra tidak ada.
 - Recovery: dua pengamatan cocok berurutan, waktu pertama dilaporkan. Adopsi
@@ -95,20 +110,29 @@ Tidak adanya metrik/inventaris/bukti resource menyebabkan kegagalan tertutup.
   sinyal tidak teramati memberi `unobserved_before_stop`, bukan sensor dan bukan nol.
   Kegagalan API/format/penerimaan injeksi memberi status kegagalan, bukan sensor.
 
+Tidak ada field akar masalah manusia. R2 v2 memakai `t_d`, `t_e`, dan `t_r`; semua
+waktu berasal dari jam monotonik kolektor. Mekanisme koreksi berjalan otomatis
+dan tidak menerima label skenario.
+
 ## Sumber deployment dan kesiapan
 
 [`deployment-source.json`](deployment-source.json) hanya menunjuk sumber
-otoritatif pada revisi yang diperiksa. Kubernetes 1.32.6/RKE2 dan Ubuntu 24.04
-adalah konteks deployment yang dilaporkan pemilik; referensi kode rekonsiliasi
+otoritatif pada revisi yang diperiksa. Snapshot 25 Oktober 2026 mencatat tiga
+node RKE2 Ready, Kubernetes v1.32.6+rke2r1, Ubuntu 24.04 LTS, 18/18 Application
+ArgoCD Synced/Healthy, satu namespace aplikasi `invenio` tanpa namespace kembar,
+dan satu stack InvenioRDM penuh. Sampel memori 59% pada kedua worker bukan bukti
+jendela stabil atau penempatan dua stack. Versi ArgoCD, CNPG, OpenSearch dan
+MinIO tidak dicatat dalam snapshot; rekam versi/revisi runtime aktual sebelum
+formal. Snapshot lingkungan diverifikasi terhadap `main` di `d7ef120`, sedangkan
+sumber deployment yang diperiksa adalah `6cacea66`. Referensi kode rekonsiliasi
 menetapkan 30s, berbeda dari target proposal lama 60s. Jangan menyamakan interval
 repository reconciliation, self-heal retry, event watch dan interval evaluator.
-Rekam versi/revisi runtime aktual sebelum formal; tidak ada pemeriksaan live baru
-dalam pekerjaan ini.
 
-Bloker tetap terbuka: worker02 sekitar 71% memori versus <70%, kapasitas/placement
-dua lingkungan nyata belum terbukti, audit belum tersedia, SMTP placeholder,
-private-draft seed dan recovery/reset aplikasi belum diverifikasi. Tidak ada
-izin purge queue/data, restore, deploy, migrasi atau injeksi dari dokumen ini.
+Bloker tetap terbuka: kapasitas hanya satu stack, sehingga dua lengan harus
+berurutan; bukti penempatan dua stack tidak ada, audit belum tersedia, SMTP masih
+placeholder, OpenSearch HA ditunda, dan private-draft seed serta recovery/reset
+aplikasi belum diverifikasi. Tidak ada izin purge queue/data, restore, deploy,
+migrasi atau injeksi dari dokumen ini.
 
 Adapter akuisisi langsung, ekspor render yang aman, bootstrap terpisah dari repair,
 dan verifikasi reset aplikasi harus ditinjau/diintegrasikan sebelum izin eksperimen.
