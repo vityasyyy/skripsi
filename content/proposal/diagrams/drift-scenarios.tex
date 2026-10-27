@@ -1,4 +1,6 @@
 \documentclass[tikz,border=5pt]{standalone}
+% HISTORICAL: not included by main.tex. Current method uses one production-like
+% stack with sequential imperative/GitOps modes; R1/R2 only; R3 is not measured.
 \usepackage{tikz}
 \usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric,matrix}
 \usepackage{graphicx}
@@ -59,7 +61,7 @@
 % Metrics
 \node[box=metricyellow, below=0.4cm of m3, xshift=0.3cm] (mr1) {R1};
 \node[box=metricyellow, right=0.2cm of mr1] (mr2) {R2};
-\node[box=metricyellow, right=0.2cm of mr2] (mr3) {R3};
+\node[box=metricyellow, right=0.2cm of mr2] (mr3) {R3: not measured};
 
 \begin{scope}[on background layer]
     \node[group=metricyellow, fit=(mr1)(mr3), label={[font=\small\bfseries]below:Metrik}] (metrics) {};
