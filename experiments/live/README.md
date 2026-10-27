@@ -4,6 +4,7 @@
 eksekusi. Tidak ada run klaster yang dilakukan saat harness ini dibuat. Seluruh
 gerbang formal pada `experiments/LIVE-OBSERVER.md` dan Bab III tetap berlaku;
 uji offline tidak membuktikan klaster, seed, audit, kapasitas, atau metode siap.
+Orkestrator batch 210 run (`run_matrix.py`) juga belum dijalankan pada klaster.
 
 Harness menargetkan **satu stack InvenioRDM nyata**:
 
@@ -26,6 +27,7 @@ namespace lengan kembar dan menolak run bila ada lebih dari satu stack
 | Berkas | Fungsi |
 |---|---|
 | `run_one.py` | CLI satu run; default dry-run, `--live` untuk mutasi nyata |
+| `run_matrix.py` | Orkestrator batch 210 run; manifest, resume, ringkasan R1/R2 |
 | `harness.py` | arm control, snapshot, kontrak R1, injeksi, repair, kolektor, timeline |
 | `convert.py` | konversi JSONL ke kolom CSV analisis historis |
 | `runs/` | keluaran runtime; diabaikan Git |
@@ -41,6 +43,64 @@ python3 experiments/live/run_one.py \
 Dry-run **tidak menjalankan `kubectl` atau HTTP apa pun**. Keluarannya satu baris
 JSONL, satu CSV, dan `planned_mutations`; semua waktu dan R1 `null`. Tidak ada
 token yang diminta atau dibaca.
+
+## Batch formal 210 run
+
+Batch adalah **2 lengan × 7 skenario × 15 replikasi = 210 run** pada satu stack,
+berurutan, bukan dua lingkungan serentak:
+
+- Repetisi **1--10** adalah blok **R2** (waktu deteksi, bukti, pemulihan).
+- Repetisi **11--15** adalah blok **R1** (konsistensi).
+- Urutan lengan diacak dari `--seed`; kedua lengan memakai **permutasi skenario
+  yang sama**. Seed, urutan lengan, dan permutasi dicatat di manifest.
+- `run_matrix.py` memanggil `harness.main` untuk setiap run, sehingga gate token,
+  satu stack, arm, reset, dan no-overwrite per run tetap di `harness.py`.
+
+Dry-run default (tanpa `kubectl`/HTTP):
+
+```bash
+python3 experiments/live/run_matrix.py \
+  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
+  --namespace invenio --out /tmp/invenio-batch-dry
+```
+
+Live hanya setelah izin formal dan setelah seluruh gate pada
+`experiments/LIVE-OBSERVER.md` tertutup:
+
+```bash
+export INVENIO_TOKEN=...   # jangan pernah ditulis ke argumen, log, atau bukti
+python3 experiments/live/run_matrix.py \
+  --live --confirm-single-stack --production-like \
+  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
+  --namespace exp-invenio --app invenio-bootstrap \
+  --source-revision <40-hex> --render-sha256 <64-hex> \
+  --out experiments/live/runs/formal-<batch-id>
+```
+
+`--production-like` hanya anotasi penerimaan operator; lihat batasnya di bawah.
+Tanpa flag itu batch live tetap boleh berjalan sebagai pilot, tetapi semua baris
+batch mencatat `formal_execution_approved: false`.
+
+Batch berhenti pada status `invalid_injection`, `instrumentation_failure`,
+`reset_failure`, `recovery_failure`, `cleanup_failure`, `arm_restore_failure`,
+atau kegagalan keras lain (baseline, arm state, safety refusal, nonzero exit).
+Run yang gagal, manifest, dan bukti per-run dipertahankan; run berikutnya tidak
+dijalankan. Untuk meneruskan sisa run setelah kegagalan:
+
+```bash
+python3 experiments/live/run_matrix.py \
+  --live --confirm-single-stack --production-like \
+  --namespace exp-invenio --app invenio-bootstrap \
+  --source-revision <40-hex> --render-sha256 <64-hex> \
+  --out experiments/live/runs/formal-<batch-id> --resume
+```
+
+Resume hanya menerima manifest yang cocok dengan rencana (seed, lengan,
+skenario, replikasi, namespace, app, revisi, render, mode, flag) dan tidak pernah
+menimpa run terminal. Run gagal tidak diulang; untuk mengulang sel yang gagal,
+buat batch baru dengan `--batch-id`/`--out` baru. Tanpa `--batch-id`, id batch
+diturunkan secara deterministik dari rencana dan konfigurasi, sehingga pengulangan
+perintah yang sama akan ditolak sebelum menimpa apa pun.
 
 ## Live (hanya setelah izin formal)
 
@@ -181,6 +241,29 @@ Kolom JSONL utama: `run_id`, `env`/`arm`, `scenario`, `rep`, `status`,
 `r1_baseline`, `r1_first`, `r1_last`, `kubectl_cmds`, `analysis_group`,
 `efficacy_eligible`, `source_revision`, `render_sha256`, `baseline_sha256`.
 
+### Keluaran batch
+
+| Berkas | Isi |
+|---|---|
+| `<batch_id>.manifest.json` | seed, urutan lengan, permutasi skenario, run ID/status/urutan, revisi/render, hitungan agregat |
+| `<batch_id>.rows.jsonl` | seluruh baris run dengan metadata batch; `env` tetap lengan mentah |
+| `<batch_id>.analysis.jsonl` | baris v2 yang layak analisis; `env=imperative` dipetakan ke `manual` |
+| `<batch_id>.csv` | gabungan kolom CSV historis melalui `convert.py` |
+| `<batch_id>.summary.json` | hitungan R1/R2, penyensoran per metrik, daftar eksklusi |
+
+Baris batch menambahkan `batch_id`, `batch_index`, `batch_phase` (`R1`/`R2`),
+`batch_mode`, `batch_stop_reason`, `stack_isolated: false`,
+`r3_status: not_measured`, `production_like`, dan `formal_execution_approved`.
+Baris mentah `<run_id>.jsonl` dari harness tidak diubah dan tetap
+`formal_execution_approved: false`; attestation batch hanya ada di
+`<batch_id>.rows.jsonl`, `<batch_id>.analysis.jsonl`, manifest, dan summary.
+
+`analysis.jsonl` hanya memuat run dengan status `observed`/`right_censored`,
+postcondition terverifikasi, cleanup/restore sukses, serta status metrik yang
+valid untuk `summarize.py`. Run dry, gagal, tidak lengkap, atau tanpa bukti tetap
+ada di `rows.jsonl`/CSV dan dicatat di `exclusions` summary. A/F tetap terpisah
+sebagai `hpa_control`/`visibility_boundary`; keduanya tidak masuk klaim efikasi.
+
 ### Pemetaan CSV historis
 
 `python3 experiments/live/convert.py --in <run>.jsonl --out <run>.csv`
@@ -201,8 +284,50 @@ Kolom JSONL utama: `run_id`, `env`/`arm`, `scenario`, `rep`, `status`,
 
 Nilai hilang ditulis kosong, **bukan 0**. CSV ini adalah jembatan arsip, bukan
 izin menjalankan `experiments/analysis/analyze.py` (analyzer itu mock-only dan
-menolak subjek non-S1/S2). `summarize.py` v2 memakai `env=manual`; baris live
-memakai `imperative` dan harus dipetakan sebelum analisis formal apa pun.
+menolak subjek non-S1/S2).
+
+### Pemetaan v2 ke analisis batch
+
+| Sumber | Aturan |
+|---|---|
+| `env` | `rows.jsonl` memakai `imperative`; `analysis.jsonl` dan CSV memetakan ke `manual` karena `summarize.py` hanya menerima `manual`/`gitops` |
+| `arm` | tetap nilai mentah (`imperative`/`gitops`), tidak ditimpa |
+| `rep` | 1--10 = R2; 11--15 = R1; `batch_phase` mencatat blok |
+| Waktu | `detection_seconds`, `evidence_seconds`, `recovery_seconds` dari `t_d/t_e/t_r - t0` monotonik; tidak ada imputasi |
+| Penyensoran | `*_status=right_censored`, nilai `null`, `censor_seconds` = batas beku |
+| Eksklusi | status gagal, cleanup/restore gagal, postcondition gagal, atau metrik tidak valid tidak masuk `analysis.jsonl`; tetap di `rows.jsonl`/CSV dan `summary.exclusions` |
+| Kontrol | A = `hpa_control`, F = `visibility_boundary`; keduanya tidak dipool ke efikasi B--E/G |
+| R3 | `r3_status: not_measured`; tidak ada klaim akar masalah atau audit |
+| Isolasi | `stack_isolated: false`; satu stack berurutan, bukan dua lingkungan terisolasi |
+
+`summarize.py` dijalankan pada `<batch_id>.analysis.jsonl`, bukan pada baris
+mentah yang masih memakai `env=imperative`:
+
+```bash
+python3 experiments/analysis/summarize.py --in <out>/<batch_id>.analysis.jsonl
+```
+
+Ringkasan batch (`<batch_id>.summary.json`) melaporkan jumlah R1/R2, jumlah run
+teramati/tersensor per metrik, daftar eksklusi, dan `analysis_rows`. Median hanya
+deskriptif untuk bagian teramati; tidak ada uji inferensial otomatis.
+
+## Batas `--production-like`
+
+Flag ini hanya attestation operator bahwa batch dijalankan pada stack nyata yang
+ada, bukan bukti izin formal, bukan pembuatan lingkungan terisolasi, dan bukan
+pengukuran R3. Konsekuensinya tetap:
+
+- `stack_isolated: false` — hanya satu stack; tidak ada pasangan A/B terisolasi.
+- `r3_status: not_measured` — audit API belum tersedia; atribusi pelaku tidak
+  dapat dinilai.
+- `formal_execution_approved: true` hanya jika `--production-like` diberikan
+  bersamaan dengan `--live`; dry-run dengan flag itu ditolak.
+- Flag tidak menutup gate seed, kapasitas, NTP, audit, render, atau persetujuan
+  pembimbing. Ia juga tidak mengubah run gagal menjadi data yang layak analisis.
+
+Tanpa flag, seluruh baris batch dan manifest tetap `formal_execution_approved:
+false`. Jangan menyalin metadata batch ke baris mentah harness atau menganggap
+dry-run sebagai observasi.
 
 ## Gerbang formal yang belum tertutup
 
@@ -227,6 +352,7 @@ memakai `imperative` dan harus dipetakan sebelum analisis formal apa pun.
 ## Keselamatan dan pengujian
 
 - Dry-run tidak memanggil `subprocess`/HTTP; live membutuhkan `--live` eksplisit.
+  Batch dry-run memakai jalur harness yang sama dan tidak membuat klien Kubernetes.
 - Namespace di luar `invenio`/`exp-*` ditolak; karantina selalu `exp-*`.
 - Tidak ada penghapusan seed/record, purge queue, restore, migrasi, atau
   perubahan Secret plaintext.
@@ -234,7 +360,16 @@ memakai `imperative` dan harus dipetakan sebelum analisis formal apa pun.
   kegagalannya dilaporkan dan membuat exit nonzero. Harness hanya menghapus
   namespace karantina yang memiliki label `run-id` milik run ini; namespace
   milik pihak lain tidak disentuh.
-- Token hanya dari `INVENIO_TOKEN`, tidak pernah masuk argumen, log, atau bukti.
+- Batch menulis manifest sebelum dan sesudah setiap run. Resume memvalidasi
+  skema, identitas run, status, rencana, revisi/render, dan bukti yang sudah ada;
+  run terminal tidak pernah dijalankan ulang atau ditimpa.
+- Batch berhenti pada kegagalan injeksi/instrumentasi/reset/cleanup/restore dan
+  mempertahankan run gagal beserta manifest. Exit nonzero tidak diubah menjadi
+  sukses.
+- Token hanya dari `INVENIO_TOKEN`, tidak pernah masuk argumen, log, manifest,
+  CSV, summary, atau bukti. Error batch di-redaksi bila memuat nilai token.
+- `--production-like` bukan bukti izin; `formal_execution_approved` tetap false
+  tanpa flag eksplisit, dan `stack_isolated`/`r3_status` tidak berubah.
 - `kubectl` dipanggil sebagai argumen list, tanpa shell.
 
 ```bash

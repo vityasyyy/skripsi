@@ -21,6 +21,17 @@ dengan alasan serta referensi bukti; jangan membuangnya untuk membentuk dataset
 yang hanya berisi sukses. Evaluator mengembalikan exit nonzero pada bukti tidak
 valid, bukan mengarang observasi atau menulis hasil sukses.
 
+## Batch live
+
+`experiments/live/run_matrix.py` menulis `<batch_id>.analysis.jsonl` yang sudah
+memetakan `env=imperative` ke `manual` dan hanya memuat baris yang lolos
+validasi metrik, postcondition, cleanup, dan restore. Umpan file itu ke
+`summarize.py`; baris mentah `<batch_id>.rows.jsonl` tetap memakai lengan asli
+dan seluruh kegagalan. Ringkasan batch (`<batch_id>.summary.json`) memisahkan
+R1/R2, hitungan tersensor, dan eksklusi. Lihat `experiments/live/README.md`
+untuk batas `stack_isolated: false`, `r3_status: not_measured`, dan
+`formal_execution_approved`.
+
 ## Artefak historis, bukan hasil Invenio
 
 `outputs/`, `mockgen.py`, `runs/sample-dryrun.csv` dan format CSV v1 tetap
