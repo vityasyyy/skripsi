@@ -1,6 +1,6 @@
 \chapter{JADWAL PENELITIAN}
 
-Penelitian direncanakan untuk dilaksanakan selama enam bulan, dari bulan Juni 2026 hingga November 2026. Jadwal penelitian disusun berdasarkan tahapan evaluasi empiris terkontrol: studi literatur, perancangan lingkungan, pengembangan skrip otomasi, kalibrasi \textit{baseline}, pelaksanaan eksperimen, analisis statistik, dan penulisan laporan. Tahapan-tahapan tersebut dipersempit dan saling tumpang tindih untuk efisiensi waktu.
+Penelitian direncanakan untuk dilaksanakan selama enam bulan, dari bulan Juni 2026 hingga November 2026. Jadwal penelitian disusun berdasarkan tahapan studi kasus komparatif terkontrol: studi literatur, perancangan apparatus satu stack, pengembangan skrip otomasi, kalibrasi \textit{baseline}, pelaksanaan eksperimen, analisis statistik, dan penulisan laporan. Tahapan-tahapan tersebut dipersempit dan saling tumpang tindih untuk efisiensi waktu.
 
 Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasis bulan. Simbol $\bullet$ menunjukkan bahwa kegiatan dilaksanakan pada bulan tersebut.
 
@@ -15,17 +15,17 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     \cline{2-7}
      & Jun & Jul & Agu & Sep & Okt & Nov \\
     \hline
-    Studi Literatur \& Perancangan Lingkungan & $\bullet$ & $\bullet$ & & & & \\
+    Studi Literatur \& Perancangan Apparatus & $\bullet$ & $\bullet$ & & & & \\
     \hline
-    Implementasi ArgoCD + \textit{Baseline} Imperatif & & $\bullet$ & $\bullet$ & & & \\
+    Implementasi ArgoCD, Mode Imperatif, dan \textit{Baseline} & & $\bullet$ & $\bullet$ & & & \\
     \hline
     Pengembangan Skrip Otomasi & & $\bullet$ & $\bullet$ & & & \\
     \hline
     Kalibrasi \textit{Baseline} \& Uji Coba & & & $\bullet$ & $\bullet$ & & \\
     \hline
-    Eksperimen \& Pengumpulan Data (E1--E3) & & & & $\bullet$ & $\bullet$ & \\
+    Eksperimen \& Pengumpulan Data (E1--E2, 210 run) & & & & & $\bullet$ & $\bullet$ \\
     \hline
-    Analisis Statistik \& Interpretasi & & & & & $\bullet$ & $\bullet$ \\
+    Analisis Statistik \& Interpretasi & & & & & & $\bullet$ \\
     \hline
     Penulisan Laporan & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ \\
     \hline
@@ -38,29 +38,29 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
 \section{Penjelasan Kegiatan}
 
 \begin{enumerate}
-    \item Studi Literatur dan Perancangan Lingkungan (Juni -- Juli 2026)
+    \item Studi Literatur dan Perancangan Apparatus (Juni -- Juli 2026)
     
-    Kegiatan ini mencakup pengumpulan dan analisis literatur mengenai penyimpangan konfigurasi pada Kubernetes, evaluasi empiris GitOps, metode eksperimental pada riset sistem, serta klasifikasi \textit{workload} multi-service. Sumber literatur meliputi jurnal ilmiah (IEEE, ACM, Springer), dokumentasi resmi, buku teks, dan artikel teknis. Tahap ini juga mencakup perancangan arsitektur Lingkungan A (\textit{deployment} imperatif terotomasi/\texttt{kubectl}) dan Lingkungan B (\textit{deployment} GitOps/ArgoCD), definisi variabel dan intervensi, pemilihan tujuh skenario penyimpangan, serta spesifikasi protokol pengukuran.
+    Kegiatan ini mencakup pengumpulan dan analisis literatur mengenai penyimpangan konfigurasi pada Kubernetes, evaluasi empiris GitOps, metode studi kasus dan eksperimen pada riset sistem, serta klasifikasi \textit{workload} multi-service. Sumber literatur meliputi jurnal ilmiah (IEEE, ACM, Springer), buku teks, dokumentasi resmi, dan artikel industri yang ditandai sebagai non-\textit{peer-review}. Tahap ini juga mencakup perancangan dua mode pengelolaan pada satu stack InvenioRDM produksi-like, definisi variabel dan intervensi, pemilihan tujuh skenario penyimpangan, serta spesifikasi protokol pengukuran. Tidak ada stack kembar \texttt{exp-*} dan tidak ada eksekusi paralel A/B dalam rancangan ini.
     
-    \item Implementasi ArgoCD dan \textit{Baseline} Imperatif (Juli -- Agustus 2026)
+    \item Implementasi ArgoCD, Mode Imperatif, dan \textit{Baseline} (Juli -- Agustus 2026)
     
-    Tahap implementasi meliputi konfigurasi ArgoCD pada klaster, pembuatan repositori GitOps dengan manifest deklaratif, konfigurasi \textit{baseline} imperatif terotomasi (\textit{workflow} \texttt{kubectl} otomatis), serta konfigurasi \textit{logging} dan \textit{monitoring} (Prometheus, Grafana, Kubernetes \textit{audit logs}, ArgoCD \textit{notifications}). Pada akhir fase ini, lengan imperatif dan GitOps siap dijalankan berurutan; hanya satu stack InvenioRDM aktif pada satu waktu.
+    Tahap implementasi meliputi verifikasi ArgoCD pada stack InvenioRDM yang ada, prosedur penjedaan dan pemulihan \textit{auto-sync}/\textit{self-heal}, pemeriksa dan \textit{runbook} imperatif terotomasi (\textit{workflow} \texttt{kubectl} otomatis), serta konfigurasi \textit{logging} dan \textit{monitoring} (Prometheus, Grafana, ArgoCD \textit{notifications}). Pada akhir fase ini, kedua mode siap dijalankan berurutan pada stack yang sama; hanya satu mode aktif pada satu waktu. Audit API server tidak diaktifkan pada fase ini dan tidak menjadi gerbang \textit{deployment}.
     
     \item Pengembangan Skrip Otomasi (Juli -- Agustus 2026)
     
-    Pengembangan empat skrip otomasi yang mendukung konsistensi prosedural eksperimen: (a)~\texttt{drift-inject.sh} untuk injeksi skenario penyimpangan secara acak dengan pencatatan \textit{timestamp}; (b)~\texttt{metrics-collect.sh} untuk pengumpulan metrik secara berkala via ArgoCD API dan \texttt{kubectl}; (c)~\texttt{baseline-check.sh} untuk verifikasi kondisi klaster sebelum setiap \textit{run}; dan (d)~\texttt{recovery-runbook.sh} untuk memverifikasi hasil koreksi pada lengan imperatif. Skrip dikembangkan bersama implementasi lingkungan.
+    Pengembangan empat skrip otomasi yang mendukung konsistensi prosedural eksperimen: (a)~\texttt{drift-inject.sh} untuk injeksi skenario penyimpangan secara acak dengan pencatatan \textit{timestamp}; (b)~\texttt{metrics-collect.sh} untuk pengumpulan metrik secara berkala via ArgoCD API dan \texttt{kubectl}; (c)~\texttt{baseline-check.sh} untuk verifikasi kondisi klaster sebelum setiap \textit{run}; dan (d)~\texttt{recovery-runbook.sh} untuk memverifikasi hasil koreksi pada mode imperatif. Skrip dikembangkan bersama implementasi apparatus.
     
     \item Kalibrasi \textit{Baseline} dan Uji Coba (Agustus -- September 2026)
     
-    Sebelum eksperimen dimulai, fase kalibrasi dilakukan untuk memastikan validitas internal. Kegiatan meliputi: (a)~\textit{deployment} beban uji (\textit{workload}) komposit multi-service pada lengan imperatif dan GitOps secara berurutan; (b)~verifikasi \textit{baseline} bersih; (c)~pengukuran awal konsistensi; (d)~verifikasi penggunaan sumber daya \textit{node} di bawah 70\%; dan (e)~uji coba awal untuk memvalidasi protokol pengukuran, protokol kolektor, dan skrip otomasi.
+    Sebelum eksperimen dimulai, fase kalibrasi dilakukan untuk memastikan validitas internal. Kegiatan meliputi: (a)~\textit{deployment} beban uji (\textit{workload}) komposit multi-service pada satu stack dan verifikasi kedua mode secara berurutan; (b)~pembekuan revisi sumber, SHA-256 hasil render, image digest, dan versi runtime; (c)~verifikasi \textit{baseline} bersih dan reset; (d)~verifikasi kepemilikan HPA serta prosedur penjedaan/pemulihan ArgoCD; (e)~verifikasi penggunaan sumber daya \textit{node} di bawah 70\%; dan (f)~uji coba protokol kolektor dengan sampling satu detik serta skrip otomasi. Pilot terbatas bukan data formal.
     
-    \item Eksperimen dan Pengumpulan Data (September -- Oktober 2026)
+    \item Eksperimen dan Pengumpulan Data (Oktober -- November 2026)
     
-    Rencana pelaksanaan tiga eksperimen menunggu tinjauan metode dan kelulusan gerbang Bab III. E1 menilai kesetaraan konfigurasi ($n=5$ per skenario); E2 waktu deteksi, bukti deviasi dan pemulihan ($n=10$); E3 bukti keterlacakan secara deskriptif. Target tersebut bukan jaminan daya uji. Lengan imperatif dan GitOps dijalankan berurutan pada satu stack; urutan lengan diacak dan dicatat, sedangkan urutan skenario memakai permutasi yang sama di kedua lengan. A dilaporkan sebagai kontrol HPA dan F sebagai batas visibilitas, terpisah dari B--E/G. Satu injeksi diikuti reset lengkap; kegagalan dan hasil tersensor tetap disimpan. Eksekusi formal belum diizinkan.
+    Rencana pelaksanaan dua kelompok eksperimen menunggu tinjauan metode dan kelulusan gerbang Bab III. E1 menilai kesetaraan konfigurasi (R1) dan E2 menilai waktu deteksi, bukti deviasi, dan pemulihan (R2). Sampel formal adalah 15 pengulangan per skenario per mode, yaitu 10 pengulangan protokol R2 dan 5 pengulangan protokol R1, sehingga totalnya $7 \times 2 \times 15 = 210$ run pada satu kasus. Sampling berlangsung pada interval nominal satu detik. Target tersebut bukan jaminan daya uji. Kedua mode dijalankan berurutan pada satu stack; urutan mode diacak dan dicatat, sedangkan urutan skenario memakai permutasi yang sama. A dilaporkan sebagai kontrol HPA, F sebagai batas visibilitas, dan G sebagai kasus deskriptif bukan \textit{self-heal} ArgoCD; ketiganya terpisah dari efikasi B--E. Satu injeksi diikuti reset lengkap; kegagalan dan hasil tersensor tetap disimpan. R3 tidak diukur karena audit API server tidak tersedia. Eksekusi formal belum diizinkan.
     
-    \item Analisis Statistik dan Interpretasi (Oktober -- November 2026)
+    \item Analisis Statistik dan Interpretasi (November 2026)
     
-    Analisis data meliputi statistik deskriptif (\textit{mean}, median, rentang, deviasi standar), uji perbandingan (\textit{Mann--Whitney U test}), perhitungan ukuran efek (Cohen's \textit{d}), dan interpretasi hasil. Pembahasan mencakup identifikasi skenario penyimpangan yang paling berdampak, faktor yang memengaruhi hasil, serta perumusan rekomendasi pemilihan paradigma \textit{deployment} berbasis bukti empiris terkontrol.
+    Analisis data meliputi statistik deskriptif (\textit{mean}, median, rentang, deviasi standar), uji nonparametrik berpasangan/blok bila pemasangan dapat dipertahankan atau \textit{Mann--Whitney U} bila tidak, perhitungan ukuran efek (Cliff's $\delta$ atau Hodges--Lehmann) beserta interval kepercayaan, serta analisis \textit{survival} untuk waktu deteksi dan pemulihan yang tersensor kanan. Pembahasan mencakup skenario penyimpangan yang paling berdampak, faktor yang memengaruhi hasil, non-isolasi pada satu stack, serta perumusan informasi kontekstual, bukan rekomendasi universal pemilihan paradigma.
     
     \item Penulisan Laporan (Juni -- November 2026)
     
@@ -68,5 +68,5 @@ Tabel~\ref{tab:jadwal} menunjukkan rencana jadwal pelaksanaan penelitian berbasi
     
     \item Seminar / Sidang (November 2026)
     
-    Presentasi dan sidang tugas akhir di depan dosen penguji, mencakup paparan hasil eksperimen, analisis statistik, rekomendasi paradigma, dan kesimpulan.
+    Presentasi dan sidang tugas akhir di depan dosen penguji, mencakup paparan hasil eksperimen, analisis statistik, informasi kontekstual, dan kesimpulan yang dibatasi pada kasus yang diuji.
 \end{enumerate}

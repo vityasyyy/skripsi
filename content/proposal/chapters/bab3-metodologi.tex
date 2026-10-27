@@ -2,40 +2,38 @@
 
 \section{Deskripsi Umum dan Status Rancangan}
 
-Penelitian ini merancang evaluasi empiris terkontrol atas pengelolaan imperatif terotomasi berbasis \texttt{kubectl} (Lingkungan A) dan GitOps berbasis ArgoCD (Lingkungan B). Lingkungan A menggunakan pemeriksa dan \textit{runbook} otomatis tetap; tidak ada operator yang menunggu, mengetik, atau memilih tindakan korektif selama pengukuran. Beban formal adalah InvenioRDM nyata beserta dependensi multi-service, bukan aplikasi NGINX pengganti. Yang dibandingkan adalah dua prosedur operasional pada konfigurasi tertentu, bukan keunggulan universal suatu paradigma.
+Penelitian ini merupakan studi kasus komparatif terkontrol (\textit{controlled single-case comparative study}) atas dua mode pengelolaan pada satu stack InvenioRDM produksi-like: (1)~mode imperatif terotomasi berbasis \texttt{kubectl} dan (2)~mode GitOps berbasis ArgoCD. Kedua mode bukan dua \textit{deployment} terpisah dan bukan dua stack kembar. Pada mode imperatif, \textit{auto-sync} dan \textit{self-heal} ArgoCD dijeda, sedangkan pemeriksa dan \textit{runbook} otomatis tetap membandingkan keadaan aktual dengan acuan serta menjalankan koreksi \texttt{kubectl}; setelah blok selesai, ArgoCD dipulihkan dan diverifikasi. Pada mode GitOps, ArgoCD aktif melakukan rekonsiliasi. Tidak ada operator yang menunggu, mengetik, atau memilih tindakan korektif selama pengukuran; waktu reaksi manusia bukan variabel penelitian.
 
-Kedua lengan tidak dijalankan serentak. Kapasitas terverifikasi hanya mendukung satu \textit{stack} InvenioRDM penuh pada satu waktu, sehingga lengan dijalankan berurutan pada \textit{stack} yang sama. Setiap lengan dimulai dari \textit{seed} bersih yang terverifikasi dan memakai urutan skenario yang sama; hanya satu lengan aktif pada satu waktu.
+Kedua mode dijalankan berurutan pada stack yang sama. Tidak ada eksekusi paralel A/B dan tidak ada namespace \texttt{exp-*} pengganti. Konsekuensinya, penelitian ini tidak mengisolasi perlakuan dari beban latar, dependensi bersama, atau keadaan klaster yang berubah; non-isolasi tersebut merupakan keterbatasan eksplisit, bukan variabel yang dikendalikan. Yang dibandingkan adalah dua prosedur operasional pada satu kasus, bukan keunggulan universal suatu paradigma.
 
-Revisi metodologis ini merupakan draf untuk tinjauan pemilik penelitian dan pembimbing. Eksperimen formal belum disetujui dan eksekusi langsung instrumen dinonaktifkan. Kelulusan uji offline tidak membuktikan kesiapan klaster, audit, SMTP, kapasitas, ataupun pemulihan data aplikasi. Protokol imperatif terotomasi dan kolektor pasif belum diuji pada klaster. Proposal yang diterima sebelumnya dan artefak historis tetap dapat ditelusuri melalui riwayat versi; perubahan definisi tidak mengubah makna hasil historis menjadi hasil formal.
+Revisi metodologis ini merupakan draf untuk tinjauan pemilik penelitian dan pembimbing. Eksperimen formal belum disetujui dan eksekusi langsung instrumen dinonaktifkan. Kelulusan uji offline tidak membuktikan kesiapan klaster, SMTP, kapasitas, ataupun pemulihan data aplikasi. Protokol imperatif terotomasi dan kolektor pasif belum diuji secara formal pada klaster; pilot terbatas pada stack yang sama bukan data formal. Proposal yang diterima sebelumnya dan artefak historis tetap dapat ditelusuri melalui riwayat versi; perubahan definisi tidak mengubah makna hasil historis menjadi hasil formal.
 
 \section{Metodologi dan Kesetaraan Perbandingan}
 
-Rancangan mengikuti evaluasi empiris terkontrol dengan pengamatan kondisi dasar, satu intervensi, dan pengamatan pascaintervensi \citep{wohlin2012experimentation}. Kedua lengan dijalankan pada klaster yang sama, tetapi tidak serentak; rancangan bukan penugasan acak klaster dari populasi \citep{cook1979quasi}. Unit analisis adalah satu injeksi yang diterima pada satu lengan dalam satu pengulangan.
+Rancangan menggabungkan elemen eksperimen terkontrol dengan studi kasus tunggal: kondisi dasar diukur, satu intervensi dilakukan, dan kondisi pascaintervensi diamati pada kasus yang sama \citep{wohlin2012experimentation,runeson2009case}. Karena kasus tidak dipilih acak dari populasi dan kedua mode berurutan pada stack yang sama, rancangan tidak memberikan inferensi populasi \citep{cook1979quasi}. Unit analisis adalah satu injeksi yang diterima pada satu mode dalam satu pengulangan.
 
-Kedua lengan menggunakan sumber deployment, image digest, inventaris, kontrak bidang konfigurasi, kebijakan HPA, dan aturan pengukuran yang setara. Lingkungan A berada di luar kepemilikan ArgoCD. Lengan dijalankan sebagai blok berurutan pada satu stack aktif: urutan lengan diacak dan dicatat, sedangkan urutan skenario dalam kedua lengan memakai permutasi yang sama dari seed yang dicatat. Setiap run dimulai dari seed bersih yang terverifikasi; hanya satu injeksi diperbolehkan setelah reset sebelumnya terverifikasi. Tidak ada eksekusi semua mutasi tanpa reset di antaranya.
-
-Pada Lingkungan A, pemeriksa imperatif tetap membandingkan keadaan aktual dengan inventaris dan nilai yang diinginkan, menyimpan bukti perbedaan, lalu menjalankan prosedur koreksi \texttt{kubectl} yang telah ditentukan. Tidak ada operator yang menunggu, mengetik, atau memilih tindakan korektif selama pengukuran; waktu reaksi manusia dan tingkat keahlian operator bukan variabel penelitian. Evaluator bersama menghitung R1 dari pembacaan aktual dan tidak menggantikan mekanisme koreksi. Pada Lingkungan B, ArgoCD menjalankan rekonsiliasi otomatis. Identitas skenario tidak diberikan kepada mekanisme koreksi. Peneliti membakukan prosedur dan meninjau bukti, bukan menjadi subjek pengukuran kinerja manusia; NASA-TLX tidak dipakai. Prosedur pemulihan mengikuti prinsip runbook yang dapat diperiksa \citep{schlette2024playbook}.
+Kedua mode menggunakan sumber \textit{deployment}, image digest, inventaris, kontrak bidang konfigurasi, kebijakan HPA, dan aturan pengukuran yang setara. Pada mode imperatif, kepemilikan rekonsiliasi ArgoCD dijeda secara terkendali: \textit{auto-sync} dan \textit{self-heal} pada \texttt{apps} dan \texttt{invenio-bootstrap} dinonaktifkan sementara, lalu dipulihkan pada blok \texttt{finally} dan diverifikasi \citep{argocd2025sync}. Pemeriksa imperatif hanya menerima keadaan aktual dan acuan; ia tidak menerima identitas skenario. Pada mode GitOps, ArgoCD aktif dan menjadi mekanisme rekonsiliasi. Urutan mode diacak dan dicatat; urutan skenario memakai permutasi yang sama di kedua mode. Setiap run dimulai dari baseline yang terverifikasi dan hanya satu injeksi diperbolehkan setelah reset sebelumnya terverifikasi.
 
 \begin{figure}[H]
   \centering
   \begin{tikzpicture}[
-    box/.style={draw, rounded corners, align=center, text width=5.2cm, minimum height=10mm, font=\small},
+    box/.style={draw, rounded corners, align=center, text width=5.6cm, minimum height=10mm, font=\small},
     flow/.style={->, thick}, node distance=6mm]
-    \node[box] (stack) {Satu stack InvenioRDM\\revisi dan render dibekukan};
-    \node[box, below=of stack] (manual) {Lengan A: imperatif\\pemeriksa + runbook otomatis\\HPA normal};
-    \node[box, below=of manual] (resetA) {Reset ke seed bersih\\dua pembacaan lengkap};
-    \node[box, below=of resetA] (gitops) {Lengan B: GitOps\\ArgoCD, HPA normal};
-    \node[box, below=of gitops] (resetB) {Reset ke seed bersih\\sebelum blok berikutnya};
+    \node[box] (stack) {Satu stack InvenioRDM\\produksi-like, namespace \texttt{invenio}};
+    \node[box, below=of stack] (manual) {Mode imperatif\\\textit{auto-sync}/\textit{self-heal} ArgoCD dijeda\\pemeriksa + \textit{runbook} \texttt{kubectl}};
+    \node[box, below=of manual] (resetA) {Reset terverifikasi\\ArgoCD dipulihkan};
+    \node[box, below=of resetA] (gitops) {Mode GitOps\\ArgoCD aktif};
+    \node[box, below=of gitops] (resetB) {Reset terverifikasi\\sebelum blok berikutnya};
     \draw[flow] (stack) -- (manual);
     \draw[flow] (manual) -- (resetA);
     \draw[flow] (resetA) -- (gitops);
     \draw[flow] (gitops) -- (resetB);
   \end{tikzpicture}
-  \caption{Dua lengan dijalankan berurutan pada satu stack InvenioRDM; HPA aktif pada kedua lengan dan bukan pembeda perlakuan.}
+  \caption{Dua mode pengelolaan dijalankan berurutan pada satu stack InvenioRDM; mode imperatif adalah penjedaan ArgoCD, bukan \textit{deployment} terpisah.}
   \label{fig:arsitektur-eksperimen}
 \end{figure}
 
-Gambar~\ref{fig:arsitektur-eksperimen} menunjukkan bahwa hanya satu lengan aktif pada satu waktu dan setiap perpindahan lengan didahului reset ke seed bersih. HPA merupakan pengendali bersama, sehingga responsnya tidak diatribusikan kepada ArgoCD maupun kepada pemeriksa imperatif.
+Gambar~\ref{fig:arsitektur-eksperimen} menunjukkan bahwa hanya satu mode aktif pada satu waktu dan setiap perpindahan mode didahului reset serta pemulihan ArgoCD yang terverifikasi. HPA merupakan pengendali bersama, sehingga responsnya tidak diatribusikan kepada ArgoCD maupun kepada pemeriksa imperatif.
 
 \begin{figure}[H]
   \centering
@@ -43,24 +41,26 @@ Gambar~\ref{fig:arsitektur-eksperimen} menunjukkan bahwa hanya satu lengan aktif
     box/.style={draw, rounded corners, align=center, text width=6.4cm, minimum height=9mm, font=\small},
     flow/.style={->, thick}, node distance=5mm]
     \node[box] (review) {Tinjauan metode\\dan validasi offline};
-    \node[box, below=of review] (ready) {Gerbang kapasitas, audit, aplikasi\\dan pembakuan sumber};
+    \node[box, below=of review] (freeze) {Pembekuan revisi sumber, render,\\image digest, dan versi runtime};
+    \node[box, below=of freeze] (ready) {Gerbang stabilitas stack\\dan pembakuan sumber};
     \node[box, below=of ready] (baseline) {Verifikasi baseline\\dan aktifkan kolektor};
     \node[box, below=of baseline] (inject) {Satu injeksi\\dan bukti penerimaan};
     \node[box, below=of inject] (observe) {Amati sampai kejadian\\atau batas waktu};
     \node[box, below=of observe] (reset) {Reset lengkap terverifikasi\\sebelum pengulangan berikutnya};
-    \node[box, below=of reset] (analysis) {Analisis per skenario\\A dan F terpisah dari efikasi ArgoCD};
-    \draw[flow] (review) -- (ready);
+    \node[box, below=of reset] (analysis) {Analisis per skenario\\A, F, dan G terpisah dari efikasi};
+    \draw[flow] (review) -- (freeze);
+    \draw[flow] (freeze) -- (ready);
     \draw[flow] (ready) -- (baseline);
     \draw[flow] (baseline) -- (inject);
     \draw[flow] (inject) -- (observe);
     \draw[flow] (observe) -- (reset);
     \draw[flow] (reset) -- (analysis);
   \end{tikzpicture}
-  \caption{Bagan alir rancangan penelitian dengan satu lengan aktif pada satu waktu; pelaksanaan formal tetap menunggu persetujuan.}
+  \caption{Bagan alir rancangan penelitian dengan satu mode aktif pada satu waktu; pelaksanaan formal tetap menunggu persetujuan.}
   \label{fig:bagan-alir-eksperimen}
 \end{figure}
 
-Gambar~\ref{fig:bagan-alir-eksperimen} menempatkan gerbang kesiapan sebelum injeksi dan reset lengkap sebelum pengulangan berikutnya. Perpindahan lengan mengikuti urutan yang diacak dan dicatat. Kegagalan dan data tersensor disimpan, bukan dihapus agar hanya pemulihan sukses yang dilaporkan.
+Gambar~\ref{fig:bagan-alir-eksperimen} menempatkan pembekuan sumber dan gerbang kesiapan sebelum injeksi serta reset lengkap sebelum pengulangan berikutnya. Perpindahan mode mengikuti urutan yang diacak dan dicatat. Kegagalan dan data tersensor disimpan, bukan dihapus agar hanya pemulihan sukses yang dilaporkan.
 
 \section{Lingkungan dan Provenans Deployment}
 
@@ -68,27 +68,27 @@ Konteks lingkungan yang terverifikasi pada 25 Oktober 2026 adalah sebagai beriku
 \begin{itemize}
   \item Tiga node RKE2 berstatus \textit{Ready}: satu \textit{control-plane}/etcd dan dua \textit{worker}.
   \item Kubernetes v1.32.6+rke2r1 pada Ubuntu 24.04 LTS.
-  \item 18 dari 18 Application ArgoCD berstatus \textit{Synced/Healthy}; seluruhnya memakai \textit{automated sync} dan \textit{self-heal}, sedangkan \texttt{argocd-self} dan \texttt{sealed-secrets} memakai \texttt{prune: false}.
-  \item Satu namespace aplikasi, yaitu \texttt{invenio}; belum ada namespace lengan kembar. Namespace pendukung yang tercatat meliputi \texttt{argocd}, \texttt{database}, \texttt{monitoring}, dan \texttt{velero}.
+  \item 18 dari 18 Application ArgoCD berstatus \textit{Synced/Healthy}; seluruhnya memakai \textit{automated sync} dan \textit{self-heal}, sedangkan \texttt{argocd-self} dan \texttt{sealed-secrets} memakai \texttt{prune: false}. Pada mode imperatif, \textit{auto-sync}/\textit{self-heal} dijeda sementara dan dipulihkan setelah blok.
+  \item Satu stack aplikasi InvenioRDM di namespace \texttt{invenio}; tidak ada namespace kembar \texttt{exp-*}. Namespace pendukung yang tercatat meliputi \texttt{argocd}, \texttt{database}, \texttt{monitoring}, dan \texttt{velero}.
   \item Beban aktif mencakup web 2 replika (HPA 2--4), worker 3 replika (HPA 1--4), scheduler 1 replika, PostgreSQL 1 instance CNPG tanpa failover dengan backup harian pukul 02.00 UTC dan retensi 30 hari, Redis master, OpenSearch satu node, MinIO, Loki/Grafana, dan Velero \textit{node-agent}.
   \item MinIO berperan sebagai \textit{primary file store} sekaligus \textit{backup store} pada NFS yang sama; direktori \texttt{/export} berisi sekitar 35 GiB pada snapshot tersebut, PVC meminta 20 GiB, dan tidak ada salinan independen di luar domain kegagalan tersebut.
-  \item Kapasitas yang terverifikasi hanya satu stack InvenioRDM penuh. Sampel 25 Oktober 2026 menunjukkan \textit{worker-01} dan \textit{worker-02} masing-masing memakai 59\% memori, tetapi belum ada jendela pengamatan berkelanjutan atau bukti penempatan dua stack.
+  \item Kapasitas yang terverifikasi hanya untuk satu stack InvenioRDM penuh. Sampel 25 Oktober 2026 menunjukkan \textit{worker-01} dan \textit{worker-02} masing-masing memakai 59\% memori, tetapi belum ada jendela pengamatan berkelanjutan atau bukti penempatan dua stack.
   \item \textit{Seed} saat ini berupa draf privat \texttt{4ben9-bgh38} dengan berkas \texttt{seed.bin} berukuran 65.536 byte; unggah dan unduh publiknya terverifikasi, dan belum ada record publik. Nilai MD5/SHA-256 serta bukti resetnya tercatat pada snapshot dan tidak diulang di sini.
 \end{itemize}
 
-Versi ArgoCD, CNPG, OpenSearch, dan MinIO tidak dicatat dalam snapshot terverifikasi; versi aktual seluruh komponen harus direkam sebelum pengumpulan formal. Sebelum eksperimen, versi runtime, alokasi node, dan revisi yang benar-benar diterapkan harus direkam ulang.
+Versi ArgoCD v2.12.0, OpenSearch 2.19.1, dan MinIO \texttt{RELEASE.2024-12-18T13-15-44Z} tercatat pada snapshot 25 Oktober 2026; versi CNPG belum dinyatakan dan seluruh versi runtime harus direkam ulang sebelum pengumpulan formal.
 
-Lengan eksperimen tidak memakai namespace produksi \texttt{invenio}. Setiap lengan memakai namespace eksperimen terpisah yang hanya aktif selama blok lengan tersebut; namespace lengan lain beserta objeknya tidak boleh ada bersamaan. Provisioning namespace eksperimen dan salinan stack yang setara belum tersedia dan menjadi gerbang kesiapan.
+Stack formal adalah stack InvenioRDM yang sama di namespace \texttt{invenio}. Tidak ada salinan namespace \texttt{exp-*}, tidak ada \textit{deployment} kembar, dan tidak ada eksekusi paralel. Injeksi dan koreksi dibatasi pada objek yang tercantum dalam kontrak bidang; objek lain pada namespace tersebut tidak disentuh. Karena tidak ada twin, keadaan cluster-wide dan dependensi bersama tidak dapat diisolasi dari perlakuan. Pilot 27 Oktober 2026 memakai stack yang sama dan merupakan bukti pilot, bukan data formal.
 
 Sumber otoritatif adalah repositori \url{https://github.com/vityasyyy/invenio-rdm-gitops}. Revisi sumber yang diperiksa untuk kontrak bidang ialah \nolinkurl{6cacea6642a7c1690243d3b54130fa08216a9595}; penunjuknya disimpan pada \path{experiments/deployment-source.json}. Snapshot lingkungan di atas diverifikasi terhadap \texttt{main} pada \texttt{d7ef120}. Application \path{argocd/apps/invenio-bootstrap.yaml} memilih \path{k8s/apps/invenio/kustomization.yaml}, yang merujuk sumber daya dan image digest. Kedua revisi adalah referensi, bukan pernyataan bahwa klaster sedang menjalankan revisi itu. Tidak dibuat salinan manifest Invenio editable di repositori penelitian.
 
-Sebelum eksperimen, catat revisi sumber aktual, hasil render beserta SHA-256, image digest, versi ArgoCD dan chart, inventaris objek, penyesuaian namespace/isolasi yang disetujui, serta kepemilikan pengendali. Hasil render merupakan artefak bukti tak berubah, bukan sumber konfigurasi kedua. Dependensi bersama dibedakan dari sumber daya yang diisolasi agar reset satu lengan tidak mengubah data lengan lain.
+Sebelum eksperimen, catat revisi sumber aktual, hasil render beserta SHA-256, image digest, versi ArgoCD dan chart, inventaris objek, serta kepemilikan pengendali. Hasil render merupakan artefak bukti tak berubah, bukan sumber konfigurasi kedua. Dependensi bersama dibedakan dari sumber daya yang diisolasi agar reset satu mode tidak mengubah data mode lain.
 
 Konfigurasi sumber \path{k8s/infra/argocd/patches/argocd-cm.yaml} menetapkan \texttt{timeout.reconciliation} sebesar 30 detik, berbeda dari target proposal lama 60 detik. Interval rekonsiliasi repositori ini tidak sama dengan watch kejadian Kubernetes, retry self-heal, atau interval evaluator. Seluruh interval dan perilaku aktual harus dicatat serta dibekukan sebelum formal, bukan disesuaikan setelah melihat hasil.
 
 \section{Intervensi dan Kepemilikan Pengendali}
 
-Pemilihan kategori mempertimbangkan defect konfigurasi Kubernetes dan praktik operasional \citep{zhang2026configuration,pohjola2025mitigating}. Tabel~\ref{tab:matriks-eksperimen} membedakan kontrol HPA, drift terkelola, dan batas visibilitas.
+Pemilihan kategori mempertimbangkan defect konfigurasi Kubernetes dan praktik operasional \citep{zhang2026configuration,pohjola2025mitigating}. Tabel~\ref{tab:matriks-eksperimen} membedakan kontrol HPA, drift terkelola, batas visibilitas, dan kasus deskriptif.
 
 \begin{table}[H]
   \centering
@@ -99,34 +99,34 @@ Pemilihan kategori mempertimbangkan defect konfigurasi Kubernetes dan praktik op
     \hline
     Skenario & Intervensi & Kepemilikan dan analisis \\
     \hline
-    A & Perubahan replika Deployment & HPA adalah pemilik normal replika pada kedua lengan; \texttt{/spec/replicas} dikecualikan dari R1 statis; pemulihan replika oleh HPA bukan bukti ArgoCD maupun koreksi imperatif \\
+    A & Perubahan replika Deployment & HPA adalah pemilik normal replika pada kedua mode; \texttt{/spec/replicas} dikecualikan dari R1 statis; pemulihan replika oleh HPA bukan bukti ArgoCD maupun koreksi imperatif \\
     \hline
-    B & Perubahan image & Bidang Deployment terpilih; image digest acuan dibekukan \\
+    B & Perubahan image & Bidang Deployment terpilih; image digest acuan dibekukan; drift terkelola \\
     \hline
-    C & Modifikasi ConfigMap & Kesetaraan objek dan adopsi konfigurasi proses dibedakan \\
+    C & Modifikasi ConfigMap & Kesetaraan objek dan adopsi konfigurasi proses dibedakan; drift terkelola \\
     \hline
-    D & Penghapusan sumber daya & Verifikasi penciptaan ulang dan seluruh bidang; bukan sekadar rollout sehat \\
+    D & Penghapusan sumber daya & Verifikasi penciptaan ulang dan seluruh bidang; bukan sekadar rollout sehat; drift terkelola \\
     \hline
-    E & Patch requests/limits & Seluruh bidang terpilih dibandingkan dengan aturan identik \\
+    E & Patch requests/limits & Seluruh bidang terpilih dibandingkan dengan aturan identik; drift terkelola \\
     \hline
-    F & Objek pada namespace salah & Batas visibilitas objek tak terkelola; tidak diasumsikan dipangkas ArgoCD \\
+    F & Objek pada namespace salah & Batas visibilitas objek tak terkelola; tidak diasumsikan dipangkas ArgoCD; deskriptif \\
     \hline
-    G & Perubahan Secret sintetis & Isolasi dari pengendali SealedSecret wajib ditinjau; nilai tidak diterbitkan \\
+    G & Anotasi metadata Secret sintetis & Bukan kasus \textit{self-heal} ArgoCD; pemulihan dilakukan harness; deskriptif dan tidak dipool \\
     \hline
   \end{tabularx}
 \end{table}
 
-Pada skenario A, HPA web dan worker tetap memiliki replika pada kedua lengan. HPA adalah pemilik normal jumlah replika; perubahan \texttt{/spec/replicas} oleh injeksi dapat dikembalikan oleh HPA, bukan oleh ArgoCD atau oleh pemeriksa imperatif. Karena itu \texttt{/spec/replicas} dikecualikan dari R1 statis pada Deployment yang dimiliki HPA, dan nilainya dilaporkan sebagai status HPA terpisah. Tidak munculnya \textit{OutOfSync} bukan waktu deteksi nol, dan kembalinya replika bukan bukti \textit{self-heal} ArgoCD. Nilai acuan dinamis berasal dari keputusan/status HPA yang teramati, bukan angka tetap tiga replika. Kebijakan, metrik, rentang, serta jendela stabilisasi HPA dan penghormatan kepemilikan saat \textit{sync} harus diverifikasi. Hasil A dilaporkan sebagai kontrol HPA, tidak digabungkan ke estimasi efikasi B--E dan G.
+Pada skenario A, HPA web dan worker tetap memiliki replika pada kedua mode. HPA adalah pemilik normal jumlah replika; perubahan \texttt{/spec/replicas} oleh injeksi dapat dikembalikan oleh HPA, bukan oleh ArgoCD atau oleh pemeriksa imperatif. Karena itu \texttt{/spec/replicas} dikecualikan dari R1 statis pada Deployment yang dimiliki HPA, dan nilainya dilaporkan sebagai status HPA terpisah. Tidak munculnya \textit{OutOfSync} bukan waktu deteksi nol, dan kembalinya replika bukan bukti \textit{self-heal} ArgoCD. Nilai acuan dinamis berasal dari keputusan/status HPA yang teramati, bukan angka tetap tiga replika. Kebijakan, metrik, rentang, serta jendela stabilisasi HPA dan penghormatan kepemilikan saat \textit{sync} harus diverifikasi. Hasil A dilaporkan sebagai kontrol HPA, tidak digabungkan ke estimasi efikasi B--E.
 
 F dilaporkan tersendiri karena objek di luar cakupan Application tidak otomatis menjadi sasaran prune/self-heal. Objek uji harus dibangun dari spesifikasi tersanitasi, bukan menyalin UID, resourceVersion, managedFields atau status objek server ke namespace lain. Penerimaan injeksi dan pembersihan karantina wajib dibuktikan.
 
-Pada G, Secret produksi yang dihasilkan SealedSecret tidak boleh diperlakukan sebagai koreksi ArgoCD murni. Kontrak Secret sintetis dan pengendalinya harus disetujui sebelum formal. Perubahan laten ImageUpdater juga harus dibekukan dalam apparatus yang disetujui. Tidak ada izin mengubah pengendali produksi melalui rancangan ini.
+G bukan kasus \textit{self-heal} ArgoCD. Perubahan berupa anotasi metadata pada SealedSecret sintetis; pemulihan anotasi dilakukan oleh harness, bukan oleh rekonsiliasi ArgoCD. Nilai \texttt{spec.encryptedData} tidak dibaca atau ditulis. G dianalisis secara deskriptif dan tidak dipool ke estimasi efikasi B--E. Perubahan laten ImageUpdater dan pengendali SealedSecret harus dibekukan atau diisolasi sebelum formal.
 
 \section{Variabel dan Definisi Operasional}
 
 \subsection{R1: Kesetaraan Konfigurasi}
 
-Kontrak inventaris dan bidang terpilih dibekukan dari sumber yang sama untuk kedua lengan. Sumber daya cocok hanya jika ada dan seluruh bidang terpilihnya sama dengan acuan. Kontrak mencakup image, requests/limits, isi ConfigMap, kesetaraan Secret, serta bidang Service dan objek lain yang relevan.
+Kontrak inventaris dan bidang terpilih dibekukan dari sumber yang sama untuk kedua mode. Sumber daya cocok hanya jika ada dan seluruh bidang terpilihnya sama dengan acuan. Kontrak mencakup image, requests/limits, isi ConfigMap, kesetaraan Secret, serta bidang Service dan objek lain yang relevan.
 
 \[
 R1 = \frac{\text{jumlah sumber daya dengan seluruh bidang terpilih cocok}}{\text{jumlah sumber daya dalam inventaris acuan}} \times 100\%.
@@ -138,54 +138,61 @@ R1 dicatat pada baseline, pengamatan pertama pascainjeksi, dan pascakoreksi. Jik
 
 \subsection{R2: Deteksi, Bukti Deviasi, dan Pemulihan}
 
-Semua durasi dihitung dari satu jam monotonik pada host pencatat dalam detik dengan pecahan; UTC disimpan untuk audit. Kolektor dan injektor otomatis memakai sumber jam yang sama. Kolektor harus aktif sebelum injeksi. Interval nominal evaluator satu detik merupakan target validasi, bukan kemampuan live yang telah dibuktikan. Interval aktual dan jeda pembacaan dicatat, terpisah dari jadwal mekanisme koreksi.
+Semua durasi dihitung dari satu jam monotonik pada host pencatat dalam detik dengan pecahan; UTC disimpan untuk audit. Kolektor dan injektor otomatis memakai sumber jam yang sama. Kolektor harus aktif sebelum injeksi. Sampling berlangsung pada interval nominal satu detik; interval aktual dan jeda pembacaan dicatat, terpisah dari jadwal mekanisme koreksi.
 
 \begin{itemize}
   \item $t_0$: pengiriman permintaan injeksi oleh kolektor/injektor otomatis; $t_a$: penerimaan respons API. Injeksi sah hanya jika API berhasil dan perubahan bidang diverifikasi dari respons atau pembacaan balik.
-  \item $t_d$: sinyal deteksi pertama. Pada Lingkungan A, waktu pemeriksa imperatif pertama memberi sinyal berdasarkan perbedaan konfigurasi; sumbernya dicatat. Pada Lingkungan B untuk skenario B--E dan G, waktu ArgoCD pertama menunjukkan perbedaan pada bidang terpilih. Rollout gagal bukan definisi drift; rollout sehat dapat tetap memiliki image, konfigurasi, atau limits yang salah. Sinyal HPA dicatat sebagai sinyal HPA, bukan deteksi ArgoCD.
-  \item $t_e$: waktu pertama bukti tersimpan mengidentifikasi objek dan bidang yang berbeda. Pada Lingkungan A, bukti berasal dari log pemeriksa imperatif, manifest diff, atau snapshot yang disimpan kolektor; pada Lingkungan B, dari diff/status ArgoCD. Diff menunjukkan deviasi, bukan penyebab kausal; status Healthy dan selesainya perintah koreksi tidak menghasilkan waktu akar masalah.
-  \item $t_r$: pengamatan pertama seluruh inventaris dan bidang kembali cocok, dikonfirmasi pada pembacaan berikutnya. Pada Lingkungan A, konfirmasi dilakukan setelah prosedur koreksi imperatif selesai dan evaluator memverifikasi dua pembacaan; pemulihan replika oleh HPA tidak dihitung sebagai koreksi imperatif. Pada Lingkungan B, konfirmasi dilakukan setelah rekonsiliasi ArgoCD. Pada F, ketiadaan objek karantina diperiksa tersendiri.
+  \item $t_d$: sinyal deteksi pertama. Pada mode imperatif, waktu pemeriksa imperatif pertama memberi sinyal berdasarkan perbedaan konfigurasi; sumbernya dicatat. Pada mode GitOps untuk skenario B--E, waktu ArgoCD pertama menunjukkan perbedaan pada bidang terpilih. Rollout gagal bukan definisi drift; rollout sehat dapat tetap memiliki image, konfigurasi, atau limits yang salah. Sinyal HPA dicatat sebagai sinyal HPA, bukan deteksi ArgoCD.
+  \item $t_e$: waktu pertama bukti tersimpan mengidentifikasi objek dan bidang yang berbeda. Pada mode imperatif, bukti berasal dari log pemeriksa imperatif, manifest diff, atau snapshot yang disimpan kolektor; pada mode GitOps, dari diff/status ArgoCD. Diff menunjukkan deviasi, bukan penyebab kausal; status Healthy dan selesainya perintah koreksi tidak menghasilkan waktu akar masalah.
+  \item $t_r$: pengamatan pertama seluruh inventaris dan bidang kembali cocok, dikonfirmasi pada pembacaan berikutnya. Pada mode imperatif, konfirmasi dilakukan setelah prosedur koreksi imperatif selesai dan evaluator memverifikasi dua pembacaan; pemulihan replika oleh HPA tidak dihitung sebagai koreksi imperatif. Pada mode GitOps, konfirmasi dilakukan setelah rekonsiliasi ArgoCD. Pada F, ketiadaan objek karantina diperiksa tersendiri.
 \end{itemize}
 
-Durasi utama adalah $t_d-t_0$, $t_e-t_0$, dan $t_r-t_0$. Semua cap waktu dicatat oleh kolektor/injektor otomatis dengan jam UTC dan jam monotonik dari host pencatat yang sama; durasi dihitung dari jam monotonik, bukan selisih jam dinding. Pada Lingkungan A, sinyal HPA dan respons replika diberi label pengendali HPA, bukan deteksi ArgoCD. Tidak adanya sinyal sampai batas pengamatan dicatat tersensor kanan dengan waktu hilang, tidak diisi nol atau disamakan dengan $t_0$. Pemulihan konfigurasi tidak membuktikan layanan sehat atau data aplikasi pulih.
+Durasi utama adalah $t_d-t_0$, $t_e-t_0$, dan $t_r-t_0$. Semua cap waktu dicatat oleh kolektor/injektor otomatis dengan jam UTC dan jam monotonik dari host pencatat yang sama; durasi dihitung dari jam monotonik, bukan selisih jam dinding. Pada mode imperatif, sinyal HPA dan respons replika diberi label pengendali HPA, bukan deteksi ArgoCD. Tidak adanya sinyal sampai batas pengamatan dicatat tersensor kanan dengan waktu hilang, tidak diisi nol atau disamakan dengan $t_0$. Pemulihan konfigurasi tidak membuktikan layanan sehat atau data aplikasi pulih.
 
-\subsection{R3: Bukti Keterlacakan}
+\subsection{R3: Batas Pengukuran dan Pekerjaan Lanjutan}
 
-R3 dinilai secara deskriptif dengan rubrik rekonstruksi yang sama pada kedua lengan. Setiap unsur diberi status \textit{ada}, \textit{sebagian}, \textit{tidak ada}, atau \textit{tidak dapat dinilai}, disertai referensi bukti tersanitasi:
-\begin{itemize}
-  \item \textit{Pelaku}: pemeriksa imperatif, akun layanan, atau Application ArgoCD yang dapat ditelusuri dari log eksekusi otomatis, event ArgoCD, dan audit API bila tersedia.
-  \item \textit{Objek dan bidang}: objek serta bidang yang berubah dapat ditentukan dari manifest snapshot, diff ArgoCD, atau catatan perbandingan, tanpa menampilkan nilai Secret.
-  \item \textit{Waktu dan urutan}: injeksi, deteksi, dan pemulihan dapat diurutkan dari cap waktu kolektor, metadata Git, dan event pengendali.
-  \item \textit{Tindakan dan hasil}: perintah koreksi, hasil verifikasi, dan status reset dapat dikaitkan dengan run yang sama.
-\end{itemize}
-R3 bukan persentase kelengkapan dan tidak diuji sebagai perbedaan statistik. Git mencatat perubahan deklarasi, bukan otomatis pelaku mutasi \texttt{kubectl} di luar Git. Audit API Kubernetes belum tersedia pada snapshot ini; tanpa audit, unsur pelaku tidak dapat direkonstruksi untuk mutasi \textit{out-of-band} dan dilaporkan sebagai \textit{tidak dapat dinilai}, bukan nol. R3 tidak menghasilkan klaim akar masalah kausal.
+R3 (bukti keterlacakan) tidak diukur dalam penelitian ini karena audit API server Kubernetes tidak tersedia pada lingkungan eksperimen. Tanpa audit, pelaku mutasi \textit{out-of-band} tidak dapat direkonstruksi, sehingga klaim keterlacakan tidak dapat dibuat untuk kedua mode. Ketiadaan audit tidak menghambat \textit{deployment} atau pengukuran R1/R2; ia hanya menutup R3. R3 tidak dilaporkan sebagai nol, tidak dilaporkan sebagai tidak ada perbedaan, dan tidak diuji secara statistik. Unsur pelaku, objek dan bidang, waktu dan urutan, serta tindakan dan hasil didokumentasikan sebagai keterbatasan dan pekerjaan lanjutan setelah audit diaktifkan.
 
 \section{Gerbang Baseline dan Reset}
 
 Sebelum injeksi, inventaris sumber daya, pod dan node wajib tidak kosong serta lengkap; semua pod layanan harus Running dan Ready. CPU dan memori setiap node harus di bawah 70\%. Memori didefinisikan sebagai working set metrics-server dibagi allocatable node, bukan metrik host yang dapat dipertukarkan. Metrik tidak tersedia, field tidak terbaca, inventaris parsial, atau status pengendali tidak diketahui menggagalkan gerbang secara tertutup. Kelulusan sampel tunggal tidak menggantikan bukti jendela beban stabil.
 
-Hanya satu stack InvenioRDM yang boleh aktif. Sebelum lengan dimulai, tidak boleh ada namespace aplikasi kembar atau objek sisa dari lengan sebelumnya. Reset ke seed bersih wajib memverifikasi: (1)~salinan seed privat \texttt{4ben9-bgh38} di namespace eksperimen dengan \texttt{seed.bin} 65.536 byte dan SHA-256 yang cocok masih ada; (2)~tidak ada record, draft, atau berkas lain di luar seed; (3)~konfigurasi, Secret, dan antrean kembali ke acuan; (4)~HPA berada pada keadaan normal; (5)~semua pod Running dan Ready; serta (6)~tidak ada objek karantina. Reset dinyatakan sah hanya setelah dua pembacaan lengkap yang berurutan cocok. Rollout sehat saja tidak cukup. Kegagalan satu tindakan koreksi diteruskan ke pemanggil dan pengulangan berikutnya dilarang sampai reset lengkap terverifikasi. Tidak ada pengosongan queue, modifikasi data, restore, atau migrasi langsung yang diizinkan oleh naskah ini.
+Hanya satu stack InvenioRDM yang boleh aktif. Sebelum mode dimulai, tidak boleh ada namespace aplikasi kembar atau objek sisa dari blok sebelumnya. Untuk mode imperatif, \textit{auto-sync}/\textit{self-heal} pada \texttt{apps} dan \texttt{invenio-bootstrap} harus terverifikasi jeda sebelum injeksi; untuk mode GitOps, keduanya harus terverifikasi aktif. Reset wajib memverifikasi: (1)~salinan seed privat \texttt{4ben9-bgh38} di namespace \texttt{invenio} dengan \texttt{seed.bin} 65.536 byte dan SHA-256 yang cocok masih ada; (2)~tidak ada record, draft, atau berkas lain di luar seed; (3)~konfigurasi, Secret, dan antrean kembali ke acuan; (4)~HPA berada pada keadaan normal; (5)~semua pod Running dan Ready; serta (6)~tidak ada objek karantina. Reset dinyatakan sah hanya setelah dua pembacaan lengkap yang berurutan cocok. Rollout sehat saja tidak cukup. Kegagalan satu tindakan koreksi diteruskan ke pemanggil dan pengulangan berikutnya dilarang sampai reset lengkap terverifikasi. Tidak ada pengosongan queue, modifikasi data, restore, atau migrasi langsung yang diizinkan oleh naskah ini.
 
-Kesiapan juga mencakup bukti audit, isolasi, sinkronisasi jam, kepemilikan HPA, beban latar, serta pemulihan aplikasi/data/queue yang telah ditinjau. Audit API belum ditetapkan, sehingga unsur pelaku R3 belum dapat dinilai. Pemulihan aplikasi dan data setelah seed belum diuji; \textit{private-draft seed} hanya membuktikan jalur unggah/unduh, bukan pemulihan record dan berkas yang konsisten. Uji pemulihan pasca-seed tetap menjadi prasyarat. Sampel kapasitas 25 Oktober 2026 menunjukkan 59\% memori pada kedua worker, tetapi belum ada jendela berkelanjutan atau bukti penempatan dua stack; karena itu lengan dijalankan berurutan.
+Kesiapan juga mencakup sinkronisasi jam, kepemilikan HPA, beban latar, serta pemulihan aplikasi/data/queue yang telah ditinjau. Audit API belum tersedia; ini tidak menjadi gerbang \textit{deployment}, tetapi menutup R3. Pemulihan aplikasi dan data setelah seed belum diuji; \textit{private-draft seed} hanya membuktikan jalur unggah/unduh, bukan pemulihan record dan berkas yang konsisten. Uji pemulihan pasca-seed tetap menjadi prasyarat. Sampel kapasitas 25 Oktober 2026 menunjukkan 59\% memori pada kedua worker, tetapi belum ada jendela berkelanjutan atau bukti penempatan dua stack; karena itu mode dijalankan berurutan pada satu stack.
 
-SMTP masih memakai placeholder \texttt{smtp.example.org} dan \texttt{admin@example.org}; relay, autentikasi, CA, dan firewall belum diketahui, sehingga verifikasi email serta notifikasi email ditunda dan tidak menjadi bagian dari R1--R3. OpenSearch berjalan sebagai satu node; HA OpenSearch ditunda dan tidak diklaim. Tidak ada skenario yang menguji email atau HA, sehingga kedua hal tersebut berada di luar cakupan revisi ini.
+SMTP masih memakai placeholder \texttt{smtp.example.org} dan \texttt{admin@example.org}; relay, autentikasi, CA, dan firewall belum diketahui, sehingga verifikasi email serta notifikasi email ditunda dan tidak menjadi bagian dari R1--R2. OpenSearch berjalan sebagai satu node; HA OpenSearch ditunda dan tidak diklaim. Tidak ada skenario yang menguji email atau HA, sehingga kedua hal tersebut berada di luar cakupan revisi ini.
 
 Bootstrap, migrasi, fixtures, indexing dan deklarasi queue harus dipisahkan dari repair rutin. Sync perbaikan yang memicu setup dapat menambah kerja dan mengubah baseline. Antarmuka lifecycle wajib mengembalikan exit code, waktu, identitas tindakan dan postcondition; kegagalan tak terduga tidak boleh ditelan. ConfigMap/Secret yang dipakai melalui envFrom memerlukan bukti adopsi runtime terpisah, bukan hanya kesetaraan objek.
 
 \section{Instrumen dan Protokol Pengukuran}
 
-Empat entrypoint \texttt{baseline-check.sh}, \texttt{drift-inject.sh}, \texttt{metrics-collect.sh}, dan \texttt{recovery-runbook.sh} kini memvalidasi bundel bukti tersimpan secara offline. Pemeriksa bersama menolak bukti hilang/tidak konsisten, menggunakan aturan R1 identik, membedakan sinyal pengendali dari rollout, serta mempertahankan waktu tersensor. Uji fixture mencakup sukses, kegagalan dan batas; fixture bukan hasil pengukuran aplikasi. Adapter polling, injeksi, pemulihan/reset langsung, ekspor render, integrasi lifecycle, audit dan SMTP belum selesai; pengujian formal tidak boleh dimulai sebelum adapter tersebut ditinjau dan divalidasi. Protokol otomasi imperatif, kolektor pasif, dan aturan atribusi pengendali dirinci pada \path{experiments/LIVE-OBSERVER.md}; dokumen tersebut adalah rencana, bukan prosedur yang telah diuji.
+Empat entrypoint \texttt{baseline-check.sh}, \texttt{drift-inject.sh}, \texttt{metrics-collect.sh}, dan \texttt{recovery-runbook.sh} kini memvalidasi bundel bukti tersimpan secara offline. Pemeriksa bersama menolak bukti hilang/tidak konsisten, menggunakan aturan R1 identik, membedakan sinyal pengendali dari rollout, serta mempertahankan waktu tersensor. Uji fixture mencakup sukses, kegagalan dan batas; fixture bukan hasil pengukuran aplikasi. Adapter polling, injeksi, pemulihan/reset langsung, ekspor render, integrasi lifecycle, dan SMTP belum selesai; pengujian formal tidak boleh dimulai sebelum adapter tersebut ditinjau dan divalidasi. Protokol otomasi imperatif, kolektor pasif, aturan atribusi pengendali, dan rencana 210 run dirinci pada \path{experiments/LIVE-OBSERVER.md}; dokumen tersebut adalah rencana, bukan prosedur yang telah diuji.
 
-Urutan formal yang direncanakan ialah: (1) bekukan metode, sumber, batas waktu dan aturan analisis; (2) pilih lengan dan urutan yang tercatat, lalu siapkan hanya satu stack aktif; (3) verifikasi reset ke seed bersih dan simpan baseline; (4) aktifkan kolektor dan pemeriksa imperatif; (5) kirim satu injeksi dan verifikasi penerimaan; (6) catat sinyal pengendali, bukti deviasi, kesetaraan dan kesehatan sampai pulih atau batas pengamatan; (7) simpan kegagalan dan hasil tersensor; (8) verifikasi reset lengkap sebelum pengulangan berikutnya atau perpindahan lengan. Tidak ada eksekusi formal dalam revisi ini.
+Urutan formal yang direncanakan ialah: (1) bekukan metode, sumber, batas waktu dan aturan analisis; (2) pilih mode dan urutan yang tercatat; (3) bekukan revisi sumber, render SHA-256, image digest, dan versi runtime; (4) verifikasi baseline dan reset ke seed bersih; (5) aktifkan kolektor dan pemeriksa imperatif atau ArgoCD sesuai mode; (6) kirim satu injeksi dan verifikasi penerimaan; (7) catat sinyal pengendali, bukti deviasi, kesetaraan dan kesehatan sampai pulih atau batas pengamatan; (8) simpan kegagalan dan hasil tersensor; (9) verifikasi reset lengkap dan pemulihan ArgoCD sebelum pengulangan berikutnya atau perpindahan mode. Tidak ada eksekusi formal dalam revisi ini.
 
 \section{Pengulangan dan Analisis Statistik}
 
-Target deskriptif tetap $n=5$ per skenario per lengan untuk E1/R1 dan $n=10$ untuk E2/R2; E3/R3 deskriptif. Lengan dijalankan sebagai blok berurutan; urutan lengan diacak dan dicatat, dan urutan skenario memakai permutasi yang sama di kedua lengan. Karena lengan tidak serentak, kondisi klaster antarblok dapat berbeda; perbedaan tersebut dicatat sebagai ancaman dan tidak dianggap tereliminasi. A adalah kontrol HPA dan F batas visibilitas, keduanya dilaporkan terpisah dari B--E/G. Menjumlahkan skenario yang heterogen tidak membuktikan daya uji per skenario. Target ini bukan hasil analisis power yang tervalidasi dan tidak memberi jaminan kecukupan sampel \citep{cohen1988statistical}.
+Sampel formal adalah 15 pengulangan per skenario per mode: 10 pengulangan protokol R2 dan 5 pengulangan protokol R1, sehingga totalnya $7 \times 2 \times 15 = 210$ run pada satu kasus. Pembacaan R1 tetap disimpan pada setiap run sebagai bukti status, sedangkan 5 pengulangan R1 diarahkan pada protokol konsistensi. F dan G tetap menjalani protokol yang sama, tetapi hasil waktunya dilaporkan deskriptif dan tidak dipool ke estimasi efikasi. Sampling berlangsung pada interval nominal satu detik. Sebelum run, revisi sumber, SHA-256 hasil render, image digest, dan versi runtime dibekukan. Target 15 bukan hasil analisis daya dan tidak menjamin kecukupan daya per skenario \citep{dyba2006power,kitchenham2024small,cohen1988statistical}.
 
-Laporkan jumlah injeksi sah, kejadian teramati/tersensor, kegagalan instrumen/pemulihan/reset, median, rentang dan distribusi per skenario. Waktu tidak teramati tetap kosong dengan status sensor dan batas pengamatan. Kegagalan API/injeksi/infrastruktur dibedakan dari tidak terjadinya deteksi; data tidak dibuang tanpa jejak. Rencana uji tetap Mann--Whitney U dua sisi pada $\alpha=0{,}05$, dengan ukuran efek Cohen's $d$ atau Cliff's $\delta$ sebagaimana proposal sebelumnya. Penerapannya memerlukan observasi lengkap serta asumsi yang sesuai. Revisi ini tidak menetapkan pilihan ukuran efek atau keluarga uji baru. Jika ada penyensoran, analisis yang mengabaikannya tidak dianggap perbandingan lengkap; keputusan analisis data tersensor dan penyelarasan rincian proposal--skripsi memerlukan tinjauan pemilik/pembimbing sebelum formal.
+Mode dijalankan sebagai blok berurutan; urutan mode diacak dan dicatat, dan urutan skenario memakai permutasi yang sama di kedua mode. Karena mode tidak serentak dan memakai stack yang sama, kondisi klaster antarblok dapat berbeda dan observasi tidak diperlakukan independen secara naif. A adalah kontrol HPA; F batas visibilitas; G kasus deskriptif bukan \textit{self-heal} ArgoCD. Ketiganya dilaporkan terpisah dari B--E dan tidak dipool ke estimasi efikasi. Menjumlahkan skenario yang heterogen tidak membuktikan daya uji per skenario.
+
+Laporkan jumlah injeksi sah, kejadian teramati/tersensor, kegagalan instrumen/pemulihan/reset, median, rentang dan distribusi per skenario. Waktu tidak teramati tetap kosong dengan status sensor dan batas pengamatan. Kegagalan API/injeksi/infrastruktur dibedakan dari tidak terjadinya deteksi; data tidak dibuang tanpa jejak. Analisis eksploratif memakai uji nonparametrik berpasangan/blok (misalnya Wilcoxon \textit{signed-rank}) bila pemasangan skenario-pengulangan dapat dipertahankan, atau \textit{Mann--Whitney U} dua sisi bila tidak, dengan $\alpha=0{,}05$ dan koreksi Holm untuk keluarga uji yang ditetapkan sebelum data. Ukuran efek (Cliff's $\delta$ atau Hodges--Lehmann) dilaporkan bersama interval kepercayaan bootstrap. Waktu deteksi dan pemulihan yang tersensor kanan dianalisis dengan Kaplan--Meier serta median/\textit{restricted mean survival}; nilai tersensor tidak diimputasi nol. Analisis yang mengabaikan penyensoran tidak dianggap perbandingan lengkap. Rincian keluarga uji dan penanganan penyensoran memerlukan tinjauan pemilik/pembimbing sebelum formal.
 
 \section{Ancaman terhadap Validitas}
 
-Validitas internal dipengaruhi perbedaan jadwal pengendali, tekanan node, I/O latar, dependensi bersama, hooks lifecycle, dan kepemilikan HPA/SealedSecret/ImageUpdater. Karena lengan dijalankan berurutan, kondisi klaster dan waktu pengujian antarblok dapat berbeda; urutan lengan diacak, kondisi dicatat, dan reset diverifikasi, tetapi perbedaan waktu tidak dapat dieliminasi sepenuhnya. Tidak ada waktu reaksi manusia yang diukur; kedua lengan berjalan otomatis. Resolusi kolektor serta interval pemeriksa imperatif dan rekonsiliasi ArgoCD membatasi ketepatan waktu. Kendali dan pencatatan tersebut membatasi bias, tidak menjamin satu-satunya perbedaan adalah paradigma abstrak. Validitas konstruk dibatasi kontrak bidang, resolusi pengamatan, bukti audit, serta perbedaan kesetaraan konfigurasi dengan kesehatan dan pemulihan aplikasi. A dan F tidak dapat digunakan untuk klaim efikasi self-heal ArgoCD. SMTP dan HA OpenSearch tidak diuji dan tidak menjadi dasar klaim.
+\subsection{Validitas Konstruk}
 
-Validitas eksternal dibatasi satu klaster, InvenioRDM, ArgoCD, satu implementasi otomasi imperatif, dan konfigurasi yang akhirnya digunakan. Surrogat S1/S2 serta hasil mock historis bukan sampel formal dan tidak memperluas inferensi. Reliabilitas memerlukan provenans, jam kolektor, bukti lengkap, dan reset yang dapat diulang; tanpa audit API, unsur pelaku R3 tetap tidak dapat dinilai. Sampai tinjauan metode serta seluruh gerbang dipenuhi, belum tersedia dasar untuk kesimpulan komparatif empiris.
+R1 mengukur kesetaraan bidang terpilih terhadap acuan, bukan kebenaran semantik, keamanan, atau kelengkapan seluruh konfigurasi. R2 mengukur waktu pengamatan pada resolusi satu detik, bukan waktu kejadian kontinu; sinyal deteksi, bukti deviasi, dan pemulihan konfigurasi dibedakan. Kesehatan layanan dan adopsi runtime dilaporkan terpisah. R3 tidak diukur karena audit API tidak tersedia, sehingga klaim keterlacakan tidak dapat dibuat. A, F, dan G tidak boleh digunakan untuk klaim efikasi \textit{self-heal} ArgoCD.
+
+\subsection{Validitas Internal}
+
+Validitas internal dipengaruhi perbedaan jadwal pengendali, tekanan node, I/O latar, dependensi bersama, hooks lifecycle, dan kepemilikan HPA/SealedSecret/ImageUpdater. Karena kedua mode berurutan pada stack yang sama, tidak ada isolasi penuh: beban latar dan keadaan klaster dapat berubah antarb lok. Urutan mode diacak, kondisi dicatat, reset diverifikasi, dan penjedaan/pemulihan ArgoCD diperiksa, tetapi perbedaan waktu tidak dapat dieliminasi sepenuhnya. Tidak ada waktu reaksi manusia yang diukur; kedua mode berjalan otomatis. Resolusi kolektor serta interval pemeriksa imperatif dan rekonsiliasi ArgoCD membatasi ketepatan waktu. Kendali dan pencatatan tersebut membatasi bias, tidak menjamin satu-satunya perbedaan adalah paradigma abstrak.
+
+\subsection{Validitas Eksternal}
+
+Validitas eksternal dibatasi satu klaster, satu stack InvenioRDM produksi-like, satu implementasi ArgoCD, satu implementasi otomasi imperatif, dan konfigurasi yang akhirnya digunakan. Studi ini adalah studi kasus tunggal; hasilnya tidak digeneralisasi ke seluruh aplikasi multi-service, klaster, atau alat GitOps. Surrogat S1/S2 serta hasil mock historis bukan sampel formal dan tidak memperluas inferensi.
+
+\subsection{Validitas Kesimpulan}
+
+Jumlah pengulangan per sel terbatas (15 run; 10 untuk R2 dan 5 untuk R1) dan tidak dijamin memiliki daya statistik per skenario. Uji nonparametrik, ukuran efek, interval kepercayaan, dan pelaporan penyensoran dipakai agar kesimpulan tidak bergantung pada asumsi normalitas atau independensi yang tidak terpenuhi. Kegagalan, data tersensor, dan ketidakpastian dilaporkan; tidak ada klaim ekivalensi atau superioritas universal. Sampai tinjauan metode serta seluruh gerbang dipenuhi, belum tersedia dasar untuk kesimpulan komparatif empiris.
