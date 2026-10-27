@@ -279,6 +279,21 @@ def load_token(environ=None) -> str:
     return token
 
 
+class _CrossHostRedirectHandler(urlrequest.HTTPRedirectHandler):
+    """Do not forward API auth headers to a presigned object-store redirect."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is None:
+            return None
+        old_host = urlparse.urlparse(req.full_url).hostname
+        new_host = urlparse.urlparse(newurl).hostname
+        if old_host != new_host:
+            redirected.remove_header("Authorization")
+            redirected.remove_header("Accept")
+        return redirected
+
+
 class Http:
     def __init__(self, token: str, base_url: str = DEFAULT_INVENIO_URL, timeout: float = 15):
         parsed = urlparse.urlparse(base_url)
@@ -288,6 +303,7 @@ class Http:
         self._token = token
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._opener = urlrequest.build_opener(_CrossHostRedirectHandler())
 
     def __repr__(self):
         return "Http(token=<redacted>)"
@@ -301,7 +317,7 @@ class Http:
                      "User-Agent": USER_AGENT},
         )
         try:
-            with urlrequest.urlopen(request, timeout=self.timeout) as response:
+            with self._opener.open(request, timeout=self.timeout) as response:
                 return response.status, response.read()
         except urlerror.HTTPError as error:
             return error.code, error.read()
@@ -351,7 +367,7 @@ def verify_seed(http, record: str, file_name: str, expected_size: int,
 
     status, content = http.get(
         f"/api/records/{record}/draft/files/{file_name}/content",
-        accept="application/octet-stream",
+        accept="*/*",
     )
     if status != 200:
         raise SeedVerificationError(
@@ -1703,33 +1719,33 @@ class Sampler(threading.Thread):
         self.samples = []
         self.error = None
         self._lock = threading.Lock()
-        self._stop = threading.Event()
-        self._ready = threading.Event()
+        self._stop_event = threading.Event()
+        self._ready_event = threading.Event()
 
     def run(self):
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             started = self.clock.now()
             try:
                 sample = self.capture()
             except Exception as error:  # noqa: BLE001 - preserved as evidence
                 self.error = error
-                self._ready.set()
+                self._ready_event.set()
                 return
             with self._lock:
                 self.samples.append(sample)
-                self._ready.set()
+                self._ready_event.set()
             elapsed = self.clock.now().mono - started.mono
-            self._stop.wait(max(0.0, self.interval - elapsed))
+            self._stop_event.wait(max(0.0, self.interval - elapsed))
 
     def wait_ready(self, timeout=10.0):
-        return self._ready.wait(timeout)
+        return self._ready_event.wait(timeout)
 
     def snapshot(self):
         with self._lock:
             return list(self.samples)
 
     def stop(self):
-        self._stop.set()
+        self._stop_event.set()
         self.join(timeout=10)
 
 

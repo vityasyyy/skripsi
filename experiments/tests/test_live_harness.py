@@ -376,12 +376,28 @@ class SafetyTests(unittest.TestCase):
         response.status = 200
         response.read.return_value = b"{}"
         response.__enter__.return_value = response
-        with mock.patch("harness.urlrequest.urlopen", return_value=response) as opened:
-            status, body = harness.Http("token").get("/api/me")
+        http = harness.Http("token")
+        http._opener = mock.MagicMock()
+        http._opener.open.return_value = response
+        status, body = http.get("/api/me")
         self.assertEqual(status, 200)
         self.assertEqual(body, b"{}")
-        request = opened.call_args.args[0]
+        request = http._opener.open.call_args.args[0]
         self.assertEqual(request.get_header("User-agent"), harness.USER_AGENT)
+
+    def test_cross_host_redirect_drops_api_auth_headers(self):
+        handler = harness._CrossHostRedirectHandler()
+        request = harness.urlrequest.Request(
+            "https://invenio.example/api/records/x/draft/files/y/content",
+            headers={"Authorization": "Bearer tok", "Accept": "application/octet-stream"},
+        )
+        redirected = handler.redirect_request(
+            request, None, 302, "Found", {},
+            "https://minio.example/bucket/key?signature=redacted",
+        )
+        self.assertIsNotNone(redirected)
+        self.assertIsNone(redirected.get_header("Authorization"))
+        self.assertIsNone(redirected.get_header("Accept"))
 
     def test_no_token_is_ever_printed(self):
         secret = "tok-SECRET-123"
@@ -952,6 +968,17 @@ class LiveRunnerTests(unittest.TestCase):
                                  {"prune": True, "selfHeal": True})
             self.assertNotIn(("Namespace", "exp-invenio-drift"),
                              fake.objects)
+
+
+class SamplerLifecycleTests(unittest.TestCase):
+    def test_sampler_stop_does_not_shadow_thread_stop(self):
+        sampler = harness.Sampler(
+            lambda: {"ok": True}, harness.FakeClock([1.0]), 0.01,
+        )
+        sampler.start()
+        self.assertTrue(sampler.wait_ready(timeout=2))
+        sampler.stop()
+        self.assertFalse(sampler.is_alive())
 
 
 if __name__ == "__main__":
