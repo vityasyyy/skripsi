@@ -76,6 +76,8 @@ def fake_runner(statuses=None, cleanup="ok", restore="restored",
         status = statuses[index] if statuses and index < len(statuses) else "observed"
         row = make_row(item, status=status, cleanup_status=cleanup,
                        arm_restore_status=restore)
+        if status == "baseline_failure":
+            row["mutations_executed"] = 0
         if mutate:
             mutate(row)
         write_row(args.out, run_id, row)
@@ -84,9 +86,10 @@ def fake_runner(statuses=None, cleanup="ok", restore="restored",
     return runner, calls
 
 
-def run_quiet(args, run_one=None):
+def run_quiet(args, run_one=None, sleep=None):
     with redirect_stdout(io.StringIO()):
-        return run_matrix.run_batch(args, run_one=run_one)
+        return run_matrix.run_batch(
+            args, run_one=run_one, sleep=sleep or (lambda seconds: None))
 
 
 def base_args(out, batch_id, *extra):
@@ -418,6 +421,264 @@ class StopAndResumeTests(unittest.TestCase):
             ])
             self.assertEqual(run_quiet(
                 resume_args, run_one=fake_runner()[0]), 0)
+
+
+class CooldownTests(unittest.TestCase):
+    def test_defaults_are_sixty_seconds_and_one_baseline_retry(self):
+        args = run_matrix.parse_args([
+            "--out", "/tmp/unused", "--scenarios", "A", "--reps", "1"])
+        self.assertEqual(args.cooldown_seconds, 60.0)
+        self.assertEqual(args.baseline_retries, 1)
+
+    def test_live_cooldown_runs_between_cells_and_is_recorded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(live_args(
+                directory, "cool", "gitops", "AB", "1",
+                "--cooldown-seconds", "1.5"))
+            sleeper = mock.Mock()
+            runner, calls = fake_runner()
+            self.assertEqual(
+                run_quiet(args, run_one=runner, sleep=sleeper), 0)
+            self.assertEqual(len(calls), 2)
+            sleeper.assert_called_once_with(1.5)
+            manifest = json.loads(
+                (Path(directory) / "cool.manifest.json").read_text())
+            self.assertEqual(manifest["cooldown_seconds"], 1.5)
+            self.assertEqual(manifest["baseline_retries"], 1)
+            self.assertEqual(len(manifest["cooldowns"]), 1)
+            cooldown = manifest["cooldowns"][0]
+            self.assertTrue(cooldown["applied"])
+            self.assertEqual(cooldown["after_run_id"], calls[0])
+            self.assertEqual(cooldown["next_run_id"], calls[1])
+            self.assertEqual(cooldown["requested_seconds"], 1.5)
+            self.assertIsNotNone(cooldown["started_utc"])
+            self.assertIsNotNone(cooldown["finished_utc"])
+            self.assertGreaterEqual(cooldown["elapsed_seconds"], 0.0)
+
+    def test_dry_run_records_cooldowns_without_sleeping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(full_args(
+                directory, "dry-cool", "gitops imperative", "AB", "2",
+                "--cooldown-seconds", "2.5"))
+            sleeper = mock.Mock()
+            self.assertEqual(run_quiet(args, sleep=sleeper), 0)
+            sleeper.assert_not_called()
+            manifest = json.loads(
+                (Path(directory) / "dry-cool.manifest.json").read_text())
+            self.assertEqual(len(manifest["cooldowns"]), 7)
+            for cooldown in manifest["cooldowns"]:
+                self.assertFalse(cooldown["applied"])
+                self.assertEqual(cooldown["elapsed_seconds"], 0.0)
+                self.assertEqual(cooldown["requested_seconds"], 2.5)
+
+
+class BaselineRetryTests(unittest.TestCase):
+    def _args(self, directory, batch_id="retry", scenarios="A", *extra):
+        return run_matrix.parse_args(live_args(
+            directory, batch_id, "gitops", scenarios, "1", *extra))
+
+    def test_baseline_failure_retries_with_new_id_and_preserved_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            args = self._args(directory)
+            sleeper = mock.Mock()
+            runner, calls = fake_runner(
+                statuses=["baseline_failure", "observed"])
+            self.assertEqual(
+                run_quiet(args, run_one=runner, sleep=sleeper), 0)
+            self.assertEqual(len(calls), 2)
+            base_id, retry_id = calls
+            self.assertEqual(retry_id, base_id + "-retry1")
+            self.assertEqual(
+                json.loads((out / (base_id + ".jsonl")).read_text())["status"],
+                "baseline_failure")
+            self.assertEqual(
+                json.loads((out / (retry_id + ".jsonl")).read_text())["status"],
+                "observed")
+
+            manifest = json.loads((out / "retry.manifest.json").read_text())
+            entry = manifest["runs"][0]
+            self.assertEqual(manifest["state"], "complete")
+            self.assertEqual(entry["status"], "observed")
+            self.assertEqual([attempt["run_id"] for attempt in entry["attempts"]],
+                             [base_id, retry_id])
+            self.assertEqual(entry["attempts"][0]["status"], "baseline_failure")
+            self.assertEqual(entry["attempts"][1]["status"], "observed")
+            self.assertIsNone(entry["attempts"][0]["retry_of"])
+            self.assertEqual(entry["attempts"][1]["retry_of"], base_id)
+            self.assertEqual(entry["attempts"][0]["row_path"],
+                             str(out / (base_id + ".jsonl")))
+            self.assertEqual(manifest["counts"]["by_status"], {"observed": 1})
+            self.assertEqual(len(manifest["cooldowns"]), 1)
+            self.assertEqual(manifest["cooldowns"][0]["after_run_id"], base_id)
+            self.assertEqual(manifest["cooldowns"][0]["next_run_id"], retry_id)
+            sleeper.assert_called_once_with(60.0)
+
+            rows = [json.loads(line) for line in
+                    (out / "retry.rows.jsonl").read_text().splitlines()]
+            self.assertEqual([row["run_id"] for row in rows],
+                             [base_id, retry_id])
+            self.assertEqual([row["batch_attempt"] for row in rows], [0, 1])
+            self.assertEqual([row["batch_retry_of"] for row in rows],
+                             [None, base_id])
+            summary = json.loads((out / "retry.summary.json").read_text())
+            self.assertEqual(summary["analysis_rows"], 1)
+            self.assertEqual(summary["recorded"], 1)
+
+    def test_injection_recovery_cleanup_and_restore_failures_are_not_retried(self):
+        cases = (
+            ("invalid_injection", "ok", "restored", "invalid_injection"),
+            ("recovery_failure", "ok", "restored", "recovery_failure"),
+            ("instrumentation_failure", "ok", "restored",
+             "instrumentation_failure"),
+            ("observed", "failed", "restored", "cleanup_failure"),
+            ("observed", "ok", "failed", "arm_restore_failure"),
+            ("baseline_failure", "failed", "restored", "baseline_failure"),
+            ("baseline_failure", "ok", "failed", "baseline_failure"),
+        )
+        for status, cleanup, restore, reason in cases:
+            with self.subTest(reason=reason), \
+                    tempfile.TemporaryDirectory() as directory:
+                args = self._args(directory, "no-retry")
+                runner, calls = fake_runner(
+                    statuses=[status], cleanup=cleanup, restore=restore)
+                self.assertEqual(run_quiet(args, run_one=runner), 1)
+                self.assertEqual(len(calls), 1)
+                manifest = json.loads(
+                    (Path(directory) / "no-retry.manifest.json").read_text())
+                entry = manifest["runs"][0]
+                self.assertEqual(manifest["state"], "stopped")
+                self.assertEqual(entry["stop_reason"], reason)
+                self.assertEqual(len(entry["attempts"]), 1)
+                self.assertEqual(entry["attempts"][0]["run_id"], calls[0])
+
+    def test_resume_during_retry_cooldown_continues_the_retry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            args = self._args(directory, "retry-cooldown")
+            runner, calls = fake_runner(statuses=["baseline_failure"])
+
+            def interrupted(seconds):
+                raise RuntimeError("interrupted cooldown")
+
+            with self.assertRaises(RuntimeError):
+                run_quiet(args, run_one=runner, sleep=interrupted)
+            manifest = json.loads(
+                (out / "retry-cooldown.manifest.json").read_text())
+            self.assertEqual(manifest["runs"][0]["status"], "retrying")
+            self.assertEqual(len(manifest["runs"][0]["attempts"]), 1)
+
+            resume_args = run_matrix.parse_args(live_args(
+                directory, "retry-cooldown", "gitops", "A", "1", "--resume"))
+            second_runner, second_calls = fake_runner()
+            self.assertEqual(run_quiet(resume_args, run_one=second_runner), 0)
+            self.assertEqual(second_calls, [calls[0] + "-retry1"])
+            manifest = json.loads(
+                (out / "retry-cooldown.manifest.json").read_text())
+            self.assertEqual(manifest["runs"][0]["status"], "observed")
+            self.assertEqual(
+                [attempt["status"]
+                 for attempt in manifest["runs"][0]["attempts"]],
+                ["baseline_failure", "observed"])
+
+    def test_baseline_failure_with_injection_or_mutation_is_not_retried(self):
+        cases = (
+            {"injection": {"accepted": True}},
+            {"t0_utc": "2026-10-27T00:00:00+00:00"},
+            {"mutations_executed": 1},
+        )
+        for override in cases:
+            with self.subTest(override=override), \
+                    tempfile.TemporaryDirectory() as directory:
+                args = self._args(directory, "tainted")
+
+                def mutate(row, override=override):
+                    row.update(override)
+
+                runner, calls = fake_runner(
+                    statuses=["baseline_failure"], mutate=mutate)
+                self.assertEqual(run_quiet(args, run_one=runner), 1)
+                self.assertEqual(len(calls), 1)
+                manifest = json.loads(
+                    (Path(directory) / "tainted.manifest.json").read_text())
+                self.assertEqual(len(manifest["runs"][0]["attempts"]), 1)
+                self.assertEqual(manifest["state"], "stopped")
+
+    def test_resume_refuses_a_retry_slot_that_already_has_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            args = self._args(directory, "retry-slot")
+            runner, calls = fake_runner(statuses=["baseline_failure"])
+
+            def interrupted(seconds):
+                raise RuntimeError("interrupted cooldown")
+
+            with self.assertRaises(RuntimeError):
+                run_quiet(args, run_one=runner, sleep=interrupted)
+            (out / (calls[0] + "-retry1.jsonl")).write_text("{}\n")
+            resume_args = run_matrix.parse_args(live_args(
+                directory, "retry-slot", "gitops", "A", "1", "--resume"))
+            with self.assertRaises(run_matrix.BatchSafetyError):
+                run_quiet(resume_args, run_one=fake_runner()[0])
+
+    def test_failed_retry_stops_the_batch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = self._args(directory, "retry-fail", "AB")
+            runner, calls = fake_runner(
+                statuses=["baseline_failure", "baseline_failure"])
+            self.assertEqual(run_quiet(args, run_one=runner), 1)
+            self.assertEqual(len(calls), 2)
+            base_id, retry_id = calls
+            self.assertEqual(retry_id, base_id + "-retry1")
+            manifest = json.loads(
+                (Path(directory) / "retry-fail.manifest.json").read_text())
+            self.assertEqual(manifest["state"], "stopped")
+            self.assertEqual(manifest["stop_reason"], "baseline_failure")
+            self.assertEqual(manifest["stop_run_id"], retry_id)
+            self.assertEqual(manifest["runs"][0]["status"], "baseline_failure")
+            self.assertEqual(manifest["runs"][1]["status"], "pending")
+            self.assertEqual(len(manifest["runs"][0]["attempts"]), 2)
+
+    def test_zero_baseline_retries_stops_on_the_first_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = self._args(directory, "no-retry-zero",
+                              "A", "--baseline-retries", "0")
+            runner, calls = fake_runner(statuses=["baseline_failure"])
+            self.assertEqual(run_quiet(args, run_one=runner), 1)
+            self.assertEqual(len(calls), 1)
+            manifest = json.loads(
+                (Path(directory) / "no-retry-zero.manifest.json").read_text())
+            self.assertEqual(manifest["state"], "stopped")
+            self.assertEqual(manifest["stop_run_id"], calls[0])
+            self.assertEqual(len(manifest["runs"][0]["attempts"]), 1)
+
+    def test_resume_keeps_the_failed_attempt_ledger_and_continues(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            args = self._args(directory, "retry-resume", "AB")
+            runner, calls = fake_runner(
+                statuses=["baseline_failure", "baseline_failure"])
+            self.assertEqual(run_quiet(args, run_one=runner), 1)
+            base_id, retry_id = calls
+            resume_args = run_matrix.parse_args(live_args(
+                directory, "retry-resume", "gitops", "AB", "1", "--resume"))
+            second_runner, second_calls = fake_runner()
+            self.assertEqual(run_quiet(resume_args, run_one=second_runner), 1)
+            self.assertEqual(len(second_calls), 1)
+            self.assertNotIn(second_calls[0], calls)
+            manifest = json.loads(
+                (out / "retry-resume.manifest.json").read_text())
+            self.assertEqual(manifest["state"], "stopped")
+            self.assertEqual(manifest["stop_reason"], "baseline_failure")
+            self.assertEqual(manifest["stop_run_id"], retry_id)
+            self.assertEqual(manifest["runs"][0]["status"], "baseline_failure")
+            self.assertEqual(
+                [attempt["run_id"]
+                 for attempt in manifest["runs"][0]["attempts"]],
+                [base_id, retry_id])
+            self.assertEqual(manifest["runs"][1]["status"], "observed")
+            self.assertTrue((out / (base_id + ".jsonl")).exists())
+            self.assertTrue((out / (retry_id + ".jsonl")).exists())
 
 
 class AnalysisOutputTests(unittest.TestCase):

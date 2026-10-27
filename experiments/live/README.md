@@ -57,6 +57,8 @@ berurutan, bukan dua lingkungan serentak:
   satu stack, arm, reset, dan no-overwrite per run tetap di `harness.py`.
 - Batch memakai `--baseline-timeout 300` secara default agar HPA sempat settle
   setelah blok pengujian sebelumnya; nilai ini dicatat sebagai bagian protokol.
+- Batch memakai `--cooldown-seconds 60` dan `--baseline-retries 1` secara default;
+  lihat bagian cooldown dan retry di bawah.
 
 Dry-run default (tanpa `kubectl`/HTTP):
 
@@ -85,9 +87,11 @@ batch mencatat `formal_execution_approved: false`.
 
 Batch berhenti pada status `invalid_injection`, `instrumentation_failure`,
 `reset_failure`, `recovery_failure`, `cleanup_failure`, `arm_restore_failure`,
-atau kegagalan keras lain (baseline, arm state, safety refusal, nonzero exit).
-Run yang gagal, manifest, dan bukti per-run dipertahankan; run berikutnya tidak
-dijalankan. Untuk meneruskan sisa run setelah kegagalan:
+atau kegagalan keras lain (arm state, safety refusal, nonzero exit). Kegagalan
+baseline pra-injeksi adalah satu-satunya pengecualian dan hanya boleh di-retry
+sesuai `--baseline-retries`; bila retry habis, batch berhenti. Run yang gagal,
+manifest, dan bukti per-run dipertahankan; run berikutnya tidak dijalankan.
+Untuk meneruskan sisa run setelah kegagalan:
 
 ```bash
 python3 experiments/live/run_matrix.py \
@@ -98,11 +102,52 @@ python3 experiments/live/run_matrix.py \
 ```
 
 Resume hanya menerima manifest yang cocok dengan rencana (seed, lengan,
-skenario, replikasi, namespace, app, revisi, render, mode, flag) dan tidak pernah
-menimpa run terminal. Run gagal tidak diulang; untuk mengulang sel yang gagal,
-buat batch baru dengan `--batch-id`/`--out` baru. Tanpa `--batch-id`, id batch
-diturunkan secara deterministik dari rencana dan konfigurasi, sehingga pengulangan
-perintah yang sama akan ditolak sebelum menimpa apa pun.
+skenario, replikasi, namespace, app, revisi, render, mode, flag cooldown/retry)
+dan tidak pernah menimpa run terminal. Run terminal tidak diulang. Kegagalan
+baseline yang masih memiliki jatah retry tercatat sebagai `retrying` dan
+dilanjutkan dengan id retry yang sama; kegagalan terminal tetap gagal. Untuk
+mengulang sel yang gagal, buat batch baru dengan `--batch-id`/`--out` baru.
+Tanpa `--batch-id`, id batch diturunkan secara deterministik dari rencana dan
+konfigurasi, sehingga pengulangan perintah yang sama akan ditolak sebelum
+menimpa apa pun.
+
+## Cooldown kapasitas dan retry baseline
+
+Batch berjalan berurutan pada satu stack yang juga menampung HPA
+`invenio-web-hpa` (maksimum 4/4, utilisasi memori sekitar 90% request) dan node
+pada 65--67%. Batch kontinu pernah mendorong salah satu node melewati gate
+memori 70%. Dua knob berikut menjaga kapasitas tanpa mengubah protokol statistik:
+
+- `--cooldown-seconds` (default `60`) — jeda setelah setiap run terminal dan
+  sebelum run berikutnya. Tidak ada jeda setelah run terakhir dan tidak ada jeda
+  di awal batch. Setiap jeda dicatat di `cooldowns` manifest dengan
+  `after_run_id`, `next_run_id`, `requested_seconds`, `started_utc`,
+  `finished_utc`, `elapsed_seconds`, dan `applied`. Dry-run mencatat entri
+  dengan `applied: false` dan `elapsed_seconds: 0.0`; dry-run tidak benar-benar
+  tidur.
+- `--baseline-retries` (default `1`) — jumlah retry untuk **kegagalan baseline
+  pra-injeksi saja**. Retry hanya diterima bila `status: baseline_failure`,
+  tidak ada injeksi diterima, tidak ada `t0`, tidak ada mutasi, cleanup `ok`,
+  dan arm restore `restored`. Attempt gagal tetap disimpan sebagai bukti di
+  `<out>/<run_id>.jsonl` dan direktori buktinya; retry memakai id deterministik
+  `<run_id>-retry1` (lalu `-retry2`, ...). Manifest mencatat `attempts` per sel
+  (`attempt`, `retry_of`, status, waktu, `exit_code`, `stop_reason`, `error`,
+  `row_path`) sehingga hubungan dan urutan tetap auditabel.
+- Retry dijalankan setelah cooldown. Bila retry juga gagal, batch berhenti
+  (`state: stopped`, `stop_run_id` menunjuk attempt terakhir) dan sisa run tetap
+  `pending`. Kegagalan injeksi, instrumentasi, recovery, reset, cleanup, arm
+  restore, atau arm state **tidak pernah** di-retry.
+
+Cooldown dan retry **tidak** melonggarkan gate kapasitas: `baseline_gate`
+tetap otoritatif dan tetap menolak node memory >= 70%, HPA yang belum settled,
+pod yang belum Running/Ready, atau baseline yang tidak stabil. HPA min/max dan
+resource request tidak diubah siapa pun.
+
+Retry adalah artefak pemulihan protokol, **bukan sampel tambahan**. Rencana
+tetap 210 sel; `analysis.jsonl` memakai attempt terakhir tiap sel, sehingga satu
+sel tetap satu observasi. Attempt baseline yang gagal tetap muncul di
+`rows.jsonl`/CSV sebagai bukti, tetapi tidak masuk `analysis.jsonl` maupun
+hitungan statistik.
 
 ## Live (hanya setelah izin formal)
 
@@ -247,24 +292,27 @@ Kolom JSONL utama: `run_id`, `env`/`arm`, `scenario`, `rep`, `status`,
 
 | Berkas | Isi |
 |---|---|
-| `<batch_id>.manifest.json` | seed, urutan lengan, permutasi skenario, run ID/status/urutan, revisi/render, hitungan agregat |
-| `<batch_id>.rows.jsonl` | seluruh baris run dengan metadata batch; `env` tetap lengan mentah |
-| `<batch_id>.analysis.jsonl` | baris v2 yang layak analisis; `env=imperative` dipetakan ke `manual` |
+| `<batch_id>.manifest.json` | seed, urutan lengan, permutasi skenario, run ID/status/urutan, revisi/render, cooldown/retry, `attempts` per sel, `cooldowns`, hitungan agregat |
+| `<batch_id>.rows.jsonl` | seluruh baris attempt dengan metadata batch; `env` tetap lengan mentah |
+| `<batch_id>.analysis.jsonl` | baris v2 yang layak analisis, satu baris per sel (attempt terakhir); `env=imperative` dipetakan ke `manual` |
 | `<batch_id>.csv` | gabungan kolom CSV historis melalui `convert.py` |
 | `<batch_id>.summary.json` | hitungan R1/R2, penyensoran per metrik, daftar eksklusi |
 
 Baris batch menambahkan `batch_id`, `batch_index`, `batch_phase` (`R1`/`R2`),
-`batch_mode`, `batch_stop_reason`, `stack_isolated: false`,
-`r3_status: not_measured`, `production_like`, dan `formal_execution_approved`.
-Baris mentah `<run_id>.jsonl` dari harness tidak diubah dan tetap
-`formal_execution_approved: false`; attestation batch hanya ada di
-`<batch_id>.rows.jsonl`, `<batch_id>.analysis.jsonl`, manifest, dan summary.
+`batch_attempt`, `batch_retry_of`, `batch_mode`, `batch_stop_reason`,
+`stack_isolated: false`, `r3_status: not_measured`, `production_like`, dan
+`formal_execution_approved`. Baris mentah `<run_id>.jsonl` dari harness tidak
+diubah dan tetap `formal_execution_approved: false`; attestation batch hanya ada
+di `<batch_id>.rows.jsonl`, `<batch_id>.analysis.jsonl`, manifest, dan summary.
 
 `analysis.jsonl` hanya memuat run dengan status `observed`/`right_censored`,
 postcondition terverifikasi, cleanup/restore sukses, serta status metrik yang
-valid untuk `summarize.py`. Run dry, gagal, tidak lengkap, atau tanpa bukti tetap
-ada di `rows.jsonl`/CSV dan dicatat di `exclusions` summary. A/F tetap terpisah
-sebagai `hpa_control`/`visibility_boundary`; keduanya tidak masuk klaim efikasi.
+valid untuk `summarize.py`. Untuk sel yang di-retry, hanya attempt terakhir yang
+dapat menjadi observasi; attempt baseline yang gagal tetap ada di
+`rows.jsonl`/CSV sebagai bukti dan tidak menambah N. Run dry, gagal, tidak
+lengkap, atau tanpa bukti tetap ada di `rows.jsonl`/CSV dan dicatat di
+`exclusions` summary. A/F tetap terpisah sebagai
+`hpa_control`/`visibility_boundary`; keduanya tidak masuk klaim efikasi.
 
 ### Pemetaan CSV historis
 
@@ -370,6 +418,8 @@ dry-run sebagai observasi.
   sukses.
 - Token hanya dari `INVENIO_TOKEN`, tidak pernah masuk argumen, log, manifest,
   CSV, summary, atau bukti. Error batch di-redaksi bila memuat nilai token.
+- Retry hanya menyentuh kegagalan baseline pra-injeksi; cleanup/restore gagal
+  tidak pernah di-retry, dan attempt gagal tidak pernah ditimpa.
 - `--production-like` bukan bukti izin; `formal_execution_approved` tetap false
   tanpa flag eksplisit, dan `stack_isolated`/`r3_status` tidak berubah.
 - `kubectl` dipanggil sebagai argumen list, tanpa shell.

@@ -9,7 +9,9 @@ order, records the batch manifest, and writes analysis-ready rows.
 A batch is 2 arms x 7 scenarios x 15 repetitions = 210 runs. Repetitions 1..10
 are the R2 timing block; 11..15 are the R1 consistency block. Arms run
 sequentially on the same stack; the arm order is randomized and both arms use
-the same scenario permutation. See `README.md`.
+the same scenario permutation. A cooldown separates terminal runs so the shared
+stack can settle, and only a pre-injection baseline failure may be retried; each
+attempt keeps its own run id. See `README.md`.
 """
 from __future__ import annotations
 
@@ -23,6 +25,7 @@ import os
 import random
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,11 +39,13 @@ ARMS = ("gitops", "imperative")
 SCENARIOS = tuple("ABCDEFG")
 DEFAULT_REPS = 15
 DEFAULT_SEED = 20261027
-BATCH_SCHEMA_VERSION = 1
+DEFAULT_COOLDOWN_SECONDS = 60.0
+DEFAULT_BASELINE_RETRIES = 1
+BATCH_SCHEMA_VERSION = 2
 R2_REPS = range(1, 11)
 R1_REPS = range(11, 16)
 ANALYSIS_STATUSES = frozenset({"observed", "right_censored"})
-PENDING_STATUSES = frozenset({"pending", "running"})
+PENDING_STATUSES = frozenset({"pending", "running", "retrying"})
 STOP_STATUSES = frozenset({
     "invalid_injection",
     "instrumentation_failure",
@@ -61,7 +66,8 @@ MANIFEST_KEYS = (
     "formal_execution_approved", "stack_isolated", "r3_status", "created_utc",
     "updated_utc", "seed", "arms", "scenarios", "reps", "arm_order",
     "scenario_order", "namespace", "app", "source_revision", "render_sha256",
-    "runs", "counts", "stop_reason", "stop_run_id",
+    "cooldown_seconds", "baseline_retries", "runs", "cooldowns", "counts",
+    "stop_reason", "stop_run_id",
 )
 
 
@@ -178,6 +184,22 @@ def run_id_for(batch_id, item) -> str:
             f"-r{item['rep']:02d}")
 
 
+def run_id_for_retry(run_id: str, retry: int) -> str:
+    return f"{run_id}-retry{retry}"
+
+
+def run_slots(run_id: str, retries: int):
+    """Yield the base run id and its deterministic retry slots."""
+    yield run_id
+    for retry in range(1, retries + 1):
+        yield run_id_for_retry(run_id, retry)
+
+
+def final_run_id(entry) -> str:
+    attempts = entry.get("attempts") or []
+    return attempts[-1]["run_id"] if attempts else entry["run_id"]
+
+
 def _batch_paths(out, batch_id):
     base = Path(out) / batch_id
     return {
@@ -249,6 +271,10 @@ def parse_args(argv=None):
     parser.add_argument("--reps", type=int, default=DEFAULT_REPS)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--baseline-timeout", type=float, default=300.0)
+    parser.add_argument("--cooldown-seconds", type=float,
+                        default=DEFAULT_COOLDOWN_SECONDS)
+    parser.add_argument("--baseline-retries", type=int,
+                        default=DEFAULT_BASELINE_RETRIES)
     parser.add_argument(
         "--out", type=Path,
         default=Path(__file__).resolve().parent / "runs")
@@ -274,6 +300,10 @@ def parse_args(argv=None):
         parser.error(str(error))
     if not 1 <= args.reps <= DEFAULT_REPS:
         parser.error("--reps must be between 1 and 15")
+    if args.cooldown_seconds < 0 or not math.isfinite(args.cooldown_seconds):
+        parser.error("--cooldown-seconds must be a finite value >= 0")
+    if args.baseline_retries < 0:
+        parser.error("--baseline-retries must be >= 0")
     if args.batch_id and not re.fullmatch(
             r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", args.batch_id):
         parser.error(
@@ -314,6 +344,7 @@ def _new_manifest(args, plan, batch_id):
             "stop_reason": None,
             "error": None,
             "row_path": None,
+            "attempts": [],
         })
         runs.append(entry)
     return {
@@ -337,7 +368,10 @@ def _new_manifest(args, plan, batch_id):
         "app": args.app,
         "source_revision": args.source_revision,
         "render_sha256": args.render_sha256,
+        "cooldown_seconds": args.cooldown_seconds,
+        "baseline_retries": args.baseline_retries,
         "runs": runs,
+        "cooldowns": [],
         "counts": _counts(runs),
         "stop_reason": None,
         "stop_run_id": None,
@@ -351,14 +385,15 @@ def _ensure_new_batch(args, plan, batch_id, paths):
                 f"batch output already exists ({name}); use --resume or a new --out/--batch-id")
     for item in plan["runs"]:
         run_id = run_id_for(batch_id, item)
-        if len(run_id) > 63:
-            raise BatchSafetyError(
-                "batch id makes a run id longer than 63 characters")
-        jsonl = _row_path(args.out, run_id)
-        evidence = _evidence_path(args.out, run_id)
-        if jsonl.exists() or (evidence.exists() and any(evidence.iterdir())):
-            raise BatchSafetyError(
-                f"refusing to overwrite existing run output {run_id}")
+        for candidate in run_slots(run_id, args.baseline_retries):
+            if len(candidate) > 63:
+                raise BatchSafetyError(
+                    "batch id and retry suffix make a run id longer than 63 characters")
+            jsonl = _row_path(args.out, candidate)
+            evidence = _evidence_path(args.out, candidate)
+            if jsonl.exists() or (evidence.exists() and any(evidence.iterdir())):
+                raise BatchSafetyError(
+                    f"refusing to overwrite existing run output {candidate}")
 
 
 def _ensure_run_slot(args, run_id):
@@ -401,6 +436,8 @@ def _validate_resume(args, plan, batch_id, paths):
         "app": args.app,
         "source_revision": args.source_revision,
         "render_sha256": args.render_sha256,
+        "cooldown_seconds": args.cooldown_seconds,
+        "baseline_retries": args.baseline_retries,
     }
     for key, value in expected.items():
         if manifest.get(key) != value:
@@ -421,41 +458,73 @@ def _validate_resume(args, plan, batch_id, paths):
                     f"manifest run {run_id} does not match the plan")
         if entry.get("run_id") != run_id:
             raise BatchSafetyError("manifest run identity mismatch")
-        if run_id in identities:
-            raise BatchSafetyError("duplicate run identity in manifest")
-        identities.add(run_id)
         status = entry.get("status")
         if status not in PENDING_STATUSES | TERMINAL_STATUSES:
             raise BatchSafetyError(
                 f"manifest run {run_id} has unknown status {status!r}")
-        row_path = _row_path(args.out, run_id)
+        attempts = entry.get("attempts")
+        if not isinstance(attempts, list):
+            raise BatchSafetyError(
+                f"manifest run {run_id} has no attempt ledger")
+        for number, attempt in enumerate(attempts):
+            if not isinstance(attempt, dict) or attempt.get("attempt") != number:
+                raise BatchSafetyError(
+                    f"manifest run {run_id} has an invalid attempt ledger")
+            attempt_id = (run_id if number == 0
+                          else run_id_for_retry(run_id, number))
+            if attempt.get("run_id") != attempt_id:
+                raise BatchSafetyError(
+                    f"manifest run {run_id} has an unexpected retry identity")
+            expected_retry = None if number == 0 else run_id
+            if attempt.get("retry_of") != expected_retry:
+                raise BatchSafetyError(
+                    f"manifest run {run_id} has an invalid retry relationship")
+            if attempt_id in identities:
+                raise BatchSafetyError("duplicate run identity in manifest")
+            identities.add(attempt_id)
+            _validate_attempt(args, item, attempt_id, attempt)
+        if attempts:
+            last = attempts[-1]
+            if status == "retrying":
+                last_path = _row_path(args.out, last["run_id"])
+                last_row = (_read_last_jsonl(last_path)
+                            if last_path.exists() else None)
+                if (last.get("status") != "baseline_failure"
+                        or len(attempts) > args.baseline_retries
+                        or not _baseline_retryable("baseline_failure", last_row)):
+                    raise BatchSafetyError(
+                        f"manifest run {run_id} is retrying without a "
+                        "retryable baseline failure")
+            elif status != last.get("status"):
+                raise BatchSafetyError(
+                    f"manifest run {run_id} status does not match its last attempt")
+        elif status != "pending":
+            raise BatchSafetyError(
+                f"manifest run {run_id} has no attempts but is not pending")
+        row_path = _row_path(args.out, final_run_id(entry))
         if entry.get("row_path") and not Path(entry["row_path"]).exists():
             raise BatchSafetyError(
                 f"manifest run {run_id} points at missing evidence")
         if status in ROW_REQUIRED_STATUSES and not row_path.exists():
             raise BatchSafetyError(
                 f"manifest run {run_id} is missing its preserved row")
-        if row_path.exists():
-            try:
-                row = _read_last_jsonl(row_path)
-            except (OSError, ValueError, TypeError) as error:
-                raise BatchSafetyError(
-                    f"unreadable row for {run_id}: {type(error).__name__}") from error
-            if not isinstance(row, dict):
-                raise BatchSafetyError(f"invalid row for {run_id}")
-            if (row.get("run_id") != run_id
-                    or row.get("arm") != item["arm"]
-                    or row.get("scenario") != item["scenario"]
-                    or row.get("rep") != item["rep"]
-                    or row.get("status") != status):
-                raise BatchSafetyError(
-                    f"row identity/status mismatch for {run_id}")
         if status in PENDING_STATUSES:
             pending_found = True
-            evidence = _evidence_path(args.out, run_id)
-            if row_path.exists() or (evidence.exists() and any(evidence.iterdir())):
-                raise BatchSafetyError(
-                    f"pending run {run_id} already has output; refusing overwrite")
+            if not attempts:
+                next_number = 0
+            elif status == "retrying":
+                next_number = len(attempts)
+            else:
+                next_number = len(attempts) - 1
+            for number in range(next_number, args.baseline_retries + 1):
+                slot_id = (run_id if number == 0
+                           else run_id_for_retry(run_id, number))
+                next_row = _row_path(args.out, slot_id)
+                next_evidence = _evidence_path(args.out, slot_id)
+                if next_row.exists() or (next_evidence.exists()
+                                         and any(next_evidence.iterdir())):
+                    raise BatchSafetyError(
+                        f"pending run {slot_id} already has output; refusing overwrite")
     if manifest["state"] == "complete" and pending_found:
         raise BatchSafetyError("complete manifest still has pending runs")
     if manifest["state"] == "stopped" and not manifest.get("stop_reason"):
@@ -463,16 +532,51 @@ def _validate_resume(args, plan, batch_id, paths):
     return manifest
 
 
+def _validate_attempt(args, item, run_id, attempt):
+    status = attempt.get("status")
+    if status not in PENDING_STATUSES | TERMINAL_STATUSES:
+        raise BatchSafetyError(
+            f"manifest attempt {run_id} has unknown status {status!r}")
+    row_path = _row_path(args.out, run_id)
+    if attempt.get("row_path") and not Path(attempt["row_path"]).exists():
+        raise BatchSafetyError(
+            f"manifest attempt {run_id} points at missing evidence")
+    if status in ROW_REQUIRED_STATUSES and not row_path.exists():
+        raise BatchSafetyError(
+            f"manifest attempt {run_id} is missing its preserved row")
+    if row_path.exists():
+        try:
+            row = _read_last_jsonl(row_path)
+        except (OSError, ValueError, TypeError) as error:
+            raise BatchSafetyError(
+                f"unreadable row for {run_id}: {type(error).__name__}") from error
+        if not isinstance(row, dict):
+            raise BatchSafetyError(f"invalid row for {run_id}")
+        if (row.get("run_id") != run_id
+                or row.get("arm") != item["arm"]
+                or row.get("scenario") != item["scenario"]
+                or row.get("rep") != item["rep"]
+                or row.get("status") != status):
+            raise BatchSafetyError(
+                f"row identity/status mismatch for {run_id}")
+    if status in PENDING_STATUSES:
+        evidence = _evidence_path(args.out, run_id)
+        if row_path.exists() or (evidence.exists() and any(evidence.iterdir())):
+            raise BatchSafetyError(
+                f"pending run {run_id} already has output; refusing overwrite")
+
+
 def _rebuild_rows(args, manifest, batch_id):
     rows = []
     for entry in manifest["runs"]:
-        if entry.get("status") in PENDING_STATUSES:
-            continue
-        path = _row_path(args.out, entry["run_id"])
-        if not path.exists():
-            continue
-        rows.append(annotate_row(
-            _read_last_jsonl(path), entry, args, batch_id))
+        for attempt in entry.get("attempts") or []:
+            if attempt.get("status") in PENDING_STATUSES:
+                continue
+            path = _row_path(args.out, attempt["run_id"])
+            if not path.exists():
+                continue
+            rows.append(annotate_row(
+                _read_last_jsonl(path), entry, args, batch_id, attempt))
     return rows
 
 
@@ -494,17 +598,22 @@ def _resolve_batch_id(args, plan):
     else:
         batch_id = default_batch_id(args)
     for item in plan["runs"]:
-        if len(run_id_for(batch_id, item)) > 63:
-            raise BatchSafetyError("batch id makes a run id longer than 63 characters")
+        for candidate in run_slots(
+                run_id_for(batch_id, item), args.baseline_retries):
+            if len(candidate) > 63:
+                raise BatchSafetyError(
+                    "batch id and retry suffix make a run id longer than 63 characters")
     return batch_id
 
 
-def annotate_row(row, entry, args, batch_id):
+def annotate_row(row, entry, args, batch_id, attempt=None):
     annotated = dict(row)
     annotated.update({
         "batch_id": batch_id,
         "batch_index": entry["index"],
         "batch_phase": entry["phase"],
+        "batch_attempt": (attempt or {}).get("attempt", 0),
+        "batch_retry_of": (attempt or {}).get("retry_of"),
         "batch_mode": "live" if args.live else "dry_run",
         "batch_stop_reason": entry.get("stop_reason"),
         "stack_isolated": False,
@@ -589,7 +698,7 @@ def _analysis_view(manifest, rows):
         if entry["status"] in PENDING_STATUSES:
             exclusions.append(_exclusion(entry, "not_run"))
             continue
-        row = by_id.get(entry["run_id"])
+        row = by_id.get(final_run_id(entry))
         if row is None:
             exclusions.append(_exclusion(entry, "no_preserved_row"))
             continue
@@ -667,14 +776,19 @@ def _summary(manifest, analysis_rows, exclusions):
         "status_counts": manifest["counts"]["by_status"],
         "note": ("R2 = repetitions 1..10; R1 = repetitions 11..15. "
                  "Observed medians require a separate censoring-aware analysis. "
-                 "Dry runs and failed runs are never observations."),
+                 "Dry runs and failed runs are never observations. "
+                 "A retried baseline failure stays one planned cell, not an extra sample."),
     }
 
 
 def _write_batch_outputs(args, batch_id, paths, manifest, rows):
     by_id = {row.get("run_id"): row for row in rows}
-    ordered = [by_id[entry["run_id"]]
-               for entry in manifest["runs"] if entry["run_id"] in by_id]
+    ordered = []
+    for entry in manifest["runs"]:
+        for attempt in entry.get("attempts") or []:
+            row = by_id.get(attempt["run_id"])
+            if row is not None:
+                ordered.append(row)
     analysis_rows, exclusions = _analysis_view(manifest, ordered)
     summary = _summary(manifest, analysis_rows, exclusions)
     _write_json_atomic(paths["manifest"], manifest)
@@ -740,6 +854,59 @@ def _classify(args, code, row, error):
     return status, stop_reason
 
 
+def _baseline_retryable(status, row):
+    """A baseline failure is retryable only before any injection or mutation."""
+    if status != "baseline_failure" or not isinstance(row, dict):
+        return False
+    if row.get("t0_utc") is not None:
+        return False
+    injection = row.get("injection")
+    if isinstance(injection, dict) and injection.get("accepted") is not False:
+        return False
+    if row.get("cleanup_status") not in (None, "ok"):
+        return False
+    if row.get("arm_restore_status") not in (None, "restored"):
+        return False
+    return row.get("mutations_executed") in (None, 0)
+
+
+def _next_pending_run_id(manifest, current):
+    seen = False
+    for entry in manifest["runs"]:
+        if entry is current:
+            seen = True
+            continue
+        if seen and entry["status"] in PENDING_STATUSES:
+            return entry["run_id"]
+    return None
+
+
+def _cooldown(args, batch_id, paths, manifest, rows, after_run_id,
+              next_run_id, sleep):
+    record = {
+        "after_run_id": after_run_id,
+        "next_run_id": next_run_id,
+        "requested_seconds": args.cooldown_seconds,
+        "applied": bool(args.live and args.cooldown_seconds > 0),
+        "started_utc": _utc_now(),
+        "finished_utc": None,
+        "elapsed_seconds": 0.0,
+    }
+    manifest.setdefault("cooldowns", []).append(record)
+    manifest["updated_utc"] = _utc_now()
+    if not record["applied"]:
+        record["finished_utc"] = _utc_now()
+        _write_batch_outputs(args, batch_id, paths, manifest, rows)
+        return
+    _write_batch_outputs(args, batch_id, paths, manifest, rows)
+    started = time.monotonic()
+    sleep(args.cooldown_seconds)
+    record["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    record["finished_utc"] = _utc_now()
+    manifest["updated_utc"] = _utc_now()
+    _write_batch_outputs(args, batch_id, paths, manifest, rows)
+
+
 def _print_result(paths, manifest, summary):
     print(json.dumps({
         "batch_id": manifest["batch_id"],
@@ -753,7 +920,8 @@ def _print_result(paths, manifest, summary):
     }, sort_keys=True))
 
 
-def run_batch(args, run_one=None):
+def run_batch(args, run_one=None, sleep=None):
+    sleep = sleep or time.sleep
     validate_batch_args(args)
     plan = build_plan(args.arms, args.scenarios, args.reps, args.seed)
     batch_id = _resolve_batch_id(args, plan)
@@ -774,62 +942,104 @@ def run_batch(args, run_one=None):
     for entry in manifest["runs"]:
         if entry["status"] not in PENDING_STATUSES:
             continue
+        attempts = entry.setdefault("attempts", [])
+        while attempts and attempts[-1].get("status") in PENDING_STATUSES:
+            attempts.pop()
         item = {key: entry[key]
                 for key in ("index", "arm", "scenario", "rep", "phase")}
-        try:
-            _ensure_run_slot(args, entry["run_id"])
-        except BatchSafetyError as error:
-            manifest.update(state="stopped", stop_reason="output_conflict",
-                            stop_run_id=entry["run_id"], updated_utc=_utc_now())
+        while True:
+            number = len(attempts)
+            run_id = (entry["run_id"] if number == 0
+                      else run_id_for_retry(entry["run_id"], number))
+            try:
+                _ensure_run_slot(args, run_id)
+            except BatchSafetyError as error:
+                manifest.update(state="stopped", stop_reason="output_conflict",
+                                stop_run_id=run_id, updated_utc=_utc_now())
+                manifest["counts"] = _counts(manifest["runs"])
+                summary = _write_batch_outputs(
+                    args, batch_id, paths, manifest, rows)
+                _print_result(paths, manifest, summary)
+                raise error
+            started = _utc_now()
+            attempt = {
+                "attempt": number,
+                "run_id": run_id,
+                "retry_of": entry["run_id"] if number else None,
+                "status": "running",
+                "started_utc": started,
+                "finished_utc": None,
+                "exit_code": None,
+                "stop_reason": None,
+                "error": None,
+                "row_path": None,
+            }
+            attempts.append(attempt)
+            entry.update(status="running", started_utc=started,
+                         finished_utc=None, exit_code=None, stop_reason=None,
+                         error=None, row_path=None)
+            manifest["state"] = "running"
+            manifest["updated_utc"] = _utc_now()
             manifest["counts"] = _counts(manifest["runs"])
+            _write_batch_outputs(args, batch_id, paths, manifest, rows)
+            try:
+                code, row, error = runner(args, item, run_id)
+            except Exception as exception:  # noqa: BLE001 - preserve batch evidence
+                code, row = 1, None
+                error = _redact(f"{type(exception).__name__}: {exception}")
+            if row is not None and not isinstance(row, dict):
+                error = "runner returned a non-object row"
+                row = None
+            status, stop_reason = _classify(args, code, row, error)
+            row_path = _row_path(args.out, run_id)
+            if row is not None and not row_path.exists():
+                stop_reason = stop_reason or "missing_row_file"
+                error = error or f"row file missing: {row_path.name}"
+            outcome = {
+                "status": status,
+                "finished_utc": _utc_now(),
+                "exit_code": code,
+                "stop_reason": stop_reason,
+                "error": error,
+                "row_path": (str(row_path)
+                             if row is not None and row_path.exists() else None),
+            }
+            attempt.update(outcome)
+            entry.update(outcome)
+            if row is not None:
+                rows.append(annotate_row(row, entry, args, batch_id, attempt))
+            manifest["updated_utc"] = _utc_now()
+            manifest["counts"] = _counts(manifest["runs"])
+            retry = (stop_reason == "baseline_failure"
+                     and number < args.baseline_retries
+                     and _baseline_retryable(status, row))
+            if stop_reason and not retry:
+                manifest.update(state="stopped", stop_reason=stop_reason,
+                                stop_run_id=run_id)
+                summary = _write_batch_outputs(
+                    args, batch_id, paths, manifest, rows)
+                _print_result(paths, manifest, summary)
+                return 1
+            if retry:
+                entry.update(status="retrying", finished_utc=None, exit_code=None,
+                             stop_reason=None, error=None, row_path=None)
+                manifest["state"] = "running"
             summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
-            _print_result(paths, manifest, summary)
-            raise error
-        entry.update(status="running", started_utc=_utc_now(), finished_utc=None,
-                     exit_code=None, stop_reason=None, error=None, row_path=None)
-        manifest["state"] = "running"
-        manifest["updated_utc"] = _utc_now()
-        manifest["counts"] = _counts(manifest["runs"])
-        _write_batch_outputs(args, batch_id, paths, manifest, rows)
-        try:
-            code, row, error = runner(args, item, entry["run_id"])
-        except Exception as exception:  # noqa: BLE001 - preserve batch evidence
-            code, row = 1, None
-            error = _redact(f"{type(exception).__name__}: {exception}")
-        if row is not None and not isinstance(row, dict):
-            error = "runner returned a non-object row"
-            row = None
-        status, stop_reason = _classify(args, code, row, error)
-        row_path = _row_path(args.out, entry["run_id"])
-        if row is not None and not row_path.exists():
-            stop_reason = stop_reason or "missing_row_file"
-            error = error or f"row file missing: {row_path.name}"
-        entry.update(
-            status=status,
-            finished_utc=_utc_now(),
-            exit_code=code,
-            stop_reason=stop_reason,
-            error=error,
-            row_path=str(row_path) if row is not None and row_path.exists() else None,
-        )
-        if row is not None:
-            rows.append(annotate_row(row, entry, args, batch_id))
-        manifest["updated_utc"] = _utc_now()
-        manifest["counts"] = _counts(manifest["runs"])
-        if stop_reason:
-            manifest.update(state="stopped", stop_reason=stop_reason,
-                            stop_run_id=entry["run_id"])
-        summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
-        if stop_reason:
-            _print_result(paths, manifest, summary)
-            return 1
+            next_run_id = (run_id_for_retry(entry["run_id"], number + 1)
+                           if retry
+                           else _next_pending_run_id(manifest, entry))
+            if next_run_id is not None:
+                _cooldown(args, batch_id, paths, manifest, rows, run_id,
+                          next_run_id, sleep)
+            if not retry:
+                break
 
     failures = [entry for entry in manifest["runs"]
                 if entry.get("stop_reason")]
     if failures:
         first = failures[0]
         manifest.update(state="stopped", stop_reason=first["stop_reason"],
-                        stop_run_id=first["run_id"], updated_utc=_utc_now())
+                        stop_run_id=final_run_id(first), updated_utc=_utc_now())
     else:
         manifest.update(state="complete", stop_reason=None, stop_run_id=None,
                         updated_utc=_utc_now())
