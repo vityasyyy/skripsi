@@ -55,6 +55,8 @@ berurutan, bukan dua lingkungan serentak:
   yang sama**. Seed, urutan lengan, dan permutasi dicatat di manifest.
 - `run_matrix.py` memanggil `harness.main` untuk setiap run, sehingga gate token,
   satu stack, arm, reset, dan no-overwrite per run tetap di `harness.py`.
+- Batch memakai `--baseline-timeout 300` secara default agar HPA sempat settle
+  setelah blok pengujian sebelumnya; nilai ini dicatat sebagai bagian protokol.
 
 Dry-run default (tanpa `kubectl`/HTTP):
 
@@ -72,7 +74,7 @@ export INVENIO_TOKEN=...   # jangan pernah ditulis ke argumen, log, atau bukti
 python3 experiments/live/run_matrix.py \
   --live --confirm-single-stack --production-like \
   --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
-  --namespace exp-invenio --app invenio-bootstrap \
+  --namespace invenio --app invenio-bootstrap \
   --source-revision <40-hex> --render-sha256 <64-hex> \
   --out experiments/live/runs/formal-<batch-id>
 ```
@@ -90,7 +92,7 @@ dijalankan. Untuk meneruskan sisa run setelah kegagalan:
 ```bash
 python3 experiments/live/run_matrix.py \
   --live --confirm-single-stack --production-like \
-  --namespace exp-invenio --app invenio-bootstrap \
+  --namespace invenio --app invenio-bootstrap \
   --source-revision <40-hex> --render-sha256 <64-hex> \
   --out experiments/live/runs/formal-<batch-id> --resume
 ```

@@ -248,6 +248,7 @@ def parse_args(argv=None):
                         metavar="SCENARIO")
     parser.add_argument("--reps", type=int, default=DEFAULT_REPS)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    parser.add_argument("--baseline-timeout", type=float, default=300.0)
     parser.add_argument(
         "--out", type=Path,
         default=Path(__file__).resolve().parent / "runs")
@@ -705,6 +706,7 @@ def _run_one(args, item, run_id):
         argv.extend(["--source-revision", args.source_revision])
     if args.render_sha256:
         argv.extend(["--render-sha256", args.render_sha256])
+    argv.extend(["--baseline-timeout", str(args.baseline_timeout)])
     if args.live:
         argv.extend(["--live", "--confirm-single-stack"])
     with redirect_stdout(io.StringIO()):
