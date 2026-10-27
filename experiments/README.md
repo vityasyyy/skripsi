@@ -1,24 +1,20 @@
 # Instrumen bukti eksperimen (draf untuk tinjauan pemilik)
 
-**Eksperimen formal dan seluruh eksekusi langsung dinonaktifkan.** Empat skrip
-adalah entrypoint validasi **offline**, bukan pelaksana injeksi/polling/reset.
-Tidak ada klien Kubernetes, eksekusi shell dari input, atau perintah pemulihan
-tersembunyi. `--live` gagal nonzero; flag lama yang tidak didukung ditolak.
+Empat skrip lama adalah entrypoint validasi **offline**; mereka bukan pelaksana
+injeksi/polling/reset. Harness live yang terpisah ada di
+[`live/README.md`](live/README.md), dengan dry-run default dan `--live` eksplisit.
 Kelulusan fixture tidak menyatakan klaster atau aplikasi siap.
 
-Harness live yang terpisah (dry-run default, belum dijalankan pada klaster) ada
-di [`live/README.md`](live/README.md).
+## Dua mode berurutan pada satu stack
 
-## Dua lengan berurutan
-
-Kapasitas terverifikasi hanya satu stack InvenioRDM penuh; lengan imperatif (A) dan
-GitOps (B) tidak dijalankan serentak. Satu stack aktif pada satu waktu di namespace
-eksperimen yang terpisah dari produksi `invenio`; setiap run dimulai dari seed
-bersih, dan reset diverifikasi sebelum run berikutnya. Urutan lengan diacak dan
-dicatat; kedua lengan memakai permutasi skenario yang sama.
-Lengan A adalah prosedur imperatif terotomasi tetap: pemeriksa dan runbook
-berjalan otomatis tanpa waktu reaksi manusia. Evaluator bersama mengukur R1;
-kolektor pasif merekam kedua lengan. Rincian protokol ada di
+Kapasitas terverifikasi hanya satu stack InvenioRDM penuh. Mode imperatif dan
+GitOps dijalankan berurutan pada stack produksi-like `invenio`; tidak ada stack
+kembar `exp-*` dan tidak ada eksekusi paralel. Setiap run dimulai dari seed bersih
+dan reset diverifikasi sebelum run berikutnya. Urutan mode diacak dan dicatat;
+kedua mode memakai permutasi skenario yang sama. Mode imperatif adalah prosedur
+imperatif terotomasi tetap: Argo auto-sync/self-heal dijeda, pemeriksa dan runbook
+berjalan otomatis tanpa waktu reaksi manusia, lalu Argo dipulihkan. Evaluator
+bersama mengukur R1/R2; kolektor pasif merekam kedua mode. Rincian protokol ada di
 [LIVE-OBSERVER.md](LIVE-OBSERVER.md); dokumen itu rencana, bukan prosedur yang
 telah diuji.
 
@@ -131,11 +127,12 @@ sumber deployment yang diperiksa adalah `6cacea66`. Referensi kode rekonsiliasi
 menetapkan 30s, berbeda dari target proposal lama 60s. Jangan menyamakan interval
 repository reconciliation, self-heal retry, event watch dan interval evaluator.
 
-Bloker tetap terbuka: kapasitas hanya satu stack, sehingga dua lengan harus
-berurutan; bukti penempatan dua stack tidak ada, audit belum tersedia, SMTP masih
-placeholder, OpenSearch HA ditunda, dan private-draft seed serta recovery/reset
-aplikasi belum diverifikasi. Tidak ada izin purge queue/data, restore, deploy,
-migrasi atau injeksi dari dokumen ini.
+Bloker tetap terbuka: kapasitas hanya satu stack, sehingga dua mode harus
+berurutan; bukan dua stack. Audit API server tidak tersedia, sehingga R3 tidak
+diukur dan hanya dilaporkan sebagai keterbatasan. SMTP masih placeholder,
+OpenSearch HA ditunda, dan private-draft seed serta recovery/reset aplikasi belum
+diverifikasi. Tidak ada izin purge queue/data, restore, deploy, migrasi atau
+injeksi dari dokumen ini.
 
 Adapter akuisisi langsung, ekspor render yang aman, bootstrap terpisah dari repair,
 dan verifikasi reset aplikasi harus ditinjau/diintegrasikan sebelum izin eksperimen.

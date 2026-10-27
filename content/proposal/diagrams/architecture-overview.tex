@@ -1,4 +1,6 @@
 \documentclass[tikz,border=5pt]{standalone}
+% HISTORICAL: not included by main.tex. Current method uses one production-like
+% stack with sequential imperative/GitOps modes; R1/R2 only; R3 is not measured.
 \usepackage{tikz}
 \usetikzlibrary{positioning,fit,backgrounds,calc,shapes.geometric}
 \usepackage{graphicx}
@@ -50,7 +52,7 @@
 % Metrics
 \node[box=metricyellow, right=2.5cm of k8sA] (m1) {R1 Konsistensi};
 \node[box=metricyellow, above=0.3cm of m1] (m2) {R2 Waktu (s)};
-\node[box=metricyellow, below=0.3cm of m1] (m3) {R3 Traceability};
+\node[box=metricyellow, below=0.3cm of m1] (m3) {R3: not measured};
 
 % Group boxes
 \begin{scope}[on background layer]

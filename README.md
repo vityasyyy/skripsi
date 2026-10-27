@@ -1,10 +1,10 @@
-# Skripsi: Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes
+# Skripsi: Perbandingan Terkontrol Prosedur Imperatif Terotomasi dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes
 
 > Studi Kasus InvenioRDM | Departemen Ilmu Komputer dan Elektronika, FMIPA UGM
 
-Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma *deployment* manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM.
+Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol prosedur imperatif terotomasi dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM.
 
-> **Status metode:** Proposal yang telah diterima tetap dapat ditelusuri melalui riwayat Git. Penyesuaian metode pada `content/proposal/` dan `content/skripsi/` adalah **draf untuk tinjauan pemilik/pembimbing**, bukan persetujuan eksperimen formal. Lengan imperatif terotomasi dan GitOps dijalankan berurutan pada satu stack InvenioRDM; HPA normal aktif pada kedua lengan dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Instrumen aktif hanya memvalidasi bukti offline; protokol kolektor otomatis ada di [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md).
+> **Status metode:** Proposal yang telah diterima tetap dapat ditelusuri melalui riwayat Git. Penyesuaian metode pada `content/proposal/` dan `content/skripsi/` adalah **draf untuk tinjauan pemilik/pembimbing**, bukan persetujuan eksperimen formal. Mode imperatif terotomasi dan GitOps dijalankan berurutan pada satu stack InvenioRDM produksi-like; HPA normal aktif pada kedua mode dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. R3 tidak diukur karena audit API server tidak tersedia. Harness live dan protokol kolektor ada di [`experiments/live/README.md`](experiments/live/README.md) dan [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md); hasil pilot bukan data formal.
 
 ---
 
@@ -94,9 +94,9 @@ Setiap push ke `main`/`master` yang mengubah file `.tex`, `.bib`, atau `.cls` ak
 
 ## Topik Penelitian
 
-- **Judul:** Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes: Studi Kasus InvenioRDM
-- **Pendekatan:** Studi empiris terkontrol (*quasi-experiment*) dengan dua lengan berurutan (imperatif terotomasi vs GitOps) pada satu *stack* InvenioRDM; kapasitas tidak mendukung dua *stack* serentak
-- **Metrik:** R1 konsistensi deployment, R2 waktu deteksi & pemulihan drift, R3 traceability (audit trail)
+- **Judul:** Perbandingan Terkontrol Prosedur Imperatif Terotomasi dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes: Studi Kasus InvenioRDM
+- **Pendekatan:** Studi kasus komparatif terkontrol dengan dua mode pengelolaan berurutan pada satu stack InvenioRDM produksi-like; tidak ada stack kembar atau eksekusi paralel
+- **Metrik:** R1 konsistensi deployment dan R2 waktu deteksi, ketersediaan bukti, serta pemulihan drift. R3 (traceability) tidak diukur karena audit API server tidak tersedia dan dilaporkan sebagai keterbatasan
 - **Teknologi:** Kubernetes, ArgoCD, InvenioRDM, Helm, kubectl
 
 ---
