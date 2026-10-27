@@ -356,6 +356,15 @@ class SafetyTests(unittest.TestCase):
         with self.assertRaises(harness.SafetyError):
             harness.validate_live_args(args, environ={"INVENIO_TOKEN": "x"})
 
+    def test_read_retries_a_transient_response_body_timeout(self):
+        kubectl = harness.Kubectl(harness.FakeClock([1.0, 1.1, 1.2]))
+        bad = result(code=1, stderr="Unexpected error when reading response body")
+        good = result(stdout='{"kind":"ConfigMap","metadata":{"name":"x"}}')
+        with mock.patch.object(kubectl, "run", side_effect=[bad, good]) as run:
+            configmap = kubectl.get("ConfigMap", "x", "invenio")
+        self.assertEqual(configmap["metadata"]["name"], "x")
+        self.assertEqual(run.call_count, 2)
+
     def test_cluster_wide_inventory_uses_all_namespaces(self):
         completed = mock.Mock(returncode=0, stdout='{"items": []}', stderr="")
         kubectl = harness.Kubectl(harness.FakeClock([1.0]))
