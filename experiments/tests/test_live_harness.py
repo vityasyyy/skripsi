@@ -608,13 +608,27 @@ class ScenarioTests(unittest.TestCase):
         self.assertNotIn(("Deployment", "invenio-web", "exp-invenio-drift"),
                          fake.objects)
 
+    def test_scenario_g_annotation_is_removed(self):
+        sealed = sealed_secret()
+        sealed["metadata"].setdefault("annotations", {})[
+            harness.DRIFT_ANNOTATION] = "drift"
+        fake = FakeKubectl(objects={
+            ("SealedSecret", harness.SEALED_SECRET, "invenio"): sealed,
+        })
+        cleanup = harness.cleanup_g_annotation(fake, "invenio")
+        self.assertTrue(cleanup.ok)
+        self.assertNotIn(harness.DRIFT_ANNOTATION,
+                         fake.objects[("SealedSecret", harness.SEALED_SECRET,
+                                       "invenio")]["metadata"].get("annotations", {}))
+
     def test_cleanup_failure_is_reported(self):
         fake = FakeKubectl(fail_delete=True)
         fake.objects[("Namespace", "exp-invenio-drift", None)] = {
             "apiVersion": "v1", "kind": "Namespace",
             "metadata": {"name": "exp-invenio-drift"},
         }
-        cleanup = harness.cleanup_quarantine(fake, "exp-invenio-drift")
+        cleanup = harness.cleanup_quarantine(fake, "exp-invenio-drift",
+                                              wait_seconds=0)
         self.assertFalse(cleanup.ok)
         self.assertTrue(cleanup.errors)
 

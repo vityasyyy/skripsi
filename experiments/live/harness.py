@@ -1357,7 +1357,28 @@ def repair(kubectl, contract: Contract, observation: Observation,
     return commands
 
 
-def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None) -> CleanupReport:
+def cleanup_g_annotation(kubectl, namespace: str) -> CleanupReport:
+    """Remove the test annotation from the Git-managed SealedSecret."""
+    try:
+        sealed = kubectl.get("SealedSecret", SEALED_SECRET, namespace)
+        annotations = ((sealed or {}).get("metadata") or {}).get("annotations") or {}
+        if DRIFT_ANNOTATION not in annotations:
+            return CleanupReport(ok=True, results=[], errors=[])
+        result = kubectl.annotate("SealedSecret", SEALED_SECRET, namespace,
+                                  DRIFT_ANNOTATION, None)
+        if not result.ok:
+            return CleanupReport(
+                ok=False, results=[result],
+                errors=[f"remove {DRIFT_ANNOTATION} failed: "
+                        f"{result.stderr.strip()[:200]}"])
+        return CleanupReport(ok=True, results=[result], errors=[])
+    except HarnessError as error:
+        return CleanupReport(ok=False, results=[],
+                             errors=[f"annotation cleanup failed: {error}"])
+
+
+def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None,
+                       wait_seconds: float = 30.0) -> CleanupReport:
     if not quarantine.startswith("exp-"):
         raise SafetyError("quarantine cleanup only accepts exp-* namespaces")
     validate_namespace(quarantine)
@@ -1383,9 +1404,13 @@ def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None) -> Cl
                     f"delete {kind}/{name} failed: {result.stderr.strip()[:200]}")
         except HarnessError as error:
             errors.append(f"delete {kind}/{name} failed: {error}")
+    deadline = time.monotonic() + wait_seconds
     try:
-        if kubectl.get("Namespace", quarantine) is not None:
-            errors.append(f"quarantine namespace {quarantine} still exists")
+        while kubectl.get("Namespace", quarantine) is not None:
+            if time.monotonic() >= deadline:
+                errors.append(f"quarantine namespace {quarantine} still exists")
+                break
+            time.sleep(0.5)
     except HarnessError as error:
         errors.append(f"quarantine verification failed: {error}")
     return CleanupReport(ok=not errors, results=results, errors=errors)
@@ -1957,6 +1982,13 @@ class LiveRunner:
                 cleanup = (cleanup_quarantine(self.kubectl, self.quarantine,
                                               owner=run_id)
                            if allow_cleanup else CleanupReport(True, [], []))
+                if args.scenario == "G" and allow_cleanup:
+                    annotation_cleanup = cleanup_g_annotation(
+                        self.kubectl, args.namespace)
+                    cleanup = CleanupReport(
+                        ok=cleanup.ok and annotation_cleanup.ok,
+                        results=cleanup.results + annotation_cleanup.results,
+                        errors=cleanup.errors + annotation_cleanup.errors)
             except Exception as error:  # noqa: BLE001 - cleanup must not skip restore
                 cleanup = CleanupReport(
                     ok=False, results=[],
@@ -1966,17 +1998,23 @@ class LiveRunner:
             except Exception as error:  # noqa: BLE001 - report, do not skip output
                 restore_error = str(error)
             if contract is not None:
-                try:
-                    snapshotter = Snapshotter(self.kubectl, args.namespace,
-                                              self.quarantine, self.clock,
-                                              configmap_name=contract.configmap_name,
-                                              argo_namespace=args.argocd_namespace,
-                                              app=args.app)
-                    postcondition = self._postcondition(snapshotter, contract,
-                                                        args.scenario, args.arm)
-                except Exception as error:  # noqa: BLE001 - report postcondition
-                    postcondition = {"verified": False,
-                                     "error": f"{type(error).__name__}: {error}"}
+                for attempt in range(3):
+                    try:
+                        snapshotter = Snapshotter(self.kubectl, args.namespace,
+                                                  self.quarantine, self.clock,
+                                                  configmap_name=contract.configmap_name,
+                                                  argo_namespace=args.argocd_namespace,
+                                                  app=args.app)
+                        postcondition = self._postcondition(
+                            snapshotter, contract, args.scenario, args.arm)
+                        break
+                    except Exception as error:  # noqa: BLE001 - retry transient reads
+                        if attempt == 2:
+                            postcondition = {
+                                "verified": False,
+                                "error": f"{type(error).__name__}: {error}"}
+                        else:
+                            time.sleep(1)
         row = self._row(run_id, args, contract, injection, timeline, failure,
                         arm_evidence, cleanup, restore_error, postcondition)
         evidence = {
