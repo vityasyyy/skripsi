@@ -4,25 +4,24 @@
 
 Kubernetes mengelola sumber daya aplikasi melalui keadaan yang dideklarasikan dan rekonsiliasi oleh komponen pengendali. Dalam operasi nyata, keadaan aktual dapat berbeda dari deklarasi yang menjadi acuan. Perbedaan ini disebut penyimpangan konfigurasi (\textit{configuration drift}). Penyimpangan perlu dibedakan dari cacat statis: suatu manifest dapat mengandung konfigurasi yang keliru tetapi tetap sama dengan keadaan aktual, sedangkan drift merujuk pada ketidakcocokan antara acuan dan keadaan yang berjalan. Dengan demikian, pengukuran kesetaraan konfigurasi tidak dengan sendirinya menilai apakah nilai konfigurasi tersebut baik atau aman \citep{zhang2026configuration, rahman2023security}.
 
-Pengelolaan deklaratif dapat menggunakan pengendali GitOps untuk membandingkan sumber daya klaster dengan deklarasi di repositori dan mencoba merekonsiliasikannya. Pendekatan imperatif menggunakan perintah untuk mengubah keadaan klaster; perilaku setelah perubahan bergantung pada otomasi dan prosedur yang dipasang. Karena itu, perbandingan empiris perlu menetapkan dengan jelas mekanisme yang dibandingkan. Penelitian ini tidak mengukur kecepatan atau keahlian manusia. Lingkungan pembanding imperatif menggunakan prosedur otomatis berbasis \texttt{kubectl} yang tetap dan terstandarisasi, sementara lingkungan lain menggunakan ArgoCD dengan kebijakan rekonsiliasi yang akan diverifikasi sebelum eksperimen.
+Pengelolaan deklaratif dapat menggunakan pengendali GitOps untuk membandingkan sumber daya klaster dengan deklarasi di repositori dan mencoba merekonsiliasikannya. Pendekatan imperatif menggunakan perintah untuk mengubah keadaan klaster; perilaku setelah perubahan bergantung pada otomasi dan prosedur yang dipasang. Karena itu, perbandingan empiris perlu menetapkan dengan jelas mekanisme yang dibandingkan. Penelitian ini tidak mengukur kecepatan atau keahlian manusia. Mode pembanding imperatif menggunakan prosedur otomatis berbasis \texttt{kubectl} yang tetap dan terstandarisasi, sedangkan mode GitOps menggunakan ArgoCD dengan kebijakan rekonsiliasi yang diverifikasi sebelum eksperimen. Kedua mode dijalankan berurutan pada satu stack InvenioRDM produksi-like; mode imperatif adalah penjedaan ArgoCD, bukan \textit{deployment} terpisah.
 
 Sejumlah penelitian telah mengevaluasi GitOps maupun membandingkannya dengan pendekatan lain. Shrestha dan Ali membahas waktu induksi, penemuan, dan pemulihan drift dalam perbandingan GitOps dengan Ansible \citep{shrestha2024configuration}. Kagganti Nataraja mendeskripsikan perbandingan terkontrol pada Minikube satu node dengan konfigurasi keamanan yang berbeda \citep{kaggantinataraja2025security}. Matubber juga memasukkan pembanding lama yang semi-terotomasi dalam evaluasi infrastruktur Kubernetes \citep{matubber2025managing}. Studi-studi tersebut menunjukkan bahwa evaluasi komparatif telah dilakukan; penelitian ini tidak mengklaim sebagai perbandingan pertama atau menganggap bahwa GitOps pasti lebih unggul. Rincian lingkup dan batas interpretasi studi tersebut dibahas pada Bab II.
 
-Penelitian ini merancang pengukuran per skenario pada beban uji multi-service InvenioRDM. Pengukuran membedakan kesetaraan bidang konfigurasi dari kesehatan layanan, memisahkan waktu deteksi dari ketersediaan bukti yang dapat diverifikasi, dan mengukur pemulihan terhadap kesetaraan inventaris serta bidang yang telah ditetapkan. Keterlacakan dinilai berdasarkan bukti yang tersedia, bukan asumsi bahwa suatu alat selalu menghasilkan jejak lengkap. Skenario F diperlakukan secara terpisah karena menguji batas visibilitas sumber daya di luar cakupan aplikasi, bukan keberhasilan self-heal atas sumber daya terkelola.
+Penelitian ini merancang pengukuran per skenario pada beban uji multi-service InvenioRDM. Pengukuran membedakan kesetaraan bidang konfigurasi dari kesehatan layanan, memisahkan waktu deteksi dari ketersediaan bukti yang dapat diverifikasi, dan mengukur pemulihan terhadap kesetaraan inventaris serta bidang yang telah ditetapkan. Skenario A diperlakukan sebagai kontrol HPA, F sebagai batas visibilitas sumber daya di luar cakupan aplikasi, dan G sebagai kasus deskriptif yang bukan \textit{self-heal} ArgoCD; ketiganya tidak dipool ke estimasi efikasi B--E. Keterlacakan (R3) tidak diukur karena audit API server Kubernetes tidak tersedia; keterbatasan ini dibahas pada Bab III dan Bab V.
 
-Rancangan ini dimaksudkan untuk memperjelas perbedaan operasional antara dua prosedur yang ditetapkan pada konteks eksperimen tertentu. Rekomendasi praktis maupun kesimpulan tentang arah perbedaan hanya dapat dibuat setelah apparatus divalidasi, protokol ditinjau, dan data formal dikumpulkan. Pada draf ini, hasil eksperimen belum tersedia.
+Rancangan ini dimaksudkan untuk memperjelas perbedaan operasional antara dua prosedur yang ditetapkan pada konteks eksperimen tertentu. Karena kedua mode memakai satu stack secara berurutan, perlakuan tidak terisolasi dari beban latar dan dependensi bersama. Rekomendasi praktis maupun kesimpulan tentang arah perbedaan hanya dapat dibuat setelah apparatus divalidasi, protokol ditinjau, dan data formal dikumpulkan. Pada draf ini, hasil eksperimen belum tersedia.
 
 \section{Rumusan Masalah}
 
 Penelitian ini diarahkan oleh pertanyaan berikut.
 
 \begin{enumerate}
-  \item \textbf{RQ1:} Bagaimana kesetaraan bidang konfigurasi yang ditetapkan dan kesehatan layanan, yang dilaporkan secara terpisah, berubah setelah intervensi dan prosedur koreksi pada prosedur imperatif terotomasi berbasis \texttt{kubectl} dibandingkan dengan GitOps menggunakan ArgoCD?
-  \item \textbf{RQ2:} Bagaimana distribusi waktu deteksi, waktu hingga tersedia bukti penyimpangan yang dapat diverifikasi, dan waktu pemulihan konfigurasi penuh berbeda antara kedua prosedur untuk setiap skenario yang dianalisis?
-  \item \textbf{RQ3:} Bukti apa yang tersedia untuk merekonstruksi pelaku, objek dan bidang yang berubah, waktu serta urutan kejadian, dan tindakan pemulihan pada masing-masing prosedur?
+  \item \textbf{RQ1:} Bagaimana kesetaraan bidang konfigurasi yang ditetapkan dan kesehatan layanan, yang dilaporkan secara terpisah, berubah setelah intervensi dan prosedur koreksi pada mode imperatif terotomasi berbasis \texttt{kubectl} dibandingkan dengan mode GitOps menggunakan ArgoCD?
+  \item \textbf{RQ2:} Bagaimana distribusi waktu deteksi, waktu hingga tersedia bukti penyimpangan yang dapat diverifikasi, dan waktu pemulihan konfigurasi penuh berbeda antara kedua mode untuk setiap skenario yang dianalisis?
 \end{enumerate}
 
-RQ1 dan RQ2 dijawab per skenario. HPA normal tetap aktif pada kedua lengan; A menjadi kontrol HPA, bukan bukti efikasi ArgoCD memulihkan replika yang diabaikan. A dan uji batas visibilitas F dilaporkan terpisah dari estimasi B--E/G. Tidak adanya OutOfSync bukan waktu deteksi nol. RQ3 bersifat deskriptif dan tidak mengukur waktu identifikasi akar masalah. Penyesuaian tersebut tetap draf untuk tinjauan pemilik dan pembimbing; eksekusi formal dinonaktifkan.
+RQ1 dan RQ2 dijawab per skenario. HPA normal tetap aktif pada kedua mode; A menjadi kontrol HPA, bukan bukti efikasi ArgoCD memulihkan replika yang diabaikan. A, uji batas visibilitas F, dan kasus deskriptif G dilaporkan terpisah dari estimasi B--E. Tidak adanya OutOfSync bukan waktu deteksi nol. R3 tidak diukur karena audit API server tidak tersedia dan tidak dilaporkan sebagai nol atau tidak ada perbedaan. Penyesuaian tersebut tetap draf untuk tinjauan pemilik dan pembimbing; eksekusi formal dinonaktifkan.
 
 \section{Batasan Masalah}
 
@@ -30,24 +29,24 @@ Ruang lingkup penelitian dibatasi sebagai berikut.
 
 \begin{enumerate}
   \item Perbandingan mencakup satu prosedur imperatif terotomasi berbasis \texttt{kubectl} dan satu implementasi GitOps berbasis ArgoCD. Tidak ada intervensi manusia dalam waktu deteksi atau pemulihan yang diukur; hasil tidak mewakili kecepatan operator atau semua implementasi kedua paradigma.
-  \item Beban uji formal direncanakan berupa workload komposit multi-service InvenioRDM pada satu klaster Kubernetes. Komposisi aktual, versi, dan kapasitas lingkungan harus diverifikasi sebelum pengujian. Generalisasi dibatasi pada konfigurasi apparatus yang dilaporkan.
-  \item Surrogat S1 dan S2 hanya digunakan pada pilot untuk memvalidasi instrumen dan prosedur. Data pilot tidak menggantikan beban formal, tidak dipool dengan data formal, dan tidak mendukung kesimpulan tentang InvenioRDM.
-  \item Intervensi yang direncanakan meliputi perubahan replika, image, ConfigMap, penghapusan sumber daya, patch bidang terkelola, sumber daya pada namespace di luar cakupan aplikasi (F), dan perubahan Secret. F dianalisis sebagai batas visibilitas sumber daya tak terkelola; bukan sebagai skenario self-heal yang diasumsikan.
-  \item R1 menilai kesetaraan inventaris dan bidang deklaratif yang ditetapkan dengan aturan sama pada kedua lingkungan; kesehatan dilaporkan terpisah. R2 mencakup waktu deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi penuh. R3 menggunakan rubrik bukti deskriptif. Nilai Secret tidak dipublikasikan.
-  \item Analisis dibatasi pada hasil per skenario. Target jumlah pengulangan merupakan target deskriptif, bukan jaminan kecukupan daya. Data tersensor, kegagalan injeksi, dan kegagalan instrumentasi dilaporkan terpisah; tidak ada nilai hilang yang diganti nol.
+  \item Beban uji formal adalah satu stack InvenioRDM multi-service pada satu klaster Kubernetes di namespace \texttt{invenio}. Tidak ada stack kembar \texttt{exp-*} dan tidak ada eksekusi paralel A/B. Karena stack yang sama dipakai bergantian, non-isolasi terhadap beban latar dan dependensi bersama menjadi keterbatasan eksplisit. Generalisasi dibatasi pada konfigurasi apparatus yang dilaporkan.
+  \item Surrogat S1 dan S2 merupakan artefak historis/offline untuk validasi instrumen. Keduanya tidak dipakai dalam desain formal, tidak digabungkan dengan data formal, dan tidak mendukung kesimpulan tentang InvenioRDM.
+  \item Intervensi yang direncanakan meliputi perubahan replika (A), image (B), ConfigMap (C), penghapusan sumber daya (D), patch requests/limits (E), sumber daya pada namespace di luar cakupan aplikasi (F), dan anotasi metadata Secret (G). A adalah kontrol HPA; F adalah batas visibilitas sumber daya tak terkelola; G bukan kasus \textit{self-heal} ArgoCD dan dianalisis deskriptif.
+  \item R1 menilai kesetaraan inventaris dan bidang deklaratif yang ditetapkan dengan aturan sama pada kedua mode; kesehatan dilaporkan terpisah. R2 mencakup waktu deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi penuh. R3 tidak diukur karena audit API server tidak tersedia; R3 dibahas sebagai keterbatasan dan pekerjaan lanjutan, bukan sebagai nol atau tidak ada perbedaan. Nilai Secret tidak dipublikasikan.
+  \item Analisis dibatasi pada hasil per skenario. Sampel formal adalah 15 pengulangan per skenario per mode (10 R2 dan 5 R1; total 210 run); angka tersebut bukan jaminan kecukupan daya. Data tersensor, kegagalan injeksi, dan kegagalan instrumentasi dilaporkan terpisah; tidak ada nilai hilang yang diganti nol.
 \end{enumerate}
 
 \section{Tujuan Penelitian}
 
-Penelitian ini bertujuan merancang dan, setelah protokol disetujui serta apparatus divalidasi, mengevaluasi perbedaan operasional antara prosedur imperatif terotomasi berbasis \texttt{kubectl} dan GitOps berbasis ArgoCD pada beban uji formal multi-service InvenioRDM. Evaluasi mengoperasionalkan RQ1 melalui kesetaraan konfigurasi dan kesehatan yang terpisah, RQ2 melalui waktu deteksi, bukti, serta pemulihan, dan RQ3 melalui rubrik ketersediaan bukti keterlacakan. Tujuan ini tidak menyatakan sebelumnya prosedur mana yang lebih baik.
+Penelitian ini bertujuan merancang dan, setelah protokol disetujui serta apparatus divalidasi, mengevaluasi perbedaan operasional antara mode imperatif terotomasi berbasis \texttt{kubectl} dan mode GitOps berbasis ArgoCD pada beban uji formal multi-service InvenioRDM. Evaluasi mengoperasionalkan RQ1 melalui kesetaraan konfigurasi dan kesehatan yang terpisah serta RQ2 melalui waktu deteksi, bukti, dan pemulihan konfigurasi. R3 tidak diukur. Tujuan ini tidak menyatakan sebelumnya mode mana yang lebih baik.
 
 \section{Manfaat Penelitian}
 
 Jika protokol berhasil divalidasi dan data dikumpulkan, penelitian ini diharapkan dapat:
 \begin{enumerate}
-  \item memberikan deskripsi empiris yang dibatasi pada workload, skenario, dan konfigurasi yang benar-benar diuji;
+  \item memberikan deskripsi empiris yang dibatasi pada \textit{workload}, skenario, dan konfigurasi yang benar-benar diuji;
   \item mendokumentasikan definisi pengukuran serta aturan penanganan data tersensor agar dapat ditinjau dan direplikasi; dan
-  \item menyediakan informasi kontekstual bagi praktisi tanpa mengubah hasil satu apparatus menjadi rekomendasi universal tentang GitOps atau pengelolaan imperatif.
+  \item menyediakan informasi kontekstual bagi praktisi tanpa mengubah hasil satu kasus menjadi rekomendasi universal tentang GitOps atau pengelolaan imperatif.
 \end{enumerate}
 
 \section{Sistematika Penulisan}
@@ -56,7 +55,7 @@ Skripsi ini disusun sebagai berikut:
 \begin{itemize}
   \item Bab I menjelaskan latar belakang, rumusan masalah, batasan, tujuan, manfaat, dan sistematika penulisan.
   \item Bab II membahas konsep drift, pendekatan pengelolaan konfigurasi, studi empiris terkait, serta ruang kontribusi yang dibatasi.
-  \item Bab III menjelaskan rancangan perbandingan, workload, skenario, definisi metrik, protokol, analisis, dan ancaman validitas.
-  \item Bab IV menyediakan struktur pelaporan setup dan bukti untuk R1--R3; hasil empiris hanya dapat diisi setelah eksperimen formal tervalidasi.
+  \item Bab III menjelaskan rancangan perbandingan, \textit{workload}, skenario, definisi metrik, protokol, analisis, dan ancaman validitas.
+  \item Bab IV menyediakan struktur pelaporan setup dan bukti untuk R1--R2 serta batas pengukuran R3; hasil empiris hanya dapat diisi setelah eksperimen formal tervalidasi.
   \item Bab V merangkum status kesimpulan, keterbatasan, serta rekomendasi yang dapat ditindaklanjuti setelah hasil tersedia.
 \end{itemize}
