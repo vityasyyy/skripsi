@@ -752,6 +752,19 @@ class Kubectl:
         argv.extend(["-o", "json", "--ignore-not-found",
                      "--request-timeout=15s"])
         result = self.run(argv)
+        for attempt in range(2):
+            if result.returncode == 0:
+                break
+            stderr = result.stderr.lower()
+            transient = any(token in stderr for token in (
+                "unexpected error when reading response body",
+                "request canceled", "client.timeout",
+                "connection reset", "tls handshake timeout",
+                "i/o timeout", "temporarily unavailable"))
+            if not transient:
+                break
+            time.sleep(0.5 * (attempt + 1))
+            result = self.run(argv)
         if result.returncode != 0:
             raise InstrumentationError(
                 f"kubectl get {kind} failed: {result.stderr.strip()[:300]}")
