@@ -32,6 +32,77 @@ R1/R2, hitungan tersensor, dan eksklusi. Lihat `experiments/live/README.md`
 untuk batas `stack_isolated: false`, `r3_status: not_measured`, dan
 `formal_execution_approved`.
 
+### Analisis inferensial batch live
+
+`summarize.py` tetap deskriptif. `analyze_live.py` menerapkan keluarga uji yang
+dibekukan pada Bab III terhadap `<batch_id>.analysis.jsonl`. `--rows` opsional
+menambahkan hitungan eksklusi dari `<batch_id>.rows.jsonl`; tanpa berkas itu,
+eksklusi dilaporkan sebagai tidak dihitung, bukan nol.
+
+```bash
+python3 experiments/analysis/analyze_live.py \
+  --in experiments/live/runs/formal-<batch-id>/<batch-id>.analysis.jsonl \
+  --rows experiments/live/runs/formal-<batch-id>/<batch-id>.rows.jsonl \
+  --out experiments/analysis/outputs/<batch-id>
+```
+
+Keluaran yang sudah ada ditolak kecuali `--force` diberikan. Bootstrap bersifat
+deterministik: `--bootstrap 2000` (minimum 100), `--seed 20261027`, dan
+`--alpha 0.05` dapat diubah, tetapi nilai baku itulah yang harus dicatat untuk
+reproduksi. Tanpa `--rows`, eksklusi tidak dapat dihitung; `rows.jsonl` hanya
+memuat run yang tercatat, sehingga run `not_run` tetap berada di manifest dan
+summary, dan tidak dihitung sebagai eksklusi di sini.
+
+| Berkas | Isi |
+|---|---|
+| `live_analysis.json` | hasil lengkap: populasi, eksklusi, R1, survival, uji, efek, keluarga Holm |
+| `live_overview.tex` | jumlah baris R2, run teramati/tersensor, populasi, eksklusi, `R3: not measured` |
+| `live_exclusions.tex` | baris yang dieksklusi beserta alasan |
+| `live_r1.tex` | median baseline/first/last per skenario, lengan, fase; jumlah observasi |
+| `live_survival.tex` | Kaplan--Meier, median, RMST, jumlah event/tersensor, horizon |
+| `live_tests.tex` | Wilcoxon berpasangan atau Mann--Whitney eksploratif, $p$ mentah dan Holm |
+| `live_effects.tex` | Cliff's $\delta$, selisih median berpasangan, rank-biserial, CI bootstrap |
+
+Cara membaca hasil:
+
+- **Populasi.** Hanya B--E yang masuk efikasi *managed drift*. A tetap kontrol
+  HPA, F batas visibilitas, dan G deskriptif non-Argo. Ketiganya muncul di
+  tabel survival/overview tetapi tidak pernah dipool ke uji B--E. Baris batch
+  memberi G `efficacy_eligible: true` karena aturan runner hanya mengecualikan
+  A/F; analyzer menimpanya menjadi deskriptif non-Argo sesuai metode beku.
+- **Pemilihan uji.** Wilcoxon *signed-rank* dipakai hanya bila setiap blok
+  skenario-replikasi memiliki kedua lengan dan kedua nilai teramati; blok yang
+  tersensor atau tanpa pasangan memaksa Mann--Whitney U. Alasan tercatat di
+  `pairing.reason` dan penanda P/U pada tabel uji, bukan dipilih berdasarkan
+  hasil. Wilcoxon
+  memakai $p$ eksak *sign-flip* untuk maksimal 16 pasangan dan mengabaikan
+  selisih nol. Uji Mann--Whitney hanya memakai nilai teramati, memakai
+  aproksimasi normal dengan koreksi *ties*, dan **tidak** menyesuaikan
+  penyensoran. Kedua uji adalah analisis *complete-case*/teramati, bukan
+  estimasi yang sudah dikoreksi penyensoran.
+- **Holm.** Keluarga yang ditetapkan sebelum data berisi 12 hipotesis
+  B--E $\times$ \{deteksi, bukti, pemulihan\}. Hipotesis yang tidak terestimasi
+  diperlakukan sebagai $p=1$ sehingga koreksi bersifat konservatif. Nilai
+  `reject_holm` bukan klaim konfirmatoris.
+- **Penyensoran.** Waktu tersensor tidak pernah diisi nol. Kaplan--Meier dan
+  RMST memakai horizon batas penyensoran terkecil per kelompok; median `--`
+  berarti tidak tercapai dalam horizon. RMST adalah deskripsi hingga horizon,
+  bukan uji superioritas.
+- **R1.** Baseline/first/last dilaporkan sebagai median bagian teramati dengan
+  jumlah observasi; nilai hilang tidak diimputasi. R1 tidak diuji.
+- **Klaim.** `claim_status` selalu `exploratory_case_study` dan
+  `confirmatory_claims` selalu `false`. `formal_execution_approved: true` hanya
+  attestation operator, bukan persetujuan metode atau bukti bahwa seluruh
+  gerbang formal tertutup.
+- **R3.** `R3: not measured`; tidak ada klaim audit atau keterlacakan.
+
+Input divalidasi secara *fail-closed*: skema, pemetaan lengan, fase/rep,
+revisi/render, status metrik, dan nilai tersensor yang tidak konsisten
+ditolak. Batas penyensoran divalidasi per baris; horizon RMST adalah batas
+terkecil per kelompok. Ketidakcocokan `rows.jsonl` dengan `analysis.jsonl` juga
+ditolak agar tidak ada baris yang hilang diam-diam. Analisis tidak mencetak
+nilai baris mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
+
 ## Artefak historis, bukan hasil Invenio
 
 `outputs/`, `mockgen.py`, `runs/sample-dryrun.csv` dan format CSV v1 tetap
