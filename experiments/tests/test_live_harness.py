@@ -371,6 +371,18 @@ class SafetyTests(unittest.TestCase):
         self.assertIsInstance(harness.Http("token", base_url="http://127.0.0.1:8080"),
                               harness.Http)
 
+    def test_http_sets_a_stable_user_agent(self):
+        response = mock.MagicMock()
+        response.status = 200
+        response.read.return_value = b"{}"
+        response.__enter__.return_value = response
+        with mock.patch("harness.urlrequest.urlopen", return_value=response) as opened:
+            status, body = harness.Http("token").get("/api/me")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"{}")
+        request = opened.call_args.args[0]
+        self.assertEqual(request.get_header("User-agent"), harness.USER_AGENT)
+
     def test_no_token_is_ever_printed(self):
         secret = "tok-SECRET-123"
         args = harness.parse_args([

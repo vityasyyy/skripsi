@@ -48,6 +48,7 @@ SEED_SIZE = 65536
 SEED_MD5 = "8f1445bafe2c2095044af7789462f475"
 SEED_SHA256 = "7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2"
 DEFAULT_INVENIO_URL = "https://invenio.vityasy.me"
+USER_AGENT = "invenio-live-harness/1.0"
 MISSING = "<missing>"
 
 
@@ -296,7 +297,8 @@ class Http:
         request = urlrequest.Request(
             url,
             headers={"Authorization": "Bearer " + self._token,
-                     "Accept": accept},
+                     "Accept": accept,
+                     "User-Agent": USER_AGENT},
         )
         try:
             with urlrequest.urlopen(request, timeout=self.timeout) as response:
