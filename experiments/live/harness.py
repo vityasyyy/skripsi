@@ -48,6 +48,7 @@ SEED_SIZE = 65536
 SEED_MD5 = "8f1445bafe2c2095044af7789462f475"
 SEED_SHA256 = "7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2"
 DEFAULT_INVENIO_URL = "https://invenio.vityasy.me"
+USER_AGENT = "invenio-live-harness/1.0"
 MISSING = "<missing>"
 
 
@@ -278,6 +279,21 @@ def load_token(environ=None) -> str:
     return token
 
 
+class _CrossHostRedirectHandler(urlrequest.HTTPRedirectHandler):
+    """Do not forward API auth headers to a presigned object-store redirect."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is None:
+            return None
+        old_host = urlparse.urlparse(req.full_url).hostname
+        new_host = urlparse.urlparse(newurl).hostname
+        if old_host != new_host:
+            redirected.remove_header("Authorization")
+            redirected.remove_header("Accept")
+        return redirected
+
+
 class Http:
     def __init__(self, token: str, base_url: str = DEFAULT_INVENIO_URL, timeout: float = 15):
         parsed = urlparse.urlparse(base_url)
@@ -287,6 +303,7 @@ class Http:
         self._token = token
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._opener = urlrequest.build_opener(_CrossHostRedirectHandler())
 
     def __repr__(self):
         return "Http(token=<redacted>)"
@@ -296,10 +313,11 @@ class Http:
         request = urlrequest.Request(
             url,
             headers={"Authorization": "Bearer " + self._token,
-                     "Accept": accept},
+                     "Accept": accept,
+                     "User-Agent": USER_AGENT},
         )
         try:
-            with urlrequest.urlopen(request, timeout=self.timeout) as response:
+            with self._opener.open(request, timeout=self.timeout) as response:
                 return response.status, response.read()
         except urlerror.HTTPError as error:
             return error.code, error.read()
@@ -349,7 +367,7 @@ def verify_seed(http, record: str, file_name: str, expected_size: int,
 
     status, content = http.get(
         f"/api/records/{record}/draft/files/{file_name}/content",
-        accept="application/octet-stream",
+        accept="*/*",
     )
     if status != 200:
         raise SeedVerificationError(
@@ -1339,7 +1357,28 @@ def repair(kubectl, contract: Contract, observation: Observation,
     return commands
 
 
-def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None) -> CleanupReport:
+def cleanup_g_annotation(kubectl, namespace: str) -> CleanupReport:
+    """Remove the test annotation from the Git-managed SealedSecret."""
+    try:
+        sealed = kubectl.get("SealedSecret", SEALED_SECRET, namespace)
+        annotations = ((sealed or {}).get("metadata") or {}).get("annotations") or {}
+        if DRIFT_ANNOTATION not in annotations:
+            return CleanupReport(ok=True, results=[], errors=[])
+        result = kubectl.annotate("SealedSecret", SEALED_SECRET, namespace,
+                                  DRIFT_ANNOTATION, None)
+        if not result.ok:
+            return CleanupReport(
+                ok=False, results=[result],
+                errors=[f"remove {DRIFT_ANNOTATION} failed: "
+                        f"{result.stderr.strip()[:200]}"])
+        return CleanupReport(ok=True, results=[result], errors=[])
+    except HarnessError as error:
+        return CleanupReport(ok=False, results=[],
+                             errors=[f"annotation cleanup failed: {error}"])
+
+
+def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None,
+                       wait_seconds: float = 30.0) -> CleanupReport:
     if not quarantine.startswith("exp-"):
         raise SafetyError("quarantine cleanup only accepts exp-* namespaces")
     validate_namespace(quarantine)
@@ -1365,9 +1404,13 @@ def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None) -> Cl
                     f"delete {kind}/{name} failed: {result.stderr.strip()[:200]}")
         except HarnessError as error:
             errors.append(f"delete {kind}/{name} failed: {error}")
+    deadline = time.monotonic() + wait_seconds
     try:
-        if kubectl.get("Namespace", quarantine) is not None:
-            errors.append(f"quarantine namespace {quarantine} still exists")
+        while kubectl.get("Namespace", quarantine) is not None:
+            if time.monotonic() >= deadline:
+                errors.append(f"quarantine namespace {quarantine} still exists")
+                break
+            time.sleep(0.5)
     except HarnessError as error:
         errors.append(f"quarantine verification failed: {error}")
     return CleanupReport(ok=not errors, results=results, errors=errors)
@@ -1701,33 +1744,33 @@ class Sampler(threading.Thread):
         self.samples = []
         self.error = None
         self._lock = threading.Lock()
-        self._stop = threading.Event()
-        self._ready = threading.Event()
+        self._stop_event = threading.Event()
+        self._ready_event = threading.Event()
 
     def run(self):
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             started = self.clock.now()
             try:
                 sample = self.capture()
             except Exception as error:  # noqa: BLE001 - preserved as evidence
                 self.error = error
-                self._ready.set()
+                self._ready_event.set()
                 return
             with self._lock:
                 self.samples.append(sample)
-                self._ready.set()
+                self._ready_event.set()
             elapsed = self.clock.now().mono - started.mono
-            self._stop.wait(max(0.0, self.interval - elapsed))
+            self._stop_event.wait(max(0.0, self.interval - elapsed))
 
     def wait_ready(self, timeout=10.0):
-        return self._ready.wait(timeout)
+        return self._ready_event.wait(timeout)
 
     def snapshot(self):
         with self._lock:
             return list(self.samples)
 
     def stop(self):
-        self._stop.set()
+        self._stop_event.set()
         self.join(timeout=10)
 
 
@@ -1939,6 +1982,13 @@ class LiveRunner:
                 cleanup = (cleanup_quarantine(self.kubectl, self.quarantine,
                                               owner=run_id)
                            if allow_cleanup else CleanupReport(True, [], []))
+                if args.scenario == "G" and allow_cleanup:
+                    annotation_cleanup = cleanup_g_annotation(
+                        self.kubectl, args.namespace)
+                    cleanup = CleanupReport(
+                        ok=cleanup.ok and annotation_cleanup.ok,
+                        results=cleanup.results + annotation_cleanup.results,
+                        errors=cleanup.errors + annotation_cleanup.errors)
             except Exception as error:  # noqa: BLE001 - cleanup must not skip restore
                 cleanup = CleanupReport(
                     ok=False, results=[],
@@ -1948,17 +1998,23 @@ class LiveRunner:
             except Exception as error:  # noqa: BLE001 - report, do not skip output
                 restore_error = str(error)
             if contract is not None:
-                try:
-                    snapshotter = Snapshotter(self.kubectl, args.namespace,
-                                              self.quarantine, self.clock,
-                                              configmap_name=contract.configmap_name,
-                                              argo_namespace=args.argocd_namespace,
-                                              app=args.app)
-                    postcondition = self._postcondition(snapshotter, contract,
-                                                        args.scenario, args.arm)
-                except Exception as error:  # noqa: BLE001 - report postcondition
-                    postcondition = {"verified": False,
-                                     "error": f"{type(error).__name__}: {error}"}
+                for attempt in range(3):
+                    try:
+                        snapshotter = Snapshotter(self.kubectl, args.namespace,
+                                                  self.quarantine, self.clock,
+                                                  configmap_name=contract.configmap_name,
+                                                  argo_namespace=args.argocd_namespace,
+                                                  app=args.app)
+                        postcondition = self._postcondition(
+                            snapshotter, contract, args.scenario, args.arm)
+                        break
+                    except Exception as error:  # noqa: BLE001 - retry transient reads
+                        if attempt == 2:
+                            postcondition = {
+                                "verified": False,
+                                "error": f"{type(error).__name__}: {error}"}
+                        else:
+                            time.sleep(1)
         row = self._row(run_id, args, contract, injection, timeline, failure,
                         arm_evidence, cleanup, restore_error, postcondition)
         evidence = {

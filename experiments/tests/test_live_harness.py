@@ -371,6 +371,34 @@ class SafetyTests(unittest.TestCase):
         self.assertIsInstance(harness.Http("token", base_url="http://127.0.0.1:8080"),
                               harness.Http)
 
+    def test_http_sets_a_stable_user_agent(self):
+        response = mock.MagicMock()
+        response.status = 200
+        response.read.return_value = b"{}"
+        response.__enter__.return_value = response
+        http = harness.Http("token")
+        http._opener = mock.MagicMock()
+        http._opener.open.return_value = response
+        status, body = http.get("/api/me")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"{}")
+        request = http._opener.open.call_args.args[0]
+        self.assertEqual(request.get_header("User-agent"), harness.USER_AGENT)
+
+    def test_cross_host_redirect_drops_api_auth_headers(self):
+        handler = harness._CrossHostRedirectHandler()
+        request = harness.urlrequest.Request(
+            "https://invenio.example/api/records/x/draft/files/y/content",
+            headers={"Authorization": "Bearer tok", "Accept": "application/octet-stream"},
+        )
+        redirected = handler.redirect_request(
+            request, None, 302, "Found", {},
+            "https://minio.example/bucket/key?signature=redacted",
+        )
+        self.assertIsNotNone(redirected)
+        self.assertIsNone(redirected.get_header("Authorization"))
+        self.assertIsNone(redirected.get_header("Accept"))
+
     def test_no_token_is_ever_printed(self):
         secret = "tok-SECRET-123"
         args = harness.parse_args([
@@ -580,13 +608,27 @@ class ScenarioTests(unittest.TestCase):
         self.assertNotIn(("Deployment", "invenio-web", "exp-invenio-drift"),
                          fake.objects)
 
+    def test_scenario_g_annotation_is_removed(self):
+        sealed = sealed_secret()
+        sealed["metadata"].setdefault("annotations", {})[
+            harness.DRIFT_ANNOTATION] = "drift"
+        fake = FakeKubectl(objects={
+            ("SealedSecret", harness.SEALED_SECRET, "invenio"): sealed,
+        })
+        cleanup = harness.cleanup_g_annotation(fake, "invenio")
+        self.assertTrue(cleanup.ok)
+        self.assertNotIn(harness.DRIFT_ANNOTATION,
+                         fake.objects[("SealedSecret", harness.SEALED_SECRET,
+                                       "invenio")]["metadata"].get("annotations", {}))
+
     def test_cleanup_failure_is_reported(self):
         fake = FakeKubectl(fail_delete=True)
         fake.objects[("Namespace", "exp-invenio-drift", None)] = {
             "apiVersion": "v1", "kind": "Namespace",
             "metadata": {"name": "exp-invenio-drift"},
         }
-        cleanup = harness.cleanup_quarantine(fake, "exp-invenio-drift")
+        cleanup = harness.cleanup_quarantine(fake, "exp-invenio-drift",
+                                              wait_seconds=0)
         self.assertFalse(cleanup.ok)
         self.assertTrue(cleanup.errors)
 
@@ -940,6 +982,17 @@ class LiveRunnerTests(unittest.TestCase):
                                  {"prune": True, "selfHeal": True})
             self.assertNotIn(("Namespace", "exp-invenio-drift"),
                              fake.objects)
+
+
+class SamplerLifecycleTests(unittest.TestCase):
+    def test_sampler_stop_does_not_shadow_thread_stop(self):
+        sampler = harness.Sampler(
+            lambda: {"ok": True}, harness.FakeClock([1.0]), 0.01,
+        )
+        sampler.start()
+        self.assertTrue(sampler.wait_ready(timeout=2))
+        sampler.stop()
+        self.assertFalse(sampler.is_alive())
 
 
 if __name__ == "__main__":
