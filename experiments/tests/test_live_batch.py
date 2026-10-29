@@ -5,6 +5,7 @@ No test reaches a cluster. Dry-run tests use the real harness with
 call `harness.main`.
 """
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,77 @@ LIVE = ROOT / "live"
 sys.path.insert(0, str(LIVE))
 
 import run_matrix  # noqa: E402
+
+
+RENDER_REVISION = "a" * 40
+
+
+def render_bundle(namespace="exp-a", revision=RENDER_REVISION,
+                  image="ghcr.io/example/invenio:1"):
+    return {
+        "format": "invenio-frozen-render-v1",
+        "source_revision": revision,
+        "objects": [
+            {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "metadata": {"name": "invenio-web", "namespace": namespace},
+                "spec": {"template": {"spec": {"containers": [{
+                    "name": "web",
+                    "image": image,
+                    "envFrom": [{"configMapRef": {
+                        "name": "invenio-app-config-abc123"}}],
+                    "resources": {
+                        "requests": {"cpu": "250m", "memory": "512Mi"},
+                        "limits": {"cpu": "1", "memory": "2Gi"},
+                    },
+                }]}}},
+            },
+            {
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "name": "invenio-app-config-abc123",
+                    "namespace": namespace,
+                },
+                "data": {"INSTANCE_TAGLINE": "frozen"},
+            },
+            {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "metadata": {"name": "invenio-web", "namespace": namespace},
+                "spec": {
+                    "selector": {"app.kubernetes.io/name": "invenio-web"},
+                    "ports": [{"port": 8000, "targetPort": "http"}],
+                },
+            },
+            {
+                "apiVersion": "bitnami.com/v1alpha1",
+                "kind": "SealedSecret",
+                "metadata": {
+                    "name": "invenio-app-secrets",
+                    "namespace": namespace,
+                },
+                "spec": {"encryptedData": {"key": "SECRET-MUST-NOT-LEAK"}},
+            },
+        ],
+    }
+
+
+def write_render(directory, bundle=None):
+    bundle = render_bundle() if bundle is None else bundle
+    path = Path(directory) / "render.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = json.dumps(bundle, sort_keys=True).encode()
+    path.write_bytes(data)
+    return path, hashlib.sha256(data).hexdigest()
+
+
+def render_args(directory, bundle=None):
+    path, digest = write_render(directory, bundle)
+    return ["--render-file", str(path),
+            "--source-revision", RENDER_REVISION,
+            "--render-sha256", digest]
 
 
 def analysis_group(scenario):
@@ -75,7 +147,11 @@ def fake_runner(statuses=None, cleanup="ok", restore="restored",
         calls.append(run_id)
         status = statuses[index] if statuses and index < len(statuses) else "observed"
         row = make_row(item, status=status, cleanup_status=cleanup,
-                       arm_restore_status=restore)
+                       arm_restore_status=restore,
+                       source_revision=getattr(args, "source_revision", None)
+                       or "a" * 40,
+                       render_sha256=getattr(args, "render_sha256", None)
+                       or "b" * 64)
         if status == "baseline_failure":
             row["mutations_executed"] = 0
         if mutate:
@@ -107,8 +183,7 @@ def live_args(out, batch_id, arms="gitops imperative",
     return full_args(
         out, batch_id, arms, scenarios, reps, "--live",
         "--confirm-single-stack", "--namespace", "exp-a",
-        "--app", "invenio-bootstrap", "--source-revision", "a" * 40,
-        "--render-sha256", "b" * 64, *extra)
+        "--app", "invenio-bootstrap", *render_args(out), *extra)
 
 
 class PlanTests(unittest.TestCase):
@@ -261,6 +336,74 @@ class BatchSafetyTests(unittest.TestCase):
             self.assertTrue(row["formal_execution_approved"])
             self.assertFalse(row["stack_isolated"])
             self.assertEqual(row["r3_status"], "not_measured")
+
+
+class DeclarationBatchTests(unittest.TestCase):
+    def test_live_batch_requires_a_render_bundle_before_any_runner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args([
+                "--out", directory, "--batch-id", "no-render", "--seed", "17",
+                "--arms", "gitops", "--scenarios", "A", "--reps", "1",
+                "--live", "--confirm-single-stack", "--namespace", "exp-a",
+                "--app", "invenio-bootstrap",
+                "--source-revision", "a" * 40, "--render-sha256", "b" * 64,
+            ])
+            runner, calls = fake_runner()
+            with self.assertRaises(run_matrix.BatchSafetyError):
+                run_quiet(args, run_one=runner)
+            self.assertEqual(calls, [])
+
+    def test_live_batch_rejects_a_tampered_render_before_any_runner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, _ = write_render(directory)
+            args = run_matrix.parse_args([
+                "--out", directory, "--batch-id", "tampered", "--seed", "17",
+                "--arms", "gitops", "--scenarios", "A", "--reps", "1",
+                "--live", "--confirm-single-stack", "--namespace", "exp-a",
+                "--app", "invenio-bootstrap", "--render-file", str(path),
+                "--source-revision", "a" * 40, "--render-sha256", "0" * 64,
+            ])
+            runner, calls = fake_runner()
+            with self.assertRaises(run_matrix.BatchSafetyError):
+                run_quiet(args, run_one=runner)
+            self.assertEqual(calls, [])
+
+    def test_resume_rejects_changed_render_contents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            argv = live_args(directory, "changed", "gitops", "A", "1")
+            args = run_matrix.parse_args(argv)
+            self.assertEqual(run_quiet(args, run_one=fake_runner()[0]), 0)
+            manifest_before = (out / "changed.manifest.json").read_text()
+            path = Path(argv[argv.index("--render-file") + 1])
+            changed = json.dumps(
+                render_bundle(image="ghcr.io/example/invenio:other"),
+                sort_keys=True).encode()
+            path.write_bytes(changed)
+            resume = run_matrix.parse_args(argv + ["--resume"])
+            with self.assertRaises(run_matrix.BatchSafetyError):
+                run_quiet(resume, run_one=fake_runner()[0])
+            self.assertEqual((out / "changed.manifest.json").read_text(),
+                             manifest_before)
+
+    def test_declaration_identity_reaches_manifest_retries_and_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            args = run_matrix.parse_args(live_args(
+                directory, "identity", "gitops", "A", "1"))
+            runner, calls = fake_runner(
+                statuses=["baseline_failure", "observed"])
+            self.assertEqual(run_quiet(args, run_one=runner), 0)
+            manifest = json.loads(
+                (out / "identity.manifest.json").read_text())
+            self.assertEqual(manifest["source_revision"], RENDER_REVISION)
+            self.assertEqual(manifest["render_sha256"], args.render_sha256)
+            rows = [json.loads(line) for line in
+                    (out / "identity.rows.jsonl").read_text().splitlines()]
+            self.assertEqual([row["run_id"] for row in rows], calls)
+            for row in rows:
+                self.assertEqual(row["source_revision"], RENDER_REVISION)
+                self.assertEqual(row["render_sha256"], args.render_sha256)
 
 
 class StopAndResumeTests(unittest.TestCase):
@@ -416,8 +559,7 @@ class StopAndResumeTests(unittest.TestCase):
                 "--scenarios", "A", "--reps", "1", "--live",
                 "--confirm-single-stack", "--namespace", "exp-a",
                 "--app", "invenio-bootstrap",
-                "--source-revision", "a" * 40,
-                "--render-sha256", "b" * 64, "--resume",
+                *render_args(directory), "--resume",
             ])
             self.assertEqual(run_quiet(
                 resume_args, run_one=fake_runner()[0]), 0)

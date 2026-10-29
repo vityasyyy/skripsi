@@ -282,6 +282,7 @@ def parse_args(argv=None):
     parser.add_argument("--app", default=harness.DEFAULT_APP)
     parser.add_argument("--source-revision")
     parser.add_argument("--render-sha256")
+    parser.add_argument("--render-file")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--confirm-single-stack", action="store_true")
     parser.add_argument("--production-like", action="store_true")
@@ -329,6 +330,23 @@ def validate_batch_args(args):
         raise BatchSafetyError("--namespace must be explicit in live mode")
     if not args.app_explicit:
         raise BatchSafetyError("--app must be explicit in live mode")
+    if not args.render_sha256:
+        raise BatchSafetyError(
+            "--render-sha256 is required in live mode; freeze the render first")
+    if not args.source_revision:
+        raise BatchSafetyError(
+            "--source-revision is required in live mode; freeze the revision first")
+    if not args.render_file:
+        raise BatchSafetyError(
+            "--render-file is required in live mode; freeze the render bundle first")
+    if "://" in args.render_file:
+        raise BatchSafetyError("--render-file must be a local file, not a URL")
+    try:
+        harness.load_declaration(
+            args.render_file, args.render_sha256, args.source_revision,
+            args.namespace)
+    except harness.DeclarationError as error:
+        raise BatchSafetyError(f"invalid frozen render: {error}") from None
 
 
 def _new_manifest(args, plan, batch_id):
@@ -820,6 +838,8 @@ def _run_one(args, item, run_id):
         argv.extend(["--source-revision", args.source_revision])
     if args.render_sha256:
         argv.extend(["--render-sha256", args.render_sha256])
+    if args.render_file:
+        argv.extend(["--render-file", args.render_file])
     argv.extend(["--baseline-timeout", str(args.baseline_timeout)])
     if args.live:
         argv.extend(["--live", "--confirm-single-stack"])

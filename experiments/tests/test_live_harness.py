@@ -7,6 +7,7 @@ an in-memory fake.
 import copy
 import csv
 from datetime import datetime, timezone
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -192,12 +193,67 @@ def observation(at=0, deployment=None, configmap=None, secret=None, service=None
     )
 
 
-def contract(obs=None):
+def contract(obs=None, decl=None):
     obs = obs or observation()
+    decl = decl or declaration()
     return harness.build_contract(
-        obs, namespace="invenio", quarantine_namespace="exp-invenio-drift",
-        source_revision="b" * 40, render_sha256="c" * 64,
+        decl, obs, namespace="invenio",
+        quarantine_namespace="exp-invenio-drift",
     )
+
+
+DECLARATION_REVISION = "b" * 40
+
+
+def declaration_bundle(objects=None, revision=DECLARATION_REVISION):
+    if objects is None:
+        objects = [
+            web_deployment(),
+            web_configmap(),
+            sealed_secret(),
+            web_service(),
+            {
+                "apiVersion": "v1",
+                "kind": "Namespace",
+                "metadata": {"name": "invenio"},
+            },
+            {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {"name": "invenio-db-secrets", "namespace": "invenio"},
+                "data": {"password": "SECRET-VALUE-MUST-NOT-LEAK"},
+            },
+        ]
+    return {
+        "format": "invenio-frozen-render-v1",
+        "source_revision": revision,
+        "objects": objects,
+    }
+
+
+def declaration(data=None, digest=None, revision=DECLARATION_REVISION,
+                namespace="invenio"):
+    data = (json.dumps(declaration_bundle(), sort_keys=True).encode()
+            if data is None else data)
+    digest = hashlib.sha256(data).hexdigest() if digest is None else digest
+    return harness.load_declaration_bytes(
+        data, digest, revision, namespace)
+
+
+def declaration_from(mutate, revision=DECLARATION_REVISION):
+    bundle = declaration_bundle()
+    mutate(bundle)
+    data = json.dumps(bundle, sort_keys=True).encode()
+    return harness.load_declaration_bytes(
+        data, hashlib.sha256(data).hexdigest(), revision, "invenio")
+
+
+def write_render(directory, bundle=None):
+    bundle = declaration_bundle() if bundle is None else bundle
+    path = Path(directory) / "render.json"
+    data = json.dumps(bundle, sort_keys=True).encode()
+    path.write_bytes(data)
+    return path, hashlib.sha256(data).hexdigest()
 
 
 def node_object(name, cpu="4", memory="8Gi"):
@@ -444,16 +500,19 @@ class SafetyTests(unittest.TestCase):
 
     def test_no_token_is_ever_printed(self):
         secret = "tok-SECRET-123"
-        args = harness.parse_args([
-            "--arm", "gitops", "--scenario", "B", "--rep", "1", "--live",
-            "--namespace", "invenio", "--app", "invenio-bootstrap",
-            "--confirm-single-stack",
-            "--source-revision", "b" * 40, "--render-sha256", "c" * 64,
-        ])
-        with mock.patch("harness.Http") as http:
-            http.return_value.get.side_effect = harness.HarnessError("boom")
-            with self.assertRaises(harness.HarnessError) as caught:
-                harness.validate_live_args(args, environ={"INVENIO_TOKEN": secret})
+        with tempfile.TemporaryDirectory() as directory:
+            path, digest = write_render(directory)
+            args = harness.parse_args([
+                "--arm", "gitops", "--scenario", "B", "--rep", "1", "--live",
+                "--namespace", "invenio", "--app", "invenio-bootstrap",
+                "--confirm-single-stack", "--render-file", str(path),
+                "--source-revision", "b" * 40, "--render-sha256", digest,
+            ])
+            with mock.patch("harness.Http") as http:
+                http.return_value.get.side_effect = harness.HarnessError("boom")
+                with self.assertRaises(harness.HarnessError) as caught:
+                    harness.validate_live_args(
+                        args, environ={"INVENIO_TOKEN": secret})
         self.assertNotIn(secret, str(caught.exception))
 
 
@@ -533,6 +592,378 @@ class ContractTests(unittest.TestCase):
         obs = observation(extras=["exp-invenio-drift/Deployment/invenio-web"])
         self.assertEqual(harness.score(spec, obs), 100)
         self.assertTrue(obs.extra_resources)
+
+
+class IndependentOracleTests(unittest.TestCase):
+    def test_live_baseline_cannot_supply_its_own_expected_values(self):
+        frozen = declaration()
+        drifted = observation(deployment=web_deployment(image="drift:tag"))
+        spec = contract(drifted, frozen)
+        deployment = next(resource for resource in spec.resources
+                          if resource["kind"] == "Deployment")
+        self.assertEqual(
+            deployment["fields"][
+                "/spec/template/spec/containers/web/image"],
+            web_deployment()["spec"]["template"]["spec"]["containers"][0][
+                "image"])
+        self.assertEqual(harness.score(spec, drifted), 75)
+        self.assertTrue(any(
+            diff["path"] == "/spec/template/spec/containers/web/image"
+            for diff in harness.field_diffs(spec, drifted)))
+        self.assertEqual(harness.score(spec, observation()), 100)
+
+    def test_live_preflight_requires_and_validates_the_render_bundle(self):
+        args = harness.parse_args([
+            "--arm", "gitops", "--scenario", "B", "--rep", "1", "--live",
+            "--namespace", "invenio", "--app", "invenio-bootstrap",
+            "--confirm-single-stack",
+            "--source-revision", "b" * 40, "--render-sha256", "c" * 64,
+        ])
+        with mock.patch.object(harness, "Http") as http, \
+                mock.patch.object(harness, "verify_seed") as seed:
+            with self.assertRaises(harness.SafetyError):
+                harness.validate_live_args(
+                    args, environ={"INVENIO_TOKEN": "x"})
+        http.assert_not_called()
+        seed.assert_not_called()
+
+    def test_live_preflight_rejects_a_tampered_bundle_before_http(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "render.json"
+            data = json.dumps(declaration_bundle()).encode()
+            path.write_bytes(data)
+            args = harness.parse_args([
+                "--arm", "gitops", "--scenario", "B", "--rep", "1", "--live",
+                "--namespace", "invenio", "--app", "invenio-bootstrap",
+                "--confirm-single-stack", "--render-file", str(path),
+                "--source-revision", "b" * 40,
+                "--render-sha256", "0" * 64,
+            ])
+            with mock.patch.object(harness, "Http") as http, \
+                    mock.patch.object(harness, "verify_seed") as seed:
+                with self.assertRaises(harness.SafetyError):
+                    harness.validate_live_args(
+                        args, environ={"INVENIO_TOKEN": "x"})
+            http.assert_not_called()
+            seed.assert_not_called()
+
+    def test_declared_defaults_and_quantities_are_equivalent(self):
+        def mutate(bundle):
+            container = (bundle["objects"][0]["spec"]["template"]["spec"]
+                         ["containers"][0])
+            container["resources"]["requests"].update(
+                {"cpu": "1000m", "memory": "2Gi"})
+            container["resources"]["limits"].update(
+                {"cpu": "1", "memory": "2048Mi"})
+            bundle["objects"][3]["spec"].pop("type")
+
+        frozen = declaration_from(mutate)
+        deployment = web_deployment()
+        container = deployment["spec"]["template"]["spec"]["containers"][0]
+        container["resources"]["requests"].update(
+            {"cpu": "1", "memory": "2048Mi"})
+        container["resources"]["limits"].update(
+            {"cpu": "1000m", "memory": "2Gi"})
+        live = observation(deployment=deployment)
+        spec = contract(live, frozen)
+        self.assertEqual(harness.score(spec, live), 100)
+        self.assertEqual(harness.field_diffs(spec, live), [])
+
+    def test_unrelated_strings_are_not_normalized(self):
+        image = "ghcr.io/vityasyyy/invenio-ugm:release-v1"
+
+        def mutate(bundle):
+            (bundle["objects"][0]["spec"]["template"]["spec"]["containers"][0]
+             ["image"]) = image
+
+        frozen = declaration_from(mutate)
+        live = observation(deployment=web_deployment(
+            image="ghcr.io/vityasyyy/invenio-ugm:RELEASE-V1"))
+        spec = contract(live, frozen)
+        self.assertEqual(harness.score(spec, live), 75)
+
+    def test_hpa_owned_replicas_are_excluded_and_retained_separately(self):
+        frozen = declaration()
+        deployment = web_deployment()
+        deployment["spec"]["replicas"] = 1
+        live = observation(
+            deployment=deployment,
+            hpa=harness.hpa_state(web_hpa(desired=1, current=1,
+                                          spec_replicas=1), deployment))
+        spec = contract(live, frozen)
+        declared = next(resource for resource in spec.resources
+                        if resource["kind"] == "Deployment")
+        self.assertNotIn("/spec/replicas", declared["fields"])
+        self.assertNotIn("replicas", declared["manifest"]["spec"])
+        self.assertEqual(spec.baseline_hpa["deployment_spec_replicas"], 1)
+        self.assertEqual(harness.score(spec, live), 100)
+
+    def test_per_resource_matches_and_mismatches_are_preserved(self):
+        frozen = declaration()
+        live = observation(
+            deployment=web_deployment(image="drift:tag"),
+            configmap=web_configmap(tagline="drifted"),
+        )
+        spec = contract(live, frozen)
+        result = harness.resource_results(spec, live)
+        self.assertEqual(result["score"], 50)
+        self.assertEqual(result["matched"], 2)
+        self.assertEqual(result["total"], 4)
+        by_id = {item["resource"]: item for item in result["resources"]}
+        self.assertFalse(by_id["Deployment/invenio-web"]["matched"])
+        self.assertFalse(
+            by_id["ConfigMap/invenio-app-config-6dg2chdbh4"]["matched"])
+        self.assertTrue(by_id["Service/invenio-web"]["matched"])
+        self.assertTrue(by_id["SealedSecret/invenio-app-secrets"]["matched"])
+
+    def test_missing_resource_is_a_mismatch_not_an_invented_match(self):
+        frozen = declaration()
+        live = observation()
+        live.resources.pop("Service/invenio-web")
+        spec = contract(live, frozen)
+        result = harness.resource_results(spec, live)
+        self.assertEqual(result["score"], 75)
+        service = next(item for item in result["resources"]
+                       if item["resource"] == "Service/invenio-web")
+        self.assertFalse(service["matched"])
+        self.assertTrue(service["missing"])
+
+    def test_missing_observation_stays_unknown(self):
+        spec = contract()
+        out = harness.analyze_timeline(
+            spec, [], injection(), "gitops", "B", 30)
+        self.assertIsNone(out["r1_first"])
+        self.assertIsNone(out["r1_last"])
+        self.assertIsNone(out["r1_first_details"])
+        self.assertIsNone(out["r1_last_details"])
+        self.assertEqual(out["r1_baseline"], 100.0)
+
+    def test_secret_material_never_enters_contract_or_details(self):
+        spec = contract()
+        result = harness.resource_results(
+            spec, observation())
+        text = json.dumps({"contract": spec.as_dict(), "result": result})
+        self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", text)
+        self.assertNotIn("SECRET-VALUE-MUST-NOT-LEAK", text)
+        self.assertNotIn("encryptedData", text)
+
+    def test_declared_configmap_identity_ignores_a_live_configmap(self):
+        frozen = declaration()
+        live_configmap = web_configmap()
+        live_configmap["metadata"]["name"] = "invenio-app-config-live"
+        live = observation(configmap=live_configmap)
+        spec = contract(live, frozen)
+        self.assertEqual(spec.configmap_name,
+                         "invenio-app-config-6dg2chdbh4")
+        self.assertIn("ConfigMap/invenio-app-config-6dg2chdbh4",
+                      [resource["id"] for resource in spec.resources])
+        self.assertNotIn("ConfigMap/invenio-app-config-live",
+                         [resource["id"] for resource in spec.resources])
+
+    def test_observed_argo_revision_must_match_the_frozen_revision(self):
+        frozen = declaration()
+        drifted_app = application()
+        drifted_app["status"]["sync"]["revision"] = "c" * 40
+        live = observation(argo={
+            "invenio-bootstrap": harness.application_state(drifted_app),
+            "apps": harness.application_state(application("apps")),
+        })
+        with self.assertRaises(harness.InstrumentationError):
+            contract(live, frozen)
+
+    def test_sealed_secret_contract_is_metadata_only(self):
+        spec = contract()
+        sealed = next(resource for resource in spec.resources
+                      if resource["kind"] == "SealedSecret")
+        self.assertEqual(sealed["fields"], {
+            "/metadata/annotations/" + harness.DRIFT_ANNOTATION: None})
+        self.assertNotIn("spec", sealed["manifest"])
+        self.assertNotIn("encryptedData", json.dumps(spec.as_dict()))
+
+
+class DeclarationLoaderTests(unittest.TestCase):
+    def setUp(self):
+        self.data = json.dumps(declaration_bundle(), sort_keys=True).encode()
+        self.digest = hashlib.sha256(self.data).hexdigest()
+
+    def load(self, data=None, digest=None, revision=DECLARATION_REVISION,
+             namespace="invenio"):
+        return harness.load_declaration_bytes(
+            self.data if data is None else data,
+            self.digest if digest is None else digest,
+            revision, namespace)
+
+    def bundle_with(self, mutate):
+        bundle = declaration_bundle()
+        mutate(bundle)
+        data = json.dumps(bundle, sort_keys=True).encode()
+        return data, hashlib.sha256(data).hexdigest()
+
+    def test_valid_bundle_selects_exactly_the_four_scoped_resources(self):
+        selected = self.load()
+        self.assertEqual(harness.RENDER_FORMAT, "invenio-frozen-render-v1")
+        self.assertEqual(selected.format, harness.RENDER_FORMAT)
+        self.assertEqual(selected.source_revision, DECLARATION_REVISION)
+        self.assertEqual(selected.render_sha256, self.digest)
+        self.assertEqual([resource["id"] for resource in selected.resources], [
+            "Deployment/invenio-web",
+            "ConfigMap/invenio-app-config-6dg2chdbh4",
+            "Service/invenio-web",
+            "SealedSecret/invenio-app-secrets",
+        ])
+        self.assertEqual(selected.configmap_name,
+                         "invenio-app-config-6dg2chdbh4")
+        payload = selected.as_dict()
+        self.assertEqual(payload["format"], harness.RENDER_FORMAT)
+        self.assertNotIn("objects", payload)
+        self.assertNotIn("SECRET-VALUE-MUST-NOT-LEAK", json.dumps(payload))
+
+    def test_hash_revision_and_format_mismatches_fail_closed(self):
+        with self.assertRaises(harness.DeclarationError):
+            self.load(digest="0" * 64)
+        with self.assertRaises(harness.DeclarationError):
+            self.load(revision="c" * 40)
+        data, digest = self.bundle_with(
+            lambda bundle: bundle.__setitem__("format", "other-format"))
+        with self.assertRaises(harness.DeclarationError):
+            self.load(data=data, digest=digest)
+        data, digest = self.bundle_with(
+            lambda bundle: bundle.__setitem__("source_revision", "B" * 40))
+        with self.assertRaises(harness.DeclarationError):
+            self.load(data=data, digest=digest)
+
+    def test_malformed_duplicate_and_non_finite_json_are_rejected(self):
+        cases = {
+            "truncated": b'{"format":',
+            "duplicate key": b'{"format":"a","format":"b"}',
+            "non-object": b'[]',
+        }
+        for label, data in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(harness.DeclarationError):
+                    self.load(data=data, digest=hashlib.sha256(data).hexdigest())
+        prefix = (b'{"format":"invenio-frozen-render-v1","source_revision":"'
+                  + b"b" * 40 + b'","objects":[{"apiVersion":"v1",'
+                  b'"kind":"ConfigMap","metadata":{"name":"x",'
+                  b'"namespace":"invenio"},"data":{"x":')
+        for label, literal in (("NaN", b"NaN"), ("Infinity", b"Infinity"),
+                               ("overflow", b"1e999999")):
+            data = prefix + literal + b"}}]}"
+            with self.subTest(case=label):
+                with self.assertRaises(harness.DeclarationError):
+                    self.load(data=data,
+                              digest=hashlib.sha256(data).hexdigest())
+
+    def test_duplicate_missing_and_wrong_namespace_targets_are_rejected(self):
+        cases = {
+            "duplicate deployment": lambda bundle: bundle["objects"].append(
+                copy.deepcopy(web_deployment())),
+            "missing service": lambda bundle: bundle["objects"].pop(3),
+            "wrong namespace": lambda bundle: bundle["objects"][3]["metadata"]
+            .__setitem__("namespace", "other"),
+        }
+        for label, mutate in cases.items():
+            with self.subTest(case=label):
+                data, digest = self.bundle_with(mutate)
+                with self.assertRaises(harness.DeclarationError):
+                    self.load(data=data, digest=digest)
+
+    def test_configmap_identity_comes_from_the_declared_envfrom_only(self):
+        def add_unrelated(bundle):
+            other = web_configmap(tagline="unrelated")
+            other["metadata"]["name"] = "invenio-app-config-other"
+            bundle["objects"].append(other)
+
+        data, digest = self.bundle_with(add_unrelated)
+        selected = self.load(data=data, digest=digest)
+        self.assertEqual(selected.configmap_name,
+                         "invenio-app-config-6dg2chdbh4")
+
+        def ambiguous(bundle):
+            deployment = bundle["objects"][0]
+            deployment["spec"]["template"]["spec"]["containers"][0][
+                "envFrom"].append({"configMapRef": {
+                    "name": "invenio-app-config-other"}})
+            other = web_configmap()
+            other["metadata"]["name"] = "invenio-app-config-other"
+            bundle["objects"].append(other)
+
+        data, digest = self.bundle_with(ambiguous)
+        with self.assertRaises(harness.DeclarationError):
+            self.load(data=data, digest=digest)
+
+        def missing(bundle):
+            bundle["objects"][0]["spec"]["template"]["spec"]["containers"][0][
+                "envFrom"] = [{"secretRef": {"name": "invenio-app-secrets"}}]
+
+        data, digest = self.bundle_with(missing)
+        with self.assertRaises(harness.DeclarationError):
+            self.load(data=data, digest=digest)
+
+    def test_missing_or_malformed_selected_fields_are_rejected(self):
+        def remove_image(bundle):
+            bundle["objects"][0]["spec"]["template"]["spec"]["containers"][0][
+                "image"] = None
+
+        def remove_limit(bundle):
+            bundle["objects"][0]["spec"]["template"]["spec"]["containers"][0][
+                "resources"]["limits"].pop("memory")
+
+        def no_ports(bundle):
+            bundle["objects"][3]["spec"]["ports"] = []
+
+        def no_data(bundle):
+            bundle["objects"][1]["data"] = {}
+
+        def no_tagline(bundle):
+            bundle["objects"][1]["data"].pop(harness.CONFIG_KEY)
+
+        def bad_quantity(bundle):
+            bundle["objects"][0]["spec"]["template"]["spec"]["containers"][0][
+                "resources"]["requests"]["cpu"] = "not-a-quantity"
+
+        def contaminated_sealed(bundle):
+            bundle["objects"][2]["metadata"]["annotations"] = {
+                harness.DRIFT_ANNOTATION: "contaminated"}
+
+        for label, mutate in {
+            "image": remove_image,
+            "limit": remove_limit,
+            "ports": no_ports,
+            "data": no_data,
+            "tagline": no_tagline,
+            "quantity": bad_quantity,
+            "sealed annotation": contaminated_sealed,
+        }.items():
+            with self.subTest(case=label):
+                data, digest = self.bundle_with(mutate)
+                with self.assertRaises(harness.DeclarationError):
+                    self.load(data=data, digest=digest)
+
+    def test_malformed_object_shapes_fail_closed(self):
+        cases = {
+            "deployment spec": lambda bundle: bundle["objects"][0].__setitem__(
+                "spec", None),
+            "service port": lambda bundle: bundle["objects"][3]["spec"].__setitem__(
+                "ports", [None]),
+            "configmap data": lambda bundle: bundle["objects"][1].__setitem__(
+                "data", ["not-a-map"]),
+            "sealed annotations": lambda bundle: bundle["objects"][2][
+                "metadata"].__setitem__("annotations", ["not-a-map"]),
+        }
+        for label, mutate in cases.items():
+            with self.subTest(case=label):
+                data, digest = self.bundle_with(mutate)
+                with self.assertRaises(harness.DeclarationError):
+                    self.load(data=data, digest=digest)
+
+    def test_secret_material_never_enters_the_scoped_declaration(self):
+        selected = self.load()
+        text = json.dumps({"declaration": selected.as_dict(),
+                           "resources": selected.resources})
+        self.assertNotIn("SECRET-VALUE-MUST-NOT-LEAK", text)
+        self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", text)
+        self.assertNotIn("encryptedData", text)
 
 
 class NodeMetricsTests(unittest.TestCase):
@@ -1091,6 +1522,8 @@ class ScenarioTests(unittest.TestCase):
     def test_imperative_repair_is_generic_and_keeps_hpa_replicas(self):
         drifted = web_deployment(image="drift:tag")
         drifted["spec"]["replicas"] = 1
+        drifted["spec"]["template"]["spec"]["containers"][0]["resources"][
+            "limits"]["memory"] = "1024Mi"
         fake = FakeKubectl(objects={
             ("Deployment", "invenio-web", "invenio"): drifted,
             ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"): web_configmap(),
@@ -1105,7 +1538,81 @@ class ScenarioTests(unittest.TestCase):
         self.assertEqual(repaired["spec"]["template"]["spec"]["containers"][0]
                          ["image"], web_deployment()["spec"]["template"]["spec"]
                          ["containers"][0]["image"])
+        self.assertEqual(repaired["spec"]["template"]["spec"]["containers"][0]
+                         ["resources"]["limits"]["memory"], "2Gi")
         self.assertEqual(repaired["spec"]["replicas"], 1)
+        memory_patches = [
+            container["resources"]["limits"]["memory"]
+            for _, _, _, patch, _ in fake.patches
+            for container in patch.get("spec", {}).get("template", {}).get(
+                "spec", {}).get("containers", [])
+            if "resources" in container
+        ]
+        self.assertEqual(memory_patches, ["2Gi"])
+
+    def test_equivalent_quantity_readback_is_verified_not_assumed(self):
+        class EquivalentKubectl(FakeKubectl):
+            def patch(self, kind, name, namespace, patch, patch_type="merge"):
+                result = super().patch(
+                    kind, name, namespace, patch, patch_type=patch_type)
+                doc = self.objects.get((kind, name, namespace))
+                for container in ((doc or {}).get("spec", {}).get("template", {})
+                                  .get("spec", {}).get("containers", [])):
+                    limits = (container.get("resources") or {}).get("limits") or {}
+                    if limits.get("memory") == harness.MEMORY_LIMIT_DRIFT:
+                        limits["memory"] = "1572864Ki"
+                return result
+
+        fake = EquivalentKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        })
+        injected = harness.inject(fake, self.spec, "E", "run-1",
+                                  harness.FakeClock([100.0, 100.1, 100.2]))
+        self.assertTrue(injected.accepted)
+        self.assertEqual(injected.changed[0]["actual"], "1572864Ki")
+        self.assertEqual(
+            harness._quantity_bytes(injected.changed[0]["actual"], "actual"),
+            harness._quantity_bytes(harness.MEMORY_LIMIT_DRIFT, "expected"))
+
+    def test_equivalent_quantity_noop_injection_is_rejected(self):
+        fake = FakeKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        })
+        fake.no_op_patch = True
+        with self.assertRaises(harness.InjectionError):
+            harness.inject(fake, self.spec, "E", "run-1", self.clock)
+
+    def test_semantically_equal_baseline_gets_a_distinct_drift_quantity(self):
+        frozen = declaration_from(
+            lambda bundle: bundle["objects"][0]["spec"]["template"]["spec"]
+            ["containers"][0]["resources"]["limits"].__setitem__(
+                "memory", "1.5Gi"))
+        spec = contract(decl=frozen)
+        fake = FakeKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        })
+        injected = harness.inject(fake, spec, "E", "run-1", self.clock)
+        self.assertTrue(injected.accepted)
+        self.assertEqual(injected.changed[0]["actual"], "1024Mi")
+        self.assertNotEqual(
+            harness._quantity_bytes(injected.changed[0]["actual"], "actual"),
+            harness._quantity_bytes(injected.changed[0]["expected"],
+                                    "baseline"))
 
 
 class TimelineTests(unittest.TestCase):
@@ -1395,17 +1902,22 @@ class LiveRunnerTests(unittest.TestCase):
                 "invenio-bootstrap": application()}
         fake = FakeKubectl(apps=apps, objects=objects)
         with tempfile.TemporaryDirectory() as directory:
+            path, digest = write_render(directory)
             args = harness.parse_args([
                 "--arm", "imperative", "--scenario", "B", "--rep", "1",
                 "--live", "--confirm-single-stack", "--namespace", "invenio",
                 "--app", "invenio-bootstrap",
-                "--source-revision", "b" * 40, "--render-sha256", "c" * 64,
+                "--render-file", str(path),
+                "--source-revision", "b" * 40, "--render-sha256", digest,
                 "--timeout", "5", "--sample-interval", "0.01",
                 "--imperative-interval", "0.01", "--baseline-timeout", "5",
                 "--reset-timeout", "5", "--out", directory, "--run-id",
                 "live-1",
             ])
-            runner = harness.LiveRunner(args, {}, fake, AdvancingClock())
+            frozen = harness.load_declaration(
+                path, digest, "b" * 40, "invenio")
+            runner = harness.LiveRunner(
+                args, {"declaration": frozen}, fake, AdvancingClock())
             with mock.patch("harness.Sampler", DeterministicSampler), \
                     mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
@@ -1418,6 +1930,11 @@ class LiveRunnerTests(unittest.TestCase):
             self.assertGreater(row["kubectl_cmds"], 0)
             self.assertEqual(row["arm_restore_status"], "restored")
             self.assertEqual(row["cleanup_status"], "ok")
+            self.assertEqual(row["r1_baseline_details"]["score"], 100)
+            self.assertEqual(row["r1_first_details"]["total"], 4)
+            self.assertEqual(row["r1_last_details"]["total"], 4)
+            self.assertTrue(all(item["matched"] for item in
+                                row["r1_last_details"]["resources"]))
             self.assertFalse((Path(directory) / "live-1" / "commands.jsonl")
                              .read_text().strip() == "")
             for app in fake.apps.values():
@@ -1440,16 +1957,21 @@ class LiveRunnerTests(unittest.TestCase):
         fake = FakeKubectl(apps=apps, objects=objects)
         fake.pods = lambda namespace: [dict(UNREADY_POD)]
         with tempfile.TemporaryDirectory() as directory:
+            path, digest = write_render(directory)
             args = harness.parse_args([
                 "--arm", "gitops", "--scenario", "B", "--rep", "1",
                 "--live", "--confirm-single-stack", "--namespace", "invenio",
                 "--app", "invenio-bootstrap",
-                "--source-revision", "b" * 40, "--render-sha256", "c" * 64,
+                "--render-file", str(path),
+                "--source-revision", "b" * 40, "--render-sha256", digest,
                 "--timeout", "1", "--sample-interval", "0.01",
                 "--baseline-timeout", "0.2", "--reset-timeout", "1",
                 "--out", directory, "--run-id", "baseline-failed",
             ])
-            runner = harness.LiveRunner(args, {}, fake, AdvancingClock())
+            frozen = harness.load_declaration(
+                path, digest, "b" * 40, "invenio")
+            runner = harness.LiveRunner(
+                args, {"declaration": frozen}, fake, AdvancingClock())
             with mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
                 code = runner.run()
@@ -1468,6 +1990,91 @@ class LiveRunnerTests(unittest.TestCase):
             serialized = json.dumps(readiness)
             self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", serialized)
             self.assertNotIn("encryptedData", serialized)
+
+    def test_live_runner_without_declaration_fails_closed(self):
+        objects = {
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }
+        fake = FakeKubectl(objects=objects)
+        with tempfile.TemporaryDirectory() as directory:
+            path, digest = write_render(directory)
+            args = harness.parse_args([
+                "--arm", "gitops", "--scenario", "B", "--rep", "1",
+                "--live", "--confirm-single-stack", "--namespace", "invenio",
+                "--app", "invenio-bootstrap",
+                "--render-file", str(path),
+                "--source-revision", "b" * 40, "--render-sha256", digest,
+                "--timeout", "1", "--sample-interval", "0.01",
+                "--baseline-timeout", "1", "--reset-timeout", "1",
+                "--out", directory, "--run-id", "no-declaration",
+            ])
+            runner = harness.LiveRunner(
+                args, {}, fake, AdvancingClock())
+            with mock.patch("time.sleep", lambda _: None), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = runner.run()
+            row = json.loads(
+                (Path(directory) / "no-declaration.jsonl").read_text())
+            self.assertEqual(code, 1)
+            self.assertEqual(row["status"], "safety_refusal")
+            self.assertIn("frozen render declaration", row["error"])
+            self.assertIsNone(row.get("injection"))
+            self.assertEqual(fake.patches, [])
+            self.assertEqual(fake.applies, [])
+            self.assertEqual(fake.deletes, [])
+
+    def test_live_baseline_divergence_is_not_repaired_or_accepted(self):
+        objects = {
+            ("Deployment", "invenio-web", "invenio"):
+                web_deployment(image="drift:tag"),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }
+        fake = FakeKubectl(objects=objects)
+        with tempfile.TemporaryDirectory() as directory:
+            path, digest = write_render(directory)
+            args = harness.parse_args([
+                "--arm", "gitops", "--scenario", "B", "--rep", "1",
+                "--live", "--confirm-single-stack", "--namespace", "invenio",
+                "--app", "invenio-bootstrap",
+                "--render-file", str(path),
+                "--source-revision", "b" * 40, "--render-sha256", digest,
+                "--timeout", "1", "--sample-interval", "0.01",
+                "--baseline-timeout", "1", "--reset-timeout", "1",
+                "--out", directory, "--run-id", "diverged",
+            ])
+            frozen = harness.load_declaration(
+                path, digest, "b" * 40, "invenio")
+            runner = harness.LiveRunner(
+                args, {"declaration": frozen}, fake, AdvancingClock())
+            with mock.patch("time.sleep", lambda _: None), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = runner.run()
+            row = json.loads(
+                (Path(directory) / "diverged.jsonl").read_text())
+            self.assertEqual(code, 1)
+            self.assertEqual(row["status"], "baseline_failure")
+            self.assertIn("frozen declaration", row["error"])
+            self.assertIsNone(row.get("injection"))
+            self.assertEqual(fake.patches, [])
+            self.assertEqual(fake.applies, [])
+            self.assertEqual(fake.deletes, [])
+            self.assertEqual(
+                fake.objects[("Deployment", "invenio-web", "invenio")][
+                    "spec"]["template"]["spec"]["containers"][0]["image"],
+                "drift:tag")
+            readiness = json.loads(
+                (Path(directory) / "diverged" / "readiness.json").read_text())
+            self.assertEqual(readiness[-1]["reason"],
+                             "declaration_mismatch")
 
 
 class SamplerLifecycleTests(unittest.TestCase):

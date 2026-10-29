@@ -32,6 +32,7 @@ namespace lengan kembar dan menolak run bila ada lebih dari satu stack
 | `run_one.py` | CLI satu run; default dry-run, `--live` untuk mutasi nyata |
 | `run_matrix.py` | Orkestrator batch 210 run; manifest, resume, ringkasan R1/R2 |
 | `harness.py` | arm control, snapshot, kontrak R1, injeksi, repair, kolektor, timeline |
+| `declaration.py` | loader deklarasi render beku, seleksi empat resource, validasi identitas/bidang |
 | `convert.py` | konversi JSONL ke kolom CSV analisis historis |
 | `runs/` | keluaran runtime; diabaikan Git |
 
@@ -80,6 +81,7 @@ python3 experiments/live/run_matrix.py \
   --live --confirm-single-stack --production-like \
   --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
   --namespace invenio --app invenio-bootstrap \
+  --render-file /path/to/invenio-frozen-render.json \
   --source-revision <40-hex> --render-sha256 <64-hex> \
   --out experiments/live/runs/formal-<batch-id>
 ```
@@ -100,14 +102,17 @@ Untuk meneruskan sisa run setelah kegagalan:
 python3 experiments/live/run_matrix.py \
   --live --confirm-single-stack --production-like \
   --namespace invenio --app invenio-bootstrap \
+  --render-file /path/to/invenio-frozen-render.json \
   --source-revision <40-hex> --render-sha256 <64-hex> \
   --out experiments/live/runs/formal-<batch-id> --resume
 ```
 
 Resume hanya menerima manifest yang cocok dengan rencana (seed, lengan,
 skenario, replikasi, namespace, app, revisi, render, mode, flag cooldown/retry)
-dan tidak pernah menimpa run terminal. Run terminal tidak diulang. Kegagalan
-baseline yang masih memiliki jatah retry tercatat sebagai `retrying` dan
+dan tidak pernah menimpa run terminal. Run terminal tidak diulang. Berkas
+render dibaca dan di-hash ulang pada setiap invokasi; isi/revisi/hash yang
+berubah tidak dapat melanjutkan batch beku, dan path saja bukan identitas.
+Kegagalan baseline yang masih memiliki jatah retry tercatat sebagai `retrying` dan
 dilanjutkan dengan id retry yang sama; kegagalan terminal tetap gagal. Untuk
 mengulang sel yang gagal, buat batch baru dengan `--batch-id`/`--out` baru.
 Tanpa `--batch-id`, id batch diturunkan secara deterministik dari rencana dan
@@ -162,6 +167,7 @@ python3 experiments/live/run_one.py \
   --arm gitops --scenario B --rep 1 \
   --namespace exp-arm-a --app invenio-bootstrap \
   --confirm-single-stack --live \
+  --render-file /path/to/invenio-frozen-render.json \
   --source-revision <40-hex> --render-sha256 <64-hex> \
   --timeout 300 --sample-interval 1 --imperative-interval 5 \
   --out experiments/live/runs
@@ -176,9 +182,15 @@ Syarat `--live` bersifat fail-closed:
    `exp-<namespace>-drift`.
 4. `INVENIO_TOKEN` wajib; verifikasi seed memakai API Invenio dan berhenti bila
    token hilang, draf/berkas tidak ada, ukuran/checksum tidak cocok.
-5. `--source-revision` dan `--render-sha256` wajib; keduanya dibekukan sebelum
-   run, bukan direkonstruksi setelah hasil terlihat. Revisi harus sama dengan
-   revisi yang teramati pada `invenio-bootstrap`, jika tidak harness berhenti.
+5. `--render-file`, `--source-revision`, dan `--render-sha256` wajib. Berkas
+   render dibaca **satu kali**, di-hash dari byte yang benar-benar di-parse, lalu
+   divalidasi sebelum HTTP Invenio atau aktivasi lengan: format
+   `invenio-frozen-render-v1`, revisi 40 heksadesimal sama dengan
+   `--source-revision` dan revisi Argo yang teramati, SHA-256 sama dengan
+   `--render-sha256`, objek bertarget unik, namespace benar, dan seluruh bidang
+   terpilih ada. Input yang hilang, berubah, duplikat, non-finit, atau tidak
+   konsisten ditolak tanpa mencetak isi berkas. Revisi/render tidak boleh
+   direkonstruksi setelah hasil terlihat.
 6. Preflight menolak bila `invenio-web` ada di lebih dari satu namespace, bila
    Application tidak menunjuk namespace target, atau bila namespace karantina
    sudah ada.
@@ -187,6 +199,131 @@ Syarat `--live` bersifat fail-closed:
 > satu stack berurutan. Izin guard bukan sertifikasi kesiapan formal: eksekusi
 > tetap menunggu gerbang pada `experiments/LIVE-OBSERVER.md`, pembekuan,
 > persetujuan pembimbing, kapasitas, seed, dan reset yang terverifikasi.
+
+## Oracle R1 beku (deklarasi independen)
+
+Nilai harapan R1 **tidak lagi** diambil dari baseline live. Baseline live yang
+sudah berubah tidak boleh mensertifikasi dirinya sendiri. Kedua entrypoint live
+(`run_one.py`/`harness.py` dan `run_matrix.py`) menerima `--render-file`: ekspor
+render GitOps beku dalam JSON dengan bentuk:
+
+```json
+{
+  "format": "invenio-frozen-render-v1",
+  "source_revision": "<40 heksadesimal huruf kecil>",
+  "objects": [{"apiVersion": "...", "kind": "...", "metadata": {...}, "...": "..."}]
+}
+```
+
+`--render-sha256` adalah SHA-256 dari **byte berkas yang benar-benar di-parse**.
+Loader stdlib membaca byte satu kali, menghitung hash dari byte itu, lalu
+mem-parse byte yang sama; berkas tidak dibaca ulang antara verifikasi dan
+pemakaian. Format, revisi, hash, objek, namespace, dan bidang terpilih
+divalidasi sebelum HTTP Invenio, aktivasi lengan, atau injeksi. Dry-run tidak
+memerlukan berkas render dan tetap tidak melakukan subprocess/HTTP.
+
+Objek yang dipilih tepat empat, bukan seluruh render:
+
+| Resource | Bidang terpilih |
+|---|---|
+| `Deployment/invenio-web` | image container `web`; `requests`/`limits` CPU dan memori |
+| `ConfigMap/invenio-app-config-<hash>` | seluruh `data`; identitas diambil dari `envFrom.configMapRef` container `web` yang dideklarasikan, bukan dari pod live |
+| `Service/invenio-web` | `spec.type`, selector `app.kubernetes.io/name`, port pertama dan `targetPort` |
+| `SealedSecret/invenio-app-secrets` | hanya anotasi `experiment.invenio.ugm/drift`; `spec.encryptedData` tidak pernah dibaca atau disimpan |
+
+Render penuh boleh memuat objek aplikasi lain; objek di luar empat target
+diabaikan. Identitas target ganda, target hilang, namespace salah, referensi
+ConfigMap yang ambigu/hilang, bidang terpilih hilang, atau anotasi drift yang
+sudah ada di deklarasi ditolak, bukan ditebak.
+
+R1 = persentase resource yang **seluruh bidang terpilihnya** cocok
+(4 resource = 100%, 3 = 75%). Setiap baris menyimpan `r1_baseline_details`,
+`r1_first_details`, dan `r1_last_details` berisi identitas resource, status
+cocok, dan mismatch yang tersanitasi; agregat `r1_baseline`/`r1_first`/
+`r1_last` dihitung dari logika pembanding yang sama. Observasi yang tidak ada
+tetap `null`, bukan match ciptaan. `/spec/replicas` milik HPA tetap dikecualikan
+dari bidang Deployment; status HPA baseline disimpan terpisah untuk kontrol
+skenario A.
+
+Baseline live diverifikasi terhadap deklarasi sebelum injeksi. Bila berbeda,
+run berhenti sebagai `baseline_failure` dengan alasan
+`declaration_mismatch`; harness **tidak** memperbaiki baseline secara otomatis
+dan **tidak** memakai nilai live sebagai default. Manifest pemulihan Deployment
+dibangun dari deklarasi dan tidak pernah memuat `replicas`; nilai replika
+skenario A diambil dari status HPA baseline yang teramati, bukan dari deklarasi.
+
+Dua ekuivalensi sempit diterapkan pada pembanding dan pembacaan balik injeksi:
+
+- `Service.spec.type` yang dihilangkan sama dengan `ClusterIP`;
+- kuantitas Kubernetes dievaluasi dengan logika kuantitas yang ada, sehingga
+  `1000m` = `1` dan `2Gi` = `2048Mi`.
+
+Tidak ada normalisasi string lain. Patch pemulihan memakai nilai mentah
+deklarasi (string kuantitas yang valid), bukan nilai hasil normalisasi, dan
+verifikasi injeksi tetap memeriksa perubahan yang benar-benar terjadi.
+
+### Resep persiapan render beku
+
+Resep ini offline dan tidak dijalankan oleh harness. Gunakan checkout/arsip
+GitOps yang tidak berubah, renderer Kustomize yang sudah ada, dan PyYAML yang
+sudah terpasang; tidak ada framework renderer baru, unduhan, atau instalasi.
+
+```bash
+# 1. Checkout imutabel pada revisi yang dibekukan.
+git clone https://github.com/vityasyyy/invenio-rdm-gitops.git /tmp/invenio-rdm-gitops
+cd /tmp/invenio-rdm-gitops
+git checkout --detach <40-hex>
+test "$(git rev-parse HEAD)" = "<40-hex>"
+test -z "$(git status --porcelain)"
+
+# 2. Render dengan entrypoint Kustomize yang sudah ada.
+kustomize build k8s/apps/invenio/kustomization.yaml > /tmp/invenio-render.yaml
+
+# 3. Konversi offline ke JSON dan cetak hash byte.
+python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import yaml
+
+revision = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"], text=True).strip()
+documents = [item for item in yaml.safe_load_all(
+    Path("/tmp/invenio-render.yaml").read_text()) if item]
+bundle = {
+    "format": "invenio-frozen-render-v1",
+    "source_revision": revision,
+    "objects": documents,
+}
+data = json.dumps(
+    bundle, sort_keys=True, indent=2, ensure_ascii=False).encode() + b"\n"
+Path("/tmp/invenio-frozen-render.json").write_bytes(data)
+print(hashlib.sha256(data).hexdigest())
+PY
+
+# 4. Catat hash dan versi alat di catatan pembekuan.
+shasum -a 256 /tmp/invenio-frozen-render.json
+kustomize version
+python3 -c 'import sys, yaml; print(sys.version); print(yaml.__version__)'
+```
+
+Kuantitas Kubernetes harus tetap berupa string pada render (misalnya `"1"`,
+`"250m"`, `"2Gi"`). Loader menolak angka mentah untuk bidang kuantitas; itu
+adalah cacat render, bukan alasan untuk mengoersi nilai. Simpan berkas lengkap
+secara lokal untuk verifikasi pembekuan; hanya kontrak tersanitasi, hash,
+identitas, dan detail mismatch yang ditulis ke bukti. Versi yang teramati saat
+resep ini ditulis: Kustomize v5.8.1, kubectl v1.37.1, Python 3.12.8, PyYAML
+6.0.3; repository tidak mem-pin versi tersebut, jadi catatan pembekuan harus
+memakai versi aktual.
+
+**Batas provenance.** Hash dan revisi yang dideklarasikan membuktikan integritas
+byte dan kesesuaian revisi, **bukan** bahwa berkas benar-benar dihasilkan dari
+commit tersebut. Catat URL checkout, revisi, `git status --porcelain` kosong,
+perintah render, versi Kustomize/Python/PyYAML, dan hash hasil di catatan
+pembekuan. Jangan memberi label ulang pada hash lama atau mengattest berkas
+arbitrer sebagai terverifikasi sumber. Regenerasi yang berbeda harus menjadi
+artefak beku baru dengan hash dan catatan baru.
 
 ## Prosedur dua lengan berurutan
 
@@ -225,11 +362,11 @@ menghentikan run sebelum/sesudah mutasi dan menghasilkan exit nonzero.
 
 | Skenario | Objek nyata | Injeksi | Pemulihan | Atribusi/analisis |
 |---|---|---|---|---|
-| A | `Deployment/invenio-web`, `HPA/invenio-web-hpa` | `spec.replicas` ke bawah minimum HPA (2→1) | HPA mengembalikan replika | Kontrol HPA; `/spec/replicas` dikecualikan dari R1 statis; bukan efikasi ArgoCD/imperatif |
-| B | container `web` | tag image sintetis `...:drift-<id>` | digest image baseline dari snapshot | Drift terkelola; ArgoCD atau runbook |
-| C | `invenio-app-config-<hash>` | key non-rahasia `INSTANCE_TAGLINE` | data baseline | Drift terkelola; adopsi runtime dilaporkan terpisah |
-| D | `Deployment/invenio-web` | hapus objek | manifest Deployment baseline tersanitasi (tanpa `replicas` milik HPA); render beku tetap gerbang formal | Drift terkelola; kesetaraan objek, bukan status rollout |
-| E | container `web` | limit memori `2Gi` → `1536Mi` | nilai baseline | Drift terkelola |
+| A | `Deployment/invenio-web`, `HPA/invenio-web-hpa` | `spec.replicas` ke bawah minimum HPA (dari status HPA baseline) | HPA mengembalikan replika | Kontrol HPA; `/spec/replicas` dikecualikan dari R1 statis; bukan efikasi ArgoCD/imperatif |
+| B | container `web` | tag image sintetis `...:drift-<id>` | image deklarasi beku | Drift terkelola; ArgoCD atau runbook |
+| C | `invenio-app-config-<hash>` | key non-rahasia `INSTANCE_TAGLINE` | data deklarasi beku | Drift terkelola; adopsi runtime dilaporkan terpisah |
+| D | `Deployment/invenio-web` | hapus objek | manifest Deployment dari deklarasi beku (tanpa `replicas` milik HPA) | Drift terkelola; kesetaraan objek, bukan status rollout |
+| E | container `web` | limit memori `2Gi` → `1536Mi` | nilai deklarasi beku | Drift terkelola |
 | F | salinan `invenio-web` | buat di `exp-<namespace>-drift`, replika 0 | harness menghapus di `finally` | Batas visibilitas; objek di luar Application tidak diharapkan dipangkas ArgoCD |
 | G | `SealedSecret/invenio-app-secrets` | **hanya** anotasi metadata `experiment.invenio.ugm/drift` | hapus anotasi / restore baseline | Tidak pernah membaca atau menulis `spec.encryptedData`; atribusi ArgoCD/imperatif/lainnya dicatat |
 
@@ -261,9 +398,11 @@ perubahan pengendali.
   Kegagalan perintah koreksi: `recovery_failure`. Postcondition gagal:
   `reset_failure`.
 - R1 = persentase resource yang **seluruh bidang terpilihnya** cocok, dengan
-  penyebut kontrak baseline yang sama. `/spec/replicas` dikecualikan untuk
-  Deployment milik HPA; status HPA dilaporkan terpisah. Objek karantina F tidak
-  masuk penyebut; keberadaannya dicatat di `extra_resources`.
+  penyebut empat resource dari deklarasi beku yang sama. `/spec/replicas`
+  dikecualikan untuk Deployment milik HPA; status HPA dilaporkan terpisah.
+  Objek karantina F tidak masuk penyebut; keberadaannya dicatat di
+  `extra_resources`. Per-resource match/mismatch disimpan di
+  `r1_baseline_details`, `r1_first_details`, dan `r1_last_details`.
 - Secret hanya dibandingkan sebagai keberadaan/anotasi metadata; nilai
   `Secret`/`SealedSecret` tidak pernah masuk bukti.
 
@@ -311,7 +450,7 @@ Direktori `<out>/<run_id>/` menyimpan:
 |---|---|
 | `baseline.json` | snapshot baseline tersanitasi, HPA, pod/node, batas akuisisi; `null` bila baseline gagal |
 | `readiness.json` | observasi gate baseline yang ditolak: alasan, waktu, batas akuisisi, pod/node/HPA/Argo tanpa resource/Secret |
-| `contract.json` | kontrak inventory/bidang, `baseline_sha256`, revisi/render |
+| `contract.json` | kontrak empat resource dari deklarasi beku: identitas, bidang terpilih, manifest pemulihan tersanitasi, `baseline_sha256`, revisi/render |
 | `samples.jsonl` | setiap sampel: resource fields, HPA, status Argo, ekstra |
 | `injection.json` | `t0`/`t_a`/verifikasi, bidang berubah, perintah |
 | `imperative.json` | deteksi, bukti, perintah koreksi, kegagalan |
@@ -326,7 +465,8 @@ Kolom JSONL utama: `run_id`, `env`/`arm`, `scenario`, `rep`, `status`,
 `evidence_seconds`, `recovery_seconds`, `*_status`, `censor_seconds`,
 `max_sample_gap_seconds`, `observation_end_*`, `collector_started_*`,
 `detection_controller`, `recovery_controller`, `detection_ref`, `evidence_ref`,
-`r1_baseline`, `r1_first`, `r1_last`, `kubectl_cmds`, `analysis_group`,
+`r1_baseline`, `r1_first`, `r1_last`, `r1_baseline_details`,
+`r1_first_details`, `r1_last_details`, `kubectl_cmds`, `analysis_group`,
 `efficacy_eligible`, `source_revision`, `render_sha256`, `baseline_sha256`.
 
 ### Keluaran batch
@@ -436,8 +576,12 @@ dry-run sebagai observasi.
    harness memakai token dan gagal tertutup, tetapi tidak memulihkan data.
 4. **Versi runtime**: ArgoCD, CNPG, OpenSearch, MinIO, dan chart belum dibekukan
    pada revisi yang benar-benar berjalan.
-5. **Render dan revisi**: `--source-revision`/`--render-sha256` harus berasal dari
-   ekspor render beku; harness tidak membuktikan autentisitas ekspor.
+5. **Render, revisi, dan oracle**: `--render-file`,
+   `--source-revision`/`--render-sha256` harus berasal dari ekspor render beku
+   dan hash byte-nya; loader memvalidasi integritas dan konsistensi revisi,
+   tetapi tidak membuktikan provenance render. Catatan pembekuan harus memuat
+   perintah/versi persiapan. Harness tidak memperbaiki baseline yang berbeda
+   dari deklarasi.
 6. **Metode**: tinjauan pemilik/pembimbing untuk lengan imperatif terotomasi,
    kontrol HPA, keluarga uji, dan penanganan data tersensor.
 7. **Kapasitas, NTP, SMTP, HA OpenSearch**: bukti jendela beban, sinkronisasi jam,
@@ -450,8 +594,13 @@ dry-run sebagai observasi.
 
 ## Keselamatan dan pengujian
 
-- Dry-run tidak memanggil `subprocess`/HTTP; live membutuhkan `--live` eksplisit.
-  Batch dry-run memakai jalur harness yang sama dan tidak membuat klien Kubernetes.
+- Dry-run tidak memanggil `subprocess`/HTTP dan tidak memerlukan berkas render;
+  live membutuhkan `--live` eksplisit. Batch dry-run memakai jalur harness yang
+  sama dan tidak membuat klien Kubernetes.
+- Live membaca `--render-file` lokal satu kali, menghitung hash dari byte yang
+  di-parse, dan menolak URL, input hilang/duplikat/non-finit, revisi/hash tidak
+  cocok, identitas ganda, namespace salah, atau bidang terpilih hilang sebelum
+  HTTP/aktivasi lengan/injeksi. Isi berkas tidak dicetak pada error.
 - Namespace di luar `invenio`/`exp-*` ditolak; karantina selalu `exp-*`.
 - Tidak ada penghapusan seed/record, purge queue, restore, migrasi, atau
   perubahan Secret plaintext.
