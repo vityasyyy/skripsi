@@ -16,7 +16,7 @@
 - Formal workload retains the accepted multi-service scope. S1/S2 surrogates are pilot-only and cannot support formal InvenioRDM conclusions.
 - R1 uses the same desired-field equality/inventory rule in both arms; health is separate. Use safe equality checks for Secrets without publishing their values.
 - Replace root-cause-identification timing with time to obtain verifiable evidence of the configuration deviation; do not infer causal origin from a diff.
-- Scenario F is a separately interpreted unmanaged-resource visibility-boundary case, not an assumed ArgoCD self-heal success.
+- Scenario F was originally a separately interpreted unmanaged-resource visibility-boundary case; superseded 2026-10-29 by a declared `Service/invenio-web` targetPort drift that both mechanisms can repair.
 - No fabricated values, analysis results, versions, stability observations, supervisor approval, or completed-experiment claims.
 - Protocol changes remain a draft for supervisor review; existing apparatus is not certified to implement them.
 - Literature gap claims are bounded. Prior work includes controlled comparisons and timing-based evaluations; do not assert firstness or guaranteed GitOps superiority.

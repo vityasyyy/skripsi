@@ -127,6 +127,12 @@ def web_service():
     }
 
 
+def web_service_with_target(target):
+    service = web_service()
+    service["spec"]["ports"][0]["targetPort"] = target
+    return service
+
+
 def web_hpa(desired=2, current=2, spec_replicas=2, last_scale="2026-10-27T00:00:00Z",
             generation=1, observed_generation=1):
     return {
@@ -486,10 +492,16 @@ def _merge(target, patch):
         if isinstance(value, dict) and isinstance(target.get(key), dict):
             _merge(target[key], value)
         elif isinstance(value, list) and isinstance(target.get(key), list):
+            merge_key = next(
+                (candidate for candidate in ("name", "port")
+                 if any(isinstance(item, dict) and candidate in item
+                        for item in value)),
+                None,
+            )
             for item in value:
-                if isinstance(item, dict) and "name" in item:
+                if merge_key is not None and isinstance(item, dict):
                     for existing in target[key]:
-                        if existing.get("name") == item["name"]:
+                        if existing.get(merge_key) == item.get(merge_key):
                             _merge(existing, item)
                             break
                     else:
@@ -1721,6 +1733,7 @@ class ScenarioTests(unittest.TestCase):
             "B": "/spec/template/spec/containers/web/image",
             "C": "/data/INSTANCE_TAGLINE",
             "E": "/spec/template/spec/containers/web/resources/limits/memory",
+            "F": "/spec/ports/0/targetPort",
             "G": "/metadata/annotations/" + harness.DRIFT_ANNOTATION,
         }
         for scenario, path in cases.items():
@@ -1748,17 +1761,116 @@ class ScenarioTests(unittest.TestCase):
         with self.assertRaises(harness.InjectionError):
             harness.inject(fake, self.spec, "D", "run-1", self.clock)
 
-    def test_foreign_scenario_creates_in_exp_namespace_and_cleans_up(self):
-        fake = FakeKubectl(objects={})
-        injected = harness.inject(fake, self.spec, "F", "run-1", self.clock)
+    def test_service_targetport_injection_patches_the_declared_service(self):
+        injected = harness.inject(self.fake, self.spec, "F", "run-1", self.clock)
         self.assertTrue(injected.accepted)
-        self.assertEqual(injected.changed[0]["effect"], "created")
-        self.assertIn(("Deployment", "invenio-web", "exp-invenio-drift"),
-                      fake.objects)
-        cleanup = harness.cleanup_quarantine(fake, "exp-invenio-drift")
-        self.assertTrue(cleanup.ok)
+        self.assertEqual(len(injected.changed), 1)
+        change = injected.changed[0]
+        self.assertEqual(change["resource"], "Service/invenio-web")
+        self.assertEqual(change["path"], "/spec/ports/0/targetPort")
+        self.assertEqual(change["effect"], "value_changed")
+        self.assertEqual(change["expected"], "http")
+        self.assertNotEqual(change["actual"], "http")
+        self.assertEqual(
+            self.fake.objects[("Service", "invenio-web", "invenio")]
+            ["spec"]["ports"][0]["targetPort"], change["actual"])
+        self.assertEqual(
+            self.fake.patches,
+            [("Service", "invenio-web", "invenio",
+              {"spec": {"ports": [{"port": 8000,
+                                   "targetPort": change["actual"]}]}},
+              "strategic")])
+        self.assertEqual(self.fake.applies, [])
+        self.assertNotIn(("Namespace", "exp-invenio-drift", None),
+                         self.fake.objects)
         self.assertNotIn(("Deployment", "invenio-web", "exp-invenio-drift"),
-                         fake.objects)
+                         self.fake.objects)
+
+    def test_service_targetport_drift_is_always_distinct(self):
+        for baseline in ("http", 1, 8000, 65535):
+            with self.subTest(baseline=baseline):
+                frozen = declaration_from(
+                    lambda bundle, value=baseline: bundle["objects"][3]
+                    ["spec"]["ports"][0].__setitem__("targetPort", value))
+                spec = contract(decl=frozen)
+                fake = FakeKubectl(objects={
+                    ("Deployment", "invenio-web", "invenio"): web_deployment(),
+                    ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                        web_configmap(),
+                    ("SealedSecret", "invenio-app-secrets", "invenio"):
+                        sealed_secret(),
+                    ("Service", "invenio-web", "invenio"): web_service(),
+                    ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"):
+                        web_hpa(),
+                })
+                injected = harness.inject(fake, spec, "F", "run-1", self.clock)
+                self.assertTrue(injected.accepted)
+                change = injected.changed[0]
+                self.assertEqual(change["expected"], baseline)
+                self.assertNotEqual(change["actual"], baseline)
+                self.assertIs(type(change["actual"]), int)
+                self.assertTrue(1 <= change["actual"] <= 65535)
+
+    def test_service_targetport_readback_mismatch_raises(self):
+        self.fake.no_op_patch = True
+        with self.assertRaises(harness.InjectionError) as caught:
+            harness.inject(self.fake, self.spec, "F", "run-1", self.clock)
+        self.assertIn("/spec/ports/0/targetPort did not change",
+                      str(caught.exception))
+        self.assertTrue(self.fake.patches)
+
+    def test_service_targetport_drift_is_reported_by_field_diffs(self):
+        injected = harness.inject(self.fake, self.spec, "F", "run-1", self.clock)
+        observed = harness.observation_from_objects(
+            [self.fake.get("Service", "invenio-web", "invenio")],
+            at=point(100))
+        diffs = [diff for diff in harness.field_diffs(self.spec, observed)
+                 if diff["resource"] == "Service/invenio-web"]
+        self.assertEqual(diffs, [{
+            "resource": "Service/invenio-web",
+            "path": "/spec/ports/0/targetPort",
+            "expected": "http",
+            "actual": injected.changed[0]["actual"],
+        }])
+
+    def test_service_targetport_repair_restores_the_declared_service(self):
+        harness.inject(self.fake, self.spec, "F", "run-1", self.clock)
+        observed = harness.observation_from_objects(
+            [value for key, value in self.fake.objects.items()
+             if key[2] == "invenio"], at=point(101))
+        self.assertTrue(harness.field_diffs(self.spec, observed))
+        self.fake.patches.clear()
+        self.fake.applies.clear()
+        commands = harness.repair(self.fake, self.spec, observed, self.clock)
+        self.assertEqual(len(commands), 1)
+        self.assertTrue(commands[0].ok)
+        self.assertEqual(self.fake.patches, [])
+        applied = self.fake.applies[0]
+        self.assertEqual(applied["kind"], "Service")
+        self.assertEqual(applied["metadata"]["name"], "invenio-web")
+        self.assertEqual(applied["spec"]["ports"][0]["targetPort"], "http")
+        self.assertEqual(
+            self.fake.objects[("Service", "invenio-web", "invenio")]
+            ["spec"]["ports"][0]["targetPort"], "http")
+
+    def test_service_injection_leaves_old_quarantine_residue_to_cleanup(self):
+        deployment = web_deployment()
+        deployment["metadata"]["namespace"] = "exp-invenio-drift"
+        deployment["spec"]["replicas"] = 0
+        self.fake.objects[("Namespace", "exp-invenio-drift", None)] = {
+            "apiVersion": "v1", "kind": "Namespace",
+            "metadata": {"name": "exp-invenio-drift"},
+        }
+        self.fake.objects[
+            ("Deployment", "invenio-web", "exp-invenio-drift")] = deployment
+        harness.inject(self.fake, self.spec, "F", "run-1", self.clock)
+        cleanup = harness.cleanup_quarantine(
+            self.fake, "exp-invenio-drift", wait_seconds=0)
+        self.assertTrue(cleanup.ok)
+        self.assertNotIn(("Namespace", "exp-invenio-drift", None),
+                         self.fake.objects)
+        self.assertNotIn(("Deployment", "invenio-web", "exp-invenio-drift"),
+                         self.fake.objects)
 
     def test_scenario_g_annotation_is_removed(self):
         sealed = sealed_secret()
@@ -1997,6 +2109,51 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(out["detection_controller"], "hpa")
         self.assertEqual(out["recovery_controller"], "hpa")
         self.assertEqual(out["recovery_seconds"], 4)
+
+    def test_service_drift_gets_argo_detection_evidence_and_recovery(self):
+        argo = {
+            "invenio-bootstrap": harness.application_state(
+                application(sync="OutOfSync")),
+            "apps": harness.application_state(application("apps")),
+        }
+        samples = [
+            observation(101, service=web_service_with_target(65535),
+                        argo=argo, evaluated_at=101, evaluated_signal=True,
+                        evaluated_reads=["Service/invenio-web"]),
+            observation(102),
+            observation(103),
+        ]
+        out = self.run_timeline(samples, scenario="F", timeout=30,
+                                injected=injection(
+                                    started=100.0, ack=100.1, verified=100.2,
+                                    accepted=True))
+        self.assertEqual(out["detection_seconds"], 1)
+        self.assertEqual(out["evidence_seconds"], 1)
+        self.assertEqual(out["recovery_seconds"], 2)
+        self.assertEqual(out["detection_ref"], "argo:invenio-bootstrap")
+        self.assertEqual(out["detection_controller"], "argocd")
+        self.assertEqual(out["recovery_controller"], "argocd")
+
+    def test_service_drift_gets_imperative_attribution(self):
+        imperative = harness.ImperativeRun(
+            detection_at=point(101), evidence_at=point(101),
+            evidence_ref="diff.json",
+            commands=[result(argv=["kubectl", "apply"])])
+        samples = [
+            observation(101, service=web_service_with_target(65535)),
+            observation(102),
+            observation(103),
+        ]
+        out = self.run_timeline(samples, arm="imperative", scenario="F",
+                                timeout=30, imperative=imperative,
+                                injected=injection(
+                                    started=100.0, ack=100.1, verified=100.2,
+                                    accepted=True))
+        self.assertEqual(out["detection_seconds"], 1)
+        self.assertEqual(out["evidence_seconds"], 1)
+        self.assertEqual(out["detection_ref"], "imperative:contract-diff")
+        self.assertEqual(out["detection_controller"], "imperative")
+        self.assertEqual(out["recovery_controller"], "imperative")
 
 
 class CompletedObservationTimingTests(unittest.TestCase):

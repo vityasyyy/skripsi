@@ -371,7 +371,7 @@ menghentikan run sebelum/sesudah mutasi dan menghasilkan exit nonzero.
 | C | `invenio-app-config-<hash>` | key non-rahasia `INSTANCE_TAGLINE` | data deklarasi beku | Drift terkelola; adopsi runtime dilaporkan terpisah |
 | D | `Deployment/invenio-web` | hapus objek | manifest Deployment dari deklarasi beku (tanpa `replicas` milik HPA) | Drift terkelola; kesetaraan objek, bukan status rollout |
 | E | container `web` | limit memori `2Gi` → `1536Mi` | nilai deklarasi beku | Drift terkelola |
-| F | salinan `invenio-web` | buat di `exp-<namespace>-drift`, replika 0 | harness menghapus di `finally` | Batas visibilitas; objek di luar Application tidak diharapkan dipangkas ArgoCD |
+| F | `Service/invenio-web` | `spec.ports[0].targetPort` ke nilai integer berbeda dari deklarasi | `targetPort` deklarasi beku | Drift terkelola; ArgoCD atau runbook |
 | G | `SealedSecret/invenio-app-secrets` | **hanya** anotasi metadata `experiment.invenio.ugm/drift` | hapus anotasi / restore baseline | Tidak pernah menulis `spec.encryptedData`; nilainya tidak masuk bidang terpilih atau bukti; atribusi ArgoCD/imperatif/lainnya dicatat |
 
 Setiap injeksi memverifikasi bidang sasaran berubah dari pembacaan balik sebelum
@@ -446,8 +446,9 @@ percobaan retry. Stdout, nilai Secret, dan ciphertext tidak disimpan.
 - R1 = persentase resource yang **seluruh bidang terpilihnya** cocok, dengan
   penyebut empat resource dari deklarasi beku yang sama. `/spec/replicas`
   dikecualikan untuk Deployment milik HPA; status HPA dilaporkan terpisah.
-  Objek karantina F tidak masuk penyebut; keberadaannya dicatat di
-  `extra_resources`. Per-resource match/mismatch disimpan di
+  `Service/invenio-web` (termasuk `targetPort`) tetap menjadi bagian penyebut
+  deklarasi; objek di luar deklarasi yang tersisa dicatat di `extra_resources`.
+  Per-resource match/mismatch disimpan di
   `r1_baseline_details`, `r1_first_details`, dan `r1_last_details`.
 - Secret hanya dibandingkan sebagai keberadaan/anotasi metadata; nilai
   `Secret`/`SealedSecret` tidak pernah masuk bukti.
@@ -558,8 +559,9 @@ menentukan status run. Untuk sel yang di-retry, hanya attempt terakhir yang
 dapat menjadi observasi; attempt baseline yang gagal tetap ada di
 `rows.jsonl`/CSV sebagai bukti dan tidak menambah N. Run dry, gagal, tidak
 lengkap, atau tanpa bukti tetap ada di `rows.jsonl`/CSV dan dicatat di
-`exclusions` summary. A/F tetap terpisah sebagai
-`hpa_control`/`visibility_boundary`; keduanya tidak masuk klaim efikasi.
+`exclusions` summary. A tetap terpisah sebagai `hpa_control`; F tetap
+dilaporkan sebagai strata terpisah (`visibility_boundary`) dan keduanya tidak
+masuk klaim efikasi.
 
 ### Pemetaan CSV historis
 
