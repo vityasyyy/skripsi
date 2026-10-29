@@ -920,8 +920,8 @@ def _validate_analyzed_raw(raw, analysis, index):
         _require(raw_marker == analysis_marker,
                  f"raw row {index} timing_convention disagrees with analysis row")
     for field in RAW_ANALYSIS_FIELDS:
-        if field in raw:
-            _require(raw[field] == analysis.get(field),
+        if field in raw and field in analysis:
+            _require(raw[field] == analysis[field],
                      f"raw row {index} {field} disagrees with analysis row")
     if "env" in raw:
         raw_env = raw["env"]
