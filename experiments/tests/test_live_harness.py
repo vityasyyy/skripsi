@@ -6,7 +6,7 @@ an in-memory fake.
 """
 import copy
 import csv
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
@@ -345,9 +345,24 @@ def node_inventory(*items):
     return {"kind": "List", "apiVersion": "v1", "items": list(items)}
 
 
+METRICS_EPOCH = datetime(2026, 10, 27, tzinfo=timezone.utc)
+METRICS_TIMESTAMP = METRICS_EPOCH.isoformat()
+
+
+def metrics_stamp(offset_seconds=0.0):
+    return (METRICS_EPOCH + timedelta(seconds=offset_seconds)).isoformat()
+
+
+def node_reading(name="worker-01", cpu=10, memory=20,
+                 timestamp=METRICS_TIMESTAMP, window=30.0):
+    return {"name": name, "cpu_percent": cpu, "memory_percent": memory,
+            "metrics_timestamp": timestamp,
+            "metrics_window_seconds": window}
+
+
 READY_POD = {"name": "invenio-web-1", "phase": "Running", "ready": True}
 UNREADY_POD = {"name": "invenio-web-1", "phase": "Running", "ready": False}
-DEFAULT_NODES = [{"name": "worker-01", "cpu_percent": 10, "memory_percent": 20}]
+DEFAULT_NODES = [node_reading()]
 
 
 def injection(started=100.0, ack=100.1, verified=100.2, accepted=True,
@@ -459,8 +474,8 @@ class FakeKubectl:
         return result()
 
     def top_nodes(self):
-        return [{"name": "worker-01", "cpu_percent": 10, "memory_percent": 40},
-                {"name": "worker-02", "cpu_percent": 12, "memory_percent": 45}]
+        return [node_reading(cpu=10, memory=40),
+                node_reading(name="worker-02", cpu=12, memory=45)]
 
     def pods(self, namespace):
         return [{"name": "invenio-web-1", "phase": "Running", "ready": True}]
@@ -1296,8 +1311,7 @@ class BaselineGateTests(unittest.TestCase):
         ]
         for cpu, memory, accepted in cases:
             obs = self.ready_observation()
-            obs.nodes = [{"name": "worker-01", "cpu_percent": cpu,
-                          "memory_percent": memory}]
+            obs.nodes = [node_reading(cpu=cpu, memory=memory)]
             with self.subTest(cpu=cpu, memory=memory):
                 if accepted:
                     harness.baseline_gate(obs, "gitops")
@@ -1308,8 +1322,7 @@ class BaselineGateTests(unittest.TestCase):
     def test_invalid_node_percentages_fail_closed(self):
         for value in (None, "NaN", -1, float("inf")):
             obs = self.ready_observation()
-            obs.nodes = [{"name": "worker-01", "cpu_percent": value,
-                          "memory_percent": 10}]
+            obs.nodes = [node_reading(cpu=value, memory=10)]
             with self.subTest(value=value):
                 with self.assertRaises(harness.InstrumentationError):
                     harness.baseline_gate(obs, "gitops")
@@ -1326,6 +1339,76 @@ class BaselineGateTests(unittest.TestCase):
             with self.subTest(case=label):
                 with self.assertRaises(harness.InstrumentationError):
                     harness.baseline_gate(obs, "gitops")
+
+
+class NodeFreshnessGateTests(unittest.TestCase):
+    def issues(self, *nodes):
+        obs = observation()
+        obs.pods = [dict(READY_POD)]
+        obs.nodes = list(nodes)
+        return harness._baseline_issues(obs, "gitops")
+
+    def test_fresh_sample_passes(self):
+        self.assertEqual(
+            self.issues(node_reading(timestamp=metrics_stamp(-10))), [])
+
+    def test_stale_sample_is_retryable(self):
+        issues = self.issues(node_reading(timestamp=metrics_stamp(-31)))
+        self.assertEqual([issue["code"] for issue in issues],
+                         ["stale_metrics"])
+        self.assertTrue(issues[0]["retryable"])
+        self.assertIn("worker-01", issues[0]["detail"])
+        self.assertIn("31.000", issues[0]["detail"])
+        self.assertIn("30.0", issues[0]["detail"])
+
+    def test_sample_age_limit_is_inclusive(self):
+        self.assertEqual(
+            self.issues(node_reading(timestamp=metrics_stamp(-30))), [])
+        issues = self.issues(node_reading(timestamp=metrics_stamp(-30.001)))
+        self.assertEqual([issue["code"] for issue in issues],
+                         ["stale_metrics"])
+
+    def test_aggregation_window_limit_is_inclusive(self):
+        self.assertEqual(self.issues(node_reading(window=30.0)), [])
+        issues = self.issues(node_reading(window=30.001))
+        self.assertEqual([issue["code"] for issue in issues], ["long_window"])
+        self.assertTrue(issues[0]["retryable"])
+
+    def test_future_sample_is_a_non_retryable_clock_anomaly(self):
+        issues = self.issues(node_reading(timestamp=metrics_stamp(3)))
+        self.assertEqual([issue["code"] for issue in issues],
+                         ["clock_anomaly"])
+        self.assertFalse(issues[0]["retryable"])
+        self.assertIn("future", issues[0]["detail"])
+
+    def test_small_future_skew_within_tolerance_passes(self):
+        self.assertEqual(
+            self.issues(node_reading(timestamp=metrics_stamp(2))), [])
+        self.assertEqual(
+            self.issues(node_reading(timestamp=metrics_stamp(1.5))), [])
+
+    def test_malformed_or_missing_timestamp_fails_closed(self):
+        missing = node_reading()
+        del missing["metrics_timestamp"]
+        for timestamp in (None, "", "not-a-time", "2026-10-27T00:00:00"):
+            with self.subTest(timestamp=timestamp):
+                with self.assertRaises(harness.InstrumentationError):
+                    self.issues(node_reading(timestamp=timestamp))
+        with self.assertRaises(harness.InstrumentationError):
+            self.issues(missing)
+
+    def test_non_positive_or_non_finite_window_fails_closed(self):
+        for window in (0, -1, float("inf"), float("nan"), None):
+            with self.subTest(window=window):
+                with self.assertRaises(harness.InstrumentationError):
+                    self.issues(node_reading(window=window))
+
+    def test_missing_node_metrics_still_fails(self):
+        obs = observation()
+        obs.pods = [dict(READY_POD)]
+        issues = harness._baseline_issues(obs, "gitops")
+        self.assertEqual([issue["code"] for issue in issues],
+                         ["missing_node_metrics"])
 
 
 class BaselineReadinessTests(unittest.TestCase):
@@ -1365,8 +1448,8 @@ class BaselineReadinessTests(unittest.TestCase):
     def test_capacity_failure_recovers_when_the_next_read_is_valid(self):
         snapshotter = BaselineSnapshotter(observation())
         kubectl = BaselineKubectl(nodes=[
-            {"name": "worker-01", "cpu_percent": 10, "memory_percent": 71},
-            {"name": "worker-01", "cpu_percent": 11, "memory_percent": 40},
+            node_reading(memory=71),
+            node_reading(memory=40),
         ])
         result, _ = self.stabilize(snapshotter, kubectl)
         self.assertEqual(result.readiness_failures[0]["reason"], "capacity")
@@ -1375,7 +1458,7 @@ class BaselineReadinessTests(unittest.TestCase):
     def test_capacity_timeout_preserves_safe_observations_and_caps_sleep(self):
         snapshotter = BaselineSnapshotter(observation())
         kubectl = BaselineKubectl(nodes=[
-            {"name": "worker-01", "cpu_percent": 70, "memory_percent": 10}])
+            node_reading(cpu=70, memory=10)])
         clock = ReadinessClock()
         with self.assertRaises(harness.BaselineError) as caught:
             harness.stabilize_baseline(
@@ -1394,7 +1477,7 @@ class BaselineReadinessTests(unittest.TestCase):
     def test_no_capture_starts_after_the_deadline_is_exhausted(self):
         snapshotter = BaselineSnapshotter(observation())
         kubectl = BaselineKubectl(nodes=[
-            {"name": "worker-01", "cpu_percent": 70, "memory_percent": 10}])
+            node_reading(cpu=70, memory=10)])
         clock = ReadinessClock()
         with self.assertRaises(harness.BaselineError) as caught:
             harness.stabilize_baseline(

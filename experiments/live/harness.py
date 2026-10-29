@@ -67,6 +67,9 @@ DEFAULT_INVENIO_URL = "https://invenio.vityasy.me"
 USER_AGENT = "invenio-live-harness/1.0"
 MISSING = "<missing>"
 TIMING_CONVENTION = "completed-observation-v1"
+MAX_SAMPLE_END_AGE_SECONDS = 30.0
+MAX_AGGREGATION_WINDOW_SECONDS = 30.0
+FUTURE_SAMPLE_TOLERANCE_SECONDS = 2.0
 
 
 class HarnessError(Exception):
@@ -931,7 +934,7 @@ def _duration_seconds(value, field: str) -> float:
     return seconds
 
 
-def _timestamp(value, field: str) -> str:
+def _timestamp_instant(value, field: str) -> datetime:
     if not isinstance(value, str) or not value:
         raise InstrumentationError(f"{field} is not a valid timestamp")
     try:
@@ -940,6 +943,11 @@ def _timestamp(value, field: str) -> str:
         raise InstrumentationError(f"{field} is not a valid timestamp") from None
     if parsed.tzinfo is None:
         raise InstrumentationError(f"{field} has no timezone")
+    return parsed
+
+
+def _timestamp(value, field: str) -> str:
+    _timestamp_instant(value, field)
     return value
 
 
@@ -1494,6 +1502,10 @@ def _baseline_issues(observation: Observation, arm: str,
                 retryable=True)
     if not observation.nodes:
         add("missing_node_metrics", "no node metrics observed")
+    evaluation = None
+    if observation.nodes:
+        evaluation = _timestamp_instant(observation.at.utc,
+                                        "observation timestamp")
     for node in observation.nodes:
         if not isinstance(node, dict):
             raise InstrumentationError("node telemetry is malformed")
@@ -1508,6 +1520,29 @@ def _baseline_issues(observation: Observation, arm: str,
             if value >= 70:
                 add("capacity",
                     f"node {name} {metric} >= 70%", retryable=True)
+        timestamp = _timestamp_instant(
+            node.get("metrics_timestamp"),
+            f"node {name} metrics timestamp")
+        age = (evaluation - timestamp).total_seconds()
+        if age > MAX_SAMPLE_END_AGE_SECONDS:
+            add("stale_metrics",
+                f"node {name} metrics sample is {age:.3f}s old "
+                f"(limit {MAX_SAMPLE_END_AGE_SECONDS:.1f}s)",
+                retryable=True)
+        elif age < -FUTURE_SAMPLE_TOLERANCE_SECONDS:
+            add("clock_anomaly",
+                f"node {name} metrics sample is {-age:.3f}s in the future "
+                f"(tolerance {FUTURE_SAMPLE_TOLERANCE_SECONDS:.1f}s)")
+        window = node.get("metrics_window_seconds")
+        if (type(window) not in (int, float)
+                or not math.isfinite(window) or window <= 0):
+            raise InstrumentationError(
+                f"node {name} metrics window is not a positive finite duration")
+        if window > MAX_AGGREGATION_WINDOW_SECONDS:
+            add("long_window",
+                f"node {name} metrics window is {window:.3f}s "
+                f"(limit {MAX_AGGREGATION_WINDOW_SECONDS:.1f}s)",
+                retryable=True)
     if arm == "gitops":
         for name in (APP_OF_APPS, app):
             state = observation.argo.get(name) or {}

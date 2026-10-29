@@ -151,7 +151,10 @@ menggagalkan run; jangan memulai injeksi.
 5. CPU dan memori setiap node di bawah 70%, dihitung dari usage metrics-server
    mentah (CPU; working set untuk memori) dibagi `Node.status.allocatable`,
    dengan timestamp dan window per node. `kubectl top nodes` yang dibulatkan
-   bukan sumber pengukuran.
+   bukan sumber pengukuran. Pada saat keputusan readiness, umur sample akhir
+   maksimum 30 detik dan aggregation window maksimum 30 detik; tepat 30.0 masih
+   diterima. Sample lebih dari 2 detik di masa depan adalah `clock_anomaly` yang
+   fatal, karena itu anomali jam dan bukan data segar.
 6. Jam host pencatat tersinkronisasi dan kolektor aktif sebelum injeksi.
 7. Revisi sumber, SHA-256 render, image digest, dan versi runtime telah
    dibekukan. Berkas render beku (`--render-file`) berformat
@@ -300,8 +303,9 @@ pekerjaan lanjutan setelah audit diaktifkan.
 - Kegagalan pembacaan API atau kolektor adalah `instrumentation_failure`, bukan
   deteksi yang terlewat.
 - Kegagalan baseline sementara (pod belum Ready, HPA belum settle, kapasitas
-  valid >= 70%) ditunggu hanya sampai batas `--baseline-timeout`; kegagalan
-  fatal dan telemetri tidak valid langsung menghentikan run. Setiap observasi
+  valid >= 70%, `stale_metrics`, `long_window`) ditunggu hanya sampai batas
+  `--baseline-timeout`; kegagalan fatal (`clock_anomaly`), telemetri tidak valid
+  dan window non-positif/non-finit langsung menghentikan run. Setiap observasi
   yang ditolak dipertahankan di `readiness.json` dengan alasan dan waktu, juga
   saat `baseline.json` tidak berisi snapshot.
 - Snapshot baseline membaca snapshot, pod, dan node secara berurutan; `at`
