@@ -456,10 +456,19 @@ percobaan retry. Stdout, nilai Secret, dan ciphertext tidak disimpan.
 
 - `stabilize_baseline()` membaca snapshot, pod, lalu node secara berurutan.
   Hanya kegagalan sementara berikut yang ditunggu sampai `--baseline-timeout`:
-  pod belum Running/Ready, HPA belum settle, dan node dengan persentase valid
-  >= 70%. Setiap penolakan mereset riwayat dua pembacaan yang cocok.
+  pod belum Running/Ready, HPA belum settle, node dengan persentase valid
+  >= 70% (`capacity`), sample metrics-server lebih tua dari 30 detik
+  (`stale_metrics`), dan aggregation window lebih panjang dari 30 detik
+  (`long_window`). Setiap penolakan mereset riwayat dua pembacaan yang cocok.
   Objek wajib hilang, target HPA salah, karantina/kontaminasi, dan telemetri
   tidak valid/tidak lengkap langsung gagal tertutup.
+- Batas 30 detik untuk umur sample dan window adalah **maksimum**, jadi nilai
+  tepat 30.0 diterima dan 30.001 ditolak. Umur dihitung dari waktu evaluasi
+  observasi dikurangi `timestamp` metrics-server per node. Sample yang berada
+  lebih dari 2 detik di masa depan menghasilkan `clock_anomaly` yang bersifat
+  fatal, bukan sementara: anomali jam tidak boleh diterima sebagai data segar.
+  Batas ini adalah kebijakan kesiapan penelitian, bukan kebijakan eviction
+  Kubernetes, dan tidak mengubah gerbang 70%.
 - Dua pembacaan konfigurasi yang berurutan dan cocok adalah kriteria penerimaan
   di bawah timeout, **bukan** klaim periode hening panjang. Deadline diperiksa
   sebelum keberhasilan diterima, dan tidur dibatasi sisa anggaran waktu.
