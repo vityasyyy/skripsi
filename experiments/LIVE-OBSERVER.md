@@ -57,6 +57,59 @@ Kolektor berjalan sebelum injeksi dan menulis satu bundel bukti per run dengan
 `run_id`. Semua waktu berasal dari satu jam monotonik pada host pencatat; UTC
 disimpan untuk audit. Tidak ada cap waktu yang direkonstruksi setelah run.
 
+## Oracle R1 beku
+
+R1 dihitung terhadap **deklarasi beku yang independen**, bukan terhadap baseline
+live yang dapat berubah dan mensertifikasi dirinya sendiri. Kedua entrypoint
+live menerima `--render-file` berisi JSON:
+
+```json
+{"format": "invenio-frozen-render-v1", "source_revision": "<40-hex>",
+ "objects": [{"apiVersion": "...", "kind": "...", "metadata": {"...": "..."}}]}
+```
+
+Loader stdlib membaca byte satu kali, menghitung SHA-256 dari byte itu,
+mem-parse byte yang sama, lalu memvalidasi format, revisi, hash, identitas, dan
+bidang sebelum HTTP Invenio, aktivasi lengan, atau injeksi. Berkas yang hilang,
+duplikat kunci/objek, non-finit, namespace salah, target hilang, atau hash/
+revisi tidak cocok ditolak tanpa mencetak isi. Dry-run perencanaan tidak
+memerlukan berkas render.
+
+Empat resource dan bidang terpilih:
+
+| Resource | Bidang |
+|---|---|
+| `Deployment/invenio-web` | image container `web`; requests/limits CPU dan memori |
+| `ConfigMap/invenio-app-config-<hash>` | seluruh `data`; identitas dari `envFrom.configMapRef` deklarasi |
+| `Service/invenio-web` | `spec.type`, selector `app.kubernetes.io/name`, port pertama dan `targetPort` |
+| `SealedSecret/invenio-app-secrets` | hanya anotasi drift metadata; `spec.encryptedData` tidak dipilih/diserialisasi, tetapi bundle lokal tetap di-parse di memori |
+
+Render penuh boleh memuat objek aplikasi lain; hanya empat target yang dipilih.
+R1 = persentase resource yang seluruh bidang terpilihnya cocok (4 = 100%,
+3 = 75%). Detail per resource disimpan untuk baseline, first, dan last; agregat
+dihitung dari pembanding yang sama, dan observasi yang hilang tetap `null`.
+`/spec/replicas` milik HPA tetap dikecualikan; status HPA baseline disimpan
+terpisah untuk kontrol A.
+
+Baseline live diverifikasi terhadap deklarasi sebelum injeksi. Perbedaan
+menghentikan run sebagai `baseline_failure` dengan alasan
+`declaration_mismatch`; baseline tidak diperbaiki otomatis dan nilai live tidak
+dipakai sebagai default. Manifest pemulihan Deployment dibangun dari deklarasi
+dan tidak memuat `replicas`; replika skenario A berasal dari status HPA baseline
+yang teramati.
+
+Ekuivalensi sempit yang diperbolehkan: `Service.spec.type` dihilangkan =
+`ClusterIP`, dan kuantitas Kubernetes seperti `1000m` = `1` serta `2Gi` =
+`2048Mi`. String lain tidak dinormalisasi. Patch pemulihan memakai nilai mentah
+deklarasi, dan verifikasi injeksi memeriksa perubahan yang benar-benar terjadi.
+
+Hash dan revisi membuktikan integritas byte serta kesesuaian revisi, **bukan**
+provenance render. Catatan pembekuan harus memuat path/URL sumber lokal, revisi,
+perintah `git archive`/render, versi aktual Kustomize/Python/PyYAML, dan hash
+hasil; jika memakai checkout, catat juga `git status --porcelain` kosong. Resep
+persiapan ada di `live/README.md`; jangan memberi label ulang pada hash lama atau
+mengattest berkas arbitrer sebagai terverifikasi sumber.
+
 ## Prasyarat dan reset
 
 Sebelum setiap run, seluruh butir berikut harus benar. Kegagalan satu butir
@@ -82,7 +135,10 @@ menggagalkan run; jangan memulai injeksi.
    bukan sumber pengukuran.
 6. Jam host pencatat tersinkronisasi dan kolektor aktif sebelum injeksi.
 7. Revisi sumber, SHA-256 render, image digest, dan versi runtime telah
-   dibekukan. Nilai yang direkonstruksi setelah hasil terlihat ditolak.
+   dibekukan. Berkas render beku (`--render-file`) berformat
+   `invenio-frozen-render-v1`, dibaca satu kali, dan hash byte-nya sama dengan
+   `--render-sha256`; revisinya sama dengan `--source-revision` dan revisi Argo
+   yang teramati. Nilai yang direkonstruksi setelah hasil terlihat ditolak.
 8. Mode sesuai jadwal: untuk mode imperatif, `auto-sync`/`self-heal` pada `apps`
    dan `invenio-bootstrap` terverifikasi jeda; untuk mode GitOps, keduanya
    terverifikasi aktif.
@@ -140,6 +196,7 @@ cap waktu adalah pengamatan pertama, bukan rekonstruksi setelah fakta.
 | `t_r_utc`, `t_r_mono` | Pemulihan terkonfirmasi | Kolektor | Dua pembacaan cocok |
 | `controller` | `hpa`, `argocd`, `imperative`, `deployment-controller`, `sealed-secrets`, `other`, `unattributed` | Kolektor | Aturan atribusi di bawah |
 | `status` | `observed`, `right_censored`, `invalid_injection`, `instrumentation_failure`, `recovery_failure`, `reset_failure` | Kolektor | Tidak diisi nol |
+| `r1_*_details` | Identitas match/mismatch per resource untuk baseline/first/last | Evaluator | Turunan pembanding deklarasi yang sama; observasi hilang `null` |
 | `notes` | Anomali, jeda polling, offset jam | Kolektor | Faktual, tanpa spekulasi |
 
 Durasi yang dilaporkan: `t_d - t0`, `t_e - t0`, dan `t_r - t0`. Tidak ada field
@@ -150,7 +207,7 @@ penyebab kausal.
 
 | Bukti | Isi minimum | Sumber | Penanganan |
 |---|---|---|---|
-| Revisi dan render | Revisi Git 40 heksadesimal, SHA-256 hasil render, image digest | Repositori dan ekspor render | Bekukan sebelum run; bukan manifest editable baru |
+| Revisi dan render | Revisi Git 40 heksadesimal, SHA-256 byte render beku, image digest, identitas empat resource | Repositori dan ekspor render | Bekukan sebelum run; loader memvalidasi hash/revisi; provenance dicatat terpisah; bukan manifest editable baru |
 | Versi runtime | Kubernetes, ArgoCD, CNPG, OpenSearch, MinIO, chart | Klaster dan snapshot | Bekukan sebelum run pertama |
 | Status ArgoCD | `Application` status, sync operation, diff, event, dan kondisi | `kubectl -n argocd get application`, `argocd app get/diff` | Sanitasi; jangan sertakan token |
 | Log perintah | Perintah injeksi/koreksi, waktu mulai/akhir, exit code, keluaran relevan | Runner dan runbook otomatis | Jangan sertakan Secret |
