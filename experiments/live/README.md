@@ -432,8 +432,9 @@ percobaan retry. Stdout, nilai Secret, dan ciphertext tidak disimpan.
   Kegagalan perintah koreksi: `recovery_failure`. Postcondition gagal:
   `reset_failure`.
 - Kolektor berhenti sebelum bukti final disalin. Setiap capture memeriksa
-  stop/deadline secara kooperatif sebelum setiap pembacaan; partial acquisition
-  dan alasan stop dicatat. `sampler.json` mencatat `joined`, `in_flight`,
+  stop/deadline secara kooperatif sebelum setiap pembacaan dan sebelum setiap
+  retry/backoff pembacaan logis; partial acquisition dan alasan stop dicatat.
+  `sampler.json` mencatat `joined`, `in_flight`,
   `error`, `late_result`, `late_result_at`, `late_result_acquisition`,
   `late_error`, `stopped_at_deadline`, `partial_acquisition`, dan
   `capture_stop_reason`. Pembacaan tidak dimulai setelah stop/deadline; hasil

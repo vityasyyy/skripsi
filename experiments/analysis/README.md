@@ -114,9 +114,12 @@ mencapai deadline. Baris legacy tanpa marker tetap divalidasi dengan aturan lama
 dan tidak diwajibkan memiliki bound baru; c69 tetap dapat divalidasi sebagai
 legacy tanpa inferensi komparatif. Dataset yang mencampur baris bermarker dan
 legacy, marker tak dikenal, atau marker `rows.jsonl` yang berbeda dari
-`analysis.jsonl` ditolak. `rows.jsonl` juga harus setuju pada window, konfirmasi,
-durasi store, dan identitas read/ref pendukung bila field itu tersedia; field
-legacy yang tidak tersedia tidak dipaksakan. Batas penyensoran divalidasi per
+`analysis.jsonl` ditolak. Untuk marker `completed-observation-v1`, field
+dukungan/window/diagnostik eksplisit harus ada di kedua sisi; satu sisi yang
+hilang ditolak sebelum perbandingan nilai. Baris legacy hanya membandingkan
+irisan field yang tersedia dan tidak dipaksa memiliki field baru. `rows.jsonl`
+juga harus setuju pada window, konfirmasi, durasi store, dan identitas
+read/ref pendukung bila field itu tersedia. Batas penyensoran divalidasi per
 baris; horizon RMST adalah batas terkecil per kelompok. Analisis tidak mencetak
 nilai baris mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
 

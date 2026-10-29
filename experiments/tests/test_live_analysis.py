@@ -330,6 +330,28 @@ class ProvenanceConsistencyTests(unittest.TestCase):
                 with self.assertRaises(analyze_live.LiveAnalysisError):
                     analyze_live.validate_rows([row])
 
+    def test_new_raw_missing_explicit_support_field_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-presence-check", ["observed"])
+        for field in ("evidence_reads", "window_end_mono",
+                      "recovery_confirmation"):
+            with self.subTest(field=field):
+                raw = [dict(row) for row in raw_rows]
+                del raw[0][field]
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live._exclusions(analysis_rows, raw)
+
+    def test_new_analysis_missing_explicit_support_field_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-presence-check", ["observed"])
+        for field in ("evidence_reads", "window_end_mono",
+                      "recovery_confirmation"):
+            with self.subTest(field=field):
+                analysis = [dict(row) for row in analysis_rows]
+                del analysis[0][field]
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live._exclusions(analysis, raw_rows)
+
     def test_raw_window_end_disagreement_is_rejected(self):
         analysis_rows, raw_rows, _ = runner_view(
             "lead-valid-provenance", ["observed"])

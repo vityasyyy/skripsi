@@ -919,6 +919,11 @@ def _validate_analyzed_raw(raw, analysis, index):
     if raw_marker is not None:
         _require(raw_marker == analysis_marker,
                  f"raw row {index} timing_convention disagrees with analysis row")
+    if raw_marker == TIMING_CONVENTION:
+        one_sided = [field for field in RAW_ANALYSIS_FIELDS
+                     if (field in raw) != (field in analysis)]
+        _require(not one_sided,
+                 f"raw row {index} has one-sided timing fields: {one_sided}")
     for field in RAW_ANALYSIS_FIELDS:
         if field in raw and field in analysis:
             _require(raw[field] == analysis[field],

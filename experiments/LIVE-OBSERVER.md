@@ -323,9 +323,9 @@ pekerjaan lanjutan setelah audit diaktifkan.
   dibuang agar hanya run sukses yang tersisa.
 - Pembacaan yang masih berjalan saat stop tidak ditambahkan setelah bukti final;
   status join/error kolektor dilaporkan. Kolektor memeriksa stop/deadline secara
-  kooperatif sebelum setiap pembacaan berikutnya dan menyimpan partial
-  acquisition; kegagalan instrumen tetap kegagalan meskipun ada match
-  sebelumnya.
+  kooperatif sebelum setiap pembacaan berikutnya, retry, dan setelah backoff,
+  serta menyimpan partial acquisition; kegagalan instrumen tetap kegagalan
+  meskipun ada match sebelumnya.
 - Baris baru wajib memiliki endpoint/konfirmasi dan `window_completed`/
   `window_end_*` yang lengkap; endpoint primer/evaluasi/konfirmasi harus selesai
   tidak melewati `window_end` maupun deadline, sedangkan `t_a` dan `t_e_store`

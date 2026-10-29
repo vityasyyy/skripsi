@@ -388,7 +388,7 @@ class FakeKubectl:
             return self.clock.now()
         return point(0)
 
-    def read(self, kind, name=None, namespace=None, selector=None):
+    def read(self, kind, name=None, namespace=None, selector=None, guard=None):
         started = self._now()
         payload = self.get(kind, name, namespace, selector)
         finished = started
@@ -2648,7 +2648,7 @@ class SamplerLifecycleTests(unittest.TestCase):
                 self.blocked = threading.Event()
                 self.release = threading.Event()
 
-            def read(self, kind, name=None, namespace=None, selector=None):
+            def read(self, kind, name=None, namespace=None, selector=None, guard=None):
                 if kind == "Service":
                     self.blocked.set()
                     self.release.wait(2)
@@ -2691,7 +2691,7 @@ class SamplerLifecycleTests(unittest.TestCase):
                 self.blocked = threading.Event()
                 self.release = threading.Event()
 
-            def read(self, kind, name=None, namespace=None, selector=None):
+            def read(self, kind, name=None, namespace=None, selector=None, guard=None):
                 if kind == "Service":
                     self.blocked.set()
                     self.release.wait(2)
@@ -2863,7 +2863,7 @@ class AcquisitionBoundsTests(unittest.TestCase):
         clock = AdvancingClock()
 
         class FailingKubectl(FakeKubectl):
-            def read(self, kind, name=None, namespace=None, selector=None):
+            def read(self, kind, name=None, namespace=None, selector=None, guard=None):
                 if kind == "Service":
                     started = self._now()
                     finished = self._now()
@@ -2892,6 +2892,106 @@ class AcquisitionBoundsTests(unittest.TestCase):
         self.assertIn("Deployment/invenio-web", acquisition["reads"])
         serialized = json.dumps(acquisition)
         self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", serialized)
+
+
+class RetryCancellationTests(unittest.TestCase):
+    def snapshotter(self, kubectl, clock):
+        return harness.Snapshotter(
+            kubectl, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4")
+
+    def transient(self):
+        return mock.Mock(returncode=1, stdout="", stderr="connection reset")
+
+    def test_stop_during_first_transient_request_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        stop = {"value": False}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            stop["value"] = True
+            return self.transient()
+
+        def guard():
+            return "stop" if stop["value"] else None
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "stop")
+        record = caught.exception.acquisition["reads"][
+            "Deployment/invenio-web"]
+        self.assertFalse(record["ok"])
+        self.assertEqual(len(record["attempts"]), 1)
+
+    def test_deadline_during_first_transient_request_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        deadline = {"value": clock.now().mono + 0.5}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            clock.value += 1.0
+            return self.transient()
+
+        def guard():
+            return "deadline" if clock.now().mono >= deadline["value"] else None
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "deadline")
+
+    def test_stop_during_backoff_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        stop = {"value": False}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            return self.transient()
+
+        def guard():
+            return "stop" if stop["value"] else None
+
+        def backoff(_seconds):
+            stop["value"] = True
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run), \
+                mock.patch.object(harness.time, "sleep", side_effect=backoff):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "stop")
+
+    def test_deadline_during_backoff_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        deadline = {"value": clock.now().mono + 0.5}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            return self.transient()
+
+        def guard():
+            return "deadline" if clock.now().mono >= deadline["value"] else None
+
+        def backoff(_seconds):
+            clock.value += 1.0
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run), \
+                mock.patch.object(harness.time, "sleep", side_effect=backoff):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "deadline")
 
 
 class PostconditionTimingTests(unittest.TestCase):

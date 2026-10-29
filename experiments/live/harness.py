@@ -110,6 +110,15 @@ class CaptureStopped(HarnessError):
         self.reason = reason
 
 
+class ReadStopped(HarnessError):
+    """A cooperative stop inside one logical read/retry sequence."""
+
+    def __init__(self, reason, read_bounds=None):
+        super().__init__(f"read stopped before the next request: {reason}")
+        self.reason = reason
+        self.read_bounds = read_bounds
+
+
 @dataclass(frozen=True)
 class Point:
     mono: float
@@ -1124,7 +1133,7 @@ class Kubectl:
         payload, _ = self.read(kind, name, namespace, selector)
         return payload
 
-    def read(self, kind, name=None, namespace=None, selector=None):
+    def read(self, kind, name=None, namespace=None, selector=None, guard=None):
         argv = ["get", kind]
         if name:
             argv.append(name)
@@ -1137,7 +1146,32 @@ class Kubectl:
         argv.extend(["-o", "json", "--ignore-not-found",
                      "--request-timeout=15s"])
         attempts = []
-        result = self.run(argv)
+
+        def stopped():
+            if guard is None:
+                return None
+            reason = guard()
+            if not reason:
+                return None
+            bounds = (_read_bounds(kind, name, namespace, attempts,
+                                   present=False, ok=False)
+                      if attempts else None)
+            return ReadStopped(reason, bounds)
+
+        reason = stopped()
+        if reason is not None:
+            raise reason
+
+        def request():
+            try:
+                return self.run(argv)
+            except InstrumentationError:
+                reason = stopped()
+                if reason is not None:
+                    raise reason
+                raise
+
+        result = request()
         attempts.append(_attempt_bounds(result))
         for attempt in range(2):
             if result.returncode == 0:
@@ -1150,10 +1184,19 @@ class Kubectl:
                 "i/o timeout", "temporarily unavailable"))
             if not transient:
                 break
+            reason = stopped()
+            if reason is not None:
+                raise reason
             time.sleep(0.5 * (attempt + 1))
-            result = self.run(argv)
+            reason = stopped()
+            if reason is not None:
+                raise reason
+            result = request()
             attempts.append(_attempt_bounds(result))
         if result.returncode != 0:
+            reason = stopped()
+            if reason is not None:
+                raise reason
             error = InstrumentationError(
                 f"kubectl get {kind} failed: {result.stderr.strip()[:300]}")
             error.read_bounds = _read_bounds(
@@ -1271,7 +1314,25 @@ class Snapshotter:
     def _read(self, reads, key, kind, name=None, namespace=None, guard=None):
         self._guard_stop(reads, guard)
         try:
-            payload, bounds = self.kubectl.read(kind, name, namespace)
+            payload, bounds = self.kubectl.read(
+                kind, name, namespace, guard=guard)
+        except ReadStopped as stopped:
+            if stopped.read_bounds:
+                reads[key] = copy.deepcopy(stopped.read_bounds)
+            started = (self._capture_started
+                       if getattr(self, "_capture_started", None) else None)
+            started = started or self.clock.now()
+            finished = self.clock.now()
+            acquisition = {
+                "started": _point_dict(started),
+                "finished": _point_dict(finished),
+                "started_utc": started.utc,
+                "started_mono": started.mono,
+                "finished_utc": finished.utc,
+                "finished_mono": finished.mono,
+                "reads": copy.deepcopy(reads),
+            }
+            raise CaptureStopped(acquisition, stopped.reason)
         except InstrumentationError as error:
             bounds = getattr(error, "read_bounds", None)
             if bounds:
