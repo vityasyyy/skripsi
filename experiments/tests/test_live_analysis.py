@@ -664,5 +664,90 @@ class RetryIdentityTest(unittest.TestCase):
             self.assertEqual(report["exclusions"]["count"], 1)
 
 
+class RawAnalysisConsistencyTest(unittest.TestCase):
+    def test_matching_raw_row_accepts_normalized_env(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "review-batch", ["observed"], arm="imperative")
+        self.assertEqual(raw_rows[0]["env"], "imperative")
+        self.assertEqual(analysis_rows[0]["env"], "manual")
+        result = analyze_live.analyze(
+            analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+        self.assertEqual(result["batch"]["analysis_rows"], 1)
+
+    def test_matching_raw_row_must_agree_on_protocol_and_metrics(self):
+        cases = (
+            ("source_revision", "c" * 40),
+            ("render_sha256", "d" * 64),
+            ("batch_phase", "R1"),
+            ("recovery_seconds", 9.0),
+            ("r1_last", 90.0),
+        )
+        for field, value in cases:
+            with self.subTest(field=field):
+                analysis_rows, raw_rows, _ = runner_view(
+                    "review-batch", ["observed"])
+                raw_rows[0][field] = value
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.analyze(
+                        analysis_rows, raw_rows=raw_rows, bootstrap=100,
+                        seed=1)
+
+    def test_matching_raw_row_must_not_carry_failed_eligibility(self):
+        cases = (
+            {"cleanup_status": "failed"},
+            {"arm_restore_status": "failed"},
+            {"postcondition": {"verified": False}},
+            {"synthetic": True},
+            {"error": "preserved failure"},
+            {"batch_stop_reason": "cleanup_failure"},
+        )
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                analysis_rows, raw_rows, _ = runner_view(
+                    "review-batch", ["observed"])
+                raw_rows[0].update(overrides)
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.analyze(
+                        analysis_rows, raw_rows=raw_rows, bootstrap=100,
+                        seed=1)
+
+    def test_analyzed_row_must_not_carry_failed_eligibility(self):
+        cases = (
+            {"cleanup_status": "failed"},
+            {"arm_restore_status": "failed"},
+            {"postcondition": {"verified": False}},
+        )
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                analysis_rows, raw_rows, _ = runner_view(
+                    "review-batch", ["observed"])
+                analysis_rows[0].update(overrides)
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.analyze(
+                        analysis_rows, raw_rows=raw_rows, bootstrap=100,
+                        seed=1)
+
+    def test_missing_legacy_eligibility_fields_remain_compatible(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "review-batch", ["observed"])
+        for field in ("cleanup_status", "arm_restore_status",
+                      "postcondition"):
+            raw_rows[0].pop(field, None)
+        result = analyze_live.analyze(
+            analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+        self.assertEqual(result["batch"]["analysis_rows"], 1)
+
+    def test_invalid_raw_env_mapping_is_rejected(self):
+        for value in ("gitops", []):
+            with self.subTest(value=value):
+                analysis_rows, raw_rows, _ = runner_view(
+                    "review-batch", ["observed"], arm="imperative")
+                raw_rows[0]["env"] = value
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.analyze(
+                        analysis_rows, raw_rows=raw_rows, bootstrap=100,
+                        seed=1)
+
+
 if __name__ == "__main__":
     unittest.main()

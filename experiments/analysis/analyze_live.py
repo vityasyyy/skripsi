@@ -74,6 +74,15 @@ REVISION = re.compile(r"[0-9a-f]{40}")
 RENDER = re.compile(r"[0-9a-f]{64}")
 RETRY_SUFFIX = re.compile(r"retry([1-9][0-9]*)")
 ATTEMPT_FIELDS = ("batch_attempt", "batch_retry_of")
+RAW_ANALYSIS_FIELDS = (
+    "batch_phase", "batch_mode", "source_revision", "render_sha256",
+    "censor_seconds", "analysis_group", "efficacy_eligible", "synthetic",
+    "formal_execution_approved", "stack_isolated", "r3_status",
+    "r1_baseline", "r1_first", "r1_last",
+    "detection_seconds", "detection_status",
+    "evidence_seconds", "evidence_status",
+    "recovery_seconds", "recovery_status",
+)
 
 REQUIRED_FIELDS = frozenset({
     "schema_version", "run_id", "batch_id", "batch_phase", "batch_mode",
@@ -705,6 +714,35 @@ def _raw_identity(row, index, batch_id):
     return (arm, scenario, rep), attempt
 
 
+def _validate_analyzed_raw(raw, analysis, index):
+    """Reject raw evidence that disagrees with its analyzed run."""
+    for field in RAW_ANALYSIS_FIELDS:
+        if field in raw:
+            _require(raw[field] == analysis[field],
+                     f"raw row {index} {field} disagrees with analysis row")
+    if "env" in raw:
+        raw_env = raw["env"]
+        _require(isinstance(raw_env, str),
+                 f"raw row {index} has invalid env")
+        _require(ARM_ENV.get(raw_env, raw_env) == analysis["env"],
+                 f"raw row {index} env disagrees with analysis row")
+    for label, row in ((f"raw row {index}", raw),
+                       (f"analysis row {index}", analysis)):
+        for field, expected in (("cleanup_status", "ok"),
+                                ("arm_restore_status", "restored")):
+            if field in row:
+                _require(row[field] == expected,
+                         f"{label} has failed {field}")
+        if "postcondition" in row:
+            postcondition = row["postcondition"]
+            _require(isinstance(postcondition, dict)
+                     and postcondition.get("verified") is True,
+                     f"{label} postcondition is not verified")
+        for field in ("batch_stop_reason", "error"):
+            if field in row:
+                _require(not row[field], f"{label} has {field}")
+
+
 def _raw_retry_violation(predecessor):
     """Mirror the runner's pre-injection baseline retry policy."""
     if predecessor.get("status") != "baseline_failure":
@@ -760,6 +798,7 @@ def _exclusions(rows, raw_rows):
         if run_id in analyzed:
             _require(row.get("status") == analyzed[run_id]["status"],
                      f"raw row {index} status disagrees with analysis row")
+            _validate_analyzed_raw(row, analyzed[run_id], index)
         raw_ids.append(run_id)
         cells.setdefault(cell, []).append((attempt, row, index))
     _require(len(raw_ids) == len(set(raw_ids)), "rows.jsonl repeats a run_id")
