@@ -265,11 +265,11 @@ Atribusi dilakukan sebelum analisis, bukan setelah melihat hasil.
   dihitung sebagai koreksi imperatif. `/spec/replicas` dikecualikan dari R1
   statis untuk Deployment yang dimiliki HPA; status HPA dilaporkan terpisah.
 - **ArgoCD.** Deteksi dan pemulihan ArgoCD hanya dihitung untuk bidang terkelola
-  pada skenario B--E yang benar-benar dipulihkan oleh rekonsiliasi.
-  `OutOfSync` karena `/spec/replicas`, objek F di luar cakupan, atau perubahan
-  yang dilakukan pengendali lain bukan bukti self-heal ArgoCD.
+  pada skenario B--F yang benar-benar dipulihkan oleh rekonsiliasi.
+  `OutOfSync` karena `/spec/replicas` atau perubahan yang dilakukan pengendali
+  lain bukan bukti self-heal ArgoCD.
 - **Pemeriksa imperatif.** Deteksi dan koreksi mode imperatif hanya dihitung
-  untuk bidang terkelola pada skenario B--E yang benar-benar dijalankan oleh
+  untuk bidang terkelola pada skenario B--F yang benar-benar dijalankan oleh
   runbook. Sinyal HPA bukan deteksi imperatif.
 - **Deployment controller.** Pembuatan ulang Pod atau rollout setelah Deployment
   berubah adalah konsekuensi, bukan pemulihan konfigurasi. Pemulihan dinilai dari
@@ -281,10 +281,10 @@ Atribusi dilakukan sebelum analisis, bukan setelah melihat hasil.
 - **Tidak pasti.** Jika pengendali tidak dapat dipastikan, isi `unattributed`
   dan keluarkan dari klaim efikasi ArgoCD maupun imperatif. Jangan menebak.
 
-Skenario A dilaporkan sebagai kontrol HPA; F sebagai batas visibilitas objek
-tak terkelola; G sebagai kasus deskriptif yang **bukan** kasus self-heal ArgoCD
-(anotasi metadata dikembalikan oleh harness). Ketiganya tidak digabungkan ke
-estimasi efikasi B--E.
+Skenario A dilaporkan sebagai kontrol HPA; F sebagai drift routing
+`Service/invenio-web` yang dilaporkan terpisah; G sebagai kasus deskriptif yang
+**bukan** kasus self-heal ArgoCD (anotasi metadata dikembalikan oleh harness).
+Ketiganya tidak digabungkan ke estimasi efikasi B--E.
 
 ## R3 tidak diukur
 

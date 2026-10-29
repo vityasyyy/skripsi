@@ -1804,14 +1804,6 @@ def _short(run_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "", run_id)[-8:]
 
 
-def _deployment_manifest(contract: Contract) -> dict:
-    resource = next((item for item in contract.resources
-                     if item["id"] == "Deployment/" + WEB_DEPLOYMENT), None)
-    if resource is None:
-        raise InjectionError("baseline Deployment/invenio-web is missing")
-    return resource["manifest"]
-
-
 def _field(contract: Contract, resource_id_value: str, path: str):
     resource = next((item for item in contract.resources
                      if item["id"] == resource_id_value), None)
@@ -1917,29 +1909,22 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str,
             expected_value = target
             expected_baseline = baseline
         elif scenario == "F":
-            manifest = copy.deepcopy(_deployment_manifest(contract))
-            manifest["metadata"]["namespace"] = contract.quarantine_namespace
-            manifest["metadata"].setdefault("labels", {})[
-                "experiment.invenio.ugm/quarantine"] = short
-            manifest["metadata"]["labels"][
-                "experiment.invenio.ugm/run-id"] = run_id
-            manifest.setdefault("spec", {})["replicas"] = 0
-            manifest = recovery_manifest(manifest)
-            if kubectl.get("Namespace", contract.quarantine_namespace) is None:
-                commands.append(kubectl.apply({
-                    "apiVersion": "v1", "kind": "Namespace",
-                    "metadata": {
-                        "name": contract.quarantine_namespace,
-                        "labels": {
-                            "experiment.invenio.ugm/quarantine": short,
-                            "experiment.invenio.ugm/run-id": run_id,
-                        },
-                    }}))
-            commands.append(kubectl.apply(manifest))
-            expected_path = "/metadata/namespace"
-            expected_value = contract.quarantine_namespace
-            expected_baseline = "absent"
-            effect = "created"
+            path = "/spec/ports/0/targetPort"
+            port = _field(contract, "Service/" + WEB_SERVICE, "/spec/ports/0/port")
+            expected_baseline = _field(
+                contract, "Service/" + WEB_SERVICE, path)
+            expected_value = (
+                expected_baseline % 65535 + 1
+                if type(expected_baseline) is int else 65535)
+            if _field_matches(path, expected_baseline, expected_value):
+                raise InjectionError(
+                    "no distinct Service targetPort drift value is available")
+            commands.append(kubectl.patch(
+                "Service", WEB_SERVICE, contract.namespace,
+                {"spec": {"ports": [{"port": port,
+                                     "targetPort": expected_value}]}},
+                "strategic"))
+            expected_path = path
         elif scenario == "G":
             target = "scenario-g-" + short
             commands.append(kubectl.annotate(
@@ -2018,17 +2003,16 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str,
                             "matches_desired": False,
                             "expected": expected_baseline, "actual": actual})
         elif scenario == "F":
-            observed = kubectl.get("Deployment", WEB_DEPLOYMENT,
-                                   contract.quarantine_namespace)
-            if observed is None:
-                raise InjectionError("quarantine Deployment was not created")
-            changed.append({
-                "resource": f"{contract.quarantine_namespace}/Deployment/"
-                            + WEB_DEPLOYMENT,
-                "path": expected_path, "effect": effect,
-                "matches_desired": False,
-                "expected": expected_baseline,
-                "actual": contract.quarantine_namespace})
+            observed = kubectl.get("Service", WEB_SERVICE, contract.namespace)
+            ports = ((observed or {}).get("spec") or {}).get("ports") or []
+            actual = ports[0].get("targetPort") if ports else None
+            if actual != expected_value:
+                raise InjectionError(
+                    "/spec/ports/0/targetPort did not change")
+            changed.append({"resource": "Service/" + WEB_SERVICE,
+                            "path": expected_path, "effect": effect,
+                            "matches_desired": False,
+                            "expected": expected_baseline, "actual": actual})
         elif scenario == "G":
             observed = kubectl.get("SealedSecret", SEALED_SECRET,
                                    contract.namespace)
@@ -2420,18 +2404,18 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
                     detection = _read_completion(sample, keys)
                     detection_reads = keys
             if (detection is None and arm == "gitops"
-                    and scenario in "BCDEG"
+                    and scenario in "BCDEFG"
                     and argo_signal(sample.argo.get(app))):
                 key = "Application/" + app
                 if _read_eligible(sample, key, t0, deadline):
                     detection = _read_completion(sample, [key])
                     detection_reads = [key]
 
-        if scenario != "F" and not (imperative and scenario in "BCDEG"):
+        if not (imperative and scenario in "BCDEFG"):
             evidence, evidence_reads = _evaluation_evidence(
                 post, contract, scenario, t0, deadline, evidence_at)
 
-        if imperative and scenario in "BCDEG":
+        if imperative and scenario in "BCDEFG":
             for sample in post:
                 if imperative.detection_at is not None:
                     keys = _imperative_event_keys(
@@ -2484,15 +2468,13 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
 
     if scenario == "A":
         detection_ref = "hpa:invenio-web-hpa" if detection else None
-    elif scenario == "F":
-        detection_ref = None
     elif arm == "imperative":
         detection_ref = "imperative:contract-diff" if detection else None
     else:
         detection_ref = "argo:invenio-bootstrap" if detection else None
     evidence_ref = None
     if evidence is not None:
-        if imperative and scenario in "BCDEG" and imperative.evidence_ref:
+        if imperative and scenario in "BCDEFG" and imperative.evidence_ref:
             evidence_ref = imperative.evidence_ref
         elif scenario == "A":
             evidence_ref = "samples.jsonl"
@@ -2512,9 +2494,6 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
     if scenario == "A":
         detection_controller = "hpa"
         recovery_controller = "hpa" if recovery is not None else "unattributed"
-    elif scenario == "F":
-        detection_controller = "unattributed"
-        recovery_controller = "unattributed"
     elif arm == "imperative":
         detection_controller = "imperative" if detection else "unattributed"
         recovery_controller = ("imperative" if any(
@@ -2674,8 +2653,7 @@ def dry_run_row(run_id, arm, scenario, rep, namespace, app, args) -> dict:
         "kubectl_cmds": 0,
         "source_revision": getattr(args, "source_revision", None),
         "render_sha256": getattr(args, "render_sha256", None),
-        "planned_mutations": planned_mutations(scenario,
-                                               quarantine_namespace(namespace)),
+        "planned_mutations": planned_mutations(scenario),
         "safety": {
             "live": False,
             "namespace_allowed": True,
@@ -2684,14 +2662,14 @@ def dry_run_row(run_id, arm, scenario, rep, namespace, app, args) -> dict:
     }
 
 
-def planned_mutations(scenario, quarantine="exp-<namespace>-drift"):
+def planned_mutations(scenario):
     table = {
         "A": ["patch Deployment/invenio-web /spec/replicas (HPA-owned)"],
         "B": ["patch Deployment/invenio-web container web image"],
         "C": ["patch ConfigMap/invenio-app-config-<hash> data key"],
         "D": ["delete Deployment/invenio-web"],
         "E": ["patch Deployment/invenio-web container web memory limit"],
-        "F": [f"apply sanitized Deployment into {quarantine}"],
+        "F": ["patch Service/invenio-web spec.ports[0].targetPort"],
         "G": ["annotate SealedSecret/invenio-app-secrets metadata only"],
     }
     return table.get(scenario, [])
@@ -3075,8 +3053,7 @@ class LiveRunner:
                     now = self.clock.now().mono
                     if now >= deadline:
                         break
-                    if (samples and collector_evidence_at is None
-                            and args.scenario != "F"):
+                    if samples and collector_evidence_at is None:
                         latest = samples[-1]
                         if args.scenario == "A":
                             changed = hpa_changed(
@@ -3112,7 +3089,7 @@ class LiveRunner:
                                         "collector evidence write failed: "
                                         f"{type(error).__name__}") from None
                                 collector_evidence_store_at = self.clock.now()
-                    if args.arm == "imperative" and args.scenario in "BCDEG":
+                    if args.arm == "imperative" and args.scenario in "BCDEFG":
                         if now >= next_repair and samples:
                             latest = samples[-1]
                             diffs = field_diffs(contract, latest)
@@ -3182,7 +3159,7 @@ class LiveRunner:
                 if (timeline is not None and collector_evidence_store_at
                         and timeline.get("t_e") is not None
                         and not (args.arm == "imperative"
-                                 and args.scenario in "BCDEG")):
+                                 and args.scenario in "BCDEFG")):
                     timeline["t_e_store"] = collector_evidence_store_at
             if sampler is not None and sampler.error is not None:
                 raise InstrumentationError(str(sampler.error))
