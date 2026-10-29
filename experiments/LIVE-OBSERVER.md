@@ -82,7 +82,7 @@ Empat resource dan bidang terpilih:
 | `Deployment/invenio-web` | image container `web`; requests/limits CPU dan memori |
 | `ConfigMap/invenio-app-config-<hash>` | seluruh `data`; identitas dari `envFrom.configMapRef` deklarasi |
 | `Service/invenio-web` | `spec.type`, selector `app.kubernetes.io/name`, port pertama dan `targetPort` |
-| `SealedSecret/invenio-app-secrets` | hanya anotasi drift metadata; `spec.encryptedData` tidak pernah dibaca/disimpan |
+| `SealedSecret/invenio-app-secrets` | hanya anotasi drift metadata; `spec.encryptedData` tidak dipilih/diserialisasi, tetapi bundle lokal tetap di-parse di memori |
 
 Render penuh boleh memuat objek aplikasi lain; hanya empat target yang dipilih.
 R1 = persentase resource yang seluruh bidang terpilihnya cocok (4 = 100%,
@@ -104,11 +104,11 @@ Ekuivalensi sempit yang diperbolehkan: `Service.spec.type` dihilangkan =
 deklarasi, dan verifikasi injeksi memeriksa perubahan yang benar-benar terjadi.
 
 Hash dan revisi membuktikan integritas byte serta kesesuaian revisi, **bukan**
-provenance render. Catatan pembekuan harus memuat URL checkout, revisi,
-`git status --porcelain` kosong, perintah render, versi Kustomize/Python/PyYAML,
-dan hash hasil. Resep persiapan ada di `live/README.md`; jangan memberi label
-ulang pada hash lama atau mengattest berkas arbitrer sebagai terverifikasi
-sumber.
+provenance render. Catatan pembekuan harus memuat path/URL sumber lokal, revisi,
+perintah `git archive`/render, versi aktual Kustomize/Python/PyYAML, dan hash
+hasil; jika memakai checkout, catat juga `git status --porcelain` kosong. Resep
+persiapan ada di `live/README.md`; jangan memberi label ulang pada hash lama atau
+mengattest berkas arbitrer sebagai terverifikasi sumber.
 
 ## Prasyarat dan reset
 

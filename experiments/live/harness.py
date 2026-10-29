@@ -2087,7 +2087,7 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         "detection_ref": detection_ref,
         "evidence_ref": evidence_ref,
         "r1_baseline": (score(contract, baseline) if baseline is not None
-                        else 100.0),
+                        else None),
         "r1_first": score(contract, first) if first else None,
         "r1_last": score(contract, samples[-1]) if samples else None,
         "r1_baseline_details": (resource_results(contract, baseline)
@@ -2550,11 +2550,15 @@ class LiveRunner:
         except Exception as error:  # noqa: BLE001 - preserve evidence, then fail
             failure = error
         finally:
+            g_annotation_owned = bool(
+                args.scenario == "G" and injection is not None
+                and any(command.argv[:2] == ["annotate", "SealedSecret"]
+                        for command in injection.commands))
             try:
                 cleanup = (cleanup_quarantine(self.kubectl, self.quarantine,
                                               owner=run_id)
                            if allow_cleanup else CleanupReport(True, [], []))
-                if args.scenario == "G" and allow_cleanup:
+                if args.scenario == "G" and allow_cleanup and g_annotation_owned:
                     annotation_cleanup = cleanup_g_annotation(
                         self.kubectl, args.namespace)
                     cleanup = CleanupReport(

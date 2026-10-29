@@ -125,6 +125,7 @@ def loads(data: bytes, expected_sha256: str, expected_revision: str,
     objects = bundle.get("objects")
     if not isinstance(objects, list):
         raise DeclarationError("render bundle objects must be an array")
+    _validate_objects(objects)
     index = _index_objects(objects)
     deployment = _target(index, "Deployment", WEB_DEPLOYMENT, namespace)
     container = _web_container(deployment)
@@ -247,19 +248,31 @@ def _configmap_reference(container: dict) -> str:
     return names[0]
 
 
+def _validate_objects(objects) -> None:
+    for item in objects:
+        if not isinstance(item, dict):
+            raise DeclarationError(
+                "render bundle objects must be object dictionaries")
+        if not isinstance(item.get("apiVersion"), str) or not item["apiVersion"]:
+            raise DeclarationError(
+                "render bundle contains an object without apiVersion")
+        if not isinstance(item.get("kind"), str) or not item["kind"]:
+            raise DeclarationError(
+                "render bundle contains an object without kind")
+        metadata = item.get("metadata")
+        if not isinstance(metadata, dict):
+            raise DeclarationError(
+                "render bundle contains an object without metadata")
+        if not isinstance(metadata.get("name"), str) or not metadata["name"]:
+            raise DeclarationError(
+                "render bundle contains an object without a name")
+
+
 def _index_objects(objects):
     index = {}
     for item in objects:
-        if not isinstance(item, dict):
-            continue
-        kind = item.get("kind")
-        metadata = item.get("metadata")
-        if not isinstance(kind, str) or not isinstance(metadata, dict):
-            continue
-        name = metadata.get("name")
-        if not isinstance(name, str) or not name:
-            continue
-        index.setdefault((kind, name), []).append(item)
+        index.setdefault(
+            (item["kind"], item["metadata"]["name"]), []).append(item)
     return index
 
 

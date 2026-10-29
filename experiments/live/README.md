@@ -229,7 +229,7 @@ Objek yang dipilih tepat empat, bukan seluruh render:
 | `Deployment/invenio-web` | image container `web`; `requests`/`limits` CPU dan memori |
 | `ConfigMap/invenio-app-config-<hash>` | seluruh `data`; identitas diambil dari `envFrom.configMapRef` container `web` yang dideklarasikan, bukan dari pod live |
 | `Service/invenio-web` | `spec.type`, selector `app.kubernetes.io/name`, port pertama dan `targetPort` |
-| `SealedSecret/invenio-app-secrets` | hanya anotasi `experiment.invenio.ugm/drift`; `spec.encryptedData` tidak pernah dibaca atau disimpan |
+| `SealedSecret/invenio-app-secrets` | hanya anotasi `experiment.invenio.ugm/drift`; `spec.encryptedData` tidak dipilih atau diserialisasi, tetapi bundle lokal tetap di-parse di memori |
 
 Render penuh boleh memuat objek aplikasi lain; objek di luar empat target
 diabaikan. Identitas target ganda, target hilang, namespace salah, referensi
@@ -269,26 +269,31 @@ GitOps yang tidak berubah, renderer Kustomize yang sudah ada, dan PyYAML yang
 sudah terpasang; tidak ada framework renderer baru, unduhan, atau instalasi.
 
 ```bash
-# 1. Checkout imutabel pada revisi yang dibekukan.
-git clone https://github.com/vityasyyy/invenio-rdm-gitops.git /tmp/invenio-rdm-gitops
-cd /tmp/invenio-rdm-gitops
-git checkout --detach <40-hex>
-test "$(git rev-parse HEAD)" = "<40-hex>"
-test -z "$(git status --porcelain)"
+# 1. Gunakan checkout GitOps lokal yang sudah ada; jangan mengunduh.
+export GITOPS_SOURCE=/path/to/existing/invenio-rdm-gitops
+export GITOPS_REVISION=<40-hex>
+test -d "$GITOPS_SOURCE/.git"
+git -C "$GITOPS_SOURCE" rev-parse --verify "${GITOPS_REVISION}^{commit}"
+export GITOPS_FROZEN="$(mktemp -d /tmp/invenio-rdm-gitops-frozen.XXXXXX)"
+git -C "$GITOPS_SOURCE" archive --format=tar "$GITOPS_REVISION" \
+  | tar -x -C "$GITOPS_FROZEN"
+cd "$GITOPS_FROZEN"
 
 # 2. Render dengan entrypoint Kustomize yang sudah ada.
-kustomize build k8s/apps/invenio/kustomization.yaml > /tmp/invenio-render.yaml
+kustomize build k8s/apps/invenio > /tmp/invenio-render.yaml
 
 # 3. Konversi offline ke JSON dan cetak hash byte.
 python3 - <<'PY'
 import hashlib
 import json
+import os
 from pathlib import Path
-import subprocess
+import re
 import yaml
 
-revision = subprocess.check_output(
-    ["git", "rev-parse", "HEAD"], text=True).strip()
+revision = os.environ["GITOPS_REVISION"]
+if not re.fullmatch(r"[0-9a-f]{40}", revision):
+    raise SystemExit("GITOPS_REVISION must be 40 lowercase hex")
 documents = [item for item in yaml.safe_load_all(
     Path("/tmp/invenio-render.yaml").read_text()) if item]
 bundle = {
@@ -302,7 +307,7 @@ Path("/tmp/invenio-frozen-render.json").write_bytes(data)
 print(hashlib.sha256(data).hexdigest())
 PY
 
-# 4. Catat hash dan versi alat di catatan pembekuan.
+# 4. Catat hash dan versi alat aktual di catatan pembekuan.
 shasum -a 256 /tmp/invenio-frozen-render.json
 kustomize version
 python3 -c 'import sys, yaml; print(sys.version); print(yaml.__version__)'
@@ -312,18 +317,17 @@ Kuantitas Kubernetes harus tetap berupa string pada render (misalnya `"1"`,
 `"250m"`, `"2Gi"`). Loader menolak angka mentah untuk bidang kuantitas; itu
 adalah cacat render, bukan alasan untuk mengoersi nilai. Simpan berkas lengkap
 secara lokal untuk verifikasi pembekuan; hanya kontrak tersanitasi, hash,
-identitas, dan detail mismatch yang ditulis ke bukti. Versi yang teramati saat
-resep ini ditulis: Kustomize v5.8.1, kubectl v1.37.1, Python 3.12.8, PyYAML
-6.0.3; repository tidak mem-pin versi tersebut, jadi catatan pembekuan harus
-memakai versi aktual.
+identitas, dan detail mismatch yang ditulis ke bukti. Jangan menyalin versi alat
+dari dokumen ini; catat keluaran aktual dari perintah di atas.
 
 **Batas provenance.** Hash dan revisi yang dideklarasikan membuktikan integritas
 byte dan kesesuaian revisi, **bukan** bahwa berkas benar-benar dihasilkan dari
-commit tersebut. Catat URL checkout, revisi, `git status --porcelain` kosong,
-perintah render, versi Kustomize/Python/PyYAML, dan hash hasil di catatan
-pembekuan. Jangan memberi label ulang pada hash lama atau mengattest berkas
-arbitrer sebagai terverifikasi sumber. Regenerasi yang berbeda harus menjadi
-artefak beku baru dengan hash dan catatan baru.
+commit tersebut. Catat path/URL sumber lokal, revisi yang di-resolve, perintah
+`git archive`/render, versi aktual Kustomize/Python/PyYAML, dan hash hasil di
+catatan pembekuan. Jika memakai checkout alih-alih arsip, catat juga
+`git status --porcelain` kosong. Jangan memberi label ulang pada hash lama atau
+mengattest berkas arbitrer sebagai terverifikasi sumber. Regenerasi yang berbeda
+harus menjadi artefak beku baru dengan hash dan catatan baru.
 
 ## Prosedur dua lengan berurutan
 
@@ -368,7 +372,7 @@ menghentikan run sebelum/sesudah mutasi dan menghasilkan exit nonzero.
 | D | `Deployment/invenio-web` | hapus objek | manifest Deployment dari deklarasi beku (tanpa `replicas` milik HPA) | Drift terkelola; kesetaraan objek, bukan status rollout |
 | E | container `web` | limit memori `2Gi` → `1536Mi` | nilai deklarasi beku | Drift terkelola |
 | F | salinan `invenio-web` | buat di `exp-<namespace>-drift`, replika 0 | harness menghapus di `finally` | Batas visibilitas; objek di luar Application tidak diharapkan dipangkas ArgoCD |
-| G | `SealedSecret/invenio-app-secrets` | **hanya** anotasi metadata `experiment.invenio.ugm/drift` | hapus anotasi / restore baseline | Tidak pernah membaca atau menulis `spec.encryptedData`; atribusi ArgoCD/imperatif/lainnya dicatat |
+| G | `SealedSecret/invenio-app-secrets` | **hanya** anotasi metadata `experiment.invenio.ugm/drift` | hapus anotasi / restore baseline | Tidak pernah menulis `spec.encryptedData`; nilainya tidak masuk bidang terpilih atau bukti; atribusi ArgoCD/imperatif/lainnya dicatat |
 
 Setiap injeksi memverifikasi bidang sasaran berubah dari pembacaan balik sebelum
 jendela pengamatan dimulai. Bila tidak berubah: `invalid_injection`, bukan waktu
@@ -601,6 +605,9 @@ dry-run sebagai observasi.
   di-parse, dan menolak URL, input hilang/duplikat/non-finit, revisi/hash tidak
   cocok, identitas ganda, namespace salah, atau bidang terpilih hilang sebelum
   HTTP/aktivasi lengan/injeksi. Isi berkas tidak dicetak pada error.
+- Cleanup anotasi G hanya dijalankan bila run ini benar-benar mencoba mutasi G
+  (termasuk injeksi parsial/gagal). Baseline refusal tidak menghapus anotasi
+  yang sudah ada sebelum run.
 - Namespace di luar `invenio`/`exp-*` ditolak; karantina selalu `exp-*`.
 - Tidak ada penghapusan seed/record, purge queue, restore, migrasi, atau
   perubahan Secret plaintext.

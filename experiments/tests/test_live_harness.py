@@ -356,7 +356,7 @@ class FakeKubectl:
                 annotations.pop(key, None)
             else:
                 annotations[key] = value
-        return result()
+        return result(argv=["annotate", kind, name, key])
 
     def apply(self, manifest):
         self.applies.append(copy.deepcopy(manifest))
@@ -734,9 +734,19 @@ class IndependentOracleTests(unittest.TestCase):
             spec, [], injection(), "gitops", "B", 30)
         self.assertIsNone(out["r1_first"])
         self.assertIsNone(out["r1_last"])
+        self.assertIsNone(out["r1_baseline"])
+        self.assertIsNone(out["r1_baseline_details"])
         self.assertIsNone(out["r1_first_details"])
         self.assertIsNone(out["r1_last_details"])
+
+    def test_supplied_baseline_produces_r1_baseline(self):
+        spec = contract()
+        baseline = observation()
+        out = harness.analyze_timeline(
+            spec, [], injection(), "gitops", "B", 30, baseline=baseline)
         self.assertEqual(out["r1_baseline"], 100.0)
+        self.assertEqual(out["r1_baseline_details"]["score"], 100.0)
+        self.assertEqual(out["r1_baseline_details"]["matched"], 4)
 
     def test_secret_material_never_enters_contract_or_details(self):
         spec = contract()
@@ -956,6 +966,23 @@ class DeclarationLoaderTests(unittest.TestCase):
                 data, digest = self.bundle_with(mutate)
                 with self.assertRaises(harness.DeclarationError):
                     self.load(data=data, digest=digest)
+
+    def test_malformed_object_entries_are_rejected_without_echoing_contents(self):
+        cases = {
+            "non-object": lambda bundle: bundle["objects"].append("bad-object"),
+            "bare mapping": lambda bundle: bundle["objects"].append(
+                {"foo": "SENSITIVE-VALUE"}),
+            "missing name": lambda bundle: bundle["objects"].append(
+                {"apiVersion": "v1", "kind": "ConfigMap",
+                 "metadata": {"namespace": "invenio"}}),
+        }
+        for label, mutate in cases.items():
+            with self.subTest(case=label):
+                data, digest = self.bundle_with(mutate)
+                with self.assertRaises(harness.DeclarationError) as caught:
+                    self.load(data=data, digest=digest)
+                self.assertNotIn("SENSITIVE-VALUE", str(caught.exception))
+                self.assertNotIn("bad-object", str(caught.exception))
 
     def test_secret_material_never_enters_the_scoped_declaration(self):
         selected = self.load()
@@ -1930,6 +1957,7 @@ class LiveRunnerTests(unittest.TestCase):
             self.assertGreater(row["kubectl_cmds"], 0)
             self.assertEqual(row["arm_restore_status"], "restored")
             self.assertEqual(row["cleanup_status"], "ok")
+            self.assertEqual(row["r1_baseline"], 100.0)
             self.assertEqual(row["r1_baseline_details"]["score"], 100)
             self.assertEqual(row["r1_first_details"]["total"], 4)
             self.assertEqual(row["r1_last_details"]["total"], 4)
@@ -2027,6 +2055,98 @@ class LiveRunnerTests(unittest.TestCase):
             self.assertEqual(fake.patches, [])
             self.assertEqual(fake.applies, [])
             self.assertEqual(fake.deletes, [])
+
+    def test_g_baseline_refusal_preserves_a_preexisting_annotation(self):
+        sealed = sealed_secret({harness.DRIFT_ANNOTATION: "preexisting"})
+        fake = FakeKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed,
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        })
+        with tempfile.TemporaryDirectory() as directory:
+            path, digest = write_render(directory)
+            args = harness.parse_args([
+                "--arm", "gitops", "--scenario", "G", "--rep", "1",
+                "--live", "--confirm-single-stack", "--namespace", "invenio",
+                "--app", "invenio-bootstrap",
+                "--render-file", str(path),
+                "--source-revision", "b" * 40, "--render-sha256", digest,
+                "--timeout", "1", "--sample-interval", "0.01",
+                "--baseline-timeout", "1", "--reset-timeout", "1",
+                "--out", directory, "--run-id", "g-refused",
+            ])
+            frozen = harness.load_declaration(
+                path, digest, "b" * 40, "invenio")
+            runner = harness.LiveRunner(
+                args, {"declaration": frozen}, fake, AdvancingClock())
+            with mock.patch("time.sleep", lambda _: None), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = runner.run()
+            row = json.loads(
+                (Path(directory) / "g-refused.jsonl").read_text())
+            self.assertEqual(code, 1)
+            self.assertEqual(row["status"], "baseline_failure")
+            self.assertIn("drift annotation", row["error"])
+            self.assertIsNone(row.get("injection"))
+            self.assertEqual(fake.annotations, [])
+            annotations = fake.objects[
+                ("SealedSecret", "invenio-app-secrets", "invenio")][
+                "metadata"]["annotations"]
+            self.assertEqual(annotations[harness.DRIFT_ANNOTATION],
+                             "preexisting")
+
+    def test_g_partial_failed_injection_cleanup_is_retained(self):
+        class FailedGAnnotationKubectl(FakeKubectl):
+            def annotate(self, kind, name, namespace, key, value=None):
+                result = super().annotate(
+                    kind, name, namespace, key, value)
+                if value is not None:
+                    result.returncode = 1
+                    result.stderr = "annotation rejected"
+                return result
+
+        fake = FailedGAnnotationKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        })
+        with tempfile.TemporaryDirectory() as directory:
+            path, digest = write_render(directory)
+            args = harness.parse_args([
+                "--arm", "gitops", "--scenario", "G", "--rep", "1",
+                "--live", "--confirm-single-stack", "--namespace", "invenio",
+                "--app", "invenio-bootstrap",
+                "--render-file", str(path),
+                "--source-revision", "b" * 40, "--render-sha256", digest,
+                "--timeout", "1", "--sample-interval", "0.01",
+                "--baseline-timeout", "1", "--reset-timeout", "1",
+                "--out", directory, "--run-id", "g-partial",
+            ])
+            frozen = harness.load_declaration(
+                path, digest, "b" * 40, "invenio")
+            runner = harness.LiveRunner(
+                args, {"declaration": frozen}, fake, AdvancingClock())
+            with mock.patch("time.sleep", lambda _: None), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = runner.run()
+            row = json.loads(
+                (Path(directory) / "g-partial.jsonl").read_text())
+            self.assertEqual(code, 1)
+            self.assertEqual(row["status"], "invalid_injection")
+            self.assertEqual(row["cleanup_status"], "ok")
+            self.assertTrue(fake.annotations)
+            self.assertIsNotNone(fake.annotations[0][4])
+            self.assertIsNone(fake.annotations[-1][4])
+            annotations = fake.objects[
+                ("SealedSecret", "invenio-app-secrets", "invenio")][
+                "metadata"].get("annotations", {})
+            self.assertNotIn(harness.DRIFT_ANNOTATION, annotations)
 
     def test_live_baseline_divergence_is_not_repaired_or_accepted(self):
         objects = {
