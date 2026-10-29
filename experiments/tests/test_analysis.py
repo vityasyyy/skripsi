@@ -6,6 +6,9 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "analysis"))
+
+import summarize  # noqa: E402
 
 
 class AnalysisTest(unittest.TestCase):
@@ -37,6 +40,25 @@ class AnalysisTest(unittest.TestCase):
             self.assertIsNone(groups[0]["detection"]["observed_median_seconds"])
             self.assertEqual(groups[1]["recovery"]["right_censored"], 1)
             self.assertFalse(groups[1]["complete_time_observations"])
+
+    def test_v2_summary_counts_missing_endpoints_separately(self):
+        row = {
+            "run_id": "missing", "schema_version": 2, "scenario": "B",
+            "env": "gitops", "analysis_group": "managed_drift",
+            "synthetic": True, "source_revision": "fixture",
+            "render_sha256": "fixture",
+            "detection_status": "unobserved_before_stop",
+            "detection_seconds": None,
+            "evidence_status": "unobserved_before_stop",
+            "evidence_seconds": None,
+            "recovery_status": "observed", "recovery_seconds": 4,
+            "censor_seconds": 10,
+        }
+        group = summarize.summarize([row])["groups"][0]
+        self.assertEqual(group["detection"]["missing"], 1)
+        self.assertEqual(group["detection"]["right_censored"], 0)
+        self.assertIsNone(group["detection"]["observed_median_seconds"])
+        self.assertFalse(group["complete_time_observations"])
 
     def test_legacy_analyzer_requires_explicit_historical_mode(self):
         with tempfile.TemporaryDirectory() as directory:

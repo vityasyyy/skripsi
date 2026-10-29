@@ -42,6 +42,7 @@ DEFAULT_SEED = 20261027
 DEFAULT_COOLDOWN_SECONDS = 60.0
 DEFAULT_BASELINE_RETRIES = 1
 BATCH_SCHEMA_VERSION = 2
+TIMING_CONVENTION = harness.TIMING_CONVENTION
 R2_REPS = range(1, 11)
 R1_REPS = range(11, 16)
 ANALYSIS_STATUSES = frozenset({"observed", "right_censored"})
@@ -66,8 +67,8 @@ MANIFEST_KEYS = (
     "formal_execution_approved", "stack_isolated", "r3_status", "created_utc",
     "updated_utc", "seed", "arms", "scenarios", "reps", "arm_order",
     "scenario_order", "namespace", "app", "source_revision", "render_sha256",
-    "cooldown_seconds", "baseline_retries", "runs", "cooldowns", "counts",
-    "stop_reason", "stop_run_id",
+    "cooldown_seconds", "baseline_retries", "timing_convention",
+    "runs", "cooldowns", "counts", "stop_reason", "stop_run_id",
 )
 
 
@@ -171,6 +172,7 @@ def default_batch_id(args) -> str:
         "app": args.app,
         "source_revision": args.source_revision,
         "render_sha256": args.render_sha256,
+        "timing_convention": TIMING_CONVENTION,
         "live": bool(args.live),
         "production_like": bool(args.production_like),
     }
@@ -374,6 +376,7 @@ def _new_manifest(args, plan, batch_id):
         "formal_execution_approved": bool(args.live and args.production_like),
         "stack_isolated": False,
         "r3_status": "not_measured",
+        "timing_convention": TIMING_CONVENTION,
         "created_utc": _utc_now(),
         "updated_utc": _utc_now(),
         "seed": args.seed,
@@ -432,6 +435,9 @@ def _validate_resume(args, plan, batch_id, paths):
             f"invalid batch manifest: {type(error).__name__}: {error}") from error
     if not isinstance(manifest, dict):
         raise BatchSafetyError("invalid batch manifest: not an object")
+    if "timing_convention" not in manifest:
+        raise BatchSafetyError(
+            "cannot resume a batch that predates completed-observation timing")
     missing = [key for key in MANIFEST_KEYS if key not in manifest]
     if missing:
         raise BatchSafetyError(
@@ -444,6 +450,7 @@ def _validate_resume(args, plan, batch_id, paths):
         "formal_execution_approved": bool(args.live and args.production_like),
         "stack_isolated": False,
         "r3_status": "not_measured",
+        "timing_convention": TIMING_CONVENTION,
         "seed": args.seed,
         "arms": list(args.arms),
         "scenarios": list(args.scenarios),
@@ -574,9 +581,10 @@ def _validate_attempt(args, item, run_id, attempt):
                 or row.get("arm") != item["arm"]
                 or row.get("scenario") != item["scenario"]
                 or row.get("rep") != item["rep"]
-                or row.get("status") != status):
+                or row.get("status") != status
+                or row.get("timing_convention") != TIMING_CONVENTION):
             raise BatchSafetyError(
-                f"row identity/status mismatch for {run_id}")
+                f"row identity/status/convention mismatch for {run_id}")
     if status in PENDING_STATUSES:
         evidence = _evidence_path(args.out, run_id)
         if row_path.exists() or (evidence.exists() and any(evidence.iterdir())):
@@ -626,6 +634,11 @@ def _resolve_batch_id(args, plan):
 
 def annotate_row(row, entry, args, batch_id, attempt=None):
     annotated = dict(row)
+    marker = annotated.get("timing_convention")
+    if marker != TIMING_CONVENTION:
+        raise BatchSafetyError(
+            f"row {annotated.get('run_id')} is missing or uses an unsupported "
+            "timing convention")
     annotated.update({
         "batch_id": batch_id,
         "batch_index": entry["index"],
@@ -659,6 +672,10 @@ def _analysis_problem(row):
         return "postcondition_not_verified"
     if row.get("synthetic") is not False:
         return "synthetic"
+    if row.get("timing_convention") != TIMING_CONVENTION:
+        if row.get("timing_convention") is None:
+            return "missing_timing_convention"
+        return "unsupported_timing_convention"
     scenario = row.get("scenario")
     if scenario not in SCENARIOS:
         return "invalid_scenario"
@@ -680,6 +697,11 @@ def _analysis_problem(row):
         value = row.get(metric + "_seconds")
         metric_status = row.get(metric + "_status")
         if metric_status == "right_censored" and value is None:
+            continue
+        if (metric_status == "unobserved_before_stop" and value is None
+                and row.get("status") == "observed"
+                and row.get("stop_reason") == "recovery"
+                and row.get("recovery_status") == "observed"):
             continue
         if (metric_status == "observed"
                 and type(value) in (int, float)
@@ -778,6 +800,7 @@ def _summary(manifest, analysis_rows, exclusions):
         "formal_execution_approved": manifest["formal_execution_approved"],
         "stack_isolated": False,
         "r3_status": "not_measured",
+        "timing_convention": manifest["timing_convention"],
         "seed": manifest["seed"],
         "arm_order": manifest["arm_order"],
         "scenario_order": manifest["scenario_order"],
@@ -794,6 +817,8 @@ def _summary(manifest, analysis_rows, exclusions):
         "status_counts": manifest["counts"]["by_status"],
         "note": ("R2 = repetitions 1..10; R1 = repetitions 11..15. "
                  "Observed medians require a separate censoring-aware analysis. "
+                 "unobserved_before_stop endpoints are missing before an early "
+                 "stop, not censored observations. "
                  "Dry runs and failed runs are never observations. "
                  "A retried baseline failure stays one planned cell, not an extra sample."),
     }

@@ -12,9 +12,10 @@ python3 experiments/analysis/summarize.py --in /path/hasil-v2.jsonl
 Ringkasan stdlib memisahkan skenario, lengan, kelompok analisis, data sintetis,
 revisi sumber dan digest render. A tetap `hpa_control`, F `visibility_boundary`,
 B--E/G `managed_drift`; tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap
-metrik, jumlah teramati dan tersensor tetap dilaporkan. Median hanya untuk bagian
-teramati dan **bukan** estimasi yang sudah disesuaikan terhadap penyensoran.
-Tidak ada uji inferensial otomatis sebelum metode/keluarga uji disetujui.
+metrik, jumlah teramati, tersensor, dan hilang (`unobserved_before_stop`) tetap
+dilaporkan. Median hanya untuk bagian teramati dan **bukan** estimasi yang sudah
+disesuaikan terhadap penyensoran. Tidak ada uji inferensial otomatis sebelum
+metode/keluarga uji disetujui.
 
 Kegagalan injeksi, instrumentasi dan reset disimpan pada ledger run tersendiri
 dengan alasan serta referensi bukti; jangan membuangnya untuk membentuk dataset
@@ -59,7 +60,7 @@ summary, dan tidak dihitung sebagai eksklusi di sini.
 | `live_overview.tex` | jumlah baris R2, run teramati/tersensor, populasi, eksklusi, `R3: not measured` |
 | `live_exclusions.tex` | baris yang dieksklusi beserta alasan |
 | `live_r1.tex` | median baseline/first/last per skenario, lengan, fase; jumlah observasi |
-| `live_survival.tex` | Kaplan--Meier, median, RMST, jumlah event/tersensor, horizon |
+| `live_survival.tex` | Kaplan--Meier, median, RMST, jumlah event/tersensor/hilang/eksklusi, horizon |
 | `live_tests.tex` | Wilcoxon berpasangan atau Mann--Whitney eksploratif, $p$ mentah dan Holm |
 | `live_effects.tex` | Cliff's $\delta$, selisih median berpasangan, rank-biserial, CI bootstrap |
 
@@ -87,7 +88,9 @@ Cara membaca hasil:
 - **Penyensoran.** Waktu tersensor tidak pernah diisi nol. Kaplan--Meier dan
   RMST memakai horizon batas penyensoran terkecil per kelompok; median `--`
   berarti tidak tercapai dalam horizon. RMST adalah deskripsi hingga horizon,
-  bukan uji superioritas.
+  bukan uji superioritas. Endpoint `unobserved_before_stop` tidak dihitung
+  sebagai tersensor dan tidak masuk kurva; bila seluruh endpoint hilang, hasilnya
+  tidak terestimasi.
 - **R1.** Baseline/first/last dilaporkan sebagai median bagian teramati dengan
   jumlah observasi; nilai hilang tidak diimputasi. R1 tidak diuji.
 - **Klaim.** `claim_status` selalu `exploratory_case_study` dan
@@ -97,11 +100,26 @@ Cara membaca hasil:
 - **R3.** `R3: not measured`; tidak ada klaim audit atau keterlacakan.
 
 Input divalidasi secara *fail-closed*: skema, pemetaan lengan, fase/rep,
-revisi/render, status metrik, dan nilai tersensor yang tidak konsisten
-ditolak. Batas penyensoran divalidasi per baris; horizon RMST adalah batas
-terkecil per kelompok. Ketidakcocokan `rows.jsonl` dengan `analysis.jsonl` juga
-ditolak agar tidak ada baris yang hilang diam-diam. Analisis tidak mencetak
-nilai baris mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
+revisi/render, status metrik, batas monotonik/durasi, dan nilai tersensor yang
+tidak konsisten ditolak. `timing_convention` baru harus
+`completed-observation-v1`; dataset yang mencampur baris bermarker dan legacy,
+marker tak dikenal, atau marker `rows.jsonl` yang berbeda dari `analysis.jsonl`
+ditolak. Baris lama tanpa marker tetap dapat dianalisis sebagai legacy dan tidak
+diberi label ulang. Batas penyensoran divalidasi per baris; horizon RMST adalah
+batas terkecil per kelompok. Ketidakcocokan `rows.jsonl` dengan
+`analysis.jsonl` juga ditolak agar tidak ada baris yang hilang diam-diam.
+Analisis tidak mencetak nilai baris mentah; hanya metadata yang diizinkan yang
+masuk artefak eksklusi.
+
+`unobserved_before_stop` hanya diterima dengan nilai `null` dan provenance
+recovery dini yang valid (run `observed`, `stop_reason: recovery`, recovery
+teramati). Endpoint yang hilang tidak masuk Kaplan--Meier/RMST maupun input uji
+numerik, dan tidak dianggap tersensor. Kelompok yang seluruh endpoint-nya hilang
+dilaporkan **tidak terestimasi** (bukan "semua tersensor"); tabel survival
+menampilkan kolom `Hilang` dan `Eksklusi`, sedangkan `pairing.reason` membedakan
+`missing_blocks` dari `censored_blocks`. Uji tetap *complete-case*/observed-only:
+missingness dan penyensoran tidak disesuaikan, dan keluarga Holm 12 hipotesis
+tidak berubah.
 
 ### Identitas retry
 

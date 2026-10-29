@@ -66,6 +66,7 @@ SEED_SHA256 = "7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2"
 DEFAULT_INVENIO_URL = "https://invenio.vityasy.me"
 USER_AGENT = "invenio-live-harness/1.0"
 MISSING = "<missing>"
+TIMING_CONVENTION = "completed-observation-v1"
 
 
 class HarnessError(Exception):
@@ -201,6 +202,7 @@ class Injection:
     changed: list
     commands: list
     error: str | None = None
+    verification_started: Point | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -208,6 +210,10 @@ class Injection:
             "started_mono": self.started.mono,
             "acknowledged_utc": self.acknowledged.utc,
             "acknowledged_mono": self.acknowledged.mono,
+            "verification_started_utc": (self.verification_started.utc
+                                         if self.verification_started else None),
+            "verification_started_mono": (self.verification_started.mono
+                                          if self.verification_started else None),
             "verified_utc": self.verified.utc if self.verified else None,
             "verified_mono": self.verified.mono if self.verified else None,
             "accepted": self.accepted,
@@ -221,7 +227,10 @@ class Injection:
 class ImperativeRun:
     detection_at: Point | None = None
     evidence_at: Point | None = None
+    evidence_store_at: Point | None = None
     evidence_ref: str | None = None
+    detection_reads: list = field(default_factory=list)
+    evidence_reads: list = field(default_factory=list)
     commands: list = field(default_factory=list)
     failed: bool = False
 
@@ -231,7 +240,13 @@ class ImperativeRun:
             "detection_at_mono": self.detection_at.mono if self.detection_at else None,
             "evidence_at_utc": self.evidence_at.utc if self.evidence_at else None,
             "evidence_at_mono": self.evidence_at.mono if self.evidence_at else None,
+            "evidence_store_at_utc": (self.evidence_store_at.utc
+                                      if self.evidence_store_at else None),
+            "evidence_store_at_mono": (self.evidence_store_at.mono
+                                       if self.evidence_store_at else None),
             "evidence_ref": self.evidence_ref,
+            "detection_reads": list(self.detection_reads),
+            "evidence_reads": list(self.evidence_reads),
             "commands": [command.as_dict() for command in self.commands],
             "failed": self.failed,
         }
@@ -486,7 +501,7 @@ def resource_id(doc: dict) -> str:
 
 
 def observation_from_objects(objects, at: Point, argo=None, hpa=None,
-                             extras=None) -> Observation:
+                             extras=None, acquisition=None) -> Observation:
     resources = {}
     for doc in objects:
         if not isinstance(doc, dict) or not doc.get("kind"):
@@ -503,7 +518,8 @@ def observation_from_objects(objects, at: Point, argo=None, hpa=None,
             "manifest": sanitize_object(doc),
         }
     return Observation(at=at, resources=resources, extra_resources=list(extras or []),
-                       argo=copy.deepcopy(argo or {}), hpa=copy.deepcopy(hpa))
+                       argo=copy.deepcopy(argo or {}), hpa=copy.deepcopy(hpa),
+                       acquisition=copy.deepcopy(acquisition or {}))
 
 
 def application_state(app: dict) -> dict:
@@ -924,6 +940,33 @@ def _point_bounds(started: Point, finished: Point) -> dict:
     }
 
 
+def _attempt_bounds(command: CommandResult) -> dict:
+    return {
+        "started_utc": command.started.utc,
+        "started_mono": command.started.mono,
+        "finished_utc": command.finished.utc,
+        "finished_mono": command.finished.mono,
+        "returncode": command.returncode,
+        "ok": command.returncode == 0,
+    }
+
+
+def _read_bounds(kind, name, namespace, attempts, present, ok) -> dict:
+    last = attempts[-1]
+    return {
+        "kind": kind,
+        "name": name,
+        "namespace": namespace,
+        "started_utc": last["started_utc"],
+        "started_mono": last["started_mono"],
+        "finished_utc": last["finished_utc"],
+        "finished_mono": last["finished_mono"],
+        "ok": ok,
+        "present": present,
+        "attempts": copy.deepcopy(attempts),
+    }
+
+
 def _node_name(item, field: str, seen: set) -> str:
     if not isinstance(item, dict):
         raise InstrumentationError(f"{field} contains a non-object node")
@@ -1066,6 +1109,10 @@ class Kubectl:
         return result
 
     def get(self, kind, name=None, namespace=None, selector=None):
+        payload, _ = self.read(kind, name, namespace, selector)
+        return payload
+
+    def read(self, kind, name=None, namespace=None, selector=None):
         argv = ["get", kind]
         if name:
             argv.append(name)
@@ -1077,7 +1124,9 @@ class Kubectl:
             argv.extend(["-l", selector])
         argv.extend(["-o", "json", "--ignore-not-found",
                      "--request-timeout=15s"])
+        attempts = []
         result = self.run(argv)
+        attempts.append(_attempt_bounds(result))
         for attempt in range(2):
             if result.returncode == 0:
                 break
@@ -1091,20 +1140,30 @@ class Kubectl:
                 break
             time.sleep(0.5 * (attempt + 1))
             result = self.run(argv)
+            attempts.append(_attempt_bounds(result))
         if result.returncode != 0:
-            raise InstrumentationError(
+            error = InstrumentationError(
                 f"kubectl get {kind} failed: {result.stderr.strip()[:300]}")
+            error.read_bounds = _read_bounds(
+                kind, name, namespace, attempts, present=False, ok=False)
+            raise error
         if not result.stdout.strip():
-            return None
+            return None, _read_bounds(
+                kind, name, namespace, attempts, present=False, ok=True)
         try:
             payload = json.loads(result.stdout)
         except ValueError:
-            raise InstrumentationError(
-                f"kubectl get {kind} returned invalid JSON") from None
+            error = InstrumentationError(
+                f"kubectl get {kind} returned invalid JSON")
+            error.read_bounds = _read_bounds(
+                kind, name, namespace, attempts, present=False, ok=False)
+            raise error from None
         if isinstance(payload, dict) and payload.get("kind") == "List":
             items = payload.get("items") or []
-            return items if name is None else None
-        return payload
+            return (items if name is None else None), _read_bounds(
+                kind, name, namespace, attempts, present=True, ok=True)
+        return payload, _read_bounds(
+            kind, name, namespace, attempts, present=True, ok=True)
 
     def patch(self, kind, name, namespace, patch, patch_type="merge") -> CommandResult:
         argv = ["patch", kind, name]
@@ -1196,30 +1255,84 @@ class Snapshotter:
                      CONFIG_PREFIX)]
         return names[0] if len(names) == 1 else None
 
+    def _read(self, reads, key, kind, name=None, namespace=None):
+        try:
+            payload, bounds = self.kubectl.read(kind, name, namespace)
+        except InstrumentationError as error:
+            bounds = getattr(error, "read_bounds", None)
+            if bounds:
+                reads[key] = copy.deepcopy(bounds)
+            started = (self._capture_started
+                       if getattr(self, "_capture_started", None) else None)
+            started = started or self.clock.now()
+            finished = self.clock.now()
+            error.acquisition = {
+                "started": _point_dict(started),
+                "finished": _point_dict(finished),
+                "started_utc": started.utc,
+                "started_mono": started.mono,
+                "finished_utc": finished.utc,
+                "finished_mono": finished.mono,
+                "reads": copy.deepcopy(reads),
+            }
+            raise
+        reads[key] = copy.deepcopy(bounds)
+        return payload
+
     def capture(self, at: Point | None = None) -> Observation:
         at = at or self.clock.now()
-        deployment = self.kubectl.get("Deployment", WEB_DEPLOYMENT, self.namespace)
+        self._capture_started = at
+        reads = {}
+        deployment = self._read(
+            reads, "Deployment/" + WEB_DEPLOYMENT, "Deployment",
+            WEB_DEPLOYMENT, self.namespace)
         if deployment and self.configmap_name is None:
             self.configmap_name = self.discover_configmap(deployment)
-        configmap = (self.kubectl.get("ConfigMap", self.configmap_name, self.namespace)
-                     if self.configmap_name else None)
-        secret = self.kubectl.get("SealedSecret", SEALED_SECRET, self.namespace)
-        service = self.kubectl.get("Service", WEB_SERVICE, self.namespace)
-        hpa_doc = self.kubectl.get("HorizontalPodAutoscaler", WEB_HPA, self.namespace)
+        configmap = (self._read(
+            reads, "ConfigMap/" + self.configmap_name, "ConfigMap",
+            self.configmap_name, self.namespace)
+            if self.configmap_name else None)
+        secret = self._read(
+            reads, "SealedSecret/" + SEALED_SECRET, "SealedSecret",
+            SEALED_SECRET, self.namespace)
+        service = self._read(
+            reads, "Service/" + WEB_SERVICE, "Service", WEB_SERVICE,
+            self.namespace)
+        hpa_doc = self._read(
+            reads, "HorizontalPodAutoscaler/" + WEB_HPA,
+            "HorizontalPodAutoscaler", WEB_HPA, self.namespace)
         objects = [item for item in (deployment, configmap, secret, service) if item]
         apps = {}
         for name in (APP_OF_APPS, self.app):
-            app = self.kubectl.get("Application", name, self.argo_namespace)
+            app = self._read(
+                reads, "Application/" + name, "Application", name,
+                self.argo_namespace)
             if app is None:
                 raise InstrumentationError(f"Argo Application {name} is missing")
             apps[name] = application_state(app)
         extras = []
-        if self.kubectl.get("Namespace", self.quarantine) is not None:
-            if self.kubectl.get("Deployment", WEB_DEPLOYMENT, self.quarantine):
+        quarantine_key = "Namespace/" + self.quarantine
+        if self._read(reads, quarantine_key, "Namespace",
+                      self.quarantine) is not None:
+            quarantine_deployment = self._read(
+                reads,
+                f"{self.quarantine}/Deployment/" + WEB_DEPLOYMENT,
+                "Deployment", WEB_DEPLOYMENT, self.quarantine)
+            if quarantine_deployment:
                 extras.append(f"{self.quarantine}/Deployment/{WEB_DEPLOYMENT}")
         hpa = hpa_state(hpa_doc, deployment) if hpa_doc else None
+        finished = self.clock.now()
+        acquisition = {
+            "started": _point_dict(at),
+            "finished": _point_dict(finished),
+            "started_utc": at.utc,
+            "started_mono": at.mono,
+            "finished_utc": finished.utc,
+            "finished_mono": finished.mono,
+            "reads": reads,
+        }
         return observation_from_objects(objects, at=at, argo=apps, hpa=hpa,
-                                         extras=extras)
+                                         extras=extras, acquisition=acquisition)
 
 
 def _observation_key(observation: Observation) -> str:
@@ -1363,6 +1476,10 @@ def _instrumentation_record(error, started, finished, observation=None) -> dict:
         acquisition = copy.deepcopy(observation.acquisition)
         if acquisition:
             record["acquisition"] = acquisition
+    else:
+        acquisition = getattr(error, "acquisition", None)
+        if isinstance(acquisition, dict) and acquisition:
+            record["acquisition"] = copy.deepcopy(acquisition)
     return record
 
 
@@ -1384,9 +1501,12 @@ def stabilize_baseline(snapshotter, kubectl, arm, timeout, interval,
         try:
             observation = snapshotter.capture()
             captured = clock.now()
-            observation.acquisition = {
-                "snapshot": _point_bounds(started, captured),
-            }
+            acquisition = copy.deepcopy(observation.acquisition) or {}
+            acquisition["snapshot"] = _point_bounds(started, captured)
+            acquisition.setdefault("started", _point_dict(started))
+            acquisition.setdefault("finished", _point_dict(captured))
+            acquisition.setdefault("reads", {})
+            observation.acquisition = acquisition
             pods_started = clock.now()
             observation.pods = kubectl.pods(snapshotter.namespace)
             pods_finished = clock.now()
@@ -1780,12 +1900,14 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str,
     except InjectionError as error:
         error.injection = Injection(
             started=started, acknowledged=acknowledged, verified=None,
-            accepted=False, changed=changed, commands=commands, error=str(error))
+            accepted=False, changed=changed, commands=commands, error=str(error),
+            verification_started=acknowledged)
         raise error
     except HarnessError as error:
         error.injection = Injection(
             started=started, acknowledged=acknowledged, verified=None,
-            accepted=False, changed=changed, commands=commands, error=str(error))
+            accepted=False, changed=changed, commands=commands, error=str(error),
+            verification_started=acknowledged)
         raise
     except Exception as error:
         raise InjectionError(
@@ -1793,7 +1915,8 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str,
 
     return Injection(started=started, acknowledged=acknowledged,
                      verified=clock.now(), accepted=True, changed=changed,
-                     commands=commands, error=None)
+                     commands=commands, error=None,
+                     verification_started=acknowledged)
 
 
 def repair(kubectl, contract: Contract, observation: Observation,
@@ -1941,6 +2064,120 @@ def _metric_status(value, stop_reason):
     return "right_censored" if stop_reason == "timeout" else "unobserved_before_stop"
 
 
+def _finite_mono(value) -> bool:
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def _validate_acquisition(observation: Observation) -> dict:
+    acquisition = observation.acquisition
+    if not isinstance(acquisition, dict):
+        raise InstrumentationError("observation has no acquisition bounds")
+    started = acquisition.get("started_mono")
+    finished = acquisition.get("finished_mono")
+    if not _finite_mono(started) or not _finite_mono(finished):
+        raise InstrumentationError("capture bounds are not finite")
+    if started > finished:
+        raise InstrumentationError("capture bounds are not ordered")
+    reads = acquisition.get("reads")
+    if not isinstance(reads, dict) or not reads:
+        raise InstrumentationError("observation has no read bounds")
+    for key, record in reads.items():
+        if not isinstance(record, dict):
+            raise InstrumentationError(f"read bounds for {key} are not an object")
+        read_started = record.get("started_mono")
+        read_finished = record.get("finished_mono")
+        if not _finite_mono(read_started) or not _finite_mono(read_finished):
+            raise InstrumentationError(f"read bounds for {key} are not finite")
+        if read_started > read_finished:
+            raise InstrumentationError(f"read bounds for {key} are not ordered")
+        if read_started < started or read_finished > finished:
+            raise InstrumentationError(
+                f"read bounds for {key} fall outside the capture")
+        if type(record.get("ok")) is not bool:
+            raise InstrumentationError(f"read outcome for {key} is not boolean")
+    return acquisition
+
+
+def _read(sample: Observation, key: str) -> dict | None:
+    reads = sample.acquisition.get("reads") or {}
+    record = reads.get(key)
+    return record if isinstance(record, dict) else None
+
+
+def _read_eligible(sample: Observation, key: str, t0: float,
+                   deadline: float) -> bool:
+    record = _read(sample, key)
+    if record is None or record.get("ok") is not True:
+        return False
+    return (record["started_mono"] >= t0
+            and record["finished_mono"] <= deadline)
+
+
+def _reads_eligible(sample: Observation, keys, t0: float,
+                    deadline: float) -> bool:
+    return all(_read_eligible(sample, key, t0, deadline) for key in keys)
+
+
+def _read_completion(sample: Observation, keys) -> Point:
+    latest = max((_read(sample, key) for key in keys),
+                 key=lambda record: record["finished_mono"])
+    return Point(latest["finished_mono"], latest["finished_utc"])
+
+
+def _complete_match_completion(sample: Observation, keys) -> Point | None:
+    records = [_read(sample, key) for key in keys]
+    if not records or any(record is None or record.get("ok") is not True
+                          for record in records):
+        return None
+    latest = max(records, key=lambda record: record["finished_mono"])
+    return Point(latest["finished_mono"], latest["finished_utc"])
+
+
+def _diff_keys(contract: Contract, sample: Observation) -> list:
+    return sorted({diff["resource"] for diff in field_diffs(contract, sample)})
+
+
+def _r1_keys(contract: Contract) -> list:
+    return [resource["id"] for resource in contract.resources]
+
+
+def _hpa_keys() -> list:
+    return ["Deployment/" + WEB_DEPLOYMENT,
+            "HorizontalPodAutoscaler/" + WEB_HPA]
+
+
+def _recovery_keys(contract: Contract, scenario: str,
+                   sample: Observation) -> list:
+    keys = _r1_keys(contract)
+    if scenario == "A":
+        keys = list(dict.fromkeys(keys + _hpa_keys()))
+    elif scenario == "F":
+        keys.append("Namespace/" + contract.quarantine_namespace)
+        if sample.extra_resources:
+            keys.append(
+                f"{contract.quarantine_namespace}/Deployment/" + WEB_DEPLOYMENT)
+    return keys
+
+
+def _post_injection(sample: Observation, t0: float) -> bool:
+    acquisition = sample.acquisition
+    return acquisition["finished_mono"] >= t0
+
+
+def _imperative_event_keys(contract: Contract, sample: Observation,
+                           event: Point, t0: float, deadline: float) -> list | None:
+    if event is None or not _finite_mono(event.mono):
+        return None
+    if event.mono < t0 or event.mono > deadline:
+        return None
+    keys = _diff_keys(contract, sample)
+    if not keys or not _reads_eligible(sample, keys, t0, deadline):
+        return None
+    if _read_completion(sample, keys).mono > event.mono:
+        return None
+    return keys
+
+
 def _recovered(contract, observation, scenario):
     if score(contract, observation) != 100:
         return False
@@ -1959,65 +2196,109 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
                      app: str = DEFAULT_APP,
                      baseline: Observation | None = None) -> dict:
     samples = sorted(samples, key=lambda item: item.at.mono)
-    post = [sample for sample in samples
-            if sample.at.mono >= injection.acknowledged.mono]
-    if not post:
-        post = [sample for sample in samples
-                if sample.at.mono >= injection.started.mono]
-    first = post[0] if post else None
+    for sample in samples:
+        _validate_acquisition(sample)
+    t0 = injection.started.mono
+    deadline = t0 + timeout
+    post = [sample for sample in samples if _post_injection(sample, t0)]
     detection = None
     evidence = None
     recovery = None
     recovery_pair = None
+    detection_reads = []
+    evidence_reads = []
+    recovery_reads = []
+    t_r_first = None
+    t_r_confirmed = None
+    confirmation = "none"
     argo_seen = False
 
     if injection.accepted:
-        for index, sample in enumerate(post):
+        for sample in post:
             if scenario in "BCDEFG":
                 state = sample.argo.get(app)
-                if state and argo_signal(state):
+                if state and argo_signal(state) and _read_eligible(
+                        sample, "Application/" + app, t0, deadline):
                     argo_seen = True
-            if detection is None:
-                if imperative and scenario in "BCDEG" and imperative.detection_at:
-                    detection = imperative.detection_at
-                elif scenario == "A" and hpa_changed(contract.baseline_hpa,
-                                                     sample.hpa):
-                    detection = sample.at
-                elif arm == "gitops" and scenario in "BCDEG" and argo_signal(
-                        sample.argo.get(app)):
-                    detection = sample.at
-            if evidence is None and scenario in "ABCDEG":
-                if scenario == "A":
-                    if hpa_changed(contract.baseline_hpa, sample.hpa):
-                        evidence = sample.at
-                elif field_diffs(contract, sample):
-                    evidence = sample.at
-            if (recovery is None and recovery_pair is None
-                    and _recovered(contract, sample, scenario)):
-                if index + 1 < len(post) and _recovered(
-                        contract, post[index + 1], scenario):
-                    recovery_pair = (sample.at, post[index + 1].at)
-                    recovery = sample.at
-        if scenario in "ABCDEG" and evidence_at is not None:
-            evidence = evidence_at
-        if imperative and scenario in "BCDEG":
-            if imperative.detection_at is not None:
-                detection = imperative.detection_at
-            if imperative.evidence_at is not None:
-                evidence = imperative.evidence_at
+            if detection is None and scenario == "A" and hpa_changed(
+                    contract.baseline_hpa, sample.hpa):
+                keys = _hpa_keys()
+                if _reads_eligible(sample, keys, t0, deadline):
+                    detection = _read_completion(sample, keys)
+                    detection_reads = keys
+            if (detection is None and arm == "gitops" and scenario in "BCDEG"
+                    and argo_signal(sample.argo.get(app))):
+                key = "Application/" + app
+                if _read_eligible(sample, key, t0, deadline):
+                    detection = _read_completion(sample, [key])
+                    detection_reads = [key]
+            if evidence is None:
+                if scenario == "A" and hpa_changed(
+                        contract.baseline_hpa, sample.hpa):
+                    keys = _hpa_keys()
+                    if _reads_eligible(sample, keys, t0, deadline):
+                        evidence = _read_completion(sample, keys)
+                        evidence_reads = keys
+                elif scenario in "BCDEG" and arm == "gitops":
+                    keys = _diff_keys(contract, sample)
+                    if keys and _reads_eligible(sample, keys, t0, deadline):
+                        evidence = _read_completion(sample, keys)
+                        evidence_reads = keys
 
-    if not injection.accepted:
-        detection = None
-        evidence = None
-        recovery = None
-        recovery_pair = None
-    if detection is not None and detection.mono < injection.started.mono:
-        detection = None
-    if evidence is not None and evidence.mono < injection.started.mono:
-        evidence = None
-    if recovery is not None and recovery.mono < injection.started.mono:
-        recovery = None
-        recovery_pair = None
+        if evidence_at is not None and evidence is not None:
+            if t0 <= evidence_at.mono <= deadline and evidence_at.mono >= evidence.mono:
+                evidence = evidence_at
+
+        if imperative and scenario in "BCDEG":
+            for sample in post:
+                if imperative.detection_at is not None:
+                    keys = _imperative_event_keys(
+                        contract, sample, imperative.detection_at, t0, deadline)
+                    if keys:
+                        detection = imperative.detection_at
+                        detection_reads = keys
+                        break
+            for sample in post:
+                if imperative.evidence_at is not None:
+                    keys = _imperative_event_keys(
+                        contract, sample, imperative.evidence_at, t0, deadline)
+                    if keys:
+                        evidence = imperative.evidence_at
+                        evidence_reads = keys
+                        break
+
+        previous_match = None
+        first_match = None
+        late_match = False
+        for sample in post:
+            keys = _recovery_keys(contract, scenario, sample)
+            eligible = _reads_eligible(sample, keys, t0, deadline)
+            match = _recovered(contract, sample, scenario)
+            if not match:
+                previous_match = None
+                continue
+            completion = _complete_match_completion(sample, keys)
+            if completion is not None and completion.mono > deadline:
+                late_match = True
+            if not eligible:
+                previous_match = None
+                continue
+            completion = _read_completion(sample, keys)
+            if first_match is None:
+                first_match = completion
+            if previous_match is not None:
+                recovery_pair = (previous_match, completion)
+                recovery = previous_match
+                t_r_first = previous_match
+                t_r_confirmed = completion
+                recovery_reads = keys
+                confirmation = "confirmed"
+                break
+            previous_match = completion
+        if recovery is None and first_match is not None:
+            t_r_first = first_match
+            confirmation = ("late_confirmation" if late_match
+                            else "missing_confirmation")
 
     if scenario == "A":
         detection_ref = "hpa:invenio-web-hpa" if detection else None
@@ -2061,15 +2342,31 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         detection_controller = "argocd" if detection else "unattributed"
         recovery_controller = "argocd" if argo_seen and recovery else "unattributed"
 
-    t0 = injection.started.mono
-    ack = injection.acknowledged.mono
-
     def duration(at):
         return None if at is None else at.mono - t0
 
+    r1_keys = _r1_keys(contract)
+    eligible_r1 = [sample for sample in post
+                   if _reads_eligible(sample, r1_keys, t0, deadline)]
+    r1_first = eligible_r1[0] if eligible_r1 else None
+    r1_last = eligible_r1[-1] if eligible_r1 else None
+    if not post:
+        r1_reason = "no_samples"
+    elif not eligible_r1:
+        r1_reason = "no_eligible_capture"
+    else:
+        r1_reason = None
+
     gaps = [right.at.mono - left.at.mono
             for left, right in zip(samples, samples[1:])]
+    observation_end = None
+    if samples:
+        acquisition = samples[-1].acquisition
+        observation_end = Point(acquisition["finished_mono"],
+                                acquisition["finished_utc"])
     return {
+        "schema_version": 2,
+        "timing_convention": TIMING_CONVENTION,
         "status": status,
         "stop_reason": stop_reason,
         "detection_seconds": duration(detection),
@@ -2078,24 +2375,34 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         "detection_status": _metric_status(detection, stop_reason),
         "evidence_status": _metric_status(evidence, stop_reason),
         "recovery_status": _metric_status(recovery, stop_reason),
-        "injection_seconds": ack - t0,
+        "injection_seconds": injection.acknowledged.mono - t0,
         "censor_seconds": timeout,
         "max_sample_gap_seconds": max(gaps) if gaps else None,
-        "observation_end": samples[-1].at if samples else None,
+        "observation_end": observation_end,
         "detection_controller": detection_controller,
         "recovery_controller": recovery_controller,
         "detection_ref": detection_ref,
         "evidence_ref": evidence_ref,
+        "detection_reads": detection_reads,
+        "evidence_reads": evidence_reads,
+        "recovery_reads": recovery_reads,
+        "t_r_first_seconds": duration(t_r_first),
+        "t_r_confirmed_seconds": duration(t_r_confirmed),
+        "recovery_confirmation": confirmation,
         "r1_baseline": (score(contract, baseline) if baseline is not None
                         else None),
-        "r1_first": score(contract, first) if first else None,
-        "r1_last": score(contract, samples[-1]) if samples else None,
+        "r1_first": score(contract, r1_first) if r1_first else None,
+        "r1_last": score(contract, r1_last) if r1_last else None,
         "r1_baseline_details": (resource_results(contract, baseline)
                                 if baseline is not None else None),
-        "r1_first_details": (resource_results(contract, first)
-                             if first is not None else None),
-        "r1_last_details": (resource_results(contract, samples[-1])
-                            if samples else None),
+        "r1_first_details": (resource_results(contract, r1_first)
+                             if r1_first is not None else None),
+        "r1_last_details": (resource_results(contract, r1_last)
+                            if r1_last is not None else None),
+        "r1_baseline_reason": (None if baseline is not None
+                               else "baseline_not_observed"),
+        "r1_first_reason": r1_reason,
+        "r1_last_reason": r1_reason,
         "kubectl_cmds": len(imperative.commands) if imperative else 0,
         "analysis_group": ("hpa_control" if scenario == "A" else
                            "visibility_boundary" if scenario == "F" else
@@ -2106,6 +2413,10 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         "t_d": detection,
         "t_e": evidence,
         "t_r": recovery,
+        "t_r_first": t_r_first,
+        "t_r_confirmed": t_r_confirmed,
+        "t_e_store": (imperative.evidence_store_at
+                      if imperative and evidence is not None else None),
         "recovery_pair": recovery_pair,
         "samples": len(samples),
     }
@@ -2116,6 +2427,7 @@ def dry_run_row(run_id, arm, scenario, rep, namespace, app, args) -> dict:
         "schema_version": 2,
         "run_id": run_id,
         "synthetic": False,
+        "timing_convention": TIMING_CONVENTION,
         "formal_execution_approved": False,
         "dry_run": True,
         "mutations_executed": 0,
@@ -2135,10 +2447,17 @@ def dry_run_row(run_id, arm, scenario, rep, namespace, app, args) -> dict:
         "injection_seconds": None,
         "detection_seconds": None,
         "evidence_seconds": None,
+        "evidence_store_seconds": None,
         "recovery_seconds": None,
         "detection_status": "not_observed",
         "evidence_status": "not_observed",
         "recovery_status": "not_observed",
+        "t_r_first_seconds": None,
+        "t_r_confirmed_seconds": None,
+        "recovery_confirmation": None,
+        "detection_reads": [],
+        "evidence_reads": [],
+        "recovery_reads": [],
         "censor_seconds": None,
         "detection_controller": None,
         "recovery_controller": None,
@@ -2150,6 +2469,21 @@ def dry_run_row(run_id, arm, scenario, rep, namespace, app, args) -> dict:
         "r1_baseline_details": None,
         "r1_first_details": None,
         "r1_last_details": None,
+        "r1_baseline_reason": "dry_run",
+        "r1_first_reason": "dry_run",
+        "r1_last_reason": "dry_run",
+        "t_d_utc": None,
+        "t_d_mono": None,
+        "t_e_utc": None,
+        "t_e_mono": None,
+        "t_e_store_utc": None,
+        "t_e_store_mono": None,
+        "t_r_utc": None,
+        "t_r_mono": None,
+        "t_r_first_utc": None,
+        "t_r_first_mono": None,
+        "t_r_confirmed_utc": None,
+        "t_r_confirmed_mono": None,
         "kubectl_cmds": 0,
         "source_revision": getattr(args, "source_revision", None),
         "render_sha256": getattr(args, "render_sha256", None),
@@ -2265,28 +2599,55 @@ def validate_live_args(args, environ=None):
 
 
 class Sampler(threading.Thread):
-    def __init__(self, capture, clock, interval):
+    def __init__(self, capture, clock, interval, join_timeout=10.0):
         super().__init__(daemon=True)
         self.capture = capture
         self.clock = clock
         self.interval = interval
+        self.join_timeout = join_timeout
         self.samples = []
         self.error = None
+        self.late_error = None
+        self.deadline = None
+        self.stopped_at_deadline = False
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._ready_event = threading.Event()
+        self._closed = False
+        self._late_result = None
+        self._late_result_at = None
+        self._late_result_acquisition = None
 
     def run(self):
-        while not self._stop_event.is_set():
+        while True:
+            if self._stop_event.is_set():
+                return
+            if (self.deadline is not None
+                    and self.clock.now().mono >= self.deadline):
+                self.stopped_at_deadline = True
+                self._ready_event.set()
+                return
+            if self._stop_event.is_set():
+                return
             started = self.clock.now()
             try:
                 sample = self.capture()
             except Exception as error:  # noqa: BLE001 - preserved as evidence
-                self.error = error
+                with self._lock:
+                    self.error = error
+                    if self._closed:
+                        self.late_error = error
                 self._ready_event.set()
                 return
             with self._lock:
-                self.samples.append(sample)
+                if self._closed:
+                    self._late_result = sample
+                    if isinstance(sample, Observation):
+                        self._late_result_at = _point_dict(sample.at)
+                        self._late_result_acquisition = copy.deepcopy(
+                            sample.acquisition)
+                else:
+                    self.samples.append(sample)
                 self._ready_event.set()
             elapsed = self.clock.now().mono - started.mono
             self._stop_event.wait(max(0.0, self.interval - elapsed))
@@ -2298,9 +2659,24 @@ class Sampler(threading.Thread):
         with self._lock:
             return list(self.samples)
 
-    def stop(self):
+    def stop(self, timeout=None):
         self._stop_event.set()
-        self.join(timeout=10)
+        self.join(timeout=self.join_timeout if timeout is None else timeout)
+        with self._lock:
+            self._closed = True
+            alive = self.is_alive()
+            return {
+                "joined": not alive,
+                "in_flight": alive,
+                "error": str(self.error) if self.error else None,
+                "late_result": self._late_result is not None,
+                "late_result_at": copy.deepcopy(self._late_result_at),
+                "late_result_acquisition": copy.deepcopy(
+                    self._late_result_acquisition),
+                "late_error": (str(self.late_error)
+                               if self.late_error else None),
+                "stopped_at_deadline": self.stopped_at_deadline,
+            }
 
 
 def verify_one_stack(kubectl, namespace, app, argo_namespace):
@@ -2435,7 +2811,10 @@ class LiveRunner:
         samples = []
         imperative = None
         collector_evidence_at = None
+        collector_evidence_store_at = None
         collector_evidence_ref = None
+        sampler = None
+        sampler_stop = None
         restore_error = None
         postcondition = None
         failure = None
@@ -2447,6 +2826,7 @@ class LiveRunner:
             allow_cleanup = True
             snapshotter = Snapshotter(self.kubectl, args.namespace,
                                       self.quarantine, self.clock,
+                                      configmap_name=frozen.configmap_name,
                                       argo_namespace=args.argocd_namespace,
                                       app=args.app)
             arm_evidence = arm_controller.activate(args.arm)
@@ -2462,7 +2842,9 @@ class LiveRunner:
                               args.sample_interval)
             self.collector_started = self.clock.now()
             sampler.start()
-            sampler.wait_ready(timeout=10)
+            if not sampler.wait_ready(timeout=10):
+                raise InstrumentationError(
+                    "collector did not produce an initial sample")
             if sampler.error:
                 raise InstrumentationError(str(sampler.error))
             if not sampler.snapshot():
@@ -2471,45 +2853,76 @@ class LiveRunner:
                 injection = inject(self.kubectl, contract, args.scenario,
                                    run_id, self.clock)
                 deadline = injection.started.mono + args.timeout
+                sampler.deadline = deadline
+                t0 = injection.started.mono
                 next_repair = self.clock.now().mono
                 while self.clock.now().mono < deadline:
                     if sampler.error:
                         raise InstrumentationError(str(sampler.error))
                     samples = sampler.snapshot()
+                    now = self.clock.now().mono
+                    if now >= deadline:
+                        break
                     if (samples and collector_evidence_at is None
                             and args.scenario != "F"):
                         latest = samples[-1]
+                        evaluated = self.clock.now()
                         if args.scenario == "A":
-                            if hpa_changed(contract.baseline_hpa, latest.hpa):
-                                collector_evidence_at = latest.at
+                            keys = _hpa_keys()
+                            if (hpa_changed(contract.baseline_hpa, latest.hpa)
+                                    and _reads_eligible(latest, keys, t0,
+                                                        deadline)):
+                                collector_evidence_at = evaluated
                                 collector_evidence_ref = "samples.jsonl"
-                        elif field_diffs(contract, latest):
-                            collector_evidence_at = latest.at
-                            collector_evidence_ref = (
-                                "diff-" + _short(run_id) + "-collector.json")
-                            _write_json(evidence_dir / collector_evidence_ref, {
-                                "run_id": run_id,
-                                "at": _point_dict(latest.at),
-                                "diffs": read_diff_evidence(contract, latest),
-                            })
+                        else:
+                            keys = _diff_keys(contract, latest)
+                            if (keys and _reads_eligible(latest, keys, t0,
+                                                         deadline)):
+                                collector_evidence_at = evaluated
+                                collector_evidence_ref = (
+                                    "diff-" + _short(run_id) + "-collector.json")
+                                try:
+                                    _write_json(
+                                        evidence_dir / collector_evidence_ref, {
+                                            "run_id": run_id,
+                                            "at": _point_dict(latest.at),
+                                            "diffs": read_diff_evidence(
+                                                contract, latest),
+                                        })
+                                except OSError as error:
+                                    raise InstrumentationError(
+                                        "collector evidence write failed: "
+                                        f"{type(error).__name__}") from None
+                                collector_evidence_store_at = self.clock.now()
                     if args.arm == "imperative" and args.scenario in "BCDEG":
-                        now = self.clock.now().mono
                         if now >= next_repair and samples:
                             latest = samples[-1]
                             diffs = field_diffs(contract, latest)
-                            if diffs:
+                            keys = sorted({diff["resource"] for diff in diffs})
+                            evaluated = self.clock.now()
+                            if keys and _reads_eligible(latest, keys, t0,
+                                                        deadline):
                                 if imperative is None:
                                     imperative = ImperativeRun()
                                 if imperative.detection_at is None:
-                                    imperative.detection_at = latest.at
-                                    imperative.evidence_at = latest.at
+                                    imperative.detection_at = evaluated
+                                    imperative.detection_reads = keys
+                                    imperative.evidence_at = evaluated
+                                    imperative.evidence_reads = keys
                                     imperative.evidence_ref = (
                                         "diff-" + _short(run_id) + ".json")
-                                    _write_json(evidence_dir / imperative.evidence_ref,
-                                                {"run_id": run_id,
-                                                 "at": _point_dict(latest.at),
-                                                 "diffs": read_diff_evidence(
-                                                     contract, latest)})
+                                    try:
+                                        _write_json(
+                                            evidence_dir / imperative.evidence_ref,
+                                            {"run_id": run_id,
+                                             "at": _point_dict(latest.at),
+                                             "diffs": read_diff_evidence(
+                                                 contract, latest)})
+                                    except OSError as error:
+                                        raise InstrumentationError(
+                                            "imperative evidence write failed: "
+                                            f"{type(error).__name__}") from None
+                                    imperative.evidence_store_at = self.clock.now()
                                 commands = repair(self.kubectl, contract,
                                                   latest, self.clock)
                                 imperative.commands.extend(commands)
@@ -2527,8 +2940,9 @@ class LiveRunner:
                             break
                     time.sleep(args.sample_interval)
             finally:
-                sampler.stop()
-                samples = sampler.snapshot()
+                if sampler is not None:
+                    sampler_stop = sampler.stop()
+                    samples = sampler.snapshot()
             if injection is not None:
                 timeline = analyze_timeline(
                     contract, samples, injection, args.arm, args.scenario,
@@ -2536,6 +2950,16 @@ class LiveRunner:
                     evidence_at=collector_evidence_at,
                     provided_evidence_ref=collector_evidence_ref,
                     app=args.app, baseline=baseline)
+                if (timeline is not None and collector_evidence_store_at
+                        and timeline.get("t_e") is not None
+                        and not (args.arm == "imperative"
+                                 and args.scenario in "BCDEG")):
+                    timeline["t_e_store"] = collector_evidence_store_at
+            if sampler is not None and sampler.error is not None:
+                raise InstrumentationError(str(sampler.error))
+            if sampler_stop is not None and sampler_stop.get("in_flight"):
+                raise InstrumentationError(
+                    "collector did not join before evidence finalization")
         except HarnessError as error:
             failure = error
             readiness_failures = list(getattr(
@@ -2550,6 +2974,9 @@ class LiveRunner:
         except Exception as error:  # noqa: BLE001 - preserve evidence, then fail
             failure = error
         finally:
+            if sampler is not None and sampler_stop is None:
+                sampler_stop = sampler.stop()
+                samples = sampler.snapshot()
             g_annotation_owned = bool(
                 args.scenario == "G" and injection is not None
                 and any(command.argv[:2] == ["annotate", "SealedSecret"]
@@ -2601,6 +3028,7 @@ class LiveRunner:
             "arm": arm_evidence.as_dict() if arm_evidence else None,
             "cleanup": cleanup.as_dict() if cleanup else None,
             "postcondition": postcondition,
+            "sampler": sampler_stop,
             "row": row,
         }
         evidence["commands"] = (
@@ -2627,6 +3055,7 @@ class LiveRunner:
             evidence["readiness"] = readiness_failures
         evidence["samples"] = [{
             "at": _point_dict(sample.at),
+            "acquisition": copy.deepcopy(sample.acquisition),
             "resources": {key: value.get("fields")
                           for key, value in sample.resources.items()},
             "extra_resources": sample.extra_resources,
@@ -2644,8 +3073,19 @@ class LiveRunner:
         deadline = self.clock.now().mono + self.args.reset_timeout
         previous_ok = False
         while True:
+            started = self.clock.now()
             observation = snapshotter.capture()
             observation.pods = self.kubectl.pods(self.args.namespace)
+            finished = self.clock.now()
+            acquisition = copy.deepcopy(observation.acquisition) or {}
+            acquisition["postcondition"] = _point_bounds(started, finished)
+            acquisition.setdefault("started", _point_dict(started))
+            acquisition["started_utc"] = started.utc
+            acquisition["started_mono"] = started.mono
+            acquisition["finished"] = _point_dict(finished)
+            acquisition["finished_utc"] = finished.utc
+            acquisition["finished_mono"] = finished.mono
+            observation.acquisition = acquisition
             ok = (score(contract, observation) == 100
                   and not observation.extra_resources
                   and bool(observation.pods)
@@ -2659,18 +3099,29 @@ class LiveRunner:
                     state = observation.argo.get(name) or {}
                     ok = ok and state.get("sync") == "Synced" and \
                         state.get("health") == "Healthy"
+            if finished.mono > deadline:
+                return {"verified": False,
+                        "reason": "deadline",
+                        "deadline_mono": deadline,
+                        "error": "postcondition read completed after the reset deadline",
+                        "acquisition": acquisition}
             if ok and previous_ok:
-                return {"verified": True, "at": _point_dict(observation.at)}
+                return {"verified": True, "at": _point_dict(observation.at),
+                        "acquisition": acquisition}
             previous_ok = ok
             if self.clock.now().mono >= deadline:
                 return {"verified": False,
-                        "error": "two consecutive postcondition reads did not match"}
+                        "reason": "deadline",
+                        "deadline_mono": deadline,
+                        "error": "two consecutive postcondition reads did not match",
+                        "acquisition": acquisition}
             time.sleep(self.args.sample_interval)
 
     def _row(self, run_id, args, contract, injection, timeline, failure,
              arm_evidence, cleanup, restore_error, postcondition):
         base = {
             "schema_version": 2, "run_id": run_id, "synthetic": False,
+            "timing_convention": TIMING_CONVENTION,
             "formal_execution_approved": False, "env": args.arm,
             "arm": args.arm, "scenario": args.scenario, "rep": args.rep,
             "namespace": args.namespace, "app": args.app,
@@ -2678,16 +3129,25 @@ class LiveRunner:
             "source_revision": getattr(args, "source_revision", None),
             "render_sha256": getattr(args, "render_sha256", None),
             "detection_seconds": None, "evidence_seconds": None,
+            "evidence_store_seconds": None,
             "recovery_seconds": None, "detection_status": "not_observed",
             "evidence_status": "not_observed", "recovery_status": "not_observed",
+            "t_r_first_seconds": None, "t_r_confirmed_seconds": None,
+            "recovery_confirmation": None,
+            "detection_reads": [], "evidence_reads": [], "recovery_reads": [],
             "censor_seconds": args.timeout, "detection_controller": None,
             "recovery_controller": None, "r1_baseline": None, "r1_first": None,
             "r1_last": None, "r1_baseline_details": None,
             "r1_first_details": None, "r1_last_details": None,
+            "r1_baseline_reason": None, "r1_first_reason": None,
+            "r1_last_reason": None,
             "kubectl_cmds": 0, "t0_utc": None,
             "t0_mono": None, "t_a_utc": None, "t_a_mono": None,
             "t_d_utc": None, "t_d_mono": None, "t_e_utc": None,
-            "t_e_mono": None, "t_r_utc": None, "t_r_mono": None,
+            "t_e_mono": None, "t_e_store_utc": None, "t_e_store_mono": None,
+            "t_r_utc": None, "t_r_mono": None,
+            "t_r_first_utc": None, "t_r_first_mono": None,
+            "t_r_confirmed_utc": None, "t_r_confirmed_mono": None,
             "arm_restore_status": "failed" if restore_error else "restored",
             "arm_restore_error": restore_error,
             "cleanup_status": "failed" if cleanup and not cleanup.ok else "ok",
@@ -2715,15 +3175,25 @@ class LiveRunner:
                         "detection_status", "evidence_status", "recovery_status",
                         "detection_controller", "recovery_controller",
                         "detection_ref", "evidence_ref",
+                        "detection_reads", "evidence_reads", "recovery_reads",
+                        "t_r_first_seconds", "t_r_confirmed_seconds",
+                        "recovery_confirmation", "r1_baseline_reason",
+                        "r1_first_reason", "r1_last_reason",
                         "r1_baseline", "r1_first", "r1_last", "kubectl_cmds",
                         "r1_baseline_details", "r1_first_details",
                         "r1_last_details",
                         "max_sample_gap_seconds"):
                 base[key] = timeline[key]
-            for key in ("t_d", "t_e", "t_r"):
+            for key in ("t_d", "t_e", "t_e_store", "t_r", "t_r_first",
+                        "t_r_confirmed"):
                 point = timeline[key]
                 base[key + "_utc"] = point.utc if point else None
                 base[key + "_mono"] = point.mono if point else None
+            if timeline.get("t_e_store") is not None:
+                base["t_e_store_utc"] = timeline["t_e_store"].utc
+                base["t_e_store_mono"] = timeline["t_e_store"].mono
+                base["evidence_store_seconds"] = (
+                    timeline["t_e_store"].mono - timeline["t0"].mono)
             observation_end = timeline.get("observation_end")
             base["observation_end_utc"] = (
                 observation_end.utc if observation_end else None)

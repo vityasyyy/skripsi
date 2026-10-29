@@ -381,26 +381,55 @@ perubahan pengendali.
 
 ## Pengukuran dan penyensoran
 
-- `t0` = permintaan injeksi dikirim; `t_a` = respons API diterima; verifikasi
-  bidang harus selesai sebelum pengamatan dimulai. Batas timeout tetap dihitung
-  dari `t0` agar selaras dengan kontrak v2; verifikasi yang terlalu lama tidak
-  memberi waktu pengamatan tambahan.
-- `t_d` = sinyal pengendali pertama: `imperative` (pemeriksa), `argocd`
-  (`OutOfSync`/operation), atau `hpa` (perubahan status/scale HPA).
-- `t_e` = bukti tersimpan pertama berupa diff/snapshot tersanitasi yang
-  mengidentifikasi objek dan bidang. Untuk A, bukti adalah sampel status HPA.
-  `t_e` dapat mendahului `t_d` karena kolektor pasif tidak menunggu pengendali.
-- `t_r` = pembacaan pertama seluruh kontrak kembali cocok, dikonfirmasi pembacaan
-  berikutnya. A juga mensyaratkan HPA settled; F mensyaratkan tidak ada objek
-  karantina. Dua pembacaan harus berurutan.
+Semua endpoint primer dihitung dari **pembacaan/evaluasi yang selesai**
+(`timing_convention: completed-observation-v1`), bukan dari awal capture. Setiap
+sampel menyimpan `acquisition.started_mono`/`finished_mono`, batas setiap
+pembacaan resource (`started_*`, `finished_*`, `ok`, `present`), dan daftar
+percobaan retry. Stdout, nilai Secret, dan ciphertext tidak disimpan.
+
+- Jendela pengamatan dimulai pada `t0` (monotonic tepat sebelum perintah injeksi
+  pertama) dan berakhir pada `t0 + timeout` inklusif. Pembacaan relevan harus
+  mulai `>= t0` dan selesai `<= deadline`. Capture boleh mulai sebelum `t0` bila
+  seluruh pembacaan relevannya memenuhi jendela; pembacaan yang menyeberangi
+  `t0` atau selesai setelah deadline hanya menjadi diagnostik.
+- `t_a` = seluruh perintah injeksi selesai; `verification_started` dan
+  `verified` mencatat awal/akhir verifikasi perubahan bidang secara terpisah.
+  Perintah injeksi menyimpan batas mulai/selesai masing-masing.
+- `t_d` = selesai pembacaan sinyal/evaluasi pertama yang memenuhi jendela:
+  evaluasi pemeriksa imperatif, pembacaan status ArgoCD yang relevan, atau
+  perbandingan HPA untuk A. Tidak ada clamp ke `t_a` dan tidak ada waktu awal
+  capture.
+- `t_e` = selesai evaluasi perbedaan bidang pertama; perbandingan HPA untuk A.
+  `t_e_store` mencatat selesai penulisan artefak bukti secara terpisah. Kegagalan
+  tulis bukti adalah kegagalan yang terlihat, bukan sukses palsu.
+- `t_r_first` = selesai observasi all-match pertama; `t_r_confirmed` = selesai
+  observasi all-match berikutnya. `t_r` hanya `t_r_first` bila konfirmasi selesai
+  dalam jendela; dua capture cocok dengan konfirmasi terlambat tetap
+  `right_censored`. Mismatch memutus pasangan. `recovery_confirmation`
+  mencatat `confirmed`, `late_confirmation`, `missing_confirmation`, atau `none`.
+- R1 baseline memakai baseline yang benar-benar teramati; R1 first/last memakai
+  capture lengkap yang seluruh pembacaan empat resource-nya memenuhi jendela.
+  Bila tidak ada, nilainya `null` dengan `r1_*_reason`
+  (`no_samples`/`no_eligible_capture`/`baseline_not_observed`), bukan 0 atau
+  match ciptaan.
 - Durasi dihitung dari satu jam monotonik host, bukan selisih UTC. UTC disimpan
-  untuk audit.
+  untuk audit dan lonjakan jam UTC tidak dipakai untuk latensi.
 - Timeout: `*_seconds = null`, status `right_censored`, `censor_seconds` = batas
   beku. Tidak ada interpolasi dan tidak ada nol untuk sinyal yang hilang.
-- Deteksi tidak teramati tetapi pemulihan lebih dulu berhenti:
-  `unobserved_before_stop`. Kegagalan API/instrumentasi: `instrumentation_failure`.
+- Pemulihan lebih dulu berhenti sebelum deteksi/bukti teramati:
+  `unobserved_before_stop` dengan nilai `null`; run tetap `observed` bila
+  recovery valid. Kegagalan API/instrumentasi: `instrumentation_failure`.
   Kegagalan perintah koreksi: `recovery_failure`. Postcondition gagal:
   `reset_failure`.
+- Kolektor berhenti sebelum bukti final disalin. `sampler.json` mencatat
+  `joined`, `in_flight`, `error`, `late_result`, `late_result_at`,
+  `late_result_acquisition`, `late_error`, dan `stopped_at_deadline`. Pembacaan
+  tidak dimulai setelah stop/deadline; hasil in-flight yang selesai setelah
+  finalisasi tidak ditambahkan, tetapi kegagalan join/error tetap membuat run
+  gagal.
+- Postcondition reset memeriksa penyelesaian pembacaan terhadap deadline reset
+  sendiri dan menyimpan batas pembacaan; pembacaan yang selesai terlambat tidak
+  diterima.
 - R1 = persentase resource yang **seluruh bidang terpilihnya** cocok, dengan
   penyebut empat resource dari deklarasi beku yang sama. `/spec/replicas`
   dikecualikan untuk Deployment milik HPA; status HPA dilaporkan terpisah.
@@ -427,9 +456,9 @@ perubahan pengendali.
   bernilai `null`; snapshot resource tidak disalin agar Secret/SealedSecret
   tidak bocor.
 - `baseline.json.acquisition` mencatat awal/akhir pembacaan snapshot, pod, dan
-  node. `at` adalah awal snapshot, bukan satu instan tunggal; pembacaan
-  berurutan dapat memakan waktu dan tidak boleh ditafsirkan sebagai pengukuran
-  serentak.
+  node serta batas setiap pembacaan resource. `at` adalah awal snapshot, bukan
+  satu instan tunggal; pembacaan berurutan dapat memakan waktu dan tidak boleh
+  ditafsirkan sebagai pengukuran serentak.
 - Node diambil dari API metrics-server mentah
   (`/apis/metrics.k8s.io/v1beta1/nodes`) dan `Node.status.allocatable`, bukan
   `kubectl top nodes` yang dibulatkan. Setiap node menyimpan kuantitas mentah
@@ -455,7 +484,8 @@ Direktori `<out>/<run_id>/` menyimpan:
 | `baseline.json` | snapshot baseline tersanitasi, HPA, pod/node, batas akuisisi; `null` bila baseline gagal |
 | `readiness.json` | observasi gate baseline yang ditolak: alasan, waktu, batas akuisisi, pod/node/HPA/Argo tanpa resource/Secret |
 | `contract.json` | kontrak empat resource dari deklarasi beku: identitas, bidang terpilih, manifest pemulihan tersanitasi, `baseline_sha256`, revisi/render |
-| `samples.jsonl` | setiap sampel: resource fields, HPA, status Argo, ekstra |
+| `samples.jsonl` | setiap sampel: `at`, `acquisition` (batas capture dan setiap pembacaan), resource fields, HPA, status Argo, ekstra |
+| `sampler.json` | status akhir kolektor: join/in-flight, error, late result, dan deadline stop |
 | `injection.json` | `t0`/`t_a`/verifikasi, bidang berubah, perintah |
 | `imperative.json` | deteksi, bukti, perintah koreksi, kegagalan |
 | `arm.json` | spec Application asli dan keadaan pause |
@@ -464,24 +494,27 @@ Direktori `<out>/<run_id>/` menyimpan:
 | `commands.jsonl` | log perintah mutasi (tanpa token/Secret) |
 | `diff-*.json` | diff tersanitasi pertama |
 
-Kolom JSONL utama: `run_id`, `env`/`arm`, `scenario`, `rep`, `status`,
-`t0_*`, `t_a_*`, `t_d_*`, `t_e_*`, `t_r_*`, `detection_seconds`,
-`evidence_seconds`, `recovery_seconds`, `*_status`, `censor_seconds`,
-`max_sample_gap_seconds`, `observation_end_*`, `collector_started_*`,
-`detection_controller`, `recovery_controller`, `detection_ref`, `evidence_ref`,
-`r1_baseline`, `r1_first`, `r1_last`, `r1_baseline_details`,
-`r1_first_details`, `r1_last_details`, `kubectl_cmds`, `analysis_group`,
-`efficacy_eligible`, `source_revision`, `render_sha256`, `baseline_sha256`.
+Kolom JSONL utama: `run_id`, `timing_convention`, `env`/`arm`, `scenario`, `rep`,
+`status`, `t0_*`, `t_a_*`, `t_d_*`, `t_e_*`, `t_e_store_*`, `t_r_*`,
+`t_r_first_*`, `t_r_confirmed_*`, `detection_seconds`, `evidence_seconds`,
+`evidence_store_seconds`, `recovery_seconds`, `recovery_confirmation`,
+`*_status`, `censor_seconds`, `max_sample_gap_seconds`, `observation_end_*`,
+`collector_started_*`, `detection_controller`, `recovery_controller`,
+`detection_ref`, `evidence_ref`, `detection_reads`, `evidence_reads`,
+`recovery_reads`, `r1_baseline`, `r1_first`, `r1_last`, `r1_*_reason`,
+`r1_baseline_details`, `r1_first_details`, `r1_last_details`, `kubectl_cmds`,
+`analysis_group`, `efficacy_eligible`, `source_revision`, `render_sha256`,
+`baseline_sha256`.
 
 ### Keluaran batch
 
 | Berkas | Isi |
 |---|---|
-| `<batch_id>.manifest.json` | seed, urutan lengan, permutasi skenario, run ID/status/urutan, revisi/render, cooldown/retry, `attempts` per sel, `cooldowns`, hitungan agregat |
+| `<batch_id>.manifest.json` | seed, urutan lengan, permutasi skenario, run ID/status/urutan, revisi/render, `timing_convention`, cooldown/retry, `attempts` per sel, `cooldowns`, hitungan agregat |
 | `<batch_id>.rows.jsonl` | seluruh baris attempt dengan metadata batch; `env` tetap lengan mentah |
 | `<batch_id>.analysis.jsonl` | baris v2 yang layak analisis, satu baris per sel (attempt terakhir); `env=imperative` dipetakan ke `manual` |
 | `<batch_id>.csv` | gabungan kolom CSV historis melalui `convert.py` |
-| `<batch_id>.summary.json` | hitungan R1/R2, penyensoran per metrik, daftar eksklusi |
+| `<batch_id>.summary.json` | hitungan R1/R2, penyensoran dan endpoint hilang per metrik, daftar eksklusi |
 
 Baris batch menambahkan `batch_id`, `batch_index`, `batch_phase` (`R1`/`R2`),
 `batch_attempt`, `batch_retry_of`, `batch_mode`, `batch_stop_reason`,
@@ -489,10 +522,16 @@ Baris batch menambahkan `batch_id`, `batch_index`, `batch_phase` (`R1`/`R2`),
 `formal_execution_approved`. Baris mentah `<run_id>.jsonl` dari harness tidak
 diubah dan tetap `formal_execution_approved: false`; attestation batch hanya ada
 di `<batch_id>.rows.jsonl`, `<batch_id>.analysis.jsonl`, manifest, dan summary.
+Semua baris, manifest, dan summary baru membawa
+`timing_convention: completed-observation-v1`; resume menolak manifest tanpa
+marker atau dengan marker berbeda. Baris lama tanpa marker tetap legacy dan tidak
+diberi label ulang.
 
 `analysis.jsonl` hanya memuat run dengan status `observed`/`right_censored`,
 postcondition terverifikasi, cleanup/restore sukses, serta status metrik yang
-valid untuk `summarize.py`. Untuk sel yang di-retry, hanya attempt terakhir yang
+valid untuk `summarize.py`. `unobserved_before_stop` diterima hanya dengan nilai
+`null` dan provenance recovery dini yang terkonfirmasi; recovery tetap
+menentukan status run. Untuk sel yang di-retry, hanya attempt terakhir yang
 dapat menjadi observasi; attempt baseline yang gagal tetap ada di
 `rows.jsonl`/CSV sebagai bukti dan tidak menambah N. Run dry, gagal, tidak
 lengkap, atau tanpa bukti tetap ada di `rows.jsonl`/CSV dan dicatat di
@@ -543,8 +582,10 @@ python3 experiments/analysis/summarize.py --in <out>/<batch_id>.analysis.jsonl
 ```
 
 Ringkasan batch (`<batch_id>.summary.json`) melaporkan jumlah R1/R2, jumlah run
-teramati/tersensor per metrik, daftar eksklusi, dan `analysis_rows`. Median hanya
-deskriptif untuk bagian teramati; tidak ada uji inferensial otomatis.
+teramati/tersensor dan endpoint `unobserved_before_stop`, daftar eksklusi, serta
+`analysis_rows` dan `timing_convention`. Median hanya deskriptif untuk bagian
+teramati; endpoint hilang bukan tersensor dan tidak diimputasi. Tidak ada uji
+inferensial otomatis.
 
 ## Batas `--production-like`
 

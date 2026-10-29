@@ -31,7 +31,7 @@ def summarize(rows):
                    "render_sha256": digest, "runs": len(runs),
                    "complete_time_observations": True}
         for metric in ("detection", "evidence", "recovery"):
-            observed, censored = [], 0
+            observed, censored, missing = [], 0, 0
             for row in runs:
                 value = row[metric + "_seconds"]
                 status = row[metric + "_status"]
@@ -40,13 +40,16 @@ def summarize(rows):
                     raise ValueError("invalid observation limit")
                 if status == "right_censored" and value is None:
                     censored += 1
+                elif status == "unobserved_before_stop" and value is None:
+                    missing += 1
                 elif status == "observed" and type(value) in (int, float) and math.isfinite(value) and 0 <= value <= limit:
                     observed.append(value)
                 else:
                     raise ValueError("invalid event time/status; no imputation allowed")
             summary[metric] = {"observed": len(observed), "right_censored": censored,
+                               "missing": missing,
                                "observed_median_seconds": median(observed) if observed else None}
-            summary["complete_time_observations"] &= censored == 0
+            summary["complete_time_observations"] &= censored == 0 and missing == 0
         result.append(summary)
     if not result:
         raise ValueError("empty dataset")
