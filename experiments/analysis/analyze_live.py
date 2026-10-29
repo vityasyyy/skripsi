@@ -154,23 +154,44 @@ def _validate_metric(row, metric):
                  f"{metric}_status lacks a confirmed early-recovery provenance")
 
 
-def _validate_timing(row):
-    """Reject inconsistent persisted monotonic bounds and durations."""
-    timing_fields = ("t0_mono", "t_a_mono", "t_d_mono", "t_e_mono",
-                     "t_r_mono", "t_e_store_mono", "t_r_first_mono",
-                     "t_r_confirmed_mono")
-    if not any(row.get(field) is not None for field in timing_fields):
+def _validate_timing(row, strict):
+    """Validate completed-observation bounds for new-convention rows.
+
+    Legacy rows predate the convention and are validated by the older field
+    contract only; no new bound is invented for them.
+    """
+    if not strict:
         return
+    required = (
+        "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_r_mono",
+        "t_r_first_mono", "t_r_confirmed_mono", "window_completed",
+        "window_end_mono",
+    )
+    missing = [field for field in required if field not in row]
+    _require(not missing,
+             f"new-convention row is missing timing fields: {missing}")
     t0 = row.get("t0_mono")
     limit = row.get("censor_seconds")
     _require(_number(t0), "t0_mono is not finite")
     t_a = row.get("t_a_mono")
-    if t_a is not None:
-        _require(_number(t_a) and t_a >= t0, "t_a_mono precedes t0_mono")
-        if row.get("injection_seconds") is not None:
-            _require(math.isclose(row["injection_seconds"], t_a - t0,
-                                  rel_tol=1e-9, abs_tol=1e-9),
-                     "injection_seconds disagrees with its bounds")
+    _require(_number(t_a) and t_a >= t0, "t_a_mono is not after t0_mono")
+    if row.get("injection_seconds") is not None:
+        _require(math.isclose(row["injection_seconds"], t_a - t0,
+                              rel_tol=1e-9, abs_tol=1e-9),
+                 "injection_seconds disagrees with its bounds")
+    _require(row.get("window_completed") is True,
+             "new-convention row lacks completed observation-window provenance")
+    window_end = row.get("window_end_mono")
+    _require(_number(window_end) and window_end >= t0,
+             "window_end_mono is not a finite completion after t0")
+    if row.get("status") == "observed":
+        _require(row.get("stop_reason") == "recovery",
+                 "observed row does not record recovery as its stop reason")
+    else:
+        _require(row.get("stop_reason") == "timeout",
+                 "right-censored row does not record a timeout stop")
+        _require(window_end >= t0 + limit,
+                 "right-censored row did not complete its observation window")
     for metric in METRICS:
         key = {"detection": "t_d", "evidence": "t_e",
                "recovery": "t_r"}[metric]
@@ -178,7 +199,7 @@ def _validate_timing(row):
         value = row.get(metric + "_seconds")
         status = row.get(metric + "_status")
         if point is None:
-            _require(value is None,
+            _require(value is None and status != "observed",
                      f"{key}_mono is missing for an observed metric")
             continue
         _require(_number(point), f"{key}_mono is not finite")
@@ -214,12 +235,16 @@ def _validate_timing(row):
     if row.get("recovery_status") == "observed":
         _require(row.get("t_r_mono") is not None
                  and t_r_first is not None
+                 and t_r_confirmed is not None
                  and math.isclose(row["t_r_mono"], t_r_first,
                                   rel_tol=1e-9, abs_tol=1e-9)
-                 and t_r_confirmed is not None,
-                 "confirmed recovery lacks ordered first/confirmation bounds")
+                 and window_end >= t_r_confirmed
+                 and row.get("recovery_confirmation") == "confirmed",
+                 "confirmed recovery lacks ordered first/confirmation bounds "
+                 "and window-stop support")
     else:
-        _require(row.get("t_r_mono") is None and t_r_confirmed is None,
+        _require(row.get("t_r_mono") is None and t_r_confirmed is None
+                 and row.get("recovery_confirmation") != "confirmed",
                  "unconfirmed recovery carries a primary recovery bound")
     store = row.get("t_e_store_mono")
     if store is not None:
@@ -338,7 +363,7 @@ def validate_rows(rows):
                  f"row {index} has invalid censor_seconds")
         for metric in METRICS:
             _validate_metric(row, metric)
-        _validate_timing(row)
+        _validate_timing(row, marker == TIMING_CONVENTION)
         for field in ("r1_baseline", "r1_first", "r1_last"):
             value = row[field]
             _require(value is None or (_number(value) and 0 <= value <= 100),
@@ -962,7 +987,8 @@ def _exclusions(rows, raw_rows):
         marker = row.get("timing_convention")
         _require(marker == analysis_marker,
                  f"raw row {index} timing_convention disagrees with analysis rows")
-        _validate_timing(row)
+        _validate_timing(
+            row, marker == TIMING_CONVENTION and row.get("status") in STATUSES)
         _require(row.get("batch_id") == batch_id,
                  f"raw row {index} belongs to another batch")
         cell, attempt = _raw_identity(row, index, batch_id)

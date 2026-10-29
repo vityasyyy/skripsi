@@ -127,6 +127,17 @@ def make_row(item, status="observed", **overrides):
         "cleanup_status": "ok",
         "arm_restore_status": "restored",
         "postcondition": {"verified": True},
+        "window_completed": True,
+        "window_end_mono": 130.0,
+        "t0_mono": 100.0,
+        "t_a_mono": 100.1,
+        "t_d_mono": 101.0,
+        "t_e_mono": 101.5,
+        "t_r_mono": 102.0,
+        "t_r_first_mono": 102.0,
+        "t_r_confirmed_mono": 103.0,
+        "recovery_confirmation": "confirmed",
+        "stop_reason": "recovery",
     }
     row.update(overrides)
     return row
@@ -928,8 +939,15 @@ class AnalysisOutputTests(unittest.TestCase):
     def test_summary_counts_censoring_and_exclusions(self):
         with tempfile.TemporaryDirectory() as directory:
             def mutate(row):
+                row["status"] = "right_censored"
+                row["stop_reason"] = "timeout"
                 row["recovery_seconds"] = None
                 row["recovery_status"] = "right_censored"
+                row["t_r_mono"] = None
+                row["t_r_first_mono"] = None
+                row["t_r_confirmed_mono"] = None
+                row["recovery_confirmation"] = "none"
+                row["window_end_mono"] = 130.0
 
             args = run_matrix.parse_args(live_args(
                 directory, "censor", "gitops imperative", "B", "1"))
@@ -941,7 +959,8 @@ class AnalysisOutputTests(unittest.TestCase):
             self.assertEqual(summary["censoring"]["R2"]["recovery"],
                              {"observed": 0, "right_censored": 2,
                               "unobserved_before_stop": 0})
-            self.assertEqual(summary["phases"]["R2"]["observed"], 2)
+            self.assertEqual(summary["phases"]["R2"]["observed"], 0)
+            self.assertEqual(summary["phases"]["R2"]["right_censored"], 2)
 
 
 class TokenSafetyTests(unittest.TestCase):

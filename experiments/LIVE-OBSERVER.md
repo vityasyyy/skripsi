@@ -189,12 +189,15 @@ atau migrasi yang diizinkan oleh dokumen ini.
    pembacaan relevan yang mulai `>= t0` dan selesai `<= deadline` yang boleh
    menjadi endpoint primer. `t_d` adalah selesai pembacaan sinyal/evaluasi
    pertama (pemeriksa imperatif, status ArgoCD, atau perbandingan HPA); `t_e`
-   adalah selesai evaluasi perbedaan bidang pertama, dengan `t_e_store` untuk
-   selesai penulisan artefak bukti. `t_r_first` adalah selesai observasi
-   all-match pertama dan `t_r` hanya diterima bila observasi all-match
-   berikutnya selesai dalam jendela yang sama (`t_r_confirmed`); dua capture
-   cocok dengan konfirmasi terlambat tetap tersensor. Kolektor tidak memberi
-   petunjuk dan tidak mengubah mekanisme koreksi.
+   adalah selesai **evaluasi perbedaan yang benar-benar dijalankan**, dengan
+   `t_e_store` untuk selesai penulisan artefak bukti. Evaluasi yang tidak ada
+   atau terlambat tidak diisi mundur dari akhir pembacaan atau sampel lain.
+   `t_r_first` adalah selesai observasi all-match pertama dan `t_r` hanya
+   diterima bila observasi all-match berikutnya selesai dalam jendela yang sama
+   (`t_r_confirmed`); dua capture cocok dengan konfirmasi terlambat tetap
+   tersensor. `window_completed`/`window_end_*` membuktikan jendela benar-benar
+   mencapai deadline atau berhenti karena recovery terkonfirmasi. Kolektor tidak
+   memberi petunjuk dan tidak mengubah mekanisme koreksi.
 5. **Pasca-run dan reset.** Ekspor bundel bukti, hitung SHA-256, catat status
    akhir, dan tutup `run_id`. Untuk mode imperatif, pulihkan `invenio-bootstrap`
    lalu `apps` ke nilai `automated` asli di `finally`, verifikasi, dan laporkan
@@ -217,8 +220,9 @@ cap waktu adalah pengamatan pertama, bukan rekonstruksi setelah fakta.
 | `t_a_utc`, `t_a_mono` | Seluruh perintah injeksi selesai | Injektor | Perintah dan batas perintah tercatat |
 | `verification_started_*` | Awal verifikasi perubahan bidang | Injektor | Dipisahkan dari `t_a`/`verified` |
 | `t_d_utc`, `t_d_mono` | Selesai pembacaan sinyal/evaluasi pertama yang eligible | Kolektor | `detection_source`/`detection_reads` dicatat |
-| `t_e_utc`, `t_e_mono` | Selesai evaluasi perbedaan bidang pertama | Kolektor | `evidence_ref` menunjuk artefak; `t_e_store_*` terpisah |
+| `t_e_utc`, `t_e_mono` | Selesai evaluasi perbedaan bidang pertama yang benar-benar dijalankan | Kolektor | `evidence_ref`, `evaluated_reads`; tidak ada fallback ke akhir baca; `t_e_store_*` terpisah |
 | `t_e_store_utc`, `t_e_store_mono` | Selesai penulisan artefak bukti | Kolektor | Kegagalan tulis = kegagalan terlihat |
+| `window_completed`, `window_end_*` | Jendela mencapai deadline atau berhenti karena recovery | Kolektor | `right_censored` baru wajib didukung deadline |
 | `t_r_first_*`, `t_r_confirmed_*` | Selesai observasi all-match pertama/konfirmasi | Kolektor | `recovery_confirmation` mencatat status |
 | `t_r_utc`, `t_r_mono` | Pemulihan terkonfirmasi | Kolektor | Hanya bila dua observasi all-match berurutan memenuhi jendela |
 | `controller` | `hpa`, `argocd`, `imperative`, `deployment-controller`, `sealed-secrets`, `other`, `unattributed` | Kolektor | Aturan atribusi di bawah |
@@ -302,8 +306,9 @@ pekerjaan lanjutan setelah audit diaktifkan.
   saat `baseline.json` tidak berisi snapshot.
 - Snapshot baseline membaca snapshot, pod, dan node secara berurutan; `at`
   adalah awal pembacaan, bukan satu instan. Batas awal/akhir capture, setiap
-  pembacaan resource, dan timestamp/window metrics-server dicatat. Tidak ada
-  ambang freshness baru tanpa keputusan metode.
+  pembacaan resource, dan timestamp/window metrics-server dicatat. Baseline
+  tidak mewarisi guard/deadline jendela run. Tidak ada ambang freshness baru
+  tanpa keputusan metode.
 - Hanya pembacaan relevan yang mulai `>= t0` dan selesai `<= t0 + timeout` yang
   boleh menjadi endpoint primer. Capture yang mulai sebelum `t0` hanya valid bila
   seluruh pembacaan relevannya memenuhi jendela; pembacaan yang menyeberangi
@@ -317,8 +322,14 @@ pekerjaan lanjutan setelah audit diaktifkan.
 - Pemulihan yang gagal atau reset yang gagal dicatat sebagai kegagalan, bukan
   dibuang agar hanya run sukses yang tersisa.
 - Pembacaan yang masih berjalan saat stop tidak ditambahkan setelah bukti final;
-  status join/error kolektor dilaporkan. Kegagalan instrumen tetap kegagalan
-  meskipun ada match sebelumnya.
+  status join/error kolektor dilaporkan. Kolektor memeriksa stop/deadline secara
+  kooperatif sebelum setiap pembacaan berikutnya dan menyimpan partial
+  acquisition; kegagalan instrumen tetap kegagalan meskipun ada match
+  sebelumnya.
+- Baris baru wajib memiliki endpoint/konfirmasi dan `window_completed`/
+  `window_end_*` yang lengkap; baris `right_censored` hanya sah bila deadline
+  benar-benar tercapai. Baris legacy tanpa marker tetap memakai aturan lama dan
+  tidak diwajibkan memiliki bound baru (mis. stopped batch c69).
 - Endpoint hilang tidak masuk Kaplan--Meier/RMST sebagai tersensor; kelompok
   yang seluruh endpoint-nya hilang dilaporkan tidak terestimasi. Uji efikasi
   bersifat complete-case/observed-only dan tidak menyesuaikan missingness atau

@@ -399,9 +399,17 @@ percobaan retry. Stdout, nilai Secret, dan ciphertext tidak disimpan.
   evaluasi pemeriksa imperatif, pembacaan status ArgoCD yang relevan, atau
   perbandingan HPA untuk A. Tidak ada clamp ke `t_a` dan tidak ada waktu awal
   capture.
-- `t_e` = selesai evaluasi perbedaan bidang pertama; perbandingan HPA untuk A.
-  `t_e_store` mencatat selesai penulisan artefak bukti secara terpisah. Kegagalan
-  tulis bukti adalah kegagalan yang terlihat, bukan sukses palsu.
+- `t_e` = selesai **evaluasi perbedaan bidang yang benar-benar dijalankan**
+  (`evaluated_at`), bukan akhir pembacaan. Perbandingan HPA untuk A. Event
+  evaluasi menyimpan `evaluated_signal` dan `evaluated_reads`; tidak ada
+  fallback ke akhir pembacaan dan evaluasi yang terlambat/tidak ada tidak
+  di-backdate dari sampel berikutnya. `t_e_store` mencatat selesai penulisan
+  artefak bukti secara terpisah. Kegagalan tulis bukti adalah kegagalan yang
+  terlihat, bukan sukses palsu.
+- `window_completed` dan `window_end_*` mencatat bahwa kolektor benar-benar
+  mencapai deadline (atau berhenti karena recovery terkonfirmasi). Baris
+  `right_censored` baru hanya diterima bila jendela selesai pada deadline;
+  sampel terakhir yang berhenti terlalu awal tidak boleh disebut tersensor.
 - `t_r_first` = selesai observasi all-match pertama; `t_r_confirmed` = selesai
   observasi all-match berikutnya. `t_r` hanya `t_r_first` bila konfirmasi selesai
   dalam jendela; dua capture cocok dengan konfirmasi terlambat tetap
@@ -421,12 +429,14 @@ percobaan retry. Stdout, nilai Secret, dan ciphertext tidak disimpan.
   recovery valid. Kegagalan API/instrumentasi: `instrumentation_failure`.
   Kegagalan perintah koreksi: `recovery_failure`. Postcondition gagal:
   `reset_failure`.
-- Kolektor berhenti sebelum bukti final disalin. `sampler.json` mencatat
-  `joined`, `in_flight`, `error`, `late_result`, `late_result_at`,
-  `late_result_acquisition`, `late_error`, dan `stopped_at_deadline`. Pembacaan
-  tidak dimulai setelah stop/deadline; hasil in-flight yang selesai setelah
-  finalisasi tidak ditambahkan, tetapi kegagalan join/error tetap membuat run
-  gagal.
+- Kolektor berhenti sebelum bukti final disalin. Setiap capture memeriksa
+  stop/deadline secara kooperatif sebelum setiap pembacaan; partial acquisition
+  dan alasan stop dicatat. `sampler.json` mencatat `joined`, `in_flight`,
+  `error`, `late_result`, `late_result_at`, `late_result_acquisition`,
+  `late_error`, `stopped_at_deadline`, `partial_acquisition`, dan
+  `capture_stop_reason`. Pembacaan tidak dimulai setelah stop/deadline; hasil
+  in-flight yang selesai setelah finalisasi tidak ditambahkan, tetapi kegagalan
+  join/error tetap membuat run gagal.
 - Postcondition reset memeriksa penyelesaian pembacaan terhadap deadline reset
   sendiri dan menyimpan batas pembacaan; pembacaan yang selesai terlambat tidak
   diterima.
@@ -484,7 +494,7 @@ Direktori `<out>/<run_id>/` menyimpan:
 | `baseline.json` | snapshot baseline tersanitasi, HPA, pod/node, batas akuisisi; `null` bila baseline gagal |
 | `readiness.json` | observasi gate baseline yang ditolak: alasan, waktu, batas akuisisi, pod/node/HPA/Argo tanpa resource/Secret |
 | `contract.json` | kontrak empat resource dari deklarasi beku: identitas, bidang terpilih, manifest pemulihan tersanitasi, `baseline_sha256`, revisi/render |
-| `samples.jsonl` | setiap sampel: `at`, `acquisition` (batas capture dan setiap pembacaan), resource fields, HPA, status Argo, ekstra |
+| `samples.jsonl` | setiap sampel: `at`, `acquisition` (batas capture dan setiap pembacaan), `evaluated_at`/`evaluated_signal`/`evaluated_reads`, resource fields, HPA, status Argo, ekstra |
 | `sampler.json` | status akhir kolektor: join/in-flight, error, late result, dan deadline stop |
 | `injection.json` | `t0`/`t_a`/verifikasi, bidang berubah, perintah |
 | `imperative.json` | deteksi, bukti, perintah koreksi, kegagalan |
@@ -496,7 +506,8 @@ Direktori `<out>/<run_id>/` menyimpan:
 
 Kolom JSONL utama: `run_id`, `timing_convention`, `env`/`arm`, `scenario`, `rep`,
 `status`, `t0_*`, `t_a_*`, `t_d_*`, `t_e_*`, `t_e_store_*`, `t_r_*`,
-`t_r_first_*`, `t_r_confirmed_*`, `detection_seconds`, `evidence_seconds`,
+`t_r_first_*`, `t_r_confirmed_*`, `window_completed`, `window_end_*`,
+`detection_seconds`, `evidence_seconds`,
 `evidence_store_seconds`, `recovery_seconds`, `recovery_confirmation`,
 `*_status`, `censor_seconds`, `max_sample_gap_seconds`, `observation_end_*`,
 `collector_started_*`, `detection_controller`, `recovery_controller`,

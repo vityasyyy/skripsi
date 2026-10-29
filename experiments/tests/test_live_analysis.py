@@ -126,6 +126,27 @@ def harness_row(scenario, arm, rep, *, status="observed", detection=2.0,
             row[metric + "_seconds"], row[metric + "_status"] = observation(
                 value, censor)
     row.update(overrides)
+    if row.get("timing_convention") == analyze_live.TIMING_CONVENTION:
+        row["window_completed"] = True
+        row["t0_mono"] = 100.0
+        row["t_a_mono"] = 100.1
+        row["t_d_mono"] = (None if row["detection_seconds"] is None
+                           else 100.0 + row["detection_seconds"])
+        row["t_e_mono"] = (None if row["evidence_seconds"] is None
+                           else 100.0 + row["evidence_seconds"])
+        row["t_r_mono"] = (None if row["recovery_seconds"] is None
+                           else 100.0 + row["recovery_seconds"])
+        row["t_r_first_mono"] = row["t_r_mono"]
+        row["t_r_confirmed_mono"] = (
+            None if row["t_r_mono"] is None else row["t_r_mono"] + 1.0)
+        row["recovery_confirmation"] = (
+            "confirmed" if row["recovery_seconds"] is not None else "none")
+        row["stop_reason"] = ("recovery" if row["recovery_seconds"] is not None
+                              else "timeout")
+        row["window_end_mono"] = (
+            100.0 + row["censor_seconds"]
+            if row["recovery_seconds"] is None
+            else row["t_r_mono"] + 1.0)
     return row
 
 
@@ -205,9 +226,75 @@ def completed_row(scenario, arm, rep, *, detection=2.0, evidence=3.0,
     row["t_r_first_mono"] = row["t_r_mono"]
     row["t_r_confirmed_mono"] = (
         None if recovery is None else 100.0 + recovery + 1.0)
+    row["recovery_confirmation"] = (
+        "confirmed" if recovery is not None else "none")
     row["t_e_store_mono"] = (
         None if evidence is None else 100.0 + evidence + 0.1)
+    row["window_completed"] = True
+    row["window_end_mono"] = (
+        100.0 + row["censor_seconds"] if recovery is None
+        else 100.0 + recovery + 1.0)
     return row
+
+
+class LegacyTimingTests(unittest.TestCase):
+    def test_preserved_legacy_rows_without_confirmation_bounds_still_validate(self):
+        row = make_row("B", "gitops", 1)
+        row.update({
+            "t0_mono": 100.0, "t_a_mono": 100.1,
+            "t_d_mono": 102.0, "t_e_mono": 103.0, "t_r_mono": 105.0,
+        })
+        meta = analyze_live.validate_rows([row])
+        self.assertEqual(meta["timing_convention"], None)
+        self.assertEqual(meta["analysis_rows"], 1)
+
+    def test_new_convention_rows_without_bounds_are_rejected(self):
+        row = make_row("B", "gitops", 1)
+        row["timing_convention"] = analyze_live.TIMING_CONVENTION
+        row["window_completed"] = True
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_new_right_censored_row_requires_deadline_completion(self):
+        row = completed_row("B", "gitops", 1, recovery=None)
+        row["window_end_mono"] = 105.0
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+        row["window_end_mono"] = 110.0
+        self.assertEqual(analyze_live.validate_rows([row])["analysis_rows"], 1)
+
+    def test_new_observed_row_requires_confirmation_bounds(self):
+        row = completed_row("B", "gitops", 1)
+        row["t_r_confirmed_mono"] = None
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+        row = completed_row("B", "gitops", 1)
+        row["recovery_confirmation"] = "late_confirmation"
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_excluded_preinjection_raw_row_may_lack_timing(self):
+        analysis = [completed_row("B", "gitops", 1)]
+        raw = [dict(analysis[0]), {
+            "run_id": "legacy-batch-gitops-B-r02",
+            "batch_id": "legacy-batch",
+            "batch_phase": "R2",
+            "batch_mode": "live",
+            "scenario": "B",
+            "arm": "gitops",
+            "env": "gitops",
+            "rep": 2,
+            "status": "baseline_failure",
+            "timing_convention": analyze_live.TIMING_CONVENTION,
+        }]
+        analysis[0]["batch_id"] = "legacy-batch"
+        analysis[0]["run_id"] = "legacy-batch-gitops-B-r01"
+        raw[0]["batch_id"] = "legacy-batch"
+        raw[0]["run_id"] = "legacy-batch-gitops-B-r01"
+        result = analyze_live._exclusions(analysis, raw)
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["by_reason"],
+                         {"status_not_analyzable": 1})
 
 
 class LiveAnalysisTest(unittest.TestCase):

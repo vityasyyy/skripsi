@@ -101,6 +101,15 @@ class BaselineError(HarnessError):
     pass
 
 
+class CaptureStopped(HarnessError):
+    """A cooperative between-read stop; carries safe partial acquisition."""
+
+    def __init__(self, acquisition, reason):
+        super().__init__(f"capture stopped before the next read: {reason}")
+        self.acquisition = acquisition
+        self.reason = reason
+
+
 @dataclass(frozen=True)
 class Point:
     mono: float
@@ -164,6 +173,9 @@ class Observation:
     nodes: list = field(default_factory=list)
     acquisition: dict = field(default_factory=dict)
     readiness_failures: list = field(default_factory=list)
+    evaluated_at: Point | None = None
+    evaluated_signal: bool = False
+    evaluated_reads: list = field(default_factory=list)
 
 
 @dataclass
@@ -1242,20 +1254,22 @@ class Snapshotter:
         self.argo_namespace = argo_namespace
         self.app = app
 
-    def discover_configmap(self, deployment) -> str | None:
+    def discover_configmap(self, deployment, reads=None, guard=None) -> str | None:
         if deployment:
             for source in (deployment.get("spec", {}).get("template", {}).get(
                     "spec", {}).get("containers", [{}])[0].get("envFrom") or []):
                 name = (source.get("configMapRef") or {}).get("name")
                 if name and name.startswith(CONFIG_PREFIX):
                     return name
+        self._guard_stop(reads or {}, guard)
         configmaps = self.kubectl.get("ConfigMap", namespace=self.namespace) or []
         names = [item.get("metadata", {}).get("name") for item in configmaps
                  if str(item.get("metadata", {}).get("name", "")).startswith(
                      CONFIG_PREFIX)]
         return names[0] if len(names) == 1 else None
 
-    def _read(self, reads, key, kind, name=None, namespace=None):
+    def _read(self, reads, key, kind, name=None, namespace=None, guard=None):
+        self._guard_stop(reads, guard)
         try:
             payload, bounds = self.kubectl.read(kind, name, namespace)
         except InstrumentationError as error:
@@ -1279,45 +1293,67 @@ class Snapshotter:
         reads[key] = copy.deepcopy(bounds)
         return payload
 
-    def capture(self, at: Point | None = None) -> Observation:
+    def _guard_stop(self, reads, guard):
+        if guard is None:
+            return
+        reason = guard()
+        if not reason:
+            return
+        started = (self._capture_started
+                   if getattr(self, "_capture_started", None) else None)
+        started = started or self.clock.now()
+        finished = self.clock.now()
+        acquisition = {
+            "started": _point_dict(started),
+            "finished": _point_dict(finished),
+            "started_utc": started.utc,
+            "started_mono": started.mono,
+            "finished_utc": finished.utc,
+            "finished_mono": finished.mono,
+            "reads": copy.deepcopy(reads),
+        }
+        raise CaptureStopped(acquisition, reason)
+
+    def capture(self, at: Point | None = None, guard=None) -> Observation:
         at = at or self.clock.now()
         self._capture_started = at
         reads = {}
         deployment = self._read(
             reads, "Deployment/" + WEB_DEPLOYMENT, "Deployment",
-            WEB_DEPLOYMENT, self.namespace)
+            WEB_DEPLOYMENT, self.namespace, guard=guard)
         if deployment and self.configmap_name is None:
-            self.configmap_name = self.discover_configmap(deployment)
+            self.configmap_name = self.discover_configmap(
+                deployment, reads, guard)
         configmap = (self._read(
             reads, "ConfigMap/" + self.configmap_name, "ConfigMap",
-            self.configmap_name, self.namespace)
+            self.configmap_name, self.namespace, guard=guard)
             if self.configmap_name else None)
         secret = self._read(
             reads, "SealedSecret/" + SEALED_SECRET, "SealedSecret",
-            SEALED_SECRET, self.namespace)
+            SEALED_SECRET, self.namespace, guard=guard)
         service = self._read(
             reads, "Service/" + WEB_SERVICE, "Service", WEB_SERVICE,
-            self.namespace)
+            self.namespace, guard=guard)
         hpa_doc = self._read(
             reads, "HorizontalPodAutoscaler/" + WEB_HPA,
-            "HorizontalPodAutoscaler", WEB_HPA, self.namespace)
+            "HorizontalPodAutoscaler", WEB_HPA, self.namespace, guard=guard)
         objects = [item for item in (deployment, configmap, secret, service) if item]
         apps = {}
         for name in (APP_OF_APPS, self.app):
             app = self._read(
                 reads, "Application/" + name, "Application", name,
-                self.argo_namespace)
+                self.argo_namespace, guard=guard)
             if app is None:
                 raise InstrumentationError(f"Argo Application {name} is missing")
             apps[name] = application_state(app)
         extras = []
         quarantine_key = "Namespace/" + self.quarantine
         if self._read(reads, quarantine_key, "Namespace",
-                      self.quarantine) is not None:
+                      self.quarantine, guard=guard) is not None:
             quarantine_deployment = self._read(
                 reads,
                 f"{self.quarantine}/Deployment/" + WEB_DEPLOYMENT,
-                "Deployment", WEB_DEPLOYMENT, self.quarantine)
+                "Deployment", WEB_DEPLOYMENT, self.quarantine, guard=guard)
             if quarantine_deployment:
                 extras.append(f"{self.quarantine}/Deployment/{WEB_DEPLOYMENT}")
         hpa = hpa_state(hpa_doc, deployment) if hpa_doc else None
@@ -2178,6 +2214,46 @@ def _imperative_event_keys(contract: Contract, sample: Observation,
     return keys
 
 
+def _evaluation_keys(contract: Contract, sample: Observation,
+                     scenario: str) -> list | None:
+    if sample.evaluated_signal is not True:
+        return None
+    if scenario == "A":
+        return _hpa_keys()
+    keys = list(sample.evaluated_reads or [])
+    if not keys:
+        return None
+    if not set(keys).issubset(set(_diff_keys(contract, sample))):
+        return None
+    return keys
+
+
+def _evaluation_evidence(post, contract: Contract, scenario: str,
+                         t0: float, deadline: float, evidence_at=None):
+    for sample in post:
+        keys = _evaluation_keys(contract, sample, scenario)
+        if keys is None:
+            continue
+        event = sample.evaluated_at
+        if evidence_at is not None:
+            if event is not None and not math.isclose(
+                    event.mono, evidence_at.mono, rel_tol=1e-9, abs_tol=1e-9):
+                raise InstrumentationError(
+                    "evidence evaluation disagrees with the persisted event")
+            event = evidence_at
+        if event is None or not _finite_mono(event.mono):
+            continue
+        if event.mono < t0 or event.mono > deadline:
+            continue
+        if not _reads_eligible(sample, keys, t0, deadline):
+            continue
+        if any(_read(sample, key)["finished_mono"] > event.mono
+               for key in keys):
+            continue
+        return event, keys
+    return None, []
+
+
 def _recovered(contract, observation, scenario):
     if score(contract, observation) != 100:
         return False
@@ -2194,7 +2270,9 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
                      evidence_at: Point | None = None,
                      provided_evidence_ref: str | None = None,
                      app: str = DEFAULT_APP,
-                     baseline: Observation | None = None) -> dict:
+                     baseline: Observation | None = None,
+                     window_completed: bool | None = None,
+                     window_end: Point | None = None) -> dict:
     samples = sorted(samples, key=lambda item: item.at.mono)
     for sample in samples:
         _validate_acquisition(sample)
@@ -2226,28 +2304,17 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
                 if _reads_eligible(sample, keys, t0, deadline):
                     detection = _read_completion(sample, keys)
                     detection_reads = keys
-            if (detection is None and arm == "gitops" and scenario in "BCDEG"
+            if (detection is None and arm == "gitops"
+                    and scenario in "BCDEG"
                     and argo_signal(sample.argo.get(app))):
                 key = "Application/" + app
                 if _read_eligible(sample, key, t0, deadline):
                     detection = _read_completion(sample, [key])
                     detection_reads = [key]
-            if evidence is None:
-                if scenario == "A" and hpa_changed(
-                        contract.baseline_hpa, sample.hpa):
-                    keys = _hpa_keys()
-                    if _reads_eligible(sample, keys, t0, deadline):
-                        evidence = _read_completion(sample, keys)
-                        evidence_reads = keys
-                elif scenario in "BCDEG" and arm == "gitops":
-                    keys = _diff_keys(contract, sample)
-                    if keys and _reads_eligible(sample, keys, t0, deadline):
-                        evidence = _read_completion(sample, keys)
-                        evidence_reads = keys
 
-        if evidence_at is not None and evidence is not None:
-            if t0 <= evidence_at.mono <= deadline and evidence_at.mono >= evidence.mono:
-                evidence = evidence_at
+        if scenario != "F" and not (imperative and scenario in "BCDEG"):
+            evidence, evidence_reads = _evaluation_evidence(
+                post, contract, scenario, t0, deadline, evidence_at)
 
         if imperative and scenario in "BCDEG":
             for sample in post:
@@ -2369,6 +2436,8 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         "timing_convention": TIMING_CONVENTION,
         "status": status,
         "stop_reason": stop_reason,
+        "window_completed": (True if recovery is not None else window_completed),
+        "window_end": window_end,
         "detection_seconds": duration(detection),
         "evidence_seconds": duration(evidence),
         "recovery_seconds": duration(recovery),
@@ -2484,6 +2553,9 @@ def dry_run_row(run_id, arm, scenario, rep, namespace, app, args) -> dict:
         "t_r_first_mono": None,
         "t_r_confirmed_utc": None,
         "t_r_confirmed_mono": None,
+        "window_completed": False,
+        "window_end_utc": None,
+        "window_end_mono": None,
         "kubectl_cmds": 0,
         "source_revision": getattr(args, "source_revision", None),
         "render_sha256": getattr(args, "render_sha256", None),
@@ -2599,17 +2671,21 @@ def validate_live_args(args, environ=None):
 
 
 class Sampler(threading.Thread):
-    def __init__(self, capture, clock, interval, join_timeout=10.0):
+    def __init__(self, capture, clock, interval, join_timeout=10.0,
+                 guarded=False):
         super().__init__(daemon=True)
         self.capture = capture
         self.clock = clock
         self.interval = interval
         self.join_timeout = join_timeout
+        self.guarded = guarded
         self.samples = []
         self.error = None
         self.late_error = None
         self.deadline = None
         self.stopped_at_deadline = False
+        self.stopped_capture = None
+        self.capture_stop_reason = None
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._ready_event = threading.Event()
@@ -2617,6 +2693,15 @@ class Sampler(threading.Thread):
         self._late_result = None
         self._late_result_at = None
         self._late_result_acquisition = None
+
+    def _guard(self):
+        if self._stop_event.is_set():
+            return "stop"
+        if (self.deadline is not None
+                and self.clock.now().mono >= self.deadline):
+            self.stopped_at_deadline = True
+            return "deadline"
+        return None
 
     def run(self):
         while True:
@@ -2631,7 +2716,16 @@ class Sampler(threading.Thread):
                 return
             started = self.clock.now()
             try:
-                sample = self.capture()
+                if self.guarded:
+                    sample = self.capture(guard=self._guard)
+                else:
+                    sample = self.capture()
+            except CaptureStopped as stopped:
+                with self._lock:
+                    self.stopped_capture = copy.deepcopy(stopped.acquisition)
+                    self.capture_stop_reason = stopped.reason
+                self._ready_event.set()
+                return
             except Exception as error:  # noqa: BLE001 - preserved as evidence
                 with self._lock:
                     self.error = error
@@ -2676,6 +2770,8 @@ class Sampler(threading.Thread):
                 "late_error": (str(self.late_error)
                                if self.late_error else None),
                 "stopped_at_deadline": self.stopped_at_deadline,
+                "partial_acquisition": copy.deepcopy(self.stopped_capture),
+                "capture_stop_reason": self.capture_stop_reason,
             }
 
 
@@ -2818,6 +2914,7 @@ class LiveRunner:
         restore_error = None
         postcondition = None
         failure = None
+        window_end = None
         allow_cleanup = False
         try:
             frozen = self._declaration()
@@ -2839,7 +2936,7 @@ class LiveRunner:
                 app=args.app)
             self._require_baseline_agreement(contract, baseline)
             sampler = Sampler(snapshotter.capture, self.clock,
-                              args.sample_interval)
+                              args.sample_interval, guarded=True)
             self.collector_started = self.clock.now()
             sampler.start()
             if not sampler.wait_ready(timeout=10):
@@ -2866,19 +2963,25 @@ class LiveRunner:
                     if (samples and collector_evidence_at is None
                             and args.scenario != "F"):
                         latest = samples[-1]
-                        evaluated = self.clock.now()
                         if args.scenario == "A":
+                            changed = hpa_changed(
+                                contract.baseline_hpa, latest.hpa)
                             keys = _hpa_keys()
-                            if (hpa_changed(contract.baseline_hpa, latest.hpa)
-                                    and _reads_eligible(latest, keys, t0,
-                                                        deadline)):
-                                collector_evidence_at = evaluated
-                                collector_evidence_ref = "samples.jsonl"
                         else:
-                            keys = _diff_keys(contract, latest)
-                            if (keys and _reads_eligible(latest, keys, t0,
-                                                         deadline)):
-                                collector_evidence_at = evaluated
+                            diffs = field_diffs(contract, latest)
+                            changed = bool(diffs)
+                            keys = sorted({diff["resource"]
+                                           for diff in diffs})
+                        evaluated = self.clock.now()
+                        latest.evaluated_at = evaluated
+                        latest.evaluated_signal = bool(changed)
+                        latest.evaluated_reads = list(keys)
+                        if (changed and _reads_eligible(latest, keys, t0,
+                                                        deadline)):
+                            collector_evidence_at = evaluated
+                            if args.scenario == "A":
+                                collector_evidence_ref = "samples.jsonl"
+                            else:
                                 collector_evidence_ref = (
                                     "diff-" + _short(run_id) + "-collector.json")
                                 try:
@@ -2944,12 +3047,23 @@ class LiveRunner:
                     sampler_stop = sampler.stop()
                     samples = sampler.snapshot()
             if injection is not None:
+                window_end = self.clock.now()
                 timeline = analyze_timeline(
                     contract, samples, injection, args.arm, args.scenario,
                     args.timeout, imperative,
                     evidence_at=collector_evidence_at,
                     provided_evidence_ref=collector_evidence_ref,
-                    app=args.app, baseline=baseline)
+                    app=args.app, baseline=baseline,
+                    window_end=window_end)
+                if timeline is not None:
+                    timeline["window_completed"] = (
+                        timeline["recovery_seconds"] is not None
+                        or window_end.mono >= injection.started.mono + args.timeout)
+                    if (timeline["recovery_seconds"] is None
+                            and not timeline["window_completed"]
+                            and failure is None):
+                        failure = InstrumentationError(
+                            "observation window did not reach its deadline")
                 if (timeline is not None and collector_evidence_store_at
                         and timeline.get("t_e") is not None
                         and not (args.arm == "imperative"
@@ -3020,6 +3134,11 @@ class LiveRunner:
                             time.sleep(1)
         row = self._row(run_id, args, contract, injection, timeline, failure,
                         arm_evidence, cleanup, restore_error, postcondition)
+        if sampler is not None and sampler_stop is not None:
+            sampler_stop["partial_acquisition"] = copy.deepcopy(
+                getattr(sampler, "stopped_capture", None))
+            sampler_stop["capture_stop_reason"] = getattr(
+                sampler, "capture_stop_reason", None)
         evidence = {
             "baseline": baseline if baseline else None,
             "contract": contract.as_dict() if contract else None,
@@ -3056,6 +3175,9 @@ class LiveRunner:
         evidence["samples"] = [{
             "at": _point_dict(sample.at),
             "acquisition": copy.deepcopy(sample.acquisition),
+            "evaluated_at": _point_dict(sample.evaluated_at),
+            "evaluated_signal": sample.evaluated_signal,
+            "evaluated_reads": list(sample.evaluated_reads),
             "resources": {key: value.get("fields")
                           for key, value in sample.resources.items()},
             "extra_resources": sample.extra_resources,
@@ -3148,6 +3270,8 @@ class LiveRunner:
             "t_r_utc": None, "t_r_mono": None,
             "t_r_first_utc": None, "t_r_first_mono": None,
             "t_r_confirmed_utc": None, "t_r_confirmed_mono": None,
+            "window_completed": False,
+            "window_end_utc": None, "window_end_mono": None,
             "arm_restore_status": "failed" if restore_error else "restored",
             "arm_restore_error": restore_error,
             "cleanup_status": "failed" if cleanup and not cleanup.ok else "ok",
@@ -3179,13 +3303,14 @@ class LiveRunner:
                         "t_r_first_seconds", "t_r_confirmed_seconds",
                         "recovery_confirmation", "r1_baseline_reason",
                         "r1_first_reason", "r1_last_reason",
+                        "window_completed",
                         "r1_baseline", "r1_first", "r1_last", "kubectl_cmds",
                         "r1_baseline_details", "r1_first_details",
                         "r1_last_details",
                         "max_sample_gap_seconds"):
                 base[key] = timeline[key]
             for key in ("t_d", "t_e", "t_e_store", "t_r", "t_r_first",
-                        "t_r_confirmed"):
+                        "t_r_confirmed", "window_end"):
                 point = timeline[key]
                 base[key + "_utc"] = point.utc if point else None
                 base[key + "_mono"] = point.mono if point else None

@@ -181,13 +181,14 @@ def application(name="invenio-bootstrap", automated=None, sync="Synced"):
 
 def observation(at=0, deployment=None, configmap=None, secret=None, service=None,
                 hpa=None, argo=None, extras=None, acquisition=None,
-                read_finish=None):
+                read_finish=None, evaluated_at=None, evaluated_signal=False,
+                evaluated_reads=None):
     deployment = deployment or web_deployment()
     objects = [deployment, configmap or web_configmap(), secret or sealed_secret(),
                service or web_service()]
     if acquisition is None:
         acquisition = acquisition_for(at, read_finish)
-    return harness.observation_from_objects(
+    observed = harness.observation_from_objects(
         objects, at=point(at),
         argo=argo or {"invenio-bootstrap": harness.application_state(application()),
                       "apps": harness.application_state(application("apps"))},
@@ -195,6 +196,12 @@ def observation(at=0, deployment=None, configmap=None, secret=None, service=None
         extras=extras or [],
         acquisition=acquisition,
     )
+    if evaluated_at is not None:
+        observed.evaluated_at = (evaluated_at if isinstance(evaluated_at, harness.Point)
+                                 else point(evaluated_at))
+        observed.evaluated_signal = bool(evaluated_signal)
+        observed.evaluated_reads = list(evaluated_reads or [])
+    return observed
 
 
 def read_record(start, finish=None, kind="ConfigMap", name="x",
@@ -1740,7 +1747,9 @@ class TimelineTests(unittest.TestCase):
             observation(101, deployment=web_deployment(image="drift:tag"),
                         argo={"invenio-bootstrap": harness.application_state(
                             application(sync="OutOfSync")),
-                            "apps": harness.application_state(application("apps"))}),
+                            "apps": harness.application_state(application("apps"))},
+                        evaluated_at=101, evaluated_signal=True,
+                        evaluated_reads=["Deployment/invenio-web"]),
             observation(102, deployment=web_deployment(image="drift:tag")),
             observation(103),
             observation(104),
@@ -1757,7 +1766,9 @@ class TimelineTests(unittest.TestCase):
 
     def test_missing_detection_is_not_zero(self):
         samples = [
-            observation(101, deployment=web_deployment(image="drift:tag")),
+            observation(101, deployment=web_deployment(image="drift:tag"),
+                        evaluated_at=101, evaluated_signal=True,
+                        evaluated_reads=["Deployment/invenio-web"]),
             observation(102),
             observation(103),
         ]
@@ -1831,10 +1842,11 @@ class CompletedObservationTimingTests(unittest.TestCase):
         self.spec = contract()
 
     def run_timeline(self, samples, scenario="B", arm="gitops",
-                     timeout=30, injected=None, baseline=None):
+                     timeout=30, injected=None, baseline=None, evidence_at=None):
         return harness.analyze_timeline(
             contract=self.spec, samples=samples, injection=injected or injection(),
             arm=arm, scenario=scenario, timeout=timeout, baseline=baseline,
+            evidence_at=evidence_at,
         )
 
     def test_capture_start_before_a_field_read_never_becomes_primary(self):
@@ -1847,11 +1859,75 @@ class CompletedObservationTimingTests(unittest.TestCase):
                 100.0, read_finish=100.2,
                 starts={"Application/invenio-bootstrap": 100.15},
                 finishes={"Application/invenio-bootstrap": 100.2}),
+            evaluated_at=100.2, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"],
         )
         out = self.run_timeline([sample], injected=injection(
             started=100.0, ack=100.1, verified=100.2, accepted=True))
         self.assertAlmostEqual(out["detection_seconds"], 0.2)
         self.assertAlmostEqual(out["evidence_seconds"], 0.2)
+
+    def test_gitops_evidence_is_not_synthesized_from_read_completion(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"))
+        out = self.run_timeline([sample], evidence_at=point(101.0))
+        self.assertIsNone(out["evidence_seconds"])
+        self.assertEqual(out["evidence_status"], "right_censored")
+
+    def test_gitops_late_evaluation_is_not_backdated(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=131.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline([sample], timeout=30, evidence_at=point(131.0))
+        self.assertIsNone(out["evidence_seconds"])
+        self.assertEqual(out["evidence_status"], "right_censored")
+
+    def test_gitops_timely_evaluation_uses_its_completion(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline([sample], timeout=30, evidence_at=point(101.5))
+        self.assertEqual(out["evidence_seconds"], 1.5)
+
+    def test_hpa_late_evaluation_is_not_backdated(self):
+        drifted = web_deployment()
+        drifted["spec"]["replicas"] = 1
+        hpa = harness.hpa_state(
+            web_hpa(desired=2, current=2), drifted)
+        late = observation(
+            101.0, deployment=drifted, hpa=hpa,
+            evaluated_at=131.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web",
+                             "HorizontalPodAutoscaler/invenio-web-hpa"])
+        late_out = self.run_timeline(
+            [late], scenario="A", timeout=30, evidence_at=point(131.0))
+        self.assertIsNone(late_out["evidence_seconds"])
+        timely = observation(
+            101.0, deployment=drifted, hpa=hpa,
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web",
+                             "HorizontalPodAutoscaler/invenio-web-hpa"])
+        timely_out = self.run_timeline(
+            [timely], scenario="A", timeout=30, evidence_at=point(101.5))
+        self.assertEqual(timely_out["evidence_seconds"], 1.5)
+
+    def test_transient_diff_without_evaluation_is_not_evidence(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.0, evaluated_signal=False,
+            evaluated_reads=[])
+        out = self.run_timeline([sample], evidence_at=point(101.0))
+        self.assertIsNone(out["evidence_seconds"])
+
+    def test_evidence_at_mismatching_sample_event_fails_closed(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        with self.assertRaises(harness.InstrumentationError):
+            self.run_timeline([sample], evidence_at=point(102.0))
 
     def test_read_starting_before_t0_is_excluded(self):
         sample = observation(
@@ -1921,10 +1997,14 @@ class CompletedObservationTimingTests(unittest.TestCase):
                 100.0, read_finish=100.2,
                 starts={"Application/invenio-bootstrap": 100.1},
                 finishes={"Application/invenio-bootstrap": 100.2}),
+            evaluated_at=100.2, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"],
         )
         out = self.run_timeline([sample], injected=injection(
-            started=100.0, ack=100.5, verified=100.6, accepted=True))
+            started=100.0, ack=100.5, verified=100.6, accepted=True),
+            evidence_at=point(100.2))
         self.assertAlmostEqual(out["detection_seconds"], 0.2)
+        self.assertAlmostEqual(out["evidence_seconds"], 0.2)
 
     def test_late_confirmation_is_not_observed_recovery(self):
         first = observation(101.0)
@@ -2192,10 +2272,13 @@ class AdvancingClock:
 
 
 class DeterministicSampler:
-    def __init__(self, capture, clock, interval):
+    def __init__(self, capture, clock, interval, join_timeout=10.0,
+                 guarded=False):
         self.capture = capture
         self.clock = clock
         self.interval = interval
+        self.join_timeout = join_timeout
+        self.guarded = guarded
         self.samples = []
         self.error = None
 
@@ -2525,6 +2608,90 @@ class LiveRunnerTests(unittest.TestCase):
 
 
 class SamplerLifecycleTests(unittest.TestCase):
+    def test_real_capture_stops_between_reads_after_stop(self):
+        import threading
+
+        class BlockingServiceKubectl(FakeKubectl):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.blocked = threading.Event()
+                self.release = threading.Event()
+
+            def read(self, kind, name=None, namespace=None, selector=None):
+                if kind == "Service":
+                    self.blocked.set()
+                    self.release.wait(2)
+                return super().read(kind, name, namespace, selector)
+
+        clock = AdvancingClock()
+        fake = BlockingServiceKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }, clock=clock)
+        snapshotter = harness.Snapshotter(
+            fake, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4")
+        sampler = harness.Sampler(
+            snapshotter.capture, clock, 0.01, join_timeout=0.01, guarded=True)
+        sampler.start()
+        self.assertTrue(fake.blocked.wait(2))
+        state = sampler.stop()
+        self.assertFalse(state["joined"])
+        self.assertTrue(state["in_flight"])
+        fake.release.set()
+        sampler.join(timeout=2)
+        self.assertEqual(sampler.snapshot(), [])
+        self.assertIsNotNone(sampler.stopped_capture)
+        self.assertIn("Service/invenio-web", sampler.stopped_capture["reads"])
+        read_kinds = {record["kind"] for record in fake.reads}
+        self.assertNotIn("HorizontalPodAutoscaler", read_kinds)
+        self.assertNotIn("Application", read_kinds)
+
+    def test_real_capture_stops_between_reads_at_deadline(self):
+        import threading
+
+        class BlockingServiceKubectl(FakeKubectl):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.blocked = threading.Event()
+                self.release = threading.Event()
+
+            def read(self, kind, name=None, namespace=None, selector=None):
+                if kind == "Service":
+                    self.blocked.set()
+                    self.release.wait(2)
+                return super().read(kind, name, namespace, selector)
+
+        clock = AdvancingClock()
+        fake = BlockingServiceKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }, clock=clock)
+        snapshotter = harness.Snapshotter(
+            fake, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4")
+        sampler = harness.Sampler(
+            snapshotter.capture, clock, 0.01, join_timeout=1, guarded=True)
+        sampler.start()
+        self.assertTrue(fake.blocked.wait(2))
+        sampler.deadline = 0.0
+        fake.release.set()
+        sampler.join(timeout=2)
+        self.assertTrue(sampler.stopped_at_deadline)
+        self.assertEqual(sampler.snapshot(), [])
+        self.assertIsNotNone(sampler.stopped_capture)
+        read_kinds = {record["kind"] for record in fake.reads}
+        self.assertNotIn("HorizontalPodAutoscaler", read_kinds)
+        self.assertNotIn("Application", read_kinds)
+
     def test_sampler_stop_does_not_shadow_thread_stop(self):
         sampler = harness.Sampler(
             lambda: {"ok": True}, harness.FakeClock([1.0]), 0.01,
@@ -2724,14 +2891,15 @@ class PostconditionTimingTests(unittest.TestCase):
 
 
 class SamplerFailureLiveTests(unittest.TestCase):
-    def runner(self, directory, sampler, run_id, arm="gitops", scenario="B"):
+    def runner(self, directory, sampler, run_id, arm="gitops", scenario="B",
+               timeout="1"):
         path, digest = write_render(directory)
         args = harness.parse_args([
             "--arm", arm, "--scenario", scenario, "--rep", "1",
             "--live", "--confirm-single-stack", "--namespace", "invenio",
             "--app", "invenio-bootstrap", "--render-file", str(path),
             "--source-revision", "b" * 40, "--render-sha256", digest,
-            "--timeout", "1", "--sample-interval", "0.01",
+            "--timeout", timeout, "--sample-interval", "0.01",
             "--imperative-interval", "0.01", "--baseline-timeout", "5",
             "--reset-timeout", "1", "--out", directory, "--run-id", run_id,
         ])
@@ -2758,6 +2926,55 @@ class SamplerFailureLiveTests(unittest.TestCase):
         row = json.loads(
             (Path(directory) / (run_id + ".jsonl")).read_text())
         return code, row
+
+    def test_live_collector_stamps_evaluation_after_a_slow_comparison(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runner, _ = self.runner(
+                directory, None, "slow-evaluator", timeout="3")
+            fake = runner.kubectl
+            clock = runner.clock
+            deployment_key = ("Deployment", "invenio-web", "invenio")
+
+            def capture():
+                at = clock.now().mono
+                deployment = copy.deepcopy(fake.objects[deployment_key])
+                return observation(
+                    at, deployment=deployment,
+                    acquisition=acquisition_for(at, read_finish=at))
+
+            sampler = DeterministicSampler(capture, clock, 0.01)
+            original = harness.field_diffs
+            calls = {"count": 0}
+
+            def slow(contract, sample):
+                result = original(contract, sample)
+                if calls["count"] == 0:
+                    clock.value += 0.2
+                calls["count"] += 1
+                return result
+
+            with mock.patch.object(harness, "field_diffs", side_effect=slow), \
+                    mock.patch("harness.Sampler", return_value=sampler), \
+                    mock.patch("time.sleep", lambda _: None), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = runner.run()
+            row = json.loads(
+                (Path(directory) / "slow-evaluator.jsonl").read_text())
+            samples = [json.loads(line) for line in
+                       (Path(directory) / "slow-evaluator" / "samples.jsonl")
+                       .read_text().splitlines()]
+            signal = next(sample for sample in samples
+                          if sample["evaluated_signal"])
+            read_finish = max(record["finished_mono"]
+                              for record in signal["acquisition"]["reads"].values())
+            self.assertEqual(code, 1)
+            self.assertGreater(signal["evaluated_at"]["mono"], read_finish)
+            self.assertGreater(signal["evaluated_at"]["mono"],
+                               signal["at"]["mono"])
+            self.assertGreater(row["evidence_seconds"], 0)
+            self.assertAlmostEqual(
+                row["t_e_mono"], signal["evaluated_at"]["mono"])
+            self.assertIsNotNone(row["t_e_store_mono"])
 
     def test_sampler_error_after_injection_is_an_instrumentation_failure(self):
         class ErroringSampler(DeterministicSampler):

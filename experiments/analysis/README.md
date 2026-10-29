@@ -10,12 +10,15 @@ python3 experiments/analysis/summarize.py --in /path/hasil-v2.jsonl
 ```
 
 Ringkasan stdlib memisahkan skenario, lengan, kelompok analisis, data sintetis,
-revisi sumber dan digest render. A tetap `hpa_control`, F `visibility_boundary`,
-B--E/G `managed_drift`; tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap
-metrik, jumlah teramati, tersensor, dan hilang (`unobserved_before_stop`) tetap
-dilaporkan. Median hanya untuk bagian teramati dan **bukan** estimasi yang sudah
-disesuaikan terhadap penyensoran. Tidak ada uji inferensial otomatis sebelum
-metode/keluarga uji disetujui.
+revisi sumber, digest render, dan `timing_convention`. Dataset yang mencampur
+legacy dan baris bermarker, atau memakai marker tak dikenal, ditolak agar tidak
+dipool. A tetap `hpa_control`, F `visibility_boundary`, B--E/G `managed_drift`;
+tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap metrik, jumlah
+teramati, tersensor, dan hilang (`unobserved_before_stop`) tetap dilaporkan;
+missing hanya diterima dengan provenance recovery dini. Median hanya untuk
+bagian teramati dan **bukan** estimasi yang sudah disesuaikan terhadap
+penyensoran. Tidak ada uji inferensial otomatis sebelum metode/keluarga uji
+disetujui.
 
 Kegagalan injeksi, instrumentasi dan reset disimpan pada ledger run tersendiri
 dengan alasan serta referensi bukti; jangan membuangnya untuk membentuk dataset
@@ -101,15 +104,18 @@ Cara membaca hasil:
 
 Input divalidasi secara *fail-closed*: skema, pemetaan lengan, fase/rep,
 revisi/render, status metrik, batas monotonik/durasi, dan nilai tersensor yang
-tidak konsisten ditolak. `timing_convention` baru harus
-`completed-observation-v1`; dataset yang mencampur baris bermarker dan legacy,
-marker tak dikenal, atau marker `rows.jsonl` yang berbeda dari `analysis.jsonl`
-ditolak. Baris lama tanpa marker tetap dapat dianalisis sebagai legacy dan tidak
-diberi label ulang. Batas penyensoran divalidasi per baris; horizon RMST adalah
-batas terkecil per kelompok. Ketidakcocokan `rows.jsonl` dengan
-`analysis.jsonl` juga ditolak agar tidak ada baris yang hilang diam-diam.
-Analisis tidak mencetak nilai baris mentah; hanya metadata yang diizinkan yang
-masuk artefak eksklusi.
+tidak konsisten ditolak. Baris baru
+(`completed-observation-v1`) wajib membawa `t0/t_a`, endpoint/konfirmasi yang
+lengkap, serta `window_completed`/`window_end_*`; baris `right_censored` hanya
+diterima bila jendela benar-benar mencapai deadline. Baris legacy tanpa marker
+tetap divalidasi dengan aturan lama dan tidak diwajibkan memiliki bound baru;
+c69 tetap dapat divalidasi sebagai legacy tanpa inferensi komparatif.
+Dataset yang mencampur baris bermarker dan legacy, marker tak dikenal, atau
+marker `rows.jsonl` yang berbeda dari `analysis.jsonl` ditolak. Batas
+penyensoran divalidasi per baris; horizon RMST adalah batas terkecil per
+kelompok. Ketidakcocokan `rows.jsonl` dengan `analysis.jsonl` juga ditolak agar
+tidak ada baris yang hilang diam-diam. Analisis tidak mencetak nilai baris
+mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
 
 `unobserved_before_stop` hanya diterima dengan nilai `null` dan provenance
 recovery dini yang valid (run `observed`, `stop_reason: recovery`, recovery

@@ -47,6 +47,8 @@ class AnalysisTest(unittest.TestCase):
             "env": "gitops", "analysis_group": "managed_drift",
             "synthetic": True, "source_revision": "fixture",
             "render_sha256": "fixture",
+            "timing_convention": "completed-observation-v1",
+            "status": "observed", "stop_reason": "recovery",
             "detection_status": "unobserved_before_stop",
             "detection_seconds": None,
             "evidence_status": "unobserved_before_stop",
@@ -55,10 +57,50 @@ class AnalysisTest(unittest.TestCase):
             "censor_seconds": 10,
         }
         group = summarize.summarize([row])["groups"][0]
+        self.assertEqual(group["timing_convention"],
+                         "completed-observation-v1")
         self.assertEqual(group["detection"]["missing"], 1)
         self.assertEqual(group["detection"]["right_censored"], 0)
         self.assertIsNone(group["detection"]["observed_median_seconds"])
         self.assertFalse(group["complete_time_observations"])
+
+    def test_summary_rejects_mixed_or_unknown_conventions(self):
+        base = {
+            "schema_version": 2, "scenario": "B", "env": "gitops",
+            "analysis_group": "managed_drift", "synthetic": True,
+            "source_revision": "fixture", "render_sha256": "fixture",
+            "status": "observed", "stop_reason": "recovery",
+            "detection_status": "observed", "detection_seconds": 2,
+            "evidence_status": "observed", "evidence_seconds": 3,
+            "recovery_status": "observed", "recovery_seconds": 4,
+            "censor_seconds": 10,
+        }
+        legacy = dict(base, run_id="legacy")
+        current = dict(base, run_id="current",
+                       timing_convention="completed-observation-v1")
+        with self.assertRaises(ValueError):
+            summarize.summarize([legacy, current])
+        unknown = dict(base, run_id="unknown",
+                       timing_convention="unknown-convention")
+        with self.assertRaises(ValueError):
+            summarize.summarize([unknown])
+
+    def test_summary_rejects_missing_without_early_stop_provenance(self):
+        row = {
+            "run_id": "missing", "schema_version": 2, "scenario": "B",
+            "env": "gitops", "analysis_group": "managed_drift",
+            "synthetic": True, "source_revision": "fixture",
+            "render_sha256": "fixture",
+            "timing_convention": "completed-observation-v1",
+            "status": "right_censored", "stop_reason": "timeout",
+            "detection_status": "unobserved_before_stop",
+            "detection_seconds": None,
+            "evidence_status": "right_censored", "evidence_seconds": None,
+            "recovery_status": "right_censored", "recovery_seconds": None,
+            "censor_seconds": 10,
+        }
+        with self.assertRaises(ValueError):
+            summarize.summarize([row])
 
     def test_legacy_analyzer_requires_explicit_historical_mode(self):
         with tempfile.TemporaryDirectory() as directory:

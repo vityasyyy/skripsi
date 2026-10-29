@@ -676,6 +676,35 @@ def _analysis_problem(row):
         if row.get("timing_convention") is None:
             return "missing_timing_convention"
         return "unsupported_timing_convention"
+    if row.get("window_completed") is not True:
+        return "window_not_completed"
+    required_timing = (
+        "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_r_mono",
+        "t_r_first_mono", "t_r_confirmed_mono", "window_end_mono",
+    )
+    if any(field not in row for field in required_timing):
+        return "incomplete_timing_bounds"
+    numeric = (row.get("t0_mono"), row.get("t_a_mono"),
+               row.get("window_end_mono"))
+    if (any(type(value) not in (int, float) or not math.isfinite(value)
+            for value in numeric)
+            or row["t_a_mono"] < row["t0_mono"]
+            or row["window_end_mono"] < row["t0_mono"]):
+        return "invalid_timing_bounds"
+    limit = row.get("censor_seconds")
+    if (type(limit) not in (int, float) or not math.isfinite(limit)
+            or limit <= 0):
+        return "invalid_censor_seconds"
+    if row.get("status") == "observed":
+        if (row.get("stop_reason") != "recovery"
+                or row.get("recovery_status") != "observed"
+                or row.get("t_r_first_mono") is None
+                or row.get("t_r_confirmed_mono") is None):
+            return "incomplete_timing_bounds"
+    else:
+        if (row.get("stop_reason") != "timeout"
+                or row["window_end_mono"] < row["t0_mono"] + limit):
+            return "window_not_completed"
     scenario = row.get("scenario")
     if scenario not in SCENARIOS:
         return "invalid_scenario"
