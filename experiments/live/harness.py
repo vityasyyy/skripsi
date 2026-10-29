@@ -65,6 +65,9 @@ SEED_MD5 = "8f1445bafe2c2095044af7789462f475"
 SEED_SHA256 = "7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2"
 DEFAULT_INVENIO_URL = "https://invenio.vityasy.me"
 USER_AGENT = "invenio-live-harness/1.0"
+HTTP_RETRY_ATTEMPTS = 3
+HTTP_RETRY_BACKOFF_SECONDS = (0.5, 1.0)
+TRANSIENT_HTTP_STATUSES = frozenset({429, 502, 503, 504})
 MISSING = "<missing>"
 TIMING_CONVENTION = "completed-observation-v1"
 MAX_SAMPLE_END_AGE_SECONDS = 30.0
@@ -367,21 +370,29 @@ class Http:
 
     def get(self, path: str, accept: str = "application/json"):
         url = self.base_url + path if path.startswith("/") else path
-        request = urlrequest.Request(
-            url,
-            headers={"Authorization": "Bearer " + self._token,
-                     "Accept": accept,
-                     "User-Agent": USER_AGENT},
-        )
-        try:
-            with self._opener.open(request, timeout=self.timeout) as response:
-                return response.status, response.read()
-        except urlerror.HTTPError as error:
-            return error.code, error.read()
-        except (urlerror.URLError, TimeoutError, OSError) as error:
-            raise HarnessError(
-                f"Invenio API request failed: {type(error).__name__}"
-            ) from None
+        headers = {"Authorization": "Bearer " + self._token,
+                   "Accept": accept,
+                   "User-Agent": USER_AGENT}
+        for attempt in range(HTTP_RETRY_ATTEMPTS):
+            request = urlrequest.Request(url, headers=headers)
+            try:
+                with self._opener.open(request, timeout=self.timeout) as response:
+                    return response.status, response.read()
+            except urlerror.HTTPError as error:
+                if (error.code not in TRANSIENT_HTTP_STATUSES
+                        or attempt + 1 == HTTP_RETRY_ATTEMPTS):
+                    return error.code, error.read()
+                error.close()
+            except (urlerror.URLError, TimeoutError, ConnectionError) as error:
+                if attempt + 1 == HTTP_RETRY_ATTEMPTS:
+                    raise HarnessError(
+                        f"Invenio API request failed: {type(error).__name__}"
+                    ) from None
+            except OSError as error:
+                raise HarnessError(
+                    f"Invenio API request failed: {type(error).__name__}"
+                ) from None
+            time.sleep(HTTP_RETRY_BACKOFF_SECONDS[attempt])
 
 
 def verify_seed(http, record: str, file_name: str, expected_size: int,

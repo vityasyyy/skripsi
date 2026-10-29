@@ -599,6 +599,85 @@ class SafetyTests(unittest.TestCase):
         self.assertIsNone(redirected.get_header("Authorization"))
         self.assertIsNone(redirected.get_header("Accept"))
 
+    def test_http_retries_a_transient_transport_failure_then_succeeds(self):
+        response = mock.MagicMock()
+        response.status = 200
+        response.read.return_value = b'{"ok": true}'
+        response.__enter__.return_value = response
+        http = harness.Http("token")
+        http._opener = mock.MagicMock()
+        http._opener.open.side_effect = [
+            harness.urlerror.URLError(ConnectionResetError("connection reset")),
+            response,
+        ]
+        with mock.patch("time.sleep") as sleep:
+            status, body = http.get("/api/records/x/draft")
+        self.assertEqual((status, body), (200, b'{"ok": true}'))
+        self.assertEqual(http._opener.open.call_count, 2)
+        sleep.assert_called_once_with(0.5)
+
+    def test_http_does_not_retry_a_forbidden_response(self):
+        http = harness.Http("token")
+        http._opener = mock.MagicMock()
+        http._opener.open.side_effect = harness.urlerror.HTTPError(
+            "https://invenio.example/api/me", 403, "Forbidden", {},
+            io.BytesIO(b'{"error": "forbidden"}'))
+        with mock.patch("time.sleep") as sleep:
+            status, body = http.get("/api/me")
+        self.assertEqual((status, body), (403, b'{"error": "forbidden"}'))
+        self.assertEqual(http._opener.open.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_http_does_not_retry_a_missing_resource(self):
+        http = harness.Http("token")
+        http._opener = mock.MagicMock()
+        http._opener.open.side_effect = harness.urlerror.HTTPError(
+            "https://invenio.example/api/me", 404, "Not Found", {},
+            io.BytesIO(b'{"error": "not found"}'))
+        with mock.patch("time.sleep") as sleep:
+            status, body = http.get("/api/me")
+        self.assertEqual((status, body), (404, b'{"error": "not found"}'))
+        self.assertEqual(http._opener.open.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_http_retries_transient_statuses_with_bounded_backoff(self):
+        def error(code):
+            return harness.urlerror.HTTPError(
+                "https://invenio.example/api/me", code, "error", {},
+                io.BytesIO(f"status {code}".encode()))
+
+        http = harness.Http("token")
+        http._opener = mock.MagicMock()
+        http._opener.open.side_effect = [error(503), error(429), error(504)]
+        with mock.patch("time.sleep") as sleep:
+            status, body = http.get("/api/me")
+        self.assertEqual((status, body), (504, b"status 504"))
+        self.assertEqual(http._opener.open.call_count, 3)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list],
+                         [0.5, 1.0])
+
+    def test_http_exhausts_transient_transport_failures_then_raises(self):
+        http = harness.Http("token")
+        http._opener = mock.MagicMock()
+        http._opener.open.side_effect = harness.urlerror.URLError("timed out")
+        with mock.patch("time.sleep") as sleep:
+            with self.assertRaises(harness.HarnessError):
+                http.get("/api/me")
+        self.assertEqual(http._opener.open.call_count, 3)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list],
+                         [0.5, 1.0])
+
+    def test_http_transport_error_never_contains_the_token(self):
+        token = "tok-SECRET-123"
+        http = harness.Http(token)
+        http._opener = mock.MagicMock()
+        http._opener.open.side_effect = harness.urlerror.URLError(
+            f"dial failed with Authorization: Bearer {token}")
+        with mock.patch("time.sleep", lambda _: None):
+            with self.assertRaises(harness.HarnessError) as caught:
+                http.get("/api/me")
+        self.assertNotIn(token, str(caught.exception))
+
     def test_no_token_is_ever_printed(self):
         secret = "tok-SECRET-123"
         with tempfile.TemporaryDirectory() as directory:
