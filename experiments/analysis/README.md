@@ -103,6 +103,36 @@ terkecil per kelompok. Ketidakcocokan `rows.jsonl` dengan `analysis.jsonl` juga
 ditolak agar tidak ada baris yang hilang diam-diam. Analisis tidak mencetak
 nilai baris mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
 
+### Identitas retry
+
+`analysis.jsonl` memakai attempt terakhir tiap sel, sehingga satu sel tetap satu
+observasi. Run ID retry dari runner berbentuk
+`<batch>-<lengan>-<skenario>-r<rep>-retry<N>`. Analyzer menerima ID dasar tanpa
+metadata attempt (bukti lama) dan ID retry hanya bila `batch_attempt` adalah
+bilangan bulat >= 1 yang sama dengan `<N>` dan `batch_retry_of` sama dengan ID
+dasar. Metadata parsial, nilai boolean/float/negatif/string, parent berbeda,
+sufiks tidak kanonik (`retry0`, `retry01`, `retryx`), dan sel ganda (basis plus
+retry di `analysis.jsonl`) ditolak. ID asli tidak diubah dan attempt gagal tidak
+menambah observasi statistik.
+
+Dengan `--rows`, setiap baris mentah divalidasi terhadap batch, lengan,
+skenario, replikasi, dan metadata attempt yang sama. Untuk run yang masuk
+`analysis.jsonl`, proyeksi field protokol/provenans/metrik yang tersedia harus
+sama dengan baris analysis (fase, mode, revisi, render, batas sensor,
+kelompok, eligibility, synthetic, attestation, R1, dan metrik); `env`
+dinormalisasi dari `imperative` ke `manual`. Baris tersebut juga tidak boleh
+membawa cleanup/arm restore/postcondition gagal atau stop/error eksplisit.
+Rantai attempt per sel harus berurutan dari 0; setiap attempt > 0 harus
+didahului `baseline_failure` yang memenuhi kebijakan retry runner: tanpa `t0`,
+injeksi tidak diterima, cleanup `ok`, arm `restored`, dan tanpa mutasi.
+Attempt baseline gagal tetap muncul di tabel eksklusi sebagai bukti, bukan
+observasi tambahan. Field eligibility lama yang tidak ada tidak diminta, tetapi
+nilai yang ada dan tidak valid tetap ditolak; validasi ini tidak mengklaim
+verifikasi bukti lengkap. Tanpa `--rows`, hubungan rantai tidak dapat
+diverifikasi; analyzer hanya memeriksa konsistensi metadata di
+`analysis.jsonl` dan tidak mengklaim validasi rantai. Baris lama tanpa field
+attempt diperlakukan sebagai attempt 0.
+
 ## Artefak historis, bukan hasil Invenio
 
 `outputs/`, `mockgen.py`, `runs/sample-dryrun.csv` dan format CSV v1 tetap

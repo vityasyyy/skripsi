@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import argparse
 import copy
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -145,6 +147,8 @@ class Observation:
     hpa: dict | None
     pods: list = field(default_factory=list)
     nodes: list = field(default_factory=list)
+    acquisition: dict = field(default_factory=dict)
+    readiness_failures: list = field(default_factory=list)
 
 
 @dataclass
@@ -689,6 +693,23 @@ def hpa_settled(state: dict | None) -> bool:
             and generation_ok)
 
 
+def hpa_telemetry_valid(state: dict) -> bool:
+    values = (state.get("desired"), state.get("current"),
+              state.get("deployment_spec_replicas"), state.get("min"),
+              state.get("max"))
+    if any(type(value) is not int or value < 0 for value in values):
+        return False
+    if values[3] <= 0 or values[4] < values[3]:
+        return False
+    if type(state.get("able_to_scale")) is not bool:
+        return False
+    generation = state.get("generation")
+    observed = state.get("observed_generation")
+    if generation is None and observed is None:
+        return True
+    return type(generation) is int and type(observed) is int
+
+
 def hpa_changed(baseline: dict | None, current: dict | None) -> bool:
     if not baseline or not current:
         return False
@@ -706,6 +727,245 @@ def argo_signal(state: dict | None) -> bool:
     return any(item.get("type") in ("ComparisonError", "SyncError")
                and item.get("status") == "True"
                for item in state.get("conditions") or [])
+
+
+_QUANTITY_RE = re.compile(
+    r"^(?P<number>[+-]?(?:\d+(?:\.\d*)?|\.\d+))"
+    r"(?P<suffix>Ki|Mi|Gi|Ti|Pi|Ei|[numkKMGTPE]|[eE][+-]?\d+)?$")
+_BINARY_FACTORS = {
+    "Ki": 1024, "Mi": 1024 ** 2, "Gi": 1024 ** 3,
+    "Ti": 1024 ** 4, "Pi": 1024 ** 5, "Ei": 1024 ** 6,
+}
+_DECIMAL_FACTORS = {
+    None: 1, "n": Decimal("1e-9"), "u": Decimal("1e-6"),
+    "m": Decimal("1e-3"), "k": 1000, "M": 1000 ** 2, "G": 1000 ** 3,
+    "T": 1000 ** 4, "P": 1000 ** 5, "E": 1000 ** 6,
+}
+_DURATION_PART = re.compile(r"(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)")
+_DURATION_FACTORS = {
+    "ns": Decimal("1e-9"), "us": Decimal("1e-6"), "µs": Decimal("1e-6"),
+    "ms": Decimal("1e-3"), "s": 1, "m": 60, "h": 3600,
+}
+
+
+def _quantity(value, field: str) -> Decimal:
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise InstrumentationError(f"{field} is not a valid Kubernetes quantity")
+    match = _QUANTITY_RE.fullmatch(value)
+    if match is None:
+        raise InstrumentationError(f"{field} is not a valid Kubernetes quantity")
+    try:
+        number = Decimal(match.group("number"))
+    except InvalidOperation:
+        raise InstrumentationError(
+            f"{field} is not a valid Kubernetes quantity") from None
+    suffix = match.group("suffix")
+    try:
+        if suffix in _BINARY_FACTORS:
+            factor = Decimal(_BINARY_FACTORS[suffix])
+        elif suffix in _DECIMAL_FACTORS:
+            factor = Decimal(_DECIMAL_FACTORS[suffix])
+        elif suffix and suffix[0] in "eE":
+            factor = Decimal(10) ** int(suffix[1:])
+        else:
+            raise InstrumentationError(
+                f"{field} is not a valid Kubernetes quantity")
+        result = number * factor
+    except ArithmeticError:
+        raise InstrumentationError(
+            f"{field} is not a valid Kubernetes quantity") from None
+    if result == 0 and number != 0:
+        raise InstrumentationError(f"{field} underflows")
+    if not result.is_finite():
+        raise InstrumentationError(f"{field} is not a finite Kubernetes quantity")
+    return result
+
+
+def _quantity_nanocores(value, field: str, positive: bool = False) -> int:
+    try:
+        amount = _quantity(value, field) * Decimal(10 ** 9)
+    except ArithmeticError:
+        raise InstrumentationError(f"{field} is not a valid CPU quantity") from None
+    if amount != amount.to_integral_value():
+        raise InstrumentationError(f"{field} is not representable in nanocores")
+    result = int(amount)
+    if result < 0 or (positive and result == 0):
+        raise InstrumentationError(
+            f"{field} must be {'positive' if positive else 'non-negative'}")
+    return result
+
+
+def _quantity_bytes(value, field: str, positive: bool = False) -> int:
+    amount = _quantity(value, field)
+    if amount != amount.to_integral_value():
+        raise InstrumentationError(f"{field} is not representable in bytes")
+    result = int(amount)
+    if result < 0 or (positive and result == 0):
+        raise InstrumentationError(
+            f"{field} must be {'positive' if positive else 'non-negative'}")
+    return result
+
+
+def _duration_seconds(value, field: str) -> float:
+    if not isinstance(value, str) or not value:
+        raise InstrumentationError(f"{field} is not a valid duration")
+    position = 0
+    total = Decimal(0)
+    try:
+        for match in _DURATION_PART.finditer(value):
+            if match.start() != position:
+                raise InstrumentationError(f"{field} is not a valid duration")
+            total += Decimal(match.group(1)) * Decimal(
+                _DURATION_FACTORS[match.group(2)])
+            position = match.end()
+        if position != len(value) or total <= 0:
+            raise InstrumentationError(f"{field} is not a valid duration")
+        seconds = float(total)
+    except ArithmeticError:
+        raise InstrumentationError(f"{field} is not a valid duration") from None
+    if not math.isfinite(seconds):
+        raise InstrumentationError(f"{field} is not a finite duration")
+    return seconds
+
+
+def _timestamp(value, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise InstrumentationError(f"{field} is not a valid timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise InstrumentationError(f"{field} is not a valid timestamp") from None
+    if parsed.tzinfo is None:
+        raise InstrumentationError(f"{field} has no timezone")
+    return value
+
+
+def _command_bounds(command: CommandResult) -> dict:
+    return {
+        "started_utc": command.started.utc,
+        "started_mono": command.started.mono,
+        "finished_utc": command.finished.utc,
+        "finished_mono": command.finished.mono,
+    }
+
+
+def _point_bounds(started: Point, finished: Point) -> dict:
+    return {
+        "started_utc": started.utc,
+        "started_mono": started.mono,
+        "finished_utc": finished.utc,
+        "finished_mono": finished.mono,
+    }
+
+
+def _node_name(item, field: str, seen: set) -> str:
+    if not isinstance(item, dict):
+        raise InstrumentationError(f"{field} contains a non-object node")
+    metadata = item.get("metadata")
+    if not isinstance(metadata, dict):
+        raise InstrumentationError(f"{field} node has no metadata")
+    name = metadata.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise InstrumentationError(f"{field} node has no name")
+    if name in seen:
+        raise InstrumentationError(f"duplicate node {name} in {field}")
+    seen.add(name)
+    return name
+
+
+def parse_node_metrics(metrics_payload, nodes_payload, metrics_bounds,
+                       allocatable_bounds) -> list:
+    if not isinstance(metrics_payload, dict):
+        raise InstrumentationError("node metrics payload is not an object")
+    metrics_items = metrics_payload.get("items")
+    if not isinstance(metrics_items, list) or not metrics_items:
+        raise InstrumentationError("no node metrics returned")
+    if isinstance(nodes_payload, dict):
+        nodes_payload = nodes_payload.get("items")
+    if not isinstance(nodes_payload, list) or not nodes_payload:
+        raise InstrumentationError("no node inventory returned")
+    allocatable = {}
+    seen = set()
+    for item in nodes_payload:
+        name = _node_name(item, "node inventory", seen)
+        status = item.get("status")
+        if not isinstance(status, dict):
+            raise InstrumentationError(f"node {name} has no status")
+        resources = status.get("allocatable")
+        if not isinstance(resources, dict):
+            raise InstrumentationError(
+                f"node {name} has no allocatable resources")
+        allocatable[name] = {
+            "cpu": resources.get("cpu"),
+            "memory": resources.get("memory"),
+            "cpu_nanocores": _quantity_nanocores(
+                resources.get("cpu"), f"node {name} allocatable cpu", True),
+            "memory_bytes": _quantity_bytes(
+                resources.get("memory"), f"node {name} allocatable memory", True),
+        }
+    usage = {}
+    seen = set()
+    for item in metrics_items:
+        name = _node_name(item, "node metrics", seen)
+        if name not in allocatable:
+            raise InstrumentationError(
+                f"node metrics returned for unexpected node {name}")
+        resources = item.get("usage")
+        if not isinstance(resources, dict):
+            raise InstrumentationError(f"node {name} metrics have no usage")
+        timestamp = _timestamp(item.get("timestamp"),
+                               f"node {name} metrics timestamp")
+        window = item.get("window")
+        window_seconds = _duration_seconds(
+            window, f"node {name} metrics window")
+        usage[name] = {
+            "cpu": resources.get("cpu"),
+            "memory": resources.get("memory"),
+            "cpu_nanocores": _quantity_nanocores(
+                resources.get("cpu"), f"node {name} usage cpu"),
+            "memory_bytes": _quantity_bytes(
+                resources.get("memory"), f"node {name} usage memory"),
+            "timestamp": timestamp,
+            "window": window,
+            "window_seconds": window_seconds,
+        }
+    missing = sorted(set(allocatable) - set(usage))
+    if missing:
+        raise InstrumentationError(
+            "node metrics missing for " + ", ".join(missing))
+    nodes = []
+    for name in sorted(usage):
+        observed = usage[name]
+        capacity = allocatable[name]
+        cpu_percent = float(
+            Decimal(observed["cpu_nanocores"]) * 100
+            / Decimal(capacity["cpu_nanocores"]))
+        memory_percent = float(
+            Decimal(observed["memory_bytes"]) * 100
+            / Decimal(capacity["memory_bytes"]))
+        if not math.isfinite(cpu_percent) or not math.isfinite(memory_percent):
+            raise InstrumentationError(f"node {name} percentage is not finite")
+        nodes.append({
+            "name": name,
+            "cpu_usage": observed["cpu"],
+            "memory_usage": observed["memory"],
+            "cpu_allocatable": capacity["cpu"],
+            "memory_allocatable": capacity["memory"],
+            "cpu_usage_nanocores": observed["cpu_nanocores"],
+            "cpu_allocatable_nanocores": capacity["cpu_nanocores"],
+            "memory_usage_bytes": observed["memory_bytes"],
+            "memory_allocatable_bytes": capacity["memory_bytes"],
+            "cpu_percent": cpu_percent,
+            "memory_percent": memory_percent,
+            "metrics_timestamp": observed["timestamp"],
+            "metrics_window": observed["window"],
+            "metrics_window_seconds": observed["window_seconds"],
+            "acquisition": {
+                "metrics": copy.deepcopy(metrics_bounds),
+                "allocatable": copy.deepcopy(allocatable_bounds),
+            },
+        })
+    return nodes
 
 
 class Kubectl:
@@ -810,24 +1070,23 @@ class Kubectl:
         return self.run(argv, mutating=True, timeout=timeout)
 
     def top_nodes(self) -> list:
-        result = self.run(["top", "nodes", "--no-headers"])
+        result = self.run(["get", "--raw",
+                           "/apis/metrics.k8s.io/v1beta1/nodes",
+                           "--request-timeout=15s"])
         if result.returncode != 0:
             raise InstrumentationError(
-                f"kubectl top nodes failed: {result.stderr.strip()[:300]}")
-        nodes = []
-        for line in result.stdout.splitlines():
-            parts = line.split()
-            if len(parts) < 5:
-                continue
-            try:
-                nodes.append({"name": parts[0],
-                              "cpu_percent": float(parts[2].rstrip("%")),
-                              "memory_percent": float(parts[4].rstrip("%"))})
-            except ValueError:
-                raise InstrumentationError("invalid kubectl top nodes output") from None
-        if not nodes:
-            raise InstrumentationError("no node metrics returned")
-        return nodes
+                f"metrics-server node read failed: {result.stderr.strip()[:300]}")
+        try:
+            metrics = json.loads(result.stdout)
+        except ValueError:
+            raise InstrumentationError(
+                "metrics-server node read returned invalid JSON") from None
+        allocatable_started = self.clock.now()
+        nodes = self.get("Node")
+        allocatable_finished = self.clock.now()
+        return parse_node_metrics(
+            metrics, nodes, _command_bounds(result),
+            _point_bounds(allocatable_started, allocatable_finished))
 
     def pods(self, namespace) -> list:
         items = self.get("Pod", namespace=namespace) or []
@@ -910,62 +1169,215 @@ def _observation_key(observation: Observation) -> str:
     })
 
 
-def baseline_gate(observation: Observation, arm: str, app: str = DEFAULT_APP) -> None:
+def _baseline_issues(observation: Observation, arm: str,
+                     app: str = DEFAULT_APP) -> list:
+    issues = []
+
+    def add(code, detail, retryable=False):
+        issues.append({"code": code, "detail": detail,
+                       "retryable": retryable})
+
     if not any(key.startswith("ConfigMap/" + CONFIG_PREFIX)
                for key in observation.resources):
-        raise BaselineError("generated invenio-app-config ConfigMap is missing")
+        add("missing_configmap",
+            "generated invenio-app-config ConfigMap is missing")
     if "Deployment/" + WEB_DEPLOYMENT not in observation.resources:
-        raise BaselineError("invenio-web Deployment is missing")
+        add("missing_deployment", "invenio-web Deployment is missing")
     if "SealedSecret/" + SEALED_SECRET not in observation.resources:
-        raise BaselineError("invenio-app-secrets SealedSecret is missing")
-    sealed = observation.resources["SealedSecret/" + SEALED_SECRET]
-    if sealed["fields"].get("/metadata/annotations/" + DRIFT_ANNOTATION) is not None:
-        raise BaselineError("drift annotation is already present on SealedSecret")
+        add("missing_sealed_secret",
+            "invenio-app-secrets SealedSecret is missing")
+    else:
+        sealed = observation.resources["SealedSecret/" + SEALED_SECRET]
+        if sealed["fields"].get(
+                "/metadata/annotations/" + DRIFT_ANNOTATION) is not None:
+            add("contamination",
+                "drift annotation is already present on SealedSecret")
     if "Service/" + WEB_SERVICE not in observation.resources:
-        raise BaselineError("invenio-web Service is missing")
-    if observation.hpa is None:
-        raise BaselineError("invenio-web-hpa is missing")
-    if observation.hpa.get("target") != "Deployment/" + WEB_DEPLOYMENT:
-        raise BaselineError("HPA does not target invenio-web")
-    if not hpa_settled(observation.hpa):
-        raise BaselineError("HPA is not settled at baseline")
+        add("missing_service", "invenio-web Service is missing")
+    if not isinstance(observation.hpa, dict):
+        add("missing_hpa", "invenio-web-hpa is missing")
+    else:
+        if observation.hpa.get("target") != "Deployment/" + WEB_DEPLOYMENT:
+            add("hpa_target", "HPA does not target invenio-web")
+        elif not hpa_telemetry_valid(observation.hpa):
+            raise InstrumentationError("HPA telemetry is malformed")
+        elif not hpa_settled(observation.hpa):
+            add("hpa_settling", "HPA is not settled at baseline",
+                retryable=True)
     if observation.extra_resources:
-        raise BaselineError("quarantine resources exist before the run")
+        add("quarantine_preexisting",
+            "quarantine resources exist before the run")
     if not observation.pods:
-        raise BaselineError("no pods observed")
+        add("pod_readiness", "no pods observed", retryable=True)
     for pod in observation.pods:
+        if not isinstance(pod, dict):
+            raise InstrumentationError("pod telemetry is malformed")
         if pod.get("phase") != "Running" or pod.get("ready") is not True:
-            raise BaselineError(
-                f"pod {pod.get('name')} is not Running and Ready")
+            add("pod_readiness",
+                f"pod {pod.get('name')} is not Running and Ready",
+                retryable=True)
     if not observation.nodes:
-        raise BaselineError("no node metrics observed")
+        add("missing_node_metrics", "no node metrics observed")
     for node in observation.nodes:
+        if not isinstance(node, dict):
+            raise InstrumentationError("node telemetry is malformed")
+        name = node.get("name")
         for metric in ("cpu_percent", "memory_percent"):
-            if node.get(metric) is None or node[metric] >= 70:
-                raise BaselineError(f"node {node.get('name')} {metric} >= 70%")
+            value = node.get(metric)
+            finite = (type(value) is int
+                      or (type(value) is float and math.isfinite(value)))
+            if not finite or value < 0:
+                raise InstrumentationError(
+                    f"node {name} {metric} is not a finite percentage")
+            if value >= 70:
+                add("capacity",
+                    f"node {name} {metric} >= 70%", retryable=True)
     if arm == "gitops":
         for name in (APP_OF_APPS, app):
             state = observation.argo.get(name) or {}
             if state.get("sync") != "Synced" or state.get("health") != "Healthy":
-                raise BaselineError(
+                add("argo_state",
                     f"Argo Application {name} is not Synced/Healthy")
+    return issues
+
+
+def baseline_gate(observation: Observation, arm: str,
+                  app: str = DEFAULT_APP) -> None:
+    issues = _baseline_issues(observation, arm, app)
+    if issues:
+        fatal = [issue for issue in issues if not issue["retryable"]]
+        raise BaselineError((fatal or issues)[0]["detail"])
+
+
+def _readiness_record(observation: Observation, issues: list, kind: str) -> dict:
+    return {
+        "kind": kind,
+        "at": _point_dict(observation.at),
+        "acquisition": copy.deepcopy(observation.acquisition),
+        "reason": issues[0]["code"],
+        "detail": issues[0]["detail"],
+        "reasons": copy.deepcopy(issues),
+        "pods": copy.deepcopy(observation.pods),
+        "nodes": copy.deepcopy(observation.nodes),
+        "hpa": copy.deepcopy(observation.hpa),
+        "argo": copy.deepcopy(observation.argo),
+        "extra_resources": copy.deepcopy(observation.extra_resources),
+    }
+
+
+def _raise_readiness(error, failures):
+    error.readiness_failures = failures
+    raise error
+
+
+def _instrumentation_record(error, started, finished, observation=None) -> dict:
+    record = {
+        "kind": "instrumentation_failure",
+        "at": _point_dict(started),
+        "acquisition": {"snapshot": _point_bounds(started, finished)},
+        "reason": "instrumentation_failure",
+        "detail": str(error),
+        "reasons": [{"code": "instrumentation_failure",
+                     "detail": str(error), "retryable": False}],
+        "pods": [],
+        "nodes": [],
+        "hpa": None,
+        "argo": {},
+        "extra_resources": [],
+    }
+    if observation is not None:
+        record.update({
+            "at": _point_dict(observation.at),
+            "pods": copy.deepcopy(observation.pods),
+            "nodes": copy.deepcopy(observation.nodes),
+            "hpa": copy.deepcopy(observation.hpa),
+            "argo": copy.deepcopy(observation.argo),
+            "extra_resources": copy.deepcopy(observation.extra_resources),
+        })
+        acquisition = copy.deepcopy(observation.acquisition)
+        if acquisition:
+            record["acquisition"] = acquisition
+    return record
 
 
 def stabilize_baseline(snapshotter, kubectl, arm, timeout, interval,
                        clock, sleep=time.sleep, app=DEFAULT_APP) -> Observation:
     deadline = clock.now().mono + timeout
-    previous = None
+    previous_key = None
+    failures = []
+    attempted = False
     while True:
-        observation = snapshotter.capture()
-        observation.pods = kubectl.pods(snapshotter.namespace)
-        observation.nodes = kubectl.top_nodes()
-        baseline_gate(observation, arm, app)
-        if previous and _observation_key(previous) == _observation_key(observation):
+        if attempted and clock.now().mono >= deadline:
+            _raise_readiness(BaselineError(
+                f"baseline did not stabilize within {timeout}s"), failures)
+        attempted = True
+        started = clock.now()
+        observation = None
+        pods_started = None
+        nodes_started = None
+        try:
+            observation = snapshotter.capture()
+            captured = clock.now()
+            observation.acquisition = {
+                "snapshot": _point_bounds(started, captured),
+            }
+            pods_started = clock.now()
+            observation.pods = kubectl.pods(snapshotter.namespace)
+            pods_finished = clock.now()
+            observation.acquisition["pods"] = _point_bounds(
+                pods_started, pods_finished)
+            nodes_started = clock.now()
+            observation.nodes = kubectl.top_nodes()
+            nodes_finished = clock.now()
+            observation.acquisition["nodes"] = _point_bounds(
+                nodes_started, nodes_finished)
+            issues = _baseline_issues(observation, arm, app)
+        except InstrumentationError as error:
+            finished = clock.now()
+            if observation is not None:
+                if pods_started is not None and "pods" not in observation.acquisition:
+                    observation.acquisition["pods"] = _point_bounds(
+                        pods_started, finished)
+                elif (nodes_started is not None
+                      and "nodes" not in observation.acquisition):
+                    observation.acquisition["nodes"] = _point_bounds(
+                        nodes_started, finished)
+            failures.append(_instrumentation_record(
+                error, started, finished, observation))
+            _raise_readiness(error, failures)
+        now = clock.now().mono
+        if issues:
+            previous_key = None
+            failures.append(_readiness_record(observation, issues, "gate"))
+            fatal = [issue for issue in issues if not issue["retryable"]]
+            if fatal:
+                _raise_readiness(BaselineError(fatal[0]["detail"]), failures)
+            if now >= deadline:
+                _raise_readiness(BaselineError(
+                    f"baseline not ready within {timeout}s: "
+                    + "; ".join(issue["detail"] for issue in issues)), failures)
+            sleep(min(interval, deadline - now))
+            continue
+        key = _observation_key(observation)
+        if now >= deadline:
+            failures.append(_readiness_record(observation, [{
+                "code": "deadline",
+                "detail": "baseline read crossed the settling deadline",
+                "retryable": True,
+            }], "deadline"))
+            _raise_readiness(BaselineError(
+                f"baseline did not stabilize within {timeout}s"), failures)
+        if previous_key == key:
+            observation.readiness_failures = failures
             return observation
-        previous = observation
-        if clock.now().mono >= deadline:
-            raise BaselineError("two consecutive baseline reads did not match")
-        sleep(interval)
+        if previous_key is not None:
+            failures.append(_readiness_record(observation, [{
+                "code": "unmatched_read",
+                "detail": "baseline read did not match the previous read",
+                "retryable": True,
+            }], "unmatched"))
+        previous_key = key
+        sleep(min(interval, deadline - now))
 
 
 class ArmController:
@@ -1877,6 +2289,7 @@ class LiveRunner:
         timeline = None
         contract = None
         baseline = None
+        readiness_failures = []
         samples = []
         imperative = None
         collector_evidence_at = None
@@ -1897,6 +2310,7 @@ class LiveRunner:
             baseline = stabilize_baseline(
                 snapshotter, self.kubectl, args.arm, args.baseline_timeout,
                 args.sample_interval, self.clock, app=args.app)
+            readiness_failures = list(baseline.readiness_failures)
             contract = build_contract(
                 baseline, args.namespace, self.quarantine,
                 source_revision=args.source_revision,
@@ -1981,6 +2395,8 @@ class LiveRunner:
                     app=args.app)
         except HarnessError as error:
             failure = error
+            readiness_failures = list(getattr(
+                error, "readiness_failures", readiness_failures))
             injection = getattr(error, "injection", injection)
             if arm_evidence is None and arm_controller.original:
                 arm_evidence = ArmEvidence(
@@ -2051,6 +2467,8 @@ class LiveRunner:
         if baseline:
             evidence["baseline"] = {
                 "at": _point_dict(baseline.at),
+                "acquisition": baseline.acquisition,
+                "readiness_failures": baseline.readiness_failures,
                 "resources": {key: {"fields": value.get("fields"),
                                     "manifest": value.get("manifest")}
                               for key, value in baseline.resources.items()},
@@ -2058,6 +2476,8 @@ class LiveRunner:
                 "pods": baseline.pods, "nodes": baseline.nodes,
                 "extra_resources": baseline.extra_resources,
             }
+        if readiness_failures:
+            evidence["readiness"] = readiness_failures
         evidence["samples"] = [{
             "at": _point_dict(sample.at),
             "resources": {key: value.get("fields")

@@ -72,6 +72,17 @@ DEFAULT_ALPHA = 0.05
 BATCH_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
 REVISION = re.compile(r"[0-9a-f]{40}")
 RENDER = re.compile(r"[0-9a-f]{64}")
+RETRY_SUFFIX = re.compile(r"retry([1-9][0-9]*)")
+ATTEMPT_FIELDS = ("batch_attempt", "batch_retry_of")
+RAW_ANALYSIS_FIELDS = (
+    "batch_phase", "batch_mode", "source_revision", "render_sha256",
+    "censor_seconds", "analysis_group", "efficacy_eligible", "synthetic",
+    "formal_execution_approved", "stack_isolated", "r3_status",
+    "r1_baseline", "r1_first", "r1_last",
+    "detection_seconds", "detection_status",
+    "evidence_seconds", "evidence_status",
+    "recovery_seconds", "recovery_status",
+)
 
 REQUIRED_FIELDS = frozenset({
     "schema_version", "run_id", "batch_id", "batch_phase", "batch_mode",
@@ -132,6 +143,40 @@ def _validate_metric(row, metric):
                  f"{metric}_seconds must be null when right_censored")
 
 
+def _run_attempt(row, label, base_run_id):
+    """Attempt number encoded by the run id; retries use `-retry<N>`."""
+    run_id = row["run_id"]
+    if run_id == base_run_id:
+        return 0
+    prefix = base_run_id + "-"
+    _require(run_id.startswith(prefix),
+             f"{label} has run_id/identity mismatch")
+    match = RETRY_SUFFIX.fullmatch(run_id[len(prefix):])
+    _require(match is not None, f"{label} has malformed retry suffix")
+    return int(match.group(1))
+
+
+def _validate_attempt_metadata(row, label, base_run_id, attempt):
+    """Check optional attempt fields; legacy unsuffixed rows omit them."""
+    present = [field for field in ATTEMPT_FIELDS if field in row]
+    _require(len(present) in (0, 2),
+             f"{label} has incomplete attempt metadata")
+    if not present:
+        _require(attempt == 0,
+                 f"{label} retry lacks batch_attempt/batch_retry_of")
+        return
+    value = row["batch_attempt"]
+    _require(type(value) is int and value >= 0,
+             f"{label} has invalid batch_attempt")
+    retry_of = row["batch_retry_of"]
+    if value == 0:
+        _require(retry_of is None, f"{label} has invalid batch_retry_of")
+    else:
+        _require(retry_of == base_run_id,
+                 f"{label} has mismatched batch_retry_of")
+    _require(value == attempt, f"{label} has inconsistent retry suffix")
+
+
 def validate_rows(rows):
     """Validate one batch analysis dataset; raise on any inconsistency."""
     _require(isinstance(rows, list) and rows, "dataset must be a non-empty list")
@@ -178,8 +223,9 @@ def validate_rows(rows):
         batch_id = row["batch_id"]
         _require(isinstance(batch_id, str) and BATCH_ID.fullmatch(batch_id),
                  f"row {index} has invalid batch_id")
-        _require(run_id == f"{batch_id}-{arm}-{scenario}-r{rep:02d}",
-                 f"row {index} has run_id/identity mismatch")
+        base_run_id = f"{batch_id}-{arm}-{scenario}-r{rep:02d}"
+        attempt = _run_attempt(row, f"row {index}", base_run_id)
+        _validate_attempt_metadata(row, f"row {index}", base_run_id, attempt)
         _require(REVISION.fullmatch(str(row["source_revision"])),
                  f"row {index} has invalid source_revision")
         _require(RENDER.fullmatch(str(row["render_sha256"])),
@@ -652,6 +698,85 @@ def _classify_raw(row):
     return None
 
 
+def _raw_identity(row, index, batch_id):
+    """Return the raw row's cell and attempt, validated against its run id."""
+    arm = row.get("arm")
+    _require(isinstance(arm, str) and arm in ARM_ENV,
+             f"raw row {index} has invalid arm")
+    scenario = row.get("scenario")
+    _require(scenario in SCENARIOS, f"raw row {index} has invalid scenario")
+    rep = row.get("rep")
+    _require(type(rep) is int and 1 <= rep <= 15,
+             f"raw row {index} has invalid rep")
+    base_run_id = f"{batch_id}-{arm}-{scenario}-r{rep:02d}"
+    attempt = _run_attempt(row, f"raw row {index}", base_run_id)
+    _validate_attempt_metadata(row, f"raw row {index}", base_run_id, attempt)
+    return (arm, scenario, rep), attempt
+
+
+def _validate_analyzed_raw(raw, analysis, index):
+    """Reject raw evidence that disagrees with its analyzed run."""
+    for field in RAW_ANALYSIS_FIELDS:
+        if field in raw:
+            _require(raw[field] == analysis[field],
+                     f"raw row {index} {field} disagrees with analysis row")
+    if "env" in raw:
+        raw_env = raw["env"]
+        _require(isinstance(raw_env, str),
+                 f"raw row {index} has invalid env")
+        _require(ARM_ENV.get(raw_env, raw_env) == analysis["env"],
+                 f"raw row {index} env disagrees with analysis row")
+    for label, row in ((f"raw row {index}", raw),
+                       (f"analysis row {index}", analysis)):
+        for field, expected in (("cleanup_status", "ok"),
+                                ("arm_restore_status", "restored")):
+            if field in row:
+                _require(row[field] == expected,
+                         f"{label} has failed {field}")
+        if "postcondition" in row:
+            postcondition = row["postcondition"]
+            _require(isinstance(postcondition, dict)
+                     and postcondition.get("verified") is True,
+                     f"{label} postcondition is not verified")
+        for field in ("batch_stop_reason", "error"):
+            if field in row:
+                _require(not row[field], f"{label} has {field}")
+
+
+def _raw_retry_violation(predecessor):
+    """Mirror the runner's pre-injection baseline retry policy."""
+    if predecessor.get("status") != "baseline_failure":
+        return "predecessor_not_baseline_failure"
+    if predecessor.get("t0_utc") is not None:
+        return "predecessor_started_injection"
+    injection = predecessor.get("injection")
+    if isinstance(injection, dict) and injection.get("accepted") is not False:
+        return "predecessor_injection_not_rejected"
+    if predecessor.get("cleanup_status") not in (None, "ok"):
+        return "predecessor_cleanup_not_ok"
+    if predecessor.get("arm_restore_status") not in (None, "restored"):
+        return "predecessor_arm_not_restored"
+    if predecessor.get("mutations_executed") not in (None, 0):
+        return "predecessor_mutated"
+    return None
+
+
+def _validate_raw_chain(cells):
+    """Each attempt after 0 must follow one retryable baseline failure."""
+    for cell, attempts in cells.items():
+        attempts.sort(key=lambda item: item[0])
+        numbers = [item[0] for item in attempts]
+        _require(numbers == list(range(len(numbers))),
+                 f"raw rows for cell {cell} have a broken attempt chain")
+        for position in range(1, len(attempts)):
+            _, predecessor, _ = attempts[position - 1]
+            _, _, index = attempts[position]
+            reason = _raw_retry_violation(predecessor)
+            _require(reason is None,
+                     f"raw row {index} has a retry chain that violates the "
+                     f"baseline retry policy ({reason})")
+
+
 def _exclusions(rows, raw_rows):
     if raw_rows is None:
         return {"source": "not_provided", "raw_rows": None, "count": None,
@@ -659,7 +784,9 @@ def _exclusions(rows, raw_rows):
     _require(isinstance(raw_rows, list) and raw_rows,
              "rows.jsonl must contain at least one row")
     batch_id = rows[0]["batch_id"]
+    analyzed = {row["run_id"]: row for row in rows}
     raw_ids = []
+    cells = {}
     for index, row in enumerate(raw_rows, 1):
         _require(isinstance(row, dict), f"raw row {index} is not an object")
         run_id = row.get("run_id")
@@ -667,10 +794,16 @@ def _exclusions(rows, raw_rows):
                  f"raw row {index} has invalid run_id")
         _require(row.get("batch_id") == batch_id,
                  f"raw row {index} belongs to another batch")
+        cell, attempt = _raw_identity(row, index, batch_id)
+        if run_id in analyzed:
+            _require(row.get("status") == analyzed[run_id]["status"],
+                     f"raw row {index} status disagrees with analysis row")
+            _validate_analyzed_raw(row, analyzed[run_id], index)
         raw_ids.append(run_id)
+        cells.setdefault(cell, []).append((attempt, row, index))
     _require(len(raw_ids) == len(set(raw_ids)), "rows.jsonl repeats a run_id")
-    analyzed = {row["run_id"] for row in rows}
-    _require(not (analyzed - set(raw_ids)),
+    _validate_raw_chain(cells)
+    _require(not (set(analyzed) - set(raw_ids)),
              "rows.jsonl is missing analyzed runs")
     excluded = []
     for row in raw_rows:

@@ -1,10 +1,13 @@
 # Harness eksperimen live InvenioRDM
 
 **Status: implementasi offline-tested, dry-run default.** Dokumen ini bukan izin
-eksekusi. Tidak ada run klaster yang dilakukan saat harness ini dibuat. Seluruh
-gerbang formal pada `experiments/LIVE-OBSERVER.md` dan Bab III tetap berlaku;
-uji offline tidak membuktikan klaster, seed, audit, kapasitas, atau metode siap.
-Orkestrator batch 210 run (`run_matrix.py`) juga belum dijalankan pada klaster.
+eksekusi. Pilot terbatas 27 Oktober 2026 berhasil dan tetap bukti pilot, bukan
+data formal. Percobaan formal yang tidak lengkap dihentikan; tidak ada
+peluncuran formal baru yang disetujui. Perubahan ini tidak menjalankan klaster.
+Gerbang formal yang tersisa pada `experiments/LIVE-OBSERVER.md` dan Bab III tetap
+berlaku; uji offline tidak membuktikan klaster, seed, kapasitas, recovery, atau
+metode siap. Batch formal 210 run (`run_matrix.py`) belum diselesaikan pada
+klaster.
 
 Harness menargetkan **satu stack InvenioRDM nyata**:
 
@@ -139,9 +142,11 @@ memori 70%. Dua knob berikut menjaga kapasitas tanpa mengubah protokol statistik
   restore, atau arm state **tidak pernah** di-retry.
 
 Cooldown dan retry **tidak** melonggarkan gate kapasitas: `baseline_gate`
-tetap otoritatif dan tetap menolak node memory >= 70%, HPA yang belum settled,
-pod yang belum Running/Ready, atau baseline yang tidak stabil. HPA min/max dan
-resource request tidak diubah siapa pun.
+tetap otoritatif. Pod yang belum Running/Ready, HPA yang belum settle, dan node
+dengan CPU atau memori valid >= 70% ditunggu sampai `--baseline-timeout`; objek
+wajib yang hilang, target HPA yang salah, karantina/kontaminasi, atau telemetri
+yang tidak valid/tidak lengkap menghentikan run segera. HPA min/max dan resource
+request tidak diubah siapa pun.
 
 Retry adalah artefak pemulihan protokol, **bukan sampel tambahan**. Rencana
 tetap 210 sel; `analysis.jsonl` memakai attempt terakhir tiap sel, sehingga satu
@@ -178,10 +183,10 @@ Syarat `--live` bersifat fail-closed:
    Application tidak menunjuk namespace target, atau bila namespace karantina
    sudah ada.
 
-> Namespace produksi `invenio` secara teknis diizinkan oleh guard untuk
-> kalibrasi/inspeksi, tetapi **bukan** lingkungan formal. Bab III mewajibkan
-> namespace eksperimen terpisah dan salinan stack yang setara. Jangan menjalankan
-> blok formal di `invenio`.
+> Namespace `invenio` adalah satu-satunya stack nyata yang dipilih untuk desain
+> satu stack berurutan. Izin guard bukan sertifikasi kesiapan formal: eksekusi
+> tetap menunggu gerbang pada `experiments/LIVE-OBSERVER.md`, pembekuan,
+> persetujuan pembimbing, kapasitas, seed, dan reset yang terverifikasi.
 
 ## Prosedur dua lengan berurutan
 
@@ -262,6 +267,41 @@ perubahan pengendali.
 - Secret hanya dibandingkan sebagai keberadaan/anotasi metadata; nilai
   `Secret`/`SealedSecret` tidak pernah masuk bukti.
 
+### Baseline readiness, node, dan batas waktu
+
+- `stabilize_baseline()` membaca snapshot, pod, lalu node secara berurutan.
+  Hanya kegagalan sementara berikut yang ditunggu sampai `--baseline-timeout`:
+  pod belum Running/Ready, HPA belum settle, dan node dengan persentase valid
+  >= 70%. Setiap penolakan mereset riwayat dua pembacaan yang cocok.
+  Objek wajib hilang, target HPA salah, karantina/kontaminasi, dan telemetri
+  tidak valid/tidak lengkap langsung gagal tertutup.
+- Dua pembacaan konfigurasi yang berurutan dan cocok adalah kriteria penerimaan
+  di bawah timeout, **bukan** klaim periode hening panjang. Deadline diperiksa
+  sebelum keberhasilan diterima, dan tidur dibatasi sisa anggaran waktu.
+- Setiap observasi readiness yang ditolak disimpan di `readiness.json` beserta
+  alasan, waktu, batas akuisisi, pod, node, HPA, status Argo, dan objek karantina.
+  Berkas ini tetap ditulis saat baseline gagal, termasuk ketika `baseline.json`
+  bernilai `null`; snapshot resource tidak disalin agar Secret/SealedSecret
+  tidak bocor.
+- `baseline.json.acquisition` mencatat awal/akhir pembacaan snapshot, pod, dan
+  node. `at` adalah awal snapshot, bukan satu instan tunggal; pembacaan
+  berurutan dapat memakan waktu dan tidak boleh ditafsirkan sebagai pengukuran
+  serentak.
+- Node diambil dari API metrics-server mentah
+  (`/apis/metrics.k8s.io/v1beta1/nodes`) dan `Node.status.allocatable`, bukan
+  `kubectl top nodes` yang dibulatkan. Setiap node menyimpan kuantitas mentah
+  (`cpu_usage`, `memory_usage`, `cpu_allocatable`, `memory_allocatable`), nilai
+  eksak (`cpu_*_nanocores`, `memory_*_bytes`), `cpu_percent`/`memory_percent`,
+  `metrics_timestamp`, `metrics_window`, dan batas akuisisi kedua pembacaan.
+  Memori berarti working set metrics-server dibagi allocatable.
+- Cakupan node harus sama antara metrics-server dan inventaris `Node`; nama
+  duplikat, node hilang/berlebih, kuantitas tidak valid, timestamp/window tidak
+  valid, atau penyebut nol/non-positif adalah `InstrumentationError`. Tidak ada
+  fallback ke CLI bulat atau MemAvailable host.
+- Kebaruan timestamp hanya dicatat, bukan diuji terhadap ambang baru. Protokol
+  tidak menetapkan ambang freshness numerik; menambahkannya memerlukan keputusan
+  metode terlebih dahulu.
+
 ## Keluaran dan bukti
 
 `<out>/<run_id>.jsonl` — satu baris hasil; `<out>/<run_id>.csv` — kolom analisis.
@@ -269,7 +309,8 @@ Direktori `<out>/<run_id>/` menyimpan:
 
 | Berkas | Isi |
 |---|---|
-| `baseline.json` | snapshot baseline tersanitasi, HPA, pod/node |
+| `baseline.json` | snapshot baseline tersanitasi, HPA, pod/node, batas akuisisi; `null` bila baseline gagal |
+| `readiness.json` | observasi gate baseline yang ditolak: alasan, waktu, batas akuisisi, pod/node/HPA/Argo tanpa resource/Secret |
 | `contract.json` | kontrak inventory/bidang, `baseline_sha256`, revisi/render |
 | `samples.jsonl` | setiap sampel: resource fields, HPA, status Argo, ekstra |
 | `injection.json` | `t0`/`t_a`/verifikasi, bidang berubah, perintah |
@@ -368,12 +409,13 @@ ada, bukan bukti izin formal, bukan pembuatan lingkungan terisolasi, dan bukan
 pengukuran R3. Konsekuensinya tetap:
 
 - `stack_isolated: false` — hanya satu stack; tidak ada pasangan A/B terisolasi.
-- `r3_status: not_measured` — audit API belum tersedia; atribusi pelaku tidak
+- `r3_status: not_measured` — R3 dikecualikan/ditunda; atribusi pelaku tidak
   dapat dinilai.
 - `formal_execution_approved: true` hanya jika `--production-like` diberikan
   bersamaan dengan `--live`; dry-run dengan flag itu ditolak.
-- Flag tidak menutup gate seed, kapasitas, NTP, audit, render, atau persetujuan
-  pembimbing. Ia juga tidak mengubah run gagal menjadi data yang layak analisis.
+- Flag tidak menutup gate seed, kapasitas, NTP, render, atau persetujuan
+  pembimbing; R3 tetap `not_measured` dan audit tidak diminta pada gelombang ini.
+  Ia juga tidak mengubah run gagal menjadi data yang layak analisis.
 
 Tanpa flag, seluruh baris batch dan manifest tetap `formal_execution_approved:
 false`. Jangan menyalin metadata batch ke baris mentah harness atau menganggap
@@ -381,13 +423,17 @@ dry-run sebagai observasi.
 
 ## Gerbang formal yang belum tertutup
 
-1. **Namespace eksperimen**: stack `invenio` produksi belum disalin ke namespace
-   `exp-*`; dua lingkungan A/B nyata belum tersedia.
-2. **Audit API**: belum ada bukti audit; unsur pelaku R3 tetap
-   `tidak dapat dinilai`.
-3. **Salinan seed per lengan**: seed `4ben9-bgh38` adalah draf produksi; salinan
-   di namespace eksperimen beserta SHA-256 belum diverifikasi. Verifikasi seed
-   harness memakai token dan gagal tertutup, tetapi tidak menciptakan salinan.
+1. **Kesiapan formal satu stack**: stack `invenio` adalah satu-satunya stack
+   nyata pada arah desain satu stack berurutan. Ketersediaannya di guard tidak
+   otomatis mensertifikasi kesiapan formal; izin, pembekuan, kapasitas, bukti
+   seed/recovery yang tersisa, dan bukti pendukung tetap harus ditutup.
+2. **Audit API/R3 (dikecualikan)**: R3 tetap `not_measured`; audit API
+   dikecualikan/ditunda dan bukan gerbang atau syarat mengaktifkan audit pada
+   gelombang ini. Unsur pelaku tetap tidak dapat dinilai.
+3. **Seed dan reset**: unggah/unduh seed serta reset/pembersihan orphan telah
+   diverifikasi terpisah. Yang masih belum terbukti adalah pemulihan
+   database/berkas terisolasi pasca-seed pada stack nyata; verifikasi seed
+   harness memakai token dan gagal tertutup, tetapi tidak memulihkan data.
 4. **Versi runtime**: ArgoCD, CNPG, OpenSearch, MinIO, dan chart belum dibekukan
    pada revisi yang benar-benar berjalan.
 5. **Render dan revisi**: `--source-revision`/`--render-sha256` harus berasal dari
@@ -396,8 +442,11 @@ dry-run sebagai observasi.
    kontrol HPA, keluarga uji, dan penanganan data tersensor.
 7. **Kapasitas, NTP, SMTP, HA OpenSearch**: bukti jendela beban, sinkronisasi jam,
    relay email, dan HA belum ada; tidak boleh menjadi prasyarat diam-diam.
-8. **Pilot tak terukur**: belum ada run live yang ditinjau; harness ini belum
-   diuji pada klaster.
+8. **Pilot 27 Oktober dan percobaan formal yang dihentikan**: pilot terbatas
+   27 Oktober 2026 berhasil dan tetap bukti pilot, bukan data formal. Percobaan
+   formal yang tidak lengkap dihentikan dan bukan hasil; belum ada run formal
+   lengkap yang ditinjau. Tidak ada peluncuran formal baru yang disetujui, dan
+   harness belum terbukti siap untuk eksekusi formal.
 
 ## Keselamatan dan pengujian
 

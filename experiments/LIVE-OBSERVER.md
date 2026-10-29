@@ -4,7 +4,8 @@
 merinci observer/kolektor pasif untuk kedua mode pada Bab III. Tidak ada klaim
 hasil formal dalam dokumen ini. Eksperimen formal belum disetujui; seluruh
 gerbang pada Bab III tetap berlaku. Pilot terbatas pada 27 Oktober 2026 memakai
-stack yang sama dan merupakan bukti pilot, bukan data formal.
+stack yang sama dan merupakan bukti pilot; percobaan yang dihentikan tetap
+berstatus dihentikan dan bukan data formal.
 
 ## Ruang lingkup dan desain
 
@@ -73,9 +74,12 @@ menggagalkan run; jangan memulai injeksi.
 3. Konfigurasi, Secret, dan antrean kembali ke acuan; HPA berada pada keadaan
    normal; semua pod layanan Running dan Ready.
 4. Dua pembacaan lengkap yang berurutan cocok. Rollout sehat saja bukan bukti
-   reset.
-5. CPU dan memori setiap node di bawah 70% (working set metrics-server dibagi
-   allocatable), dengan jendela pengamatan yang dicatat.
+   reset, dan dua pembacaan yang cocok adalah kriteria berurutan di bawah
+   timeout, bukan klaim periode hening panjang.
+5. CPU dan memori setiap node di bawah 70%, dihitung dari usage metrics-server
+   mentah (CPU; working set untuk memori) dibagi `Node.status.allocatable`,
+   dengan timestamp dan window per node. `kubectl top nodes` yang dibulatkan
+   bukan sumber pengukuran.
 6. Jam host pencatat tersinkronisasi dan kolektor aktif sebelum injeksi.
 7. Revisi sumber, SHA-256 render, image digest, dan versi runtime telah
    dibekukan. Nilai yang direkonstruksi setelah hasil terlihat ditolak.
@@ -153,6 +157,7 @@ penyebab kausal.
 | Snapshot manifest | Objek sebelum dan sesudah, bidang terpilih | `kubectl get -o yaml` | Hapus `managedFields`, `resourceVersion`, status server, dan nilai Secret |
 | Alert | Nama alert, `startsAt`, label, fingerprint | Alertmanager/Grafana | Jangan hanya menyalin teks pesan |
 | HPA | Target, replika aktual, event, kondisi | `kubectl -n invenio get hpa -o yaml`, event | Terpisah dari R1 statis |
+| Baseline readiness | Alasan penolakan, waktu, batas akuisisi, pod/node/HPA/Argo, tanpa resource/Secret | Harness | `readiness.json`; dipertahankan saat baseline gagal |
 | Seed dan reset | ID draf, ukuran dan SHA-256 berkas, jumlah record/berkas, status antrean/index | Invenio dan `kubectl` | Seed tidak boleh diubah |
 | Log kolektor | Interval aktual, jeda polling, kegagalan baca, versi kolektor | Kolektor | Di-hash setelah run |
 
@@ -206,6 +211,14 @@ pekerjaan lanjutan setelah audit diaktifkan.
   deteksi nol.
 - Kegagalan pembacaan API atau kolektor adalah `instrumentation_failure`, bukan
   deteksi yang terlewat.
+- Kegagalan baseline sementara (pod belum Ready, HPA belum settle, kapasitas
+  valid >= 70%) ditunggu hanya sampai batas `--baseline-timeout`; kegagalan
+  fatal dan telemetri tidak valid langsung menghentikan run. Setiap observasi
+  yang ditolak dipertahankan di `readiness.json` dengan alasan dan waktu, juga
+  saat `baseline.json` tidak berisi snapshot.
+- Snapshot baseline membaca snapshot, pod, dan node secara berurutan; `at`
+  adalah awal pembacaan, bukan satu instan. Batas awal/akhir dan timestamp/window
+  metrics-server dicatat. Tidak ada ambang freshness baru tanpa keputusan metode.
 - Tidak ada sinyal sampai batas pengamatan adalah `right_censored` dengan batas
   waktu; waktu hilang tetap kosong.
 - Pemulihan yang gagal atau reset yang gagal dicatat sebagai kegagalan, bukan

@@ -27,10 +27,11 @@ def point(mono, utc="2026-10-27T00:00:00+00:00"):
     return harness.Point(mono=mono, utc=utc)
 
 
-def result(argv=None, code=0, stdout="", stderr=""):
+def result(argv=None, code=0, stdout="", stderr="", started=None, finished=None):
     return harness.CommandResult(
         argv=argv or ["kubectl"], returncode=code, stdout=stdout,
-        stderr=stderr, started=point(0), finished=point(0),
+        stderr=stderr, started=started or point(0),
+        finished=finished or point(0),
     )
 
 
@@ -197,6 +198,39 @@ def contract(obs=None):
         obs, namespace="invenio", quarantine_namespace="exp-invenio-drift",
         source_revision="b" * 40, render_sha256="c" * 64,
     )
+
+
+def node_object(name, cpu="4", memory="8Gi"):
+    return {
+        "apiVersion": "v1",
+        "kind": "Node",
+        "metadata": {"name": name},
+        "status": {"allocatable": {"cpu": cpu, "memory": memory}},
+    }
+
+
+def node_metric(name, cpu="500m", memory="1Gi",
+                timestamp="2026-10-27T00:00:00Z", window="30s"):
+    return {
+        "metadata": {"name": name},
+        "timestamp": timestamp,
+        "window": window,
+        "usage": {"cpu": cpu, "memory": memory},
+    }
+
+
+def node_metrics(*items):
+    return {"kind": "NodeMetricsList", "apiVersion": "metrics.k8s.io/v1beta1",
+            "items": list(items)}
+
+
+def node_inventory(*items):
+    return {"kind": "List", "apiVersion": "v1", "items": list(items)}
+
+
+READY_POD = {"name": "invenio-web-1", "phase": "Running", "ready": True}
+UNREADY_POD = {"name": "invenio-web-1", "phase": "Running", "ready": False}
+DEFAULT_NODES = [{"name": "worker-01", "cpu_percent": 10, "memory_percent": 20}]
 
 
 def injection(started=100.0, ack=100.1, verified=100.2, accepted=True,
@@ -499,6 +533,406 @@ class ContractTests(unittest.TestCase):
         obs = observation(extras=["exp-invenio-drift/Deployment/invenio-web"])
         self.assertEqual(harness.score(spec, obs), 100)
         self.assertTrue(obs.extra_resources)
+
+
+class NodeMetricsTests(unittest.TestCase):
+    def read(self, responses):
+        kubectl = harness.Kubectl(
+            harness.FakeClock([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]), timeout=1)
+        with mock.patch.object(kubectl, "run", side_effect=responses) as run:
+            return kubectl.top_nodes(), run
+
+    def ok(self, metrics, nodes):
+        return self.read([
+            result(stdout=json.dumps(metrics), started=point(10),
+                   finished=point(11)),
+            result(stdout=json.dumps(nodes), started=point(12),
+                   finished=point(13)),
+        ])[0]
+
+    def test_raw_usage_and_allocatable_use_kubernetes_quantity_semantics(self):
+        values, run = self.read([
+            result(stdout=json.dumps(node_metrics(
+                node_metric("worker-01", "250m", "1.5Gi"),
+                node_metric("worker-02", "1500000u", "1536Mi"))),
+                started=point(10), finished=point(11)),
+            result(stdout=json.dumps(node_inventory(
+                node_object("worker-01", "2", "4Gi"),
+                node_object("worker-02", "4", "4Gi"))),
+                started=point(12), finished=point(13)),
+        ])
+        first, second = values
+        self.assertEqual(first["name"], "worker-01")
+        self.assertEqual(first["cpu_usage"], "250m")
+        self.assertEqual(first["memory_usage"], "1.5Gi")
+        self.assertEqual(first["cpu_allocatable"], "2")
+        self.assertEqual(first["memory_allocatable"], "4Gi")
+        self.assertEqual(first["cpu_usage_nanocores"], 250_000_000)
+        self.assertEqual(first["cpu_allocatable_nanocores"], 2_000_000_000)
+        self.assertEqual(first["memory_usage_bytes"], 1_610_612_736)
+        self.assertEqual(first["memory_allocatable_bytes"], 4_294_967_296)
+        self.assertAlmostEqual(first["cpu_percent"], 12.5)
+        self.assertAlmostEqual(first["memory_percent"], 37.5)
+        self.assertEqual(first["metrics_timestamp"], "2026-10-27T00:00:00Z")
+        self.assertEqual(first["metrics_window"], "30s")
+        self.assertEqual(first["metrics_window_seconds"], 30.0)
+        self.assertEqual(first["acquisition"]["metrics"]["started_mono"], 10)
+        self.assertEqual(first["acquisition"]["metrics"]["finished_mono"], 11)
+        self.assertIn("allocatable", first["acquisition"])
+        self.assertEqual(second["cpu_usage_nanocores"], 1_500_000_000)
+        self.assertEqual(second["memory_usage_bytes"], 1_610_612_736)
+        metric_argv = run.call_args_list[0].args[0]
+        self.assertEqual(metric_argv[:3],
+                         ["get", "--raw", "/apis/metrics.k8s.io/v1beta1/nodes"])
+        self.assertNotIn("top", metric_argv)
+
+    def test_fractional_decimal_and_binary_quantities_are_exact(self):
+        values = self.ok(
+            node_metrics(node_metric("worker-01", "1.5", "1.5G")),
+            node_inventory(node_object("worker-01", "2.5", "3Gi")))
+        node = values[0]
+        self.assertEqual(node["cpu_usage_nanocores"], 1_500_000_000)
+        self.assertEqual(node["cpu_allocatable_nanocores"], 2_500_000_000)
+        self.assertEqual(node["memory_usage_bytes"], 1_500_000_000)
+        self.assertEqual(node["memory_allocatable_bytes"], 3_221_225_472)
+        self.assertAlmostEqual(node["cpu_percent"], 60.0)
+        self.assertAlmostEqual(node["memory_percent"], 46.566128730773926)
+
+    def test_missing_invalid_or_duplicate_node_data_fails_closed(self):
+        cases = {
+            "missing node metrics": (
+                node_metrics(node_metric("worker-01")),
+                node_inventory(node_object("worker-01"), node_object("worker-02"))),
+            "unexpected node metrics": (
+                node_metrics(node_metric("worker-01"), node_metric("worker-02")),
+                node_inventory(node_object("worker-01"))),
+            "duplicate metrics": (
+                node_metrics(node_metric("worker-01"), node_metric("worker-01")),
+                node_inventory(node_object("worker-01"))),
+            "duplicate allocatable": (
+                node_metrics(node_metric("worker-01")),
+                node_inventory(node_object("worker-01"),
+                               node_object("worker-01"))),
+            "missing allocatable cpu": (
+                node_metrics(node_metric("worker-01")),
+                node_inventory({"metadata": {"name": "worker-01"}, "status": {
+                    "allocatable": {"memory": "1Gi"}}})),
+            "zero allocatable memory": (
+                node_metrics(node_metric("worker-01")),
+                node_inventory(node_object("worker-01", memory="0"))),
+            "invalid usage quantity": (
+                node_metrics(node_metric("worker-01", cpu="abc")),
+                node_inventory(node_object("worker-01"))),
+            "invalid timestamp": (
+                node_metrics(node_metric("worker-01", timestamp="not-a-time")),
+                node_inventory(node_object("worker-01"))),
+            "invalid window": (
+                node_metrics(node_metric("worker-01", window="soon")),
+                node_inventory(node_object("worker-01"))),
+            "empty metrics": (node_metrics(),
+                              node_inventory(node_object("worker-01"))),
+            "empty inventory": (node_metrics(node_metric("worker-01")),
+                                node_inventory()),
+        }
+        for label, (metrics, nodes) in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(harness.InstrumentationError):
+                    self.ok(metrics, nodes)
+
+    def test_command_and_json_failures_are_instrumentation_errors(self):
+        cases = [
+            [result(code=1, stderr="metrics unavailable")],
+            [result(stdout="{")],
+            [result(stdout=json.dumps(node_metrics(
+                node_metric("worker-01")))), result(code=1, stderr="nodes down")],
+            [result(stdout=json.dumps(node_metrics(
+                node_metric("worker-01")))), result(stdout=json.dumps({}))],
+        ]
+        for responses in cases:
+            with self.subTest(responses=len(responses)):
+                with self.assertRaises(harness.InstrumentationError):
+                    self.read(responses)
+
+    def test_unbounded_quantity_and_duration_arithmetic_fail_closed(self):
+        with self.assertRaises(harness.InstrumentationError):
+            harness._quantity("1e9999999", "review")
+        with self.assertRaises(harness.InstrumentationError):
+            harness._duration_seconds("9" * 400 + "s", "review")
+        cases = {
+            "overflow quantity": (
+                node_metrics(node_metric("worker-01", cpu="1e9999999")),
+                node_inventory(node_object("worker-01"))),
+            "overflow window": (
+                node_metrics(node_metric("worker-01", window="9" * 400 + "s")),
+                node_inventory(node_object("worker-01"))),
+        }
+        for label, (metrics, nodes) in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(harness.InstrumentationError):
+                    self.ok(metrics, nodes)
+
+
+class ReadinessClock:
+    def __init__(self):
+        self.value = 0.0
+        self.sleeps = []
+
+    def now(self):
+        self.value += 0.01
+        return point(self.value)
+
+    def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.value += seconds
+
+    def advance(self, seconds):
+        self.value += seconds
+
+
+class BaselineSnapshotter:
+    def __init__(self, observation_value, clock=None, advance=0.0):
+        self.namespace = "invenio"
+        self.observation = observation_value
+        self.clock = clock
+        self.advance = advance
+        self.calls = 0
+
+    def capture(self):
+        self.calls += 1
+        if self.clock and self.advance:
+            self.clock.advance(self.advance)
+        return copy.deepcopy(self.observation)
+
+
+class BaselineKubectl:
+    def __init__(self, pods=None, nodes=None, node_error=None):
+        self.pod_values = list(pods or [dict(READY_POD)])
+        self.node_values = copy.deepcopy(nodes or DEFAULT_NODES)
+        self.node_error = node_error
+
+    @staticmethod
+    def _take(values):
+        return values.pop(0) if len(values) > 1 else values[0]
+
+    def pods(self, namespace):
+        return [copy.deepcopy(self._take(self.pod_values))]
+
+    def top_nodes(self):
+        if self.node_error is not None:
+            raise self.node_error
+        return [copy.deepcopy(self._take(self.node_values))]
+
+
+class BaselineSequenceSnapshotter:
+    def __init__(self, values):
+        self.namespace = "invenio"
+        self.values = list(values)
+        self.calls = 0
+
+    def capture(self):
+        self.calls += 1
+        value = self.values.pop(0) if len(self.values) > 1 else self.values[0]
+        return copy.deepcopy(value)
+
+
+class BaselineGateTests(unittest.TestCase):
+    def ready_observation(self):
+        obs = observation()
+        obs.pods = [dict(READY_POD)]
+        obs.nodes = copy.deepcopy(DEFAULT_NODES)
+        return obs
+
+    def test_capacity_rejects_both_metrics_at_or_above_seventy(self):
+        cases = [
+            (69.9, 69.9, True),
+            (70.0, 10.0, False),
+            (10.0, 70.0, False),
+            (70.1, 10.0, False),
+            (10.0, 70.1, False),
+        ]
+        for cpu, memory, accepted in cases:
+            obs = self.ready_observation()
+            obs.nodes = [{"name": "worker-01", "cpu_percent": cpu,
+                          "memory_percent": memory}]
+            with self.subTest(cpu=cpu, memory=memory):
+                if accepted:
+                    harness.baseline_gate(obs, "gitops")
+                else:
+                    with self.assertRaises(harness.BaselineError):
+                        harness.baseline_gate(obs, "gitops")
+
+    def test_invalid_node_percentages_fail_closed(self):
+        for value in (None, "NaN", -1, float("inf")):
+            obs = self.ready_observation()
+            obs.nodes = [{"name": "worker-01", "cpu_percent": value,
+                          "memory_percent": 10}]
+            with self.subTest(value=value):
+                with self.assertRaises(harness.InstrumentationError):
+                    harness.baseline_gate(obs, "gitops")
+
+    def test_malformed_hpa_telemetry_fails_closed(self):
+        cases = {
+            "missing desired": ("desired", None),
+            "string replicas": ("deployment_spec_replicas", "2"),
+            "missing scale condition": ("able_to_scale", None),
+        }
+        for label, (key, value) in cases.items():
+            obs = self.ready_observation()
+            obs.hpa[key] = value
+            with self.subTest(case=label):
+                with self.assertRaises(harness.InstrumentationError):
+                    harness.baseline_gate(obs, "gitops")
+
+
+class BaselineReadinessTests(unittest.TestCase):
+    def stabilize(self, snapshotter, kubectl, timeout=5, interval=1):
+        clock = ReadinessClock()
+        result = harness.stabilize_baseline(
+            snapshotter, kubectl, "gitops", timeout, interval, clock,
+            sleep=clock.sleep)
+        return result, clock
+
+    def test_transient_readiness_recovers_and_resets_match_history(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(pods=[dict(READY_POD), dict(UNREADY_POD),
+                                       dict(READY_POD)])
+        result, clock = self.stabilize(snapshotter, kubectl)
+        self.assertEqual(snapshotter.calls, 4)
+        self.assertEqual(len(result.readiness_failures), 1)
+        failure = result.readiness_failures[0]
+        self.assertEqual(failure["reason"], "pod_readiness")
+        self.assertTrue(failure["reasons"][0]["retryable"])
+        self.assertEqual(failure["pods"], [UNREADY_POD])
+        self.assertTrue(clock.sleeps)
+
+    def test_hpa_settling_recovers_after_a_transient_scale(self):
+        unsettled = observation(hpa=harness.hpa_state(
+            web_hpa(desired=3, current=2, spec_replicas=2), web_deployment()))
+        settled = observation()
+        snapshotter = BaselineSequenceSnapshotter([unsettled, settled, settled])
+        result, clock = self.stabilize(
+            snapshotter, BaselineKubectl())
+        self.assertEqual(snapshotter.calls, 3)
+        self.assertEqual(result.readiness_failures[0]["reason"],
+                         "hpa_settling")
+        self.assertTrue(result.readiness_failures[0]["reasons"][0]["retryable"])
+        self.assertTrue(clock.sleeps)
+
+    def test_capacity_failure_recovers_when_the_next_read_is_valid(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(nodes=[
+            {"name": "worker-01", "cpu_percent": 10, "memory_percent": 71},
+            {"name": "worker-01", "cpu_percent": 11, "memory_percent": 40},
+        ])
+        result, _ = self.stabilize(snapshotter, kubectl)
+        self.assertEqual(result.readiness_failures[0]["reason"], "capacity")
+        self.assertEqual(result.nodes[0]["memory_percent"], 40)
+
+    def test_capacity_timeout_preserves_safe_observations_and_caps_sleep(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(nodes=[
+            {"name": "worker-01", "cpu_percent": 70, "memory_percent": 10}])
+        clock = ReadinessClock()
+        with self.assertRaises(harness.BaselineError) as caught:
+            harness.stabilize_baseline(
+                snapshotter, kubectl, "gitops", 0.5, 10, clock,
+                sleep=clock.sleep)
+        failures = caught.exception.readiness_failures
+        self.assertTrue(failures)
+        self.assertEqual(failures[0]["reason"], "capacity")
+        self.assertEqual(failures[0]["nodes"][0]["cpu_percent"], 70)
+        self.assertTrue(failures[0]["reasons"][0]["retryable"])
+        self.assertLessEqual(clock.sleeps[0], 0.5)
+        serialized = json.dumps(failures)
+        self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", serialized)
+        self.assertNotIn("encryptedData", serialized)
+
+    def test_no_capture_starts_after_the_deadline_is_exhausted(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(nodes=[
+            {"name": "worker-01", "cpu_percent": 70, "memory_percent": 10}])
+        clock = ReadinessClock()
+        with self.assertRaises(harness.BaselineError) as caught:
+            harness.stabilize_baseline(
+                snapshotter, kubectl, "gitops", 0.5, 10, clock,
+                sleep=clock.sleep)
+        self.assertEqual(snapshotter.calls, 1)
+        failures = caught.exception.readiness_failures
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["reason"], "capacity")
+        self.assertAlmostEqual(clock.sleeps[0], 0.43)
+
+    def test_node_metric_failure_keeps_incremental_acquisition_bounds(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(
+            node_error=harness.InstrumentationError("metrics unavailable"))
+        clock = ReadinessClock()
+        with self.assertRaises(harness.InstrumentationError) as caught:
+            harness.stabilize_baseline(
+                snapshotter, kubectl, "gitops", 5, 1, clock,
+                sleep=clock.sleep)
+        acquisition = caught.exception.readiness_failures[-1]["acquisition"]
+        self.assertEqual(set(acquisition), {"snapshot", "pods", "nodes"})
+        for segment in acquisition.values():
+            self.assertLessEqual(segment["started_mono"],
+                                 segment["finished_mono"])
+            self.assertEqual(segment["started_utc"], segment["finished_utc"])
+
+    def test_fatal_gate_failures_are_not_retried(self):
+        cases = {
+            "missing deployment": lambda obs: obs.resources.pop(
+                "Deployment/invenio-web"),
+            "quarantine preexists": lambda obs: obs.extra_resources.append(
+                "exp-invenio-drift/Deployment/invenio-web"),
+            "drift contamination": lambda obs: obs.resources[
+                "SealedSecret/invenio-app-secrets"]["fields"].__setitem__(
+                    "/metadata/annotations/" + harness.DRIFT_ANNOTATION, "x"),
+            "wrong hpa target": lambda obs: obs.hpa.__setitem__(
+                "target", "Deployment/other"),
+        }
+        for label, corrupt in cases.items():
+            obs = observation()
+            corrupt(obs)
+            snapshotter = BaselineSnapshotter(obs)
+            kubectl = BaselineKubectl()
+            clock = ReadinessClock()
+            with self.subTest(case=label):
+                with self.assertRaises(harness.BaselineError) as caught:
+                    harness.stabilize_baseline(
+                        snapshotter, kubectl, "gitops", 5, 1, clock,
+                        sleep=clock.sleep)
+                self.assertEqual(snapshotter.calls, 1)
+                self.assertEqual(clock.sleeps, [])
+                failure = caught.exception.readiness_failures[0]
+                self.assertFalse(failure["reasons"][0]["retryable"])
+
+    def test_instrumentation_failure_is_preserved_and_not_retried(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(
+            node_error=harness.InstrumentationError("metrics unavailable"))
+        clock = ReadinessClock()
+        with self.assertRaises(harness.InstrumentationError) as caught:
+            harness.stabilize_baseline(
+                snapshotter, kubectl, "gitops", 5, 1, clock,
+                sleep=clock.sleep)
+        self.assertEqual(snapshotter.calls, 1)
+        self.assertEqual(clock.sleeps, [])
+        failure = caught.exception.readiness_failures[0]
+        self.assertEqual(failure["reason"], "instrumentation_failure")
+        self.assertFalse(failure["reasons"][0]["retryable"])
+
+    def test_slow_reads_crossing_the_deadline_are_not_accepted(self):
+        clock = ReadinessClock()
+        snapshotter = BaselineSnapshotter(observation(), clock=clock,
+                                          advance=2.0)
+        kubectl = BaselineKubectl()
+        with self.assertRaises(harness.BaselineError) as caught:
+            harness.stabilize_baseline(
+                snapshotter, kubectl, "gitops", 1, 1, clock,
+                sleep=clock.sleep)
+        self.assertEqual(snapshotter.calls, 1)
+        self.assertEqual(caught.exception.readiness_failures[-1]["reason"],
+                         "deadline")
 
 
 class ArmTests(unittest.TestCase):
@@ -991,6 +1425,49 @@ class LiveRunnerTests(unittest.TestCase):
                                  {"prune": True, "selfHeal": True})
             self.assertNotIn(("Namespace", "exp-invenio-drift"),
                              fake.objects)
+
+    def test_failed_baseline_persists_readiness_without_baseline_snapshot(self):
+        objects = {
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }
+        apps = {"apps": application("apps"),
+                "invenio-bootstrap": application()}
+        fake = FakeKubectl(apps=apps, objects=objects)
+        fake.pods = lambda namespace: [dict(UNREADY_POD)]
+        with tempfile.TemporaryDirectory() as directory:
+            args = harness.parse_args([
+                "--arm", "gitops", "--scenario", "B", "--rep", "1",
+                "--live", "--confirm-single-stack", "--namespace", "invenio",
+                "--app", "invenio-bootstrap",
+                "--source-revision", "b" * 40, "--render-sha256", "c" * 64,
+                "--timeout", "1", "--sample-interval", "0.01",
+                "--baseline-timeout", "0.2", "--reset-timeout", "1",
+                "--out", directory, "--run-id", "baseline-failed",
+            ])
+            runner = harness.LiveRunner(args, {}, fake, AdvancingClock())
+            with mock.patch("time.sleep", lambda _: None), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = runner.run()
+            out = Path(directory) / "baseline-failed"
+            row = json.loads(
+                (Path(directory) / "baseline-failed.jsonl").read_text())
+            self.assertEqual(code, 1)
+            self.assertEqual(row["status"], "baseline_failure")
+            self.assertIn("not Running and Ready", row["error"])
+            self.assertIsNone(json.loads((out / "baseline.json").read_text()))
+            readiness = json.loads((out / "readiness.json").read_text())
+            self.assertTrue(readiness)
+            self.assertEqual(readiness[0]["reason"], "pod_readiness")
+            self.assertEqual(readiness[0]["pods"], [UNREADY_POD])
+            self.assertIn("nodes", readiness[0])
+            serialized = json.dumps(readiness)
+            self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", serialized)
+            self.assertNotIn("encryptedData", serialized)
 
 
 class SamplerLifecycleTests(unittest.TestCase):
