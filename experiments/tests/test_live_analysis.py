@@ -8,8 +8,10 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "analysis"))
+sys.path.insert(0, str(ROOT / "live"))
 
 import analyze_live  # noqa: E402
+import run_matrix  # noqa: E402
 
 
 REVISION = "a" * 40
@@ -72,6 +74,98 @@ def paired_batch(scenario="B", reps=range(1, 11), offset=2.0):
                              evidence=3.0 + rep / 100,
                              recovery=5.0 + rep / 100))
     return rows
+
+
+def retry_row(scenario="C", arm="imperative", rep=4, attempt=1,
+              *, batch_id=BATCH, **overrides):
+    base_id = f"{batch_id}-{arm}-{scenario}-r{rep:02d}"
+    identity = {
+        "run_id": base_id if attempt == 0 else f"{base_id}-retry{attempt}",
+        "batch_attempt": attempt,
+        "batch_retry_of": None if attempt == 0 else base_id,
+    }
+    identity.update(overrides)
+    return make_row(scenario, arm, rep, batch_id=batch_id, **identity)
+
+
+def harness_row(scenario, arm, rep, *, status="observed", detection=2.0,
+                evidence=3.0, recovery=5.0, censor=10.0, **overrides):
+    row = {
+        "schema_version": 2,
+        "run_id": None,
+        "synthetic": False,
+        "formal_execution_approved": False,
+        "env": arm,
+        "arm": arm,
+        "scenario": scenario,
+        "rep": rep,
+        "analysis_group": ("hpa_control" if scenario == "A" else
+                           "visibility_boundary" if scenario == "F" else
+                           "managed_drift"),
+        "efficacy_eligible": scenario not in ("A", "F"),
+        "status": status,
+        "censor_seconds": censor,
+        "r1_baseline": 100.0,
+        "r1_first": 100.0,
+        "r1_last": 100.0,
+        "source_revision": REVISION,
+        "render_sha256": RENDER,
+        "cleanup_status": "ok",
+        "arm_restore_status": "restored",
+        "mutations_executed": 0 if status == "baseline_failure" else 1,
+        "postcondition": {"verified": True},
+        "t0_utc": None,
+    }
+    for metric, value in (("detection", detection), ("evidence", evidence),
+                          ("recovery", recovery)):
+        if status == "baseline_failure":
+            row[metric + "_seconds"] = None
+            row[metric + "_status"] = "not_observed"
+        else:
+            row[metric + "_seconds"], row[metric + "_status"] = observation(
+                value, censor)
+    row.update(overrides)
+    return row
+
+
+class RunnerArguments:
+    live = True
+    production_like = True
+
+
+def runner_view(batch_id, statuses, *, arm="gitops", scenario="C", rep=4,
+                metrics=None):
+    """Build rows with run_matrix.annotate_row, then its real analysis view."""
+    base_id = f"{batch_id}-{arm}-{scenario}-r{rep:02d}"
+    entry = {
+        "index": 0,
+        "arm": arm,
+        "scenario": scenario,
+        "rep": rep,
+        "phase": "R2" if rep <= 10 else "R1",
+        "run_id": base_id,
+        "status": statuses[-1],
+        "stop_reason": None,
+        "attempts": [],
+    }
+    rows = []
+    for number, status in enumerate(statuses):
+        run_id = base_id if number == 0 else f"{base_id}-retry{number}"
+        attempt = {
+            "attempt": number,
+            "run_id": run_id,
+            "retry_of": base_id if number else None,
+            "status": status,
+        }
+        entry["attempts"].append(attempt)
+        payload = dict((metrics or {}).get(number, {}))
+        row = harness_row(scenario, arm, rep, status=status, **payload)
+        row["run_id"] = run_id
+        rows.append(run_matrix.annotate_row(
+            row, entry, RunnerArguments(), batch_id, attempt))
+    analysis_rows, exclusions = run_matrix._analysis_view(
+        {"runs": [entry]}, rows)
+    return analysis_rows, rows, exclusions
 
 
 def entry(result, scenario, metric):
@@ -287,13 +381,10 @@ class LiveAnalysisTest(unittest.TestCase):
     def test_exclusions_are_minimal_and_outputs_never_echo_raw_values(self):
         rows = paired_batch(reps=range(1, 2))
         raw = [dict(row) for row in rows]
-        raw.append({
-            "run_id": "failed-run", "batch_id": BATCH, "batch_mode": "live",
-            "scenario": "C", "arm": "imperative", "rep": 3,
-            "status": "invalid_injection", "cleanup_status": "ok",
-            "arm_restore_status": "restored", "synthetic": False,
-            "error": "token=supersecretvalue",
-        })
+        raw.append(make_row(
+            "C", "imperative", 3, status="invalid_injection",
+            cleanup_status="ok", arm_restore_status="restored",
+            error="token=supersecretvalue"))
         result = analyze_live.analyze(rows, raw_rows=raw, bootstrap=100, seed=1)
         self.assertEqual(result["exclusions"]["count"], 1)
         self.assertEqual(result["exclusions"]["by_reason"],
@@ -363,6 +454,214 @@ class LiveAnalysisTest(unittest.TestCase):
                          "live_effects.tex"):
                 self.assertTrue((output / name).is_file(), name)
             self.assertNotIn("secret", result.stdout + result.stderr)
+
+
+class RetryIdentityTest(unittest.TestCase):
+    def test_issue_example_retry_identity_is_accepted(self):
+        meta = analyze_live.validate_rows([
+            retry_row(scenario="C", arm="imperative", rep=14,
+                      batch_id="formal-20261027c")])
+        self.assertEqual(meta["analysis_rows"], 1)
+
+    def test_base_and_explicit_retry_metadata_are_accepted(self):
+        legacy = make_row("C", "imperative", 3)
+        explicit = retry_row(scenario="C", arm="gitops", rep=3, attempt=0)
+        retry = retry_row(scenario="C", arm="gitops", rep=3, attempt=2)
+        self.assertEqual(
+            analyze_live.validate_rows([legacy])["analysis_rows"], 1)
+        self.assertEqual(
+            analyze_live.validate_rows([explicit])["analysis_rows"], 1)
+        result = analyze_live.analyze([retry], bootstrap=100, seed=1)
+        self.assertEqual(result["batch"]["analysis_rows"], 1)
+
+    def test_censored_retry_is_accepted_as_one_censored_observation(self):
+        rows = [retry_row(scenario="C", arm="gitops", rep=4, recovery=None)]
+        result = analyze_live.analyze(rows, bootstrap=100, seed=1)
+        item = survival(result, "C", "gitops", "recovery")
+        self.assertEqual(item["censored"], 1)
+        self.assertEqual(item["events"], 0)
+        self.assertIsNone(item["median_seconds"])
+
+    def test_runner_retry_flows_through_analysis_view_into_analyzer(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["baseline_failure", "observed"])
+        self.assertEqual(
+            [row["run_id"] for row in analysis_rows],
+            ["formal-20261027c-gitops-C-r04-retry1"])
+        result = analyze_live.analyze(
+            analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+        self.assertEqual(result["batch"]["analysis_rows"], 1)
+        self.assertEqual(result["exclusions"]["count"], 1)
+        self.assertEqual(result["exclusions"]["by_reason"],
+                         {"status_not_analyzable": 1})
+        self.assertEqual(
+            sum(item["rows"] for item in result["overview"]), 1)
+        self.assertEqual(
+            result["exclusions"]["rows"][0]["run_id"],
+            "formal-20261027c-gitops-C-r04")
+
+    def test_runner_censored_retry_stays_censored(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["baseline_failure", "right_censored"],
+            metrics={1: {"recovery": None}})
+        result = analyze_live.analyze(
+            analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+        self.assertEqual(result["batch"]["analysis_rows"], 1)
+        item = survival(result, "C", "gitops", "recovery")
+        self.assertEqual(item["censored"], 1)
+
+    def test_retry_without_metadata_is_rejected(self):
+        missing = retry_row()
+        del missing["batch_attempt"]
+        del missing["batch_retry_of"]
+        partial = retry_row()
+        del partial["batch_retry_of"]
+        for label, row in (("missing", missing), ("partial", partial)):
+            with self.subTest(label):
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([row])
+
+    def test_ambiguous_attempt_values_are_rejected(self):
+        values = (True, False, 1.0, -1, "1", None, [], {})
+        for value in values:
+            with self.subTest(value=value):
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows(
+                        [retry_row(batch_attempt=value)])
+
+    def test_mismatched_retry_parent_is_rejected(self):
+        row = retry_row()
+        row["batch_retry_of"] = "other-batch-gitops-C-r04"
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_inconsistent_retry_suffix_is_rejected(self):
+        row = retry_row(attempt=1)
+        row["batch_attempt"] = 2
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_malformed_retry_suffix_is_rejected(self):
+        base_id = f"{BATCH}-imperative-C-r04"
+        for suffix in ("-retry0", "-retry01", "-retry", "-retryx",
+                       "-retry1x", "-retry-1"):
+            with self.subTest(suffix):
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([
+                        retry_row(run_id=base_id + suffix)])
+
+    def test_base_id_with_retry_metadata_is_rejected(self):
+        base_id = f"{BATCH}-imperative-C-r04"
+        cases = (
+            {"run_id": base_id, "batch_attempt": 1,
+             "batch_retry_of": base_id},
+            {"run_id": base_id, "batch_attempt": 0,
+             "batch_retry_of": base_id},
+        )
+        for overrides in cases:
+            with self.subTest(overrides):
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([retry_row(**overrides)])
+
+    def test_base_identity_fields_must_match_the_run_id(self):
+        cases = (
+            ("arm", "gitops"),
+            ("scenario", "D"),
+            ("rep", 5),
+        )
+        for field, value in cases:
+            with self.subTest(field=field):
+                row = retry_row()
+                row[field] = value
+                if field == "arm":
+                    row["env"] = value
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([row])
+
+    def test_duplicate_statistical_cell_rejects_base_plus_retry(self):
+        rows = [retry_row(attempt=0), retry_row(attempt=1)]
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows(rows)
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(rows, bootstrap=100, seed=1)
+
+    def test_raw_rows_reject_inconsistent_identity(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["observed"])
+        raw_rows[0]["rep"] = 5
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(
+                analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+
+    def test_raw_rows_reject_duplicate_run_ids(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["observed"])
+        raw = raw_rows + [dict(raw_rows[0])]
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(
+                analysis_rows, raw_rows=raw, bootstrap=100, seed=1)
+
+    def test_raw_retry_requires_attempt_metadata(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["baseline_failure", "observed"])
+        for row in raw_rows:
+            del row["batch_attempt"]
+            del row["batch_retry_of"]
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(
+                analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+
+    def test_raw_retry_chain_requires_predecessor(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["baseline_failure", "observed"])
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(
+                analysis_rows, raw_rows=raw_rows[-1:], bootstrap=100, seed=1)
+
+    def test_raw_retry_chain_rejects_successful_predecessor(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["observed", "observed"])
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(
+                analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+
+    def test_raw_retry_chain_rejects_non_retryable_baseline(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["baseline_failure", "observed"])
+        raw_rows[0]["mutations_executed"] = 1
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(
+                analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+
+    def test_legacy_unsuffixed_rows_without_metadata_keep_working(self):
+        rows = paired_batch(reps=range(1, 3))
+        raw_rows = [dict(row) for row in rows]
+        result = analyze_live.analyze(
+            rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+        self.assertEqual(result["batch"]["analysis_rows"], 4)
+        self.assertEqual(result["exclusions"]["count"], 0)
+
+    def test_cli_reads_analysis_and_raw_retry_inputs_together(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "formal-20261027c", ["baseline_failure", "observed"])
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "batch.analysis.jsonl"
+            raw = Path(directory) / "batch.rows.jsonl"
+            output = Path(directory) / "out"
+            source.write_text("\n".join(
+                json.dumps(row) for row in analysis_rows) + "\n")
+            raw.write_text("\n".join(
+                json.dumps(row) for row in raw_rows) + "\n")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "analysis/analyze_live.py"),
+                 "--in", str(source), "--rows", str(raw),
+                 "--out", str(output), "--bootstrap", "100", "--seed", "1"],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(
+                (output / "live_analysis.json").read_text())
+            self.assertEqual(report["batch"]["analysis_rows"], 1)
+            self.assertEqual(report["exclusions"]["count"], 1)
 
 
 if __name__ == "__main__":
