@@ -760,26 +760,32 @@ def _quantity(value, field: str) -> Decimal:
         raise InstrumentationError(
             f"{field} is not a valid Kubernetes quantity") from None
     suffix = match.group("suffix")
-    if suffix in _BINARY_FACTORS:
-        factor = Decimal(_BINARY_FACTORS[suffix])
-    elif suffix in _DECIMAL_FACTORS:
-        factor = Decimal(_DECIMAL_FACTORS[suffix])
-    elif suffix and suffix[0] in "eE":
-        try:
+    try:
+        if suffix in _BINARY_FACTORS:
+            factor = Decimal(_BINARY_FACTORS[suffix])
+        elif suffix in _DECIMAL_FACTORS:
+            factor = Decimal(_DECIMAL_FACTORS[suffix])
+        elif suffix and suffix[0] in "eE":
             factor = Decimal(10) ** int(suffix[1:])
-        except (InvalidOperation, ValueError):
+        else:
             raise InstrumentationError(
-                f"{field} is not a valid Kubernetes quantity") from None
-    else:
-        raise InstrumentationError(f"{field} is not a valid Kubernetes quantity")
-    result = number * factor
+                f"{field} is not a valid Kubernetes quantity")
+        result = number * factor
+    except ArithmeticError:
+        raise InstrumentationError(
+            f"{field} is not a valid Kubernetes quantity") from None
+    if result == 0 and number != 0:
+        raise InstrumentationError(f"{field} underflows")
     if not result.is_finite():
         raise InstrumentationError(f"{field} is not a finite Kubernetes quantity")
     return result
 
 
 def _quantity_nanocores(value, field: str, positive: bool = False) -> int:
-    amount = _quantity(value, field) * Decimal(10 ** 9)
+    try:
+        amount = _quantity(value, field) * Decimal(10 ** 9)
+    except ArithmeticError:
+        raise InstrumentationError(f"{field} is not a valid CPU quantity") from None
     if amount != amount.to_integral_value():
         raise InstrumentationError(f"{field} is not representable in nanocores")
     result = int(amount)
@@ -805,15 +811,21 @@ def _duration_seconds(value, field: str) -> float:
         raise InstrumentationError(f"{field} is not a valid duration")
     position = 0
     total = Decimal(0)
-    for match in _DURATION_PART.finditer(value):
-        if match.start() != position:
+    try:
+        for match in _DURATION_PART.finditer(value):
+            if match.start() != position:
+                raise InstrumentationError(f"{field} is not a valid duration")
+            total += Decimal(match.group(1)) * Decimal(
+                _DURATION_FACTORS[match.group(2)])
+            position = match.end()
+        if position != len(value) or total <= 0:
             raise InstrumentationError(f"{field} is not a valid duration")
-        total += Decimal(match.group(1)) * Decimal(
-            _DURATION_FACTORS[match.group(2)])
-        position = match.end()
-    if position != len(value) or total <= 0:
-        raise InstrumentationError(f"{field} is not a valid duration")
-    return float(total)
+        seconds = float(total)
+    except ArithmeticError:
+        raise InstrumentationError(f"{field} is not a valid duration") from None
+    if not math.isfinite(seconds):
+        raise InstrumentationError(f"{field} is not a finite duration")
+    return seconds
 
 
 def _timestamp(value, field: str) -> str:
@@ -1276,13 +1288,15 @@ def _instrumentation_record(error, started, finished, observation=None) -> dict:
     if observation is not None:
         record.update({
             "at": _point_dict(observation.at),
-            "acquisition": copy.deepcopy(observation.acquisition),
             "pods": copy.deepcopy(observation.pods),
             "nodes": copy.deepcopy(observation.nodes),
             "hpa": copy.deepcopy(observation.hpa),
             "argo": copy.deepcopy(observation.argo),
             "extra_resources": copy.deepcopy(observation.extra_resources),
         })
+        acquisition = copy.deepcopy(observation.acquisition)
+        if acquisition:
+            record["acquisition"] = acquisition
     return record
 
 
@@ -1291,27 +1305,45 @@ def stabilize_baseline(snapshotter, kubectl, arm, timeout, interval,
     deadline = clock.now().mono + timeout
     previous_key = None
     failures = []
+    attempted = False
     while True:
+        if attempted and clock.now().mono >= deadline:
+            _raise_readiness(BaselineError(
+                f"baseline did not stabilize within {timeout}s"), failures)
+        attempted = True
         started = clock.now()
         observation = None
+        pods_started = None
+        nodes_started = None
         try:
             observation = snapshotter.capture()
             captured = clock.now()
+            observation.acquisition = {
+                "snapshot": _point_bounds(started, captured),
+            }
             pods_started = clock.now()
             observation.pods = kubectl.pods(snapshotter.namespace)
             pods_finished = clock.now()
+            observation.acquisition["pods"] = _point_bounds(
+                pods_started, pods_finished)
             nodes_started = clock.now()
             observation.nodes = kubectl.top_nodes()
             nodes_finished = clock.now()
-            observation.acquisition = {
-                "snapshot": _point_bounds(started, captured),
-                "pods": _point_bounds(pods_started, pods_finished),
-                "nodes": _point_bounds(nodes_started, nodes_finished),
-            }
+            observation.acquisition["nodes"] = _point_bounds(
+                nodes_started, nodes_finished)
             issues = _baseline_issues(observation, arm, app)
         except InstrumentationError as error:
+            finished = clock.now()
+            if observation is not None:
+                if pods_started is not None and "pods" not in observation.acquisition:
+                    observation.acquisition["pods"] = _point_bounds(
+                        pods_started, finished)
+                elif (nodes_started is not None
+                      and "nodes" not in observation.acquisition):
+                    observation.acquisition["nodes"] = _point_bounds(
+                        nodes_started, finished)
             failures.append(_instrumentation_record(
-                error, started, clock.now(), observation))
+                error, started, finished, observation))
             _raise_readiness(error, failures)
         now = clock.now().mono
         if issues:

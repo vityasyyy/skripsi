@@ -653,6 +653,24 @@ class NodeMetricsTests(unittest.TestCase):
                 with self.assertRaises(harness.InstrumentationError):
                     self.read(responses)
 
+    def test_unbounded_quantity_and_duration_arithmetic_fail_closed(self):
+        with self.assertRaises(harness.InstrumentationError):
+            harness._quantity("1e9999999", "review")
+        with self.assertRaises(harness.InstrumentationError):
+            harness._duration_seconds("9" * 400 + "s", "review")
+        cases = {
+            "overflow quantity": (
+                node_metrics(node_metric("worker-01", cpu="1e9999999")),
+                node_inventory(node_object("worker-01"))),
+            "overflow window": (
+                node_metrics(node_metric("worker-01", window="9" * 400 + "s")),
+                node_inventory(node_object("worker-01"))),
+        }
+        for label, (metrics, nodes) in cases.items():
+            with self.subTest(case=label):
+                with self.assertRaises(harness.InstrumentationError):
+                    self.ok(metrics, nodes)
+
 
 class ReadinessClock:
     def __init__(self):
@@ -828,6 +846,37 @@ class BaselineReadinessTests(unittest.TestCase):
         serialized = json.dumps(failures)
         self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", serialized)
         self.assertNotIn("encryptedData", serialized)
+
+    def test_no_capture_starts_after_the_deadline_is_exhausted(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(nodes=[
+            {"name": "worker-01", "cpu_percent": 70, "memory_percent": 10}])
+        clock = ReadinessClock()
+        with self.assertRaises(harness.BaselineError) as caught:
+            harness.stabilize_baseline(
+                snapshotter, kubectl, "gitops", 0.5, 10, clock,
+                sleep=clock.sleep)
+        self.assertEqual(snapshotter.calls, 1)
+        failures = caught.exception.readiness_failures
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["reason"], "capacity")
+        self.assertAlmostEqual(clock.sleeps[0], 0.43)
+
+    def test_node_metric_failure_keeps_incremental_acquisition_bounds(self):
+        snapshotter = BaselineSnapshotter(observation())
+        kubectl = BaselineKubectl(
+            node_error=harness.InstrumentationError("metrics unavailable"))
+        clock = ReadinessClock()
+        with self.assertRaises(harness.InstrumentationError) as caught:
+            harness.stabilize_baseline(
+                snapshotter, kubectl, "gitops", 5, 1, clock,
+                sleep=clock.sleep)
+        acquisition = caught.exception.readiness_failures[-1]["acquisition"]
+        self.assertEqual(set(acquisition), {"snapshot", "pods", "nodes"})
+        for segment in acquisition.values():
+            self.assertLessEqual(segment["started_mono"],
+                                 segment["finished_mono"])
+            self.assertEqual(segment["started_utc"], segment["finished_utc"])
 
     def test_fatal_gate_failures_are_not_retried(self):
         cases = {
