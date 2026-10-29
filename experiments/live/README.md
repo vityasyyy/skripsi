@@ -1,11 +1,13 @@
 # Harness eksperimen live InvenioRDM
 
 **Status: implementasi offline-tested, dry-run default.** Dokumen ini bukan izin
-eksekusi. Percobaan live sebelumnya telah dihentikan dan bukan data formal;
-perubahan ini tidak menjalankan klaster. Seluruh gerbang formal pada
-`experiments/LIVE-OBSERVER.md` dan Bab III tetap berlaku; uji offline tidak
-membuktikan klaster, seed, audit, kapasitas, atau metode siap. Batch formal 210
-run (`run_matrix.py`) belum diselesaikan pada klaster.
+eksekusi. Pilot terbatas 27 Oktober 2026 berhasil dan tetap bukti pilot, bukan
+data formal. Percobaan formal yang tidak lengkap dihentikan; tidak ada
+peluncuran formal baru yang disetujui. Perubahan ini tidak menjalankan klaster.
+Gerbang formal yang tersisa pada `experiments/LIVE-OBSERVER.md` dan Bab III tetap
+berlaku; uji offline tidak membuktikan klaster, seed, kapasitas, recovery, atau
+metode siap. Batch formal 210 run (`run_matrix.py`) belum diselesaikan pada
+klaster.
 
 Harness menargetkan **satu stack InvenioRDM nyata**:
 
@@ -407,12 +409,13 @@ ada, bukan bukti izin formal, bukan pembuatan lingkungan terisolasi, dan bukan
 pengukuran R3. Konsekuensinya tetap:
 
 - `stack_isolated: false` — hanya satu stack; tidak ada pasangan A/B terisolasi.
-- `r3_status: not_measured` — audit API belum tersedia; atribusi pelaku tidak
+- `r3_status: not_measured` — R3 dikecualikan/ditunda; atribusi pelaku tidak
   dapat dinilai.
 - `formal_execution_approved: true` hanya jika `--production-like` diberikan
   bersamaan dengan `--live`; dry-run dengan flag itu ditolak.
-- Flag tidak menutup gate seed, kapasitas, NTP, audit, render, atau persetujuan
-  pembimbing. Ia juga tidak mengubah run gagal menjadi data yang layak analisis.
+- Flag tidak menutup gate seed, kapasitas, NTP, render, atau persetujuan
+  pembimbing; R3 tetap `not_measured` dan audit tidak diminta pada gelombang ini.
+  Ia juga tidak mengubah run gagal menjadi data yang layak analisis.
 
 Tanpa flag, seluruh baris batch dan manifest tetap `formal_execution_approved:
 false`. Jangan menyalin metadata batch ke baris mentah harness atau menganggap
@@ -422,14 +425,15 @@ dry-run sebagai observasi.
 
 1. **Kesiapan formal satu stack**: stack `invenio` adalah satu-satunya stack
    nyata pada arah desain satu stack berurutan. Ketersediaannya di guard tidak
-   otomatis mensertifikasi kesiapan formal; izin, pembekuan, kapasitas, seed,
-   reset, dan bukti pendukung tetap harus ditutup.
-2. **Audit API**: belum ada bukti audit; unsur pelaku R3 tetap
-   `tidak dapat dinilai`.
-3. **Seed dan reset**: seed `4ben9-bgh38` adalah draf produksi; pemulihan
-   record/berkas dan reset pasca-seed pada stack nyata belum diverifikasi.
-   Verifikasi seed harness memakai token dan gagal tertutup, tetapi tidak
-   menciptakan atau memulihkan salinan data.
+   otomatis mensertifikasi kesiapan formal; izin, pembekuan, kapasitas, bukti
+   seed/recovery yang tersisa, dan bukti pendukung tetap harus ditutup.
+2. **Audit API/R3 (dikecualikan)**: R3 tetap `not_measured`; audit API
+   dikecualikan/ditunda dan bukan gerbang atau syarat mengaktifkan audit pada
+   gelombang ini. Unsur pelaku tetap tidak dapat dinilai.
+3. **Seed dan reset**: unggah/unduh seed serta reset/pembersihan orphan telah
+   diverifikasi terpisah. Yang masih belum terbukti adalah pemulihan
+   database/berkas terisolasi pasca-seed pada stack nyata; verifikasi seed
+   harness memakai token dan gagal tertutup, tetapi tidak memulihkan data.
 4. **Versi runtime**: ArgoCD, CNPG, OpenSearch, MinIO, dan chart belum dibekukan
    pada revisi yang benar-benar berjalan.
 5. **Render dan revisi**: `--source-revision`/`--render-sha256` harus berasal dari
@@ -438,9 +442,11 @@ dry-run sebagai observasi.
    kontrol HPA, keluarga uji, dan penanganan data tersensor.
 7. **Kapasitas, NTP, SMTP, HA OpenSearch**: bukti jendela beban, sinkronisasi jam,
    relay email, dan HA belum ada; tidak boleh menjadi prasyarat diam-diam.
-8. **Pilot yang dihentikan**: percobaan live sebelumnya dihentikan dan bukan
-   data formal; belum ada run formal yang ditinjau, dan harness belum terbukti
-   siap untuk eksekusi formal.
+8. **Pilot 27 Oktober dan percobaan formal yang dihentikan**: pilot terbatas
+   27 Oktober 2026 berhasil dan tetap bukti pilot, bukan data formal. Percobaan
+   formal yang tidak lengkap dihentikan dan bukan hasil; belum ada run formal
+   lengkap yang ditinjau. Tidak ada peluncuran formal baru yang disetujui, dan
+   harness belum terbukti siap untuk eksekusi formal.
 
 ## Keselamatan dan pengujian
 
