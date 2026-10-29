@@ -82,6 +82,12 @@ RAW_ANALYSIS_FIELDS = (
     "formal_execution_approved", "stack_isolated", "r3_status", "stop_reason",
     "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_e_store_mono",
     "t_r_mono", "t_r_first_mono", "t_r_confirmed_mono",
+    "window_completed", "window_end_mono", "window_end_utc",
+    "recovery_confirmation", "t_r_first_seconds", "t_r_confirmed_seconds",
+    "evidence_store_seconds",
+    "detection_reads", "evidence_reads", "recovery_reads",
+    "detection_ref", "evidence_ref",
+    "detection_controller", "recovery_controller",
     "r1_baseline", "r1_first", "r1_last",
     "detection_seconds", "detection_status",
     "evidence_seconds", "evidence_status",
@@ -205,6 +211,8 @@ def _validate_timing(row, strict):
         _require(_number(point), f"{key}_mono is not finite")
         _require(point >= t0, f"{key}_mono precedes t0_mono")
         _require(point <= t0 + limit, f"{key}_mono exceeds the censor limit")
+        _require(point <= window_end,
+                 f"{key}_mono occurs after the observation window ended")
         _require(_number(value)
                  and math.isclose(value, point - t0, rel_tol=1e-9,
                                   abs_tol=1e-9),
@@ -216,6 +224,8 @@ def _validate_timing(row, strict):
     if t_r_first is not None:
         _require(_number(t_r_first) and t0 <= t_r_first <= t0 + limit,
                  "t_r_first_mono is outside the observation window")
+        _require(t_r_first <= window_end,
+                 "t_r_first_mono occurs after the observation window ended")
         if row.get("t_r_first_seconds") is not None:
             _require(math.isclose(row["t_r_first_seconds"],
                                   t_r_first - t0, rel_tol=1e-9,
@@ -225,6 +235,8 @@ def _validate_timing(row, strict):
         _require(_number(t_r_confirmed)
                  and t0 <= t_r_confirmed <= t0 + limit,
                  "t_r_confirmed_mono is outside the observation window")
+        _require(t_r_confirmed <= window_end,
+                 "t_r_confirmed_mono occurs after the observation window ended")
         _require(t_r_first is not None and t_r_confirmed >= t_r_first,
                  "confirmation bounds are not ordered")
         if row.get("t_r_confirmed_seconds") is not None:

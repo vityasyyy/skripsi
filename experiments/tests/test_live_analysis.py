@@ -297,6 +297,58 @@ class LegacyTimingTests(unittest.TestCase):
                          {"status_not_analyzable": 1})
 
 
+class ProvenanceConsistencyTests(unittest.TestCase):
+    def test_endpoint_after_window_end_is_rejected_by_batch_and_analyzer(self):
+        analysis_rows, _, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        row = dict(analysis_rows[0])
+        row["detection_seconds"] = 9.0
+        row["t_d_mono"] = 109.0
+        self.assertIsNotNone(run_matrix._analysis_problem(row))
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_batch_and_analyzer_reject_tampered_duration_and_confirmation(self):
+        analysis_rows, _, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        cases = (
+            {"detection_seconds": 9.0},
+            {"injection_seconds": 9.0},
+            {"t_r_confirmed_mono": 104.0},
+            {"window_end_mono": 105.5},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                row = dict(analysis_rows[0])
+                row.update(override)
+                self.assertIsNotNone(run_matrix._analysis_problem(row))
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([row])
+
+    def test_raw_window_end_disagreement_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        raw = [dict(row) for row in raw_rows]
+        raw[0]["window_end_mono"] += 1.0
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live._exclusions(analysis_rows, raw)
+
+    def test_raw_supporting_identity_disagreement_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        cases = (
+            {"recovery_confirmation": "none"},
+            {"evidence_reads": ["Service/invenio-web"]},
+            {"t_e_store_mono": 104.0},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                raw = [dict(row) for row in raw_rows]
+                raw[0].update(override)
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live._exclusions(analysis_rows, raw)
+
+
 class LiveAnalysisTest(unittest.TestCase):
     def test_timing_convention_matches_the_runner_contract(self):
         self.assertEqual(analyze_live.TIMING_CONVENTION,

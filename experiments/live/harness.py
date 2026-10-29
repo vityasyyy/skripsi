@@ -2234,7 +2234,17 @@ def _evaluation_evidence(post, contract: Contract, scenario: str,
         keys = _evaluation_keys(contract, sample, scenario)
         if keys is None:
             continue
+        if not _reads_eligible(sample, keys, t0, deadline):
+            continue
         event = sample.evaluated_at
+        if event is not None:
+            if not _finite_mono(event.mono):
+                continue
+            if event.mono < t0 or event.mono > deadline:
+                continue
+            if any(_read(sample, key)["finished_mono"] > event.mono
+                   for key in keys):
+                continue
         if evidence_at is not None:
             if event is not None and not math.isclose(
                     event.mono, evidence_at.mono, rel_tol=1e-9, abs_tol=1e-9):
@@ -2244,8 +2254,6 @@ def _evaluation_evidence(post, contract: Contract, scenario: str,
         if event is None or not _finite_mono(event.mono):
             continue
         if event.mono < t0 or event.mono > deadline:
-            continue
-        if not _reads_eligible(sample, keys, t0, deadline):
             continue
         if any(_read(sample, key)["finished_mono"] > event.mono
                for key in keys):

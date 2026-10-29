@@ -327,9 +327,11 @@ pekerjaan lanjutan setelah audit diaktifkan.
   acquisition; kegagalan instrumen tetap kegagalan meskipun ada match
   sebelumnya.
 - Baris baru wajib memiliki endpoint/konfirmasi dan `window_completed`/
-  `window_end_*` yang lengkap; baris `right_censored` hanya sah bila deadline
-  benar-benar tercapai. Baris legacy tanpa marker tetap memakai aturan lama dan
-  tidak diwajibkan memiliki bound baru (mis. stopped batch c69).
+  `window_end_*` yang lengkap; endpoint primer/evaluasi/konfirmasi harus selesai
+  tidak melewati `window_end` maupun deadline, sedangkan `t_a` dan `t_e_store`
+  boleh overlap/tertulis setelah stop. Baris `right_censored` hanya sah bila
+  deadline benar-benar tercapai. Baris legacy tanpa marker tetap memakai aturan
+  lama dan tidak diwajibkan memiliki bound baru (mis. stopped batch c69).
 - Endpoint hilang tidak masuk Kaplan--Meier/RMST sebagai tersensor; kelompok
   yang seluruh endpoint-nya hilang dilaporkan tidak terestimasi. Uji efikasi
   bersifat complete-case/observed-only dan tidak menyesuaikan missingness atau

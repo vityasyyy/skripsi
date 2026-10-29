@@ -1867,6 +1867,37 @@ class CompletedObservationTimingTests(unittest.TestCase):
         self.assertAlmostEqual(out["detection_seconds"], 0.2)
         self.assertAlmostEqual(out["evidence_seconds"], 0.2)
 
+    def test_ineligible_earlier_evidence_candidate_is_skipped(self):
+        early = observation(
+            99.9, deployment=web_deployment(image="drift:tag"),
+            acquisition=acquisition_for(
+                99.9, read_finish=100.5,
+                starts={"Deployment/invenio-web": 99.9}),
+            evaluated_at=100.6, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        eligible = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline(
+            [early, eligible], timeout=30, evidence_at=point(101.5))
+        self.assertEqual(out["evidence_seconds"], 1.5)
+
+    def test_late_earlier_evidence_candidate_is_skipped(self):
+        late = observation(
+            100.0, deployment=web_deployment(image="drift:tag"),
+            acquisition=acquisition_for(
+                100.0, read_finish=100.5),
+            evaluated_at=131.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        eligible = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline(
+            [late, eligible], timeout=30, evidence_at=point(101.5))
+        self.assertEqual(out["evidence_seconds"], 1.5)
+
     def test_gitops_evidence_is_not_synthesized_from_read_completion(self):
         sample = observation(
             101.0, deployment=web_deployment(image="drift:tag"))

@@ -655,6 +655,101 @@ def annotate_row(row, entry, args, batch_id, attempt=None):
     return annotated
 
 
+def _timing_problem(row):
+    required = (
+        "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_r_mono",
+        "t_r_first_mono", "t_r_confirmed_mono", "window_end_mono",
+    )
+    if any(field not in row for field in required):
+        return "incomplete_timing_bounds"
+    limit = row.get("censor_seconds")
+    if (type(limit) not in (int, float) or not math.isfinite(limit)
+            or limit <= 0):
+        return "invalid_censor_seconds"
+    t0 = row.get("t0_mono")
+    t_a = row.get("t_a_mono")
+    window_end = row.get("window_end_mono")
+    if (any(type(value) not in (int, float) or not math.isfinite(value)
+            for value in (t0, t_a, window_end))
+            or t_a < t0 or window_end < t0):
+        return "invalid_timing_bounds"
+    if row.get("injection_seconds") is not None and not math.isclose(
+            row["injection_seconds"], t_a - t0, rel_tol=1e-9, abs_tol=1e-9):
+        return "invalid_timing_bounds"
+    if row.get("status") == "observed":
+        if (row.get("stop_reason") != "recovery"
+                or row.get("recovery_status") != "observed"):
+            return "incomplete_timing_bounds"
+    else:
+        if row.get("recovery_status") != "right_censored":
+            return "incomplete_timing_bounds"
+        if row.get("stop_reason") != "timeout":
+            return "window_not_completed"
+        if window_end < t0 + limit:
+            return "window_not_completed"
+    for metric, key in (("detection", "t_d"), ("evidence", "t_e"),
+                        ("recovery", "t_r")):
+        point = row.get(key + "_mono")
+        value = row.get(metric + "_seconds")
+        status = row.get(metric + "_status")
+        if point is None:
+            if value is not None or status == "observed":
+                return f"invalid_{metric}_observation"
+            continue
+        if (type(point) not in (int, float) or not math.isfinite(point)
+                or point < t0 or point > t0 + limit or point > window_end):
+            return f"invalid_{metric}_observation"
+        if (status != "observed" or type(value) not in (int, float)
+                or not math.isfinite(value)
+                or not math.isclose(value, point - t0, rel_tol=1e-9,
+                                    abs_tol=1e-9)):
+            return f"invalid_{metric}_observation"
+    first = row.get("t_r_first_mono")
+    confirmed = row.get("t_r_confirmed_mono")
+    if first is not None:
+        if (type(first) not in (int, float) or not math.isfinite(first)
+                or first < t0 or first > t0 + limit or first > window_end):
+            return "invalid_recovery_observation"
+        if row.get("t_r_first_seconds") is not None and not math.isclose(
+                row["t_r_first_seconds"], first - t0, rel_tol=1e-9,
+                abs_tol=1e-9):
+            return "invalid_recovery_observation"
+    if confirmed is not None:
+        if (type(confirmed) not in (int, float)
+                or not math.isfinite(confirmed)
+                or confirmed < t0 or confirmed > t0 + limit
+                or confirmed > window_end or first is None
+                or confirmed < first):
+            return "invalid_recovery_observation"
+        if row.get("t_r_confirmed_seconds") is not None and not math.isclose(
+                row["t_r_confirmed_seconds"], confirmed - t0, rel_tol=1e-9,
+                abs_tol=1e-9):
+            return "invalid_recovery_observation"
+    if row.get("recovery_status") == "observed":
+        if (row.get("t_r_mono") is None or first is None
+                or confirmed is None
+                or not math.isclose(row["t_r_mono"], first, rel_tol=1e-9,
+                                    abs_tol=1e-9)
+                or window_end < confirmed
+                or row.get("recovery_confirmation") != "confirmed"):
+            return "incomplete_timing_bounds"
+    else:
+        if (row.get("t_r_mono") is not None or confirmed is not None
+                or row.get("recovery_confirmation") == "confirmed"):
+            return "invalid_recovery_observation"
+    store = row.get("t_e_store_mono")
+    if store is not None:
+        if (type(store) not in (int, float) or not math.isfinite(store)
+                or row.get("t_e_mono") is None
+                or store < row["t_e_mono"]):
+            return "invalid_evidence_store"
+        if row.get("evidence_store_seconds") is not None and not math.isclose(
+                row["evidence_store_seconds"], store - t0, rel_tol=1e-9,
+                abs_tol=1e-9):
+            return "invalid_evidence_store"
+    return None
+
+
 def _analysis_problem(row):
     status = row.get("status")
     if status not in ANALYSIS_STATUSES:
@@ -678,33 +773,9 @@ def _analysis_problem(row):
         return "unsupported_timing_convention"
     if row.get("window_completed") is not True:
         return "window_not_completed"
-    required_timing = (
-        "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_r_mono",
-        "t_r_first_mono", "t_r_confirmed_mono", "window_end_mono",
-    )
-    if any(field not in row for field in required_timing):
-        return "incomplete_timing_bounds"
-    numeric = (row.get("t0_mono"), row.get("t_a_mono"),
-               row.get("window_end_mono"))
-    if (any(type(value) not in (int, float) or not math.isfinite(value)
-            for value in numeric)
-            or row["t_a_mono"] < row["t0_mono"]
-            or row["window_end_mono"] < row["t0_mono"]):
-        return "invalid_timing_bounds"
-    limit = row.get("censor_seconds")
-    if (type(limit) not in (int, float) or not math.isfinite(limit)
-            or limit <= 0):
-        return "invalid_censor_seconds"
-    if row.get("status") == "observed":
-        if (row.get("stop_reason") != "recovery"
-                or row.get("recovery_status") != "observed"
-                or row.get("t_r_first_mono") is None
-                or row.get("t_r_confirmed_mono") is None):
-            return "incomplete_timing_bounds"
-    else:
-        if (row.get("stop_reason") != "timeout"
-                or row["window_end_mono"] < row["t0_mono"] + limit):
-            return "window_not_completed"
+    problem = _timing_problem(row)
+    if problem:
+        return problem
     scenario = row.get("scenario")
     if scenario not in SCENARIOS:
         return "invalid_scenario"

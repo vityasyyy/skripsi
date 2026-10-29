@@ -407,8 +407,10 @@ percobaan retry. Stdout, nilai Secret, dan ciphertext tidak disimpan.
   artefak bukti secara terpisah. Kegagalan tulis bukti adalah kegagalan yang
   terlihat, bukan sukses palsu.
 - `window_completed` dan `window_end_*` mencatat bahwa kolektor benar-benar
-  mencapai deadline (atau berhenti karena recovery terkonfirmasi). Baris
-  `right_censored` baru hanya diterima bila jendela selesai pada deadline;
+  mencapai deadline (atau berhenti karena recovery terkonfirmasi). Endpoint
+  primer/evaluasi/konfirmasi harus selesai tidak melewati `window_end` maupun
+  deadline; `t_a` dan `t_e_store` boleh melewati/overlap secara diagnostik.
+  Baris `right_censored` baru hanya diterima bila jendela selesai pada deadline;
   sampel terakhir yang berhenti terlalu awal tidak boleh disebut tersensor.
 - `t_r_first` = selesai observasi all-match pertama; `t_r_confirmed` = selesai
   observasi all-match berikutnya. `t_r` hanya `t_r_first` bila konfirmasi selesai

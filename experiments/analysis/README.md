@@ -106,16 +106,19 @@ Input divalidasi secara *fail-closed*: skema, pemetaan lengan, fase/rep,
 revisi/render, status metrik, batas monotonik/durasi, dan nilai tersensor yang
 tidak konsisten ditolak. Baris baru
 (`completed-observation-v1`) wajib membawa `t0/t_a`, endpoint/konfirmasi yang
-lengkap, serta `window_completed`/`window_end_*`; baris `right_censored` hanya
-diterima bila jendela benar-benar mencapai deadline. Baris legacy tanpa marker
-tetap divalidasi dengan aturan lama dan tidak diwajibkan memiliki bound baru;
-c69 tetap dapat divalidasi sebagai legacy tanpa inferensi komparatif.
-Dataset yang mencampur baris bermarker dan legacy, marker tak dikenal, atau
-marker `rows.jsonl` yang berbeda dari `analysis.jsonl` ditolak. Batas
-penyensoran divalidasi per baris; horizon RMST adalah batas terkecil per
-kelompok. Ketidakcocokan `rows.jsonl` dengan `analysis.jsonl` juga ditolak agar
-tidak ada baris yang hilang diam-diam. Analisis tidak mencetak nilai baris
-mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
+lengkap, serta `window_completed`/`window_end_*`; endpoint primer, evaluasi, dan
+konfirmasi harus selesai tidak melewati `window_end` maupun deadline, sedangkan
+`t_a` dan `t_e_store` boleh tumpang tindih/tertulis setelah stop secara
+diagnostik. Baris `right_censored` hanya diterima bila jendela benar-benar
+mencapai deadline. Baris legacy tanpa marker tetap divalidasi dengan aturan lama
+dan tidak diwajibkan memiliki bound baru; c69 tetap dapat divalidasi sebagai
+legacy tanpa inferensi komparatif. Dataset yang mencampur baris bermarker dan
+legacy, marker tak dikenal, atau marker `rows.jsonl` yang berbeda dari
+`analysis.jsonl` ditolak. `rows.jsonl` juga harus setuju pada window, konfirmasi,
+durasi store, dan identitas read/ref pendukung bila field itu tersedia; field
+legacy yang tidak tersedia tidak dipaksakan. Batas penyensoran divalidasi per
+baris; horizon RMST adalah batas terkecil per kelompok. Analisis tidak mencetak
+nilai baris mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
 
 `unobserved_before_stop` hanya diterima dengan nilai `null` dan provenance
 recovery dini yang valid (run `observed`, `stop_reason: recovery`, recovery
