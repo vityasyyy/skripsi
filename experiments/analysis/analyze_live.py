@@ -38,6 +38,8 @@ SCENARIOS = tuple("ABCDEFG")
 EFFICACY_SCENARIOS = frozenset("BCDE")
 METRICS = ("detection", "evidence", "recovery")
 STATUSES = frozenset({"observed", "right_censored"})
+METRIC_STATUSES = STATUSES | {"unobserved_before_stop"}
+TIMING_CONVENTION = "completed-observation-v1"
 POPULATIONS = {
     "A": "hpa_control",
     "B": "managed_drift",
@@ -77,7 +79,15 @@ ATTEMPT_FIELDS = ("batch_attempt", "batch_retry_of")
 RAW_ANALYSIS_FIELDS = (
     "batch_phase", "batch_mode", "source_revision", "render_sha256",
     "censor_seconds", "analysis_group", "efficacy_eligible", "synthetic",
-    "formal_execution_approved", "stack_isolated", "r3_status",
+    "formal_execution_approved", "stack_isolated", "r3_status", "stop_reason",
+    "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_e_store_mono",
+    "t_r_mono", "t_r_first_mono", "t_r_confirmed_mono",
+    "window_completed", "window_end_mono", "window_end_utc",
+    "recovery_confirmation", "t_r_first_seconds", "t_r_confirmed_seconds",
+    "evidence_store_seconds",
+    "detection_reads", "evidence_reads", "recovery_reads",
+    "detection_ref", "evidence_ref",
+    "detection_controller", "recovery_controller",
     "r1_baseline", "r1_first", "r1_last",
     "detection_seconds", "detection_status",
     "evidence_seconds", "evidence_status",
@@ -132,15 +142,131 @@ def _validate_metric(row, metric):
     value = row.get(metric + "_seconds")
     status = row.get(metric + "_status")
     limit = row["censor_seconds"]
-    _require(isinstance(status, str) and status in STATUSES,
-             f"{metric}_status is not observed/right_censored")
+    _require(isinstance(status, str) and status in METRIC_STATUSES,
+             f"{metric}_status is not a supported metric status")
     if status == "observed":
         _require(_number(value), f"{metric}_seconds is not a finite number")
         _require(0 <= value <= limit,
                  f"{metric}_seconds is outside [0, censor_seconds]")
-    else:
+    elif status == "right_censored":
         _require(value is None,
                  f"{metric}_seconds must be null when right_censored")
+    else:
+        _require(value is None,
+                 f"{metric}_seconds must be null when unobserved_before_stop")
+        _require(row.get("status") == "observed"
+                 and row.get("stop_reason") == "recovery"
+                 and row.get("recovery_status") == "observed",
+                 f"{metric}_status lacks a confirmed early-recovery provenance")
+
+
+def _validate_timing(row, strict):
+    """Validate completed-observation bounds for new-convention rows.
+
+    Legacy rows predate the convention and are validated by the older field
+    contract only; no new bound is invented for them.
+    """
+    if not strict:
+        return
+    required = (
+        "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_r_mono",
+        "t_r_first_mono", "t_r_confirmed_mono", "window_completed",
+        "window_end_mono",
+    )
+    missing = [field for field in required if field not in row]
+    _require(not missing,
+             f"new-convention row is missing timing fields: {missing}")
+    t0 = row.get("t0_mono")
+    limit = row.get("censor_seconds")
+    _require(_number(t0), "t0_mono is not finite")
+    t_a = row.get("t_a_mono")
+    _require(_number(t_a) and t_a >= t0, "t_a_mono is not after t0_mono")
+    if row.get("injection_seconds") is not None:
+        _require(math.isclose(row["injection_seconds"], t_a - t0,
+                              rel_tol=1e-9, abs_tol=1e-9),
+                 "injection_seconds disagrees with its bounds")
+    _require(row.get("window_completed") is True,
+             "new-convention row lacks completed observation-window provenance")
+    window_end = row.get("window_end_mono")
+    _require(_number(window_end) and window_end >= t0,
+             "window_end_mono is not a finite completion after t0")
+    if row.get("status") == "observed":
+        _require(row.get("stop_reason") == "recovery",
+                 "observed row does not record recovery as its stop reason")
+    else:
+        _require(row.get("stop_reason") == "timeout",
+                 "right-censored row does not record a timeout stop")
+        _require(window_end >= t0 + limit,
+                 "right-censored row did not complete its observation window")
+    for metric in METRICS:
+        key = {"detection": "t_d", "evidence": "t_e",
+               "recovery": "t_r"}[metric]
+        point = row.get(key + "_mono")
+        value = row.get(metric + "_seconds")
+        status = row.get(metric + "_status")
+        if point is None:
+            _require(value is None and status != "observed",
+                     f"{key}_mono is missing for an observed metric")
+            continue
+        _require(_number(point), f"{key}_mono is not finite")
+        _require(point >= t0, f"{key}_mono precedes t0_mono")
+        _require(point <= t0 + limit, f"{key}_mono exceeds the censor limit")
+        _require(point <= window_end,
+                 f"{key}_mono occurs after the observation window ended")
+        _require(_number(value)
+                 and math.isclose(value, point - t0, rel_tol=1e-9,
+                                  abs_tol=1e-9),
+                 f"{metric}_seconds disagrees with its bounds")
+        _require(status == "observed",
+                 f"{key}_mono is present for a non-observed metric")
+    t_r_first = row.get("t_r_first_mono")
+    t_r_confirmed = row.get("t_r_confirmed_mono")
+    if t_r_first is not None:
+        _require(_number(t_r_first) and t0 <= t_r_first <= t0 + limit,
+                 "t_r_first_mono is outside the observation window")
+        _require(t_r_first <= window_end,
+                 "t_r_first_mono occurs after the observation window ended")
+        if row.get("t_r_first_seconds") is not None:
+            _require(math.isclose(row["t_r_first_seconds"],
+                                  t_r_first - t0, rel_tol=1e-9,
+                                  abs_tol=1e-9),
+                     "t_r_first_seconds disagrees with its bounds")
+    if t_r_confirmed is not None:
+        _require(_number(t_r_confirmed)
+                 and t0 <= t_r_confirmed <= t0 + limit,
+                 "t_r_confirmed_mono is outside the observation window")
+        _require(t_r_confirmed <= window_end,
+                 "t_r_confirmed_mono occurs after the observation window ended")
+        _require(t_r_first is not None and t_r_confirmed >= t_r_first,
+                 "confirmation bounds are not ordered")
+        if row.get("t_r_confirmed_seconds") is not None:
+            _require(math.isclose(row["t_r_confirmed_seconds"],
+                                  t_r_confirmed - t0, rel_tol=1e-9,
+                                  abs_tol=1e-9),
+                     "t_r_confirmed_seconds disagrees with its bounds")
+    if row.get("recovery_status") == "observed":
+        _require(row.get("t_r_mono") is not None
+                 and t_r_first is not None
+                 and t_r_confirmed is not None
+                 and math.isclose(row["t_r_mono"], t_r_first,
+                                  rel_tol=1e-9, abs_tol=1e-9)
+                 and window_end >= t_r_confirmed
+                 and row.get("recovery_confirmation") == "confirmed",
+                 "confirmed recovery lacks ordered first/confirmation bounds "
+                 "and window-stop support")
+    else:
+        _require(row.get("t_r_mono") is None and t_r_confirmed is None
+                 and row.get("recovery_confirmation") != "confirmed",
+                 "unconfirmed recovery carries a primary recovery bound")
+    store = row.get("t_e_store_mono")
+    if store is not None:
+        _require(_number(store) and row.get("t_e_mono") is not None
+                 and store >= row["t_e_mono"],
+                 "t_e_store_mono precedes the evidence evaluation")
+        if row.get("evidence_store_seconds") is not None:
+            _require(math.isclose(row["evidence_store_seconds"],
+                                  store - t0, rel_tol=1e-9, abs_tol=1e-9),
+                     "evidence_store_seconds disagrees with its bounds")
 
 
 def _run_attempt(row, label, base_run_id):
@@ -182,11 +308,19 @@ def validate_rows(rows):
     _require(isinstance(rows, list) and rows, "dataset must be a non-empty list")
     batches, revisions, renders = set(), set(), set()
     approvals, isolated, modes = set(), set(), set()
+    conventions = set()
     seen_runs, seen_blocks = set(), set()
     for index, row in enumerate(rows, 1):
         _require(isinstance(row, dict), f"row {index} is not an object")
         missing = sorted(REQUIRED_FIELDS - set(row))
         _require(not missing, f"row {index} missing fields: {missing}")
+        marker = row.get("timing_convention")
+        _require(marker is None or isinstance(marker, str),
+                 f"row {index} has an invalid timing_convention")
+        if marker is not None:
+            _require(marker == TIMING_CONVENTION,
+                     f"row {index} has an unsupported timing_convention")
+        conventions.add(marker)
         _require(type(row["schema_version"]) is int
                  and row["schema_version"] == 2,
                  f"row {index} has unsupported schema_version")
@@ -241,6 +375,7 @@ def validate_rows(rows):
                  f"row {index} has invalid censor_seconds")
         for metric in METRICS:
             _validate_metric(row, metric)
+        _validate_timing(row, marker == TIMING_CONVENTION)
         for field in ("r1_baseline", "r1_first", "r1_last"):
             value = row[field]
             _require(value is None or (_number(value) and 0 <= value <= 100),
@@ -269,6 +404,8 @@ def validate_rows(rows):
     _require(len(approvals) == 1, "dataset mixes approval attestations")
     _require(len(isolated) == 1, "dataset mixes stack isolation attestations")
     _require(len(modes) == 1, "dataset mixes batch modes")
+    _require(len(conventions) == 1,
+             "dataset mixes completed-observation timing conventions")
     return {
         "batch_id": batches.pop(),
         "source_revision": revisions.pop(),
@@ -276,6 +413,7 @@ def validate_rows(rows):
         "formal_execution_approved": approvals.pop(),
         "stack_isolated": isolated.pop(),
         "batch_mode": modes.pop(),
+        "timing_convention": conventions.pop(),
         "analysis_rows": len(rows),
     }
 
@@ -480,6 +618,16 @@ def _bootstrap_median(values, resamples, seed):
     return [_percentile(draws, 0.025), _percentile(draws, 0.975)]
 
 
+def _excluded_count(exclusions, scenario, arm, phase="R2"):
+    if exclusions is None or exclusions.get("count") is None:
+        return None
+    return sum(
+        1 for item in exclusions["rows"]
+        if item.get("scenario") == scenario
+        and ARM_ENV.get(item.get("arm"), item.get("arm")) == arm
+        and item.get("phase") == phase)
+
+
 def _pairing(rows, metric):
     arms = {"manual": {}, "gitops": {}}
     for row in rows:
@@ -490,35 +638,60 @@ def _pairing(rows, metric):
     complete = [rep for rep in matched
                 if arms["manual"][rep][metric + "_status"] == "observed"
                 and arms["gitops"][rep][metric + "_status"] == "observed"]
-    censored = len(matched) - len(complete)
+    missing = [rep for rep in matched
+               if "unobserved_before_stop" in (
+                   arms["manual"][rep][metric + "_status"],
+                   arms["gitops"][rep][metric + "_status"])]
+    censored = [rep for rep in matched
+                if rep not in missing
+                and "right_censored" in (
+                    arms["manual"][rep][metric + "_status"],
+                    arms["gitops"][rep][metric + "_status"])]
     unmatched = len(blocks) - len(matched)
-    if (blocks and not unmatched and not censored
+    if (blocks and not unmatched and not missing and not censored
             and len(complete) >= MIN_PAIRS):
         return {"method": "paired", "reason": "complete_paired_blocks",
                 "blocks": len(blocks), "complete_pairs": len(complete),
-                "censored_blocks": 0, "unmatched_blocks": 0}
+                "right_censored_blocks": 0, "missing_blocks": 0,
+                "unmatched_blocks": 0, "censored_blocks": 0}
     if not blocks:
         reason = "no_r2_rows"
     elif unmatched:
         reason = "unmatched_arm_blocks"
+    elif missing:
+        reason = "missing_blocks"
     elif censored:
         reason = "censored_blocks"
     else:
         reason = "fewer_than_2_pairs"
     return {"method": "unpaired", "reason": reason, "blocks": len(blocks),
-            "complete_pairs": len(complete), "censored_blocks": censored,
-            "unmatched_blocks": unmatched}
+            "complete_pairs": len(complete),
+            "right_censored_blocks": len(censored),
+            "missing_blocks": len(missing),
+            "unmatched_blocks": unmatched,
+            "censored_blocks": len(censored)}
 
 
-def _comparison(rows, scenario, metric, bootstrap, seed):
+def _comparison(rows, scenario, metric, bootstrap, seed, exclusions=None):
     pairing = _pairing(rows, metric)
     manual = {row["rep"]: row for row in rows if row["env"] == "manual"}
     gitops = {row["rep"]: row for row in rows if row["env"] == "gitops"}
     observed = {"manual": [], "gitops": []}
+    counts = {}
     for arm, rows_by_rep in (("manual", manual), ("gitops", gitops)):
+        counts[arm] = {"observed": 0, "right_censored": 0,
+                       "missing": 0,
+                       "excluded": _excluded_count(
+                           exclusions, scenario, arm)}
         for row in rows_by_rep.values():
-            if row[metric + "_status"] == "observed":
+            status = row[metric + "_status"]
+            if status == "observed":
                 observed[arm].append(row[metric + "_seconds"])
+                counts[arm]["observed"] += 1
+            elif status == "right_censored":
+                counts[arm]["right_censored"] += 1
+            else:
+                counts[arm]["missing"] += 1
     differences = []
     pairs = []
     if pairing["method"] == "paired":
@@ -576,6 +749,9 @@ def _comparison(rows, scenario, metric, bootstrap, seed):
         analysis_set = "observed_values_only"
         note = ("Unpaired fallback uses observed values only; censoring is "
                 "not adjusted.")
+    if pairing["missing_blocks"]:
+        note += (" Missing endpoints are excluded from the numeric test and "
+                 "are not treated as censored observations.")
     return {
         "scenario": scenario,
         "metric": metric,
@@ -584,13 +760,14 @@ def _comparison(rows, scenario, metric, bootstrap, seed):
         "analysis_set": analysis_set,
         "censoring_adjusted": False,
         "note": note,
+        "endpoints": counts,
         "test": {"name": test_name, "statistic": statistic,
                  "p_value": p_value, "method": method, **size},
         "effect": effect,
     }
 
 
-def _survival_entries(rows):
+def _survival_entries(rows, exclusions=None):
     groups = {}
     for row in rows:
         groups.setdefault((row["scenario"], row["env"]), []).append(row)
@@ -603,15 +780,24 @@ def _survival_entries(rows):
                       if row[metric + "_status"] == "observed"]
             censored = [row["censor_seconds"] for row in group
                         if row[metric + "_status"] == "right_censored"]
+            missing = sum(1 for row in group
+                          if row[metric + "_status"] == "unobserved_before_stop")
+            excluded = _excluded_count(exclusions, scenario, arm)
             horizon = min(row["censor_seconds"] for row in group)
             curve = kaplan_meier(events, censored, horizon)
             administrative = sum(1 for value in events if value > horizon)
+            estimable = bool(events or censored)
             note = None
-            if administrative:
+            if not estimable:
+                note = ("not estimable: all endpoints are missing before stop; "
+                        "they are not censored observations")
+            elif administrative:
                 note = ("observed events beyond the RMST horizon are "
                         "administratively censored")
             elif curve["events"] == 0:
                 note = "all observations censored"
+            elif missing:
+                note = "missing endpoints excluded from survival, not censored"
             elif not curve["median_reached"]:
                 note = "median not reached within horizon"
             entries.append({
@@ -621,6 +807,11 @@ def _survival_entries(rows):
                 "population": POPULATIONS[scenario],
                 "included_in_efficacy": scenario in EFFICACY_SCENARIOS,
                 **curve,
+                "observed": len(events),
+                "right_censored": len(censored),
+                "missing": missing,
+                "excluded_runs": excluded,
+                "estimable": estimable,
                 "censor_limits_seconds": sorted(
                     {row["censor_seconds"] for row in group}),
                 "administratively_censored": administrative,
@@ -691,6 +882,11 @@ def _classify_raw(row):
         status = row.get(metric + "_status")
         if status == "right_censored" and value is None:
             continue
+        if (status == "unobserved_before_stop" and value is None
+                and row.get("status") == "observed"
+                and row.get("stop_reason") == "recovery"
+                and row.get("recovery_status") == "observed"):
+            continue
         if (status == "observed" and _number(value)
                 and 0 <= value <= limit):
             continue
@@ -716,8 +912,20 @@ def _raw_identity(row, index, batch_id):
 
 def _validate_analyzed_raw(raw, analysis, index):
     """Reject raw evidence that disagrees with its analyzed run."""
+    raw_marker = raw.get("timing_convention")
+    analysis_marker = analysis.get("timing_convention")
+    _require((raw_marker is None) == (analysis_marker is None),
+             f"raw row {index} timing_convention disagrees with analysis row")
+    if raw_marker is not None:
+        _require(raw_marker == analysis_marker,
+                 f"raw row {index} timing_convention disagrees with analysis row")
+    if raw_marker == TIMING_CONVENTION:
+        one_sided = [field for field in RAW_ANALYSIS_FIELDS
+                     if (field in raw) != (field in analysis)]
+        _require(not one_sided,
+                 f"raw row {index} has one-sided timing fields: {one_sided}")
     for field in RAW_ANALYSIS_FIELDS:
-        if field in raw:
+        if field in raw and field in analysis:
             _require(raw[field] == analysis[field],
                      f"raw row {index} {field} disagrees with analysis row")
     if "env" in raw:
@@ -784,6 +992,7 @@ def _exclusions(rows, raw_rows):
     _require(isinstance(raw_rows, list) and raw_rows,
              "rows.jsonl must contain at least one row")
     batch_id = rows[0]["batch_id"]
+    analysis_marker = rows[0].get("timing_convention")
     analyzed = {row["run_id"]: row for row in rows}
     raw_ids = []
     cells = {}
@@ -792,6 +1001,11 @@ def _exclusions(rows, raw_rows):
         run_id = row.get("run_id")
         _require(isinstance(run_id, str) and 0 < len(run_id) <= 128,
                  f"raw row {index} has invalid run_id")
+        marker = row.get("timing_convention")
+        _require(marker == analysis_marker,
+                 f"raw row {index} timing_convention disagrees with analysis rows")
+        _validate_timing(
+            row, marker == TIMING_CONVENTION and row.get("status") in STATUSES)
         _require(row.get("batch_id") == batch_id,
                  f"raw row {index} belongs to another batch")
         cell, attempt = _raw_identity(row, index, batch_id)
@@ -819,6 +1033,7 @@ def _exclusions(rows, raw_rows):
             "scenario": (row.get("scenario")
                          if row.get("scenario") in SCENARIOS else None),
             "rep": row.get("rep") if type(row.get("rep")) is int else None,
+            "phase": row.get("batch_phase"),
             "reason": reason,
         })
     by_reason = {}
@@ -837,6 +1052,7 @@ def analyze(rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP,
     _require(type(seed) is int and seed >= 0, "seed must be a non-negative integer")
     _require(_number(alpha) and 0 < alpha < 1, "alpha must be in (0, 1)")
     meta = validate_rows(rows)
+    exclusions = _exclusions(rows, raw_rows)
     r2_rows = [row for row in rows if row["batch_phase"] == "R2"]
     overview = []
     for scenario in SCENARIOS:
@@ -845,6 +1061,19 @@ def analyze(rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP,
                      if row["scenario"] == scenario and row["env"] == arm]
             if not group:
                 continue
+            counts = {}
+            for metric in METRICS:
+                counts[metric] = {
+                    "observed": sum(1 for row in group
+                                    if row[metric + "_status"] == "observed"),
+                    "right_censored": sum(1 for row in group
+                                          if row[metric + "_status"]
+                                          == "right_censored"),
+                    "missing": sum(1 for row in group
+                                   if row[metric + "_status"]
+                                   == "unobserved_before_stop"),
+                    "excluded": _excluded_count(exclusions, scenario, arm),
+                }
             overview.append({
                 "scenario": scenario,
                 "arm": arm,
@@ -854,13 +1083,15 @@ def analyze(rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP,
                 "right_censored_runs": sum(1 for row in group
                                            if row["status"] == "right_censored"),
                 "population": POPULATIONS[scenario],
+                "metrics": counts,
             })
-    survival_entries = _survival_entries(r2_rows)
+    survival_entries = _survival_entries(r2_rows, exclusions)
     efficacy = []
     for scenario in sorted(EFFICACY_SCENARIOS):
         for metric in METRICS:
             group = [row for row in r2_rows if row["scenario"] == scenario]
-            efficacy.append(_comparison(group, scenario, metric, bootstrap, seed))
+            efficacy.append(_comparison(
+                group, scenario, metric, bootstrap, seed, exclusions))
     p_values = [item["test"]["p_value"] for item in efficacy
                 if item["test"]["p_value"] is not None]
     adjusted = holm_adjust(p_values, FAMILY_SIZE)
@@ -893,10 +1124,13 @@ def analyze(rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP,
             "alpha": alpha,
             "bootstrap_resamples": bootstrap,
             "bootstrap_seed": seed,
+            "timing_convention": meta["timing_convention"],
             "claim_status": "exploratory_case_study",
             "confirmatory_claims": False,
         },
         "method": {
+            "timing_convention": ("completed read/evaluation endpoints; "
+                                  "right-censored only after a valid window"),
             "pairing_rule": ("all scenario/rep blocks complete for the "
                              "metric, with at least two pairs"),
             "paired_test": ("two-sided Wilcoxon signed-rank; exact sign-flip "
@@ -908,12 +1142,12 @@ def analyze(rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP,
             "holm_family": ("B-E x detection/evidence/recovery, 12 "
                             "predeclared hypotheses"),
             "survival": ("Kaplan-Meier and RMST to the smallest frozen censor "
-                         "limit per group"),
+                         "limit per group; missing endpoints are excluded"),
             "r1": ("descriptive median baseline/first/last with explicit "
                    "missing counts"),
             "claims": "exploratory case study; no confirmatory claims",
         },
-        "exclusions": _exclusions(rows, raw_rows),
+        "exclusions": exclusions,
         "overview": overview,
         "r1": _r1_entries(rows),
         "survival": survival_entries,
@@ -940,6 +1174,10 @@ def analyze(rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP,
             "efficacy_eligible=true; the frozen method classifies G as "
             "descriptive non-Argo.",
             "Censored observations are never imputed as zero.",
+            "Missing endpoints (unobserved_before_stop) are excluded from "
+            "survival and numeric tests; they are not censored observations.",
+            "Paired and unpaired tests are complete-case/observed-only; "
+            "missingness and censoring are not adjusted.",
             "Paired tests require every scenario/rep block to have both arms "
             "fully observed and at least two pairs.",
             "The RMST horizon is the smallest frozen censor limit per group.",
@@ -1118,20 +1356,23 @@ def _survival_tex(result):
         r"\setlength{\tabcolsep}{3pt}",
         r"\caption{Kaplan--Meier dan RMST waktu R2 per skenario dan lengan}",
         r"\label{tab:live-survival}",
-        r"\begin{tabular}{lllrrrrrr}",
+        r"\begin{tabular}{lllrrrrrrrrr}",
         r"\hline",
-        r"Skenario & Lengan & Metrik & $n$ & Event & Tersensor & "
-        r"Horizon (s) & Median (s) & RMST (s) \\",
+        r"Skenario & Lengan & Metrik & $n$ & Event & Tersensor & Hilang & "
+        r"Eksklusi & Horizon (s) & Median (s) & RMST (s) \\",
         r"\hline",
     ]
     for item in result["survival"]:
         median_text = _num(item["median_seconds"])
-        if not item["median_reached"]:
+        if not item["estimable"]:
+            median_text = r"--$^{\dagger}$"
+        elif not item["median_reached"]:
             median_text = "--$^{*}$"
         lines.append(
             f"{item['scenario']} & {item['arm']} & "
             f"{METRIC_LABELS[item['metric']]} & {item['n']} & "
-            f"{item['events']} & {item['censored']} & "
+            f"{item['events']} & {item['censored']} & {item['missing']} & "
+            f"{item['excluded_runs'] if item['excluded_runs'] is not None else '--'} & "
             f"{_num(item['horizon_seconds'])} & {median_text} & "
             f"{_num(item['rmst_seconds'])} \\\\")
     lines.extend([
@@ -1140,9 +1381,12 @@ def _survival_tex(result):
         r"\end{table}",
         r"\par\smallskip",
         r"\noindent\footnotesize $^{*}$ Median tidak tercapai dalam horizon. "
-        r"Data tersensor tidak diimputasi nol; RMST memakai horizon batas "
-        r"penyensoran terkecil per kelompok. A = kontrol HPA, F = batas "
-        r"visibilitas, G = deskriptif non-Argo; hanya B--E masuk efikasi.",
+        r"$^{\dagger}$ Tidak terestimasi karena seluruh endpoint hilang "
+        r"sebelum berhenti, bukan tersensor. Data tersensor tidak diimputasi "
+        r"nol; RMST memakai horizon batas penyensoran terkecil per kelompok. "
+        r"Endpoint hilang tidak masuk Kaplan--Meier, RMST, atau uji numerik. "
+        r"A = kontrol HPA, F = batas visibilitas, G = deskriptif non-Argo; "
+        r"hanya B--E masuk efikasi.",
         "",
     ])
     return "\n".join(lines)
@@ -1190,7 +1434,7 @@ def _tests_tex(result):
         r"\end{table}",
         r"\par\smallskip",
         r"\noindent\footnotesize P = berpasangan; U = tidak berpasangan "
-        r"(tersensor, tanpa pasangan, atau kurang dari dua pasangan). "
+        r"(tersensor, hilang, tanpa pasangan, atau kurang dari dua pasangan). "
         r"Keputusan: ``tolak'' = tolak $H_0$ setelah Holm; ``gagal'' = gagal "
         r"menolak $H_0$; ``--'' = tidak terestimasi. Semua uji eksploratif; "
         r"tidak ada klaim konfirmatoris. Keluarga Holm berisi 12 hipotesis "

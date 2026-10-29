@@ -105,6 +105,7 @@ def make_row(item, status="observed", **overrides):
         "run_id": overrides.pop("run_id", None),
         "synthetic": False,
         "formal_execution_approved": False,
+        "timing_convention": run_matrix.TIMING_CONVENTION,
         "dry_run": False,
         "mutations_executed": 1,
         "env": item["arm"],
@@ -126,6 +127,17 @@ def make_row(item, status="observed", **overrides):
         "cleanup_status": "ok",
         "arm_restore_status": "restored",
         "postcondition": {"verified": True},
+        "window_completed": True,
+        "window_end_mono": 130.0,
+        "t0_mono": 100.0,
+        "t_a_mono": 100.1,
+        "t_d_mono": 101.0,
+        "t_e_mono": 101.5,
+        "t_r_mono": 102.0,
+        "t_r_first_mono": 102.0,
+        "t_r_confirmed_mono": 103.0,
+        "recovery_confirmation": "confirmed",
+        "stop_reason": "recovery",
     }
     row.update(overrides)
     return row
@@ -258,6 +270,8 @@ class DryRunTests(unittest.TestCase):
         self.assertFalse(manifest["formal_execution_approved"])
         self.assertFalse(manifest["stack_isolated"])
         self.assertEqual(manifest["r3_status"], "not_measured")
+        self.assertEqual(manifest["timing_convention"],
+                         run_matrix.TIMING_CONVENTION)
         self.assertEqual(len(manifest["arm_order"]), 2)
         self.assertEqual(sorted(manifest["scenario_order"]), ["A", "B"])
         rows = [json.loads(line) for line in
@@ -270,6 +284,8 @@ class DryRunTests(unittest.TestCase):
             self.assertFalse(row["formal_execution_approved"])
             self.assertFalse(row["stack_isolated"])
             self.assertEqual(row["r3_status"], "not_measured")
+            self.assertEqual(row["timing_convention"],
+                             run_matrix.TIMING_CONVENTION)
             self.assertIn(row["batch_phase"], ("R1", "R2"))
         self.assertEqual((out / "dry.analysis.jsonl").read_text(), "")
         summary = json.loads((out / "dry.summary.json").read_text())
@@ -284,6 +300,63 @@ class DryRunTests(unittest.TestCase):
                 run_matrix.parse_args([
                     "--out", directory, "--production-like"])
             self.assertEqual(raised.exception.code, 2)
+
+
+class TimingConventionTests(unittest.TestCase):
+    def test_new_batch_records_the_convention_in_manifest_rows_and_summary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(run_quiet(
+                run_matrix.parse_args(live_args(
+                    directory, "timed", "gitops", "A", "1")),
+                run_one=fake_runner()[0]), 0)
+            manifest = json.loads(
+                (Path(directory) / "timed.manifest.json").read_text())
+            rows = [json.loads(line) for line in
+                    (Path(directory) / "timed.rows.jsonl").read_text().splitlines()]
+            summary = json.loads(
+                (Path(directory) / "timed.summary.json").read_text())
+            self.assertEqual(manifest["timing_convention"],
+                             run_matrix.TIMING_CONVENTION)
+            self.assertTrue(rows)
+            self.assertTrue(all(row["timing_convention"]
+                                == run_matrix.TIMING_CONVENTION for row in rows))
+            self.assertEqual(summary["timing_convention"],
+                             run_matrix.TIMING_CONVENTION)
+
+    def test_resume_rejects_missing_or_changed_convention(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            args = run_matrix.parse_args(live_args(
+                directory, "timed", "gitops", "A", "1"))
+            self.assertEqual(run_quiet(args, run_one=fake_runner()[0]), 0)
+            manifest_path = out / "timed.manifest.json"
+            original = json.loads(manifest_path.read_text())
+            resume = run_matrix.parse_args(live_args(
+                directory, "timed", "gitops", "A", "1", "--resume"))
+
+            changed = dict(original)
+            changed["timing_convention"] = "legacy-observation-v0"
+            manifest_path.write_text(json.dumps(changed))
+            with self.assertRaises(run_matrix.BatchSafetyError):
+                run_quiet(resume, run_one=fake_runner()[0])
+
+            missing = dict(original)
+            del missing["timing_convention"]
+            manifest_path.write_text(json.dumps(missing))
+            with self.assertRaises(run_matrix.BatchSafetyError):
+                run_quiet(resume, run_one=fake_runner()[0])
+
+    def test_annotation_rejects_an_unsupported_row_convention(self):
+        args = run_matrix.parse_args(live_args(
+            tempfile.gettempdir(), "timed", "gitops", "A", "1"))
+        entry = {"index": 0, "phase": "R2"}
+        for marker in (None, "legacy-observation-v0"):
+            with self.subTest(marker=marker):
+                row = {"run_id": "timed-gitops-A-r01"}
+                if marker is not None:
+                    row["timing_convention"] = marker
+                with self.assertRaises(run_matrix.BatchSafetyError):
+                    run_matrix.annotate_row(row, entry, args, "timed")
 
 
 class BatchSafetyTests(unittest.TestCase):
@@ -866,8 +939,15 @@ class AnalysisOutputTests(unittest.TestCase):
     def test_summary_counts_censoring_and_exclusions(self):
         with tempfile.TemporaryDirectory() as directory:
             def mutate(row):
+                row["status"] = "right_censored"
+                row["stop_reason"] = "timeout"
                 row["recovery_seconds"] = None
                 row["recovery_status"] = "right_censored"
+                row["t_r_mono"] = None
+                row["t_r_first_mono"] = None
+                row["t_r_confirmed_mono"] = None
+                row["recovery_confirmation"] = "none"
+                row["window_end_mono"] = 130.0
 
             args = run_matrix.parse_args(live_args(
                 directory, "censor", "gitops imperative", "B", "1"))
@@ -879,7 +959,8 @@ class AnalysisOutputTests(unittest.TestCase):
             self.assertEqual(summary["censoring"]["R2"]["recovery"],
                              {"observed": 0, "right_censored": 2,
                               "unobserved_before_stop": 0})
-            self.assertEqual(summary["phases"]["R2"]["observed"], 2)
+            self.assertEqual(summary["phases"]["R2"]["observed"], 0)
+            self.assertEqual(summary["phases"]["R2"]["right_censored"], 2)
 
 
 class TokenSafetyTests(unittest.TestCase):

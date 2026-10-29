@@ -11,27 +11,38 @@ import sys
 def summarize(rows):
     groups = {}
     identities = set()
+    conventions = set()
     for row in rows:
         if row["schema_version"] != 2 or row["run_id"] in identities:
             raise ValueError("wrong schema or duplicate run identity")
         identities.add(row["run_id"])
+        marker = row.get("timing_convention")
+        if marker is not None and marker != "completed-observation-v1":
+            raise ValueError("unknown timing convention")
+        conventions.add(marker)
         scenario = row["scenario"]
         if scenario not in "ABCDEFG" or len(scenario) != 1 or row["env"] not in ("manual", "gitops"):
             raise ValueError("unknown scenario/arm")
         group = "hpa_control" if scenario == "A" else "visibility_boundary" if scenario == "F" else "managed_drift"
         if row["analysis_group"] != group or type(row["synthetic"]) is not bool:
             raise ValueError("invalid analysis classification")
-        key = (scenario, row["env"], group, row["synthetic"], row["source_revision"], row["render_sha256"])
+        key = (scenario, row["env"], group, row["synthetic"],
+               row["source_revision"], row["render_sha256"], marker)
         groups.setdefault(key, []).append(row)
+    if len(conventions) != 1:
+        raise ValueError("mixed timing conventions")
+    convention = conventions.pop()
     result = []
     for key, runs in sorted(groups.items()):
-        scenario, env, group, synthetic, revision, digest = key
+        scenario, env, group, synthetic, revision, digest, marker = key
         summary = {"scenario": scenario, "env": env, "analysis_group": group,
                    "synthetic": synthetic, "source_revision": revision,
-                   "render_sha256": digest, "runs": len(runs),
+                   "render_sha256": digest,
+                   "timing_convention": marker,
+                   "runs": len(runs),
                    "complete_time_observations": True}
         for metric in ("detection", "evidence", "recovery"):
-            observed, censored = [], 0
+            observed, censored, missing = [], 0, 0
             for row in runs:
                 value = row[metric + "_seconds"]
                 status = row[metric + "_status"]
@@ -40,17 +51,27 @@ def summarize(rows):
                     raise ValueError("invalid observation limit")
                 if status == "right_censored" and value is None:
                     censored += 1
+                elif status == "unobserved_before_stop":
+                    if (value is not None
+                            or row.get("status") != "observed"
+                            or row.get("stop_reason") != "recovery"
+                            or row.get("recovery_status") != "observed"):
+                        raise ValueError(
+                            "missing endpoint without early-stop provenance")
+                    missing += 1
                 elif status == "observed" and type(value) in (int, float) and math.isfinite(value) and 0 <= value <= limit:
                     observed.append(value)
                 else:
                     raise ValueError("invalid event time/status; no imputation allowed")
             summary[metric] = {"observed": len(observed), "right_censored": censored,
+                               "missing": missing,
                                "observed_median_seconds": median(observed) if observed else None}
-            summary["complete_time_observations"] &= censored == 0
+            summary["complete_time_observations"] &= censored == 0 and missing == 0
         result.append(summary)
     if not result:
         raise ValueError("empty dataset")
     return {"schema_version": 2, "formal_execution_approved": False,
+            "timing_convention": convention,
             "note": "Observed-only medians are not censoring-adjusted comparisons; no efficacy inference.",
             "groups": result}
 

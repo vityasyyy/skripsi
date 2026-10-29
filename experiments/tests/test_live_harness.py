@@ -180,17 +180,78 @@ def application(name="invenio-bootstrap", automated=None, sync="Synced"):
 
 
 def observation(at=0, deployment=None, configmap=None, secret=None, service=None,
-                hpa=None, argo=None, extras=None):
+                hpa=None, argo=None, extras=None, acquisition=None,
+                read_finish=None, evaluated_at=None, evaluated_signal=False,
+                evaluated_reads=None):
     deployment = deployment or web_deployment()
     objects = [deployment, configmap or web_configmap(), secret or sealed_secret(),
                service or web_service()]
-    return harness.observation_from_objects(
+    if acquisition is None:
+        acquisition = acquisition_for(at, read_finish)
+    observed = harness.observation_from_objects(
         objects, at=point(at),
         argo=argo or {"invenio-bootstrap": harness.application_state(application()),
                       "apps": harness.application_state(application("apps"))},
         hpa=hpa or harness.hpa_state(web_hpa(), deployment),
         extras=extras or [],
+        acquisition=acquisition,
     )
+    if evaluated_at is not None:
+        observed.evaluated_at = (evaluated_at if isinstance(evaluated_at, harness.Point)
+                                 else point(evaluated_at))
+        observed.evaluated_signal = bool(evaluated_signal)
+        observed.evaluated_reads = list(evaluated_reads or [])
+    return observed
+
+
+def read_record(start, finish=None, kind="ConfigMap", name="x",
+                namespace="invenio", ok=True, present=True):
+    finish = start if finish is None else finish
+    started = point(start)
+    finished = point(finish)
+    return {
+        "kind": kind, "name": name, "namespace": namespace,
+        "started_utc": started.utc, "started_mono": started.mono,
+        "finished_utc": finished.utc, "finished_mono": finished.mono,
+        "ok": ok, "present": present,
+        "attempts": [{
+            "started_utc": started.utc, "started_mono": started.mono,
+            "finished_utc": finished.utc, "finished_mono": finished.mono,
+            "ok": ok, "returncode": 0 if ok else 1,
+        }],
+    }
+
+
+READ_KEYS = (
+    "Deployment/invenio-web",
+    "ConfigMap/invenio-app-config-6dg2chdbh4",
+    "SealedSecret/invenio-app-secrets",
+    "Service/invenio-web",
+    "HorizontalPodAutoscaler/invenio-web-hpa",
+    "Application/apps",
+    "Application/invenio-bootstrap",
+    "Namespace/exp-invenio-drift",
+)
+
+
+def acquisition_for(at, read_finish=None, starts=None, finishes=None):
+    read_finish = at if read_finish is None else read_finish
+    starts = starts or {}
+    finishes = finishes or {}
+    reads = {}
+    for key in READ_KEYS:
+        kind, name = key.split("/", 1)
+        reads[key] = read_record(
+            starts.get(key, at), finishes.get(key, read_finish),
+            kind=kind, name=name)
+    return {
+        "started": {"mono": float(at), "utc": point(at).utc},
+        "finished": {"mono": float(read_finish), "utc": point(read_finish).utc},
+        "started_mono": float(at), "started_utc": point(at).utc,
+        "finished_mono": float(read_finish),
+        "finished_utc": point(read_finish).utc,
+        "reads": reads,
+    }
 
 
 def contract(obs=None, decl=None):
@@ -306,7 +367,7 @@ class FakeKubectl:
     """In-memory kubectl with just the high-level operations the harness uses."""
 
     def __init__(self, apps=None, objects=None, fail_patch=False,
-                 no_op_patch=False, fail_delete=False):
+                 no_op_patch=False, fail_delete=False, clock=None):
         self.apps = apps or {
             "apps": application("apps"),
             "invenio-bootstrap": application(),
@@ -315,10 +376,35 @@ class FakeKubectl:
         self.fail_patch = fail_patch
         self.no_op_patch = no_op_patch
         self.fail_delete = fail_delete
+        self.clock = clock
         self.patches = []
         self.deletes = []
         self.applies = []
         self.annotations = []
+        self.reads = []
+
+    def _now(self):
+        if self.clock is not None:
+            return self.clock.now()
+        return point(0)
+
+    def read(self, kind, name=None, namespace=None, selector=None, guard=None):
+        started = self._now()
+        payload = self.get(kind, name, namespace, selector)
+        finished = started
+        record = {
+            "kind": kind, "name": name, "namespace": namespace,
+            "started_utc": started.utc, "started_mono": started.mono,
+            "finished_utc": finished.utc, "finished_mono": finished.mono,
+            "ok": True, "present": payload is not None,
+            "attempts": [{
+                "started_utc": started.utc, "started_mono": started.mono,
+                "finished_utc": finished.utc, "finished_mono": finished.mono,
+                "ok": True, "returncode": 0,
+            }],
+        }
+        self.reads.append(record)
+        return payload, record
 
     def get(self, kind, name=None, namespace=None, selector=None):
         if kind == "Application":
@@ -1330,8 +1416,11 @@ class BaselineReadinessTests(unittest.TestCase):
                 snapshotter, kubectl, "gitops", 5, 1, clock,
                 sleep=clock.sleep)
         acquisition = caught.exception.readiness_failures[-1]["acquisition"]
-        self.assertEqual(set(acquisition), {"snapshot", "pods", "nodes"})
+        self.assertTrue({"snapshot", "pods", "nodes", "started", "finished",
+                         "reads"}.issubset(acquisition))
         for segment in acquisition.values():
+            if not isinstance(segment, dict) or "started_mono" not in segment:
+                continue
             self.assertLessEqual(segment["started_mono"],
                                  segment["finished_mono"])
             self.assertEqual(segment["started_utc"], segment["finished_utc"])
@@ -1658,7 +1747,9 @@ class TimelineTests(unittest.TestCase):
             observation(101, deployment=web_deployment(image="drift:tag"),
                         argo={"invenio-bootstrap": harness.application_state(
                             application(sync="OutOfSync")),
-                            "apps": harness.application_state(application("apps"))}),
+                            "apps": harness.application_state(application("apps"))},
+                        evaluated_at=101, evaluated_signal=True,
+                        evaluated_reads=["Deployment/invenio-web"]),
             observation(102, deployment=web_deployment(image="drift:tag")),
             observation(103),
             observation(104),
@@ -1675,7 +1766,9 @@ class TimelineTests(unittest.TestCase):
 
     def test_missing_detection_is_not_zero(self):
         samples = [
-            observation(101, deployment=web_deployment(image="drift:tag")),
+            observation(101, deployment=web_deployment(image="drift:tag"),
+                        evaluated_at=101, evaluated_signal=True,
+                        evaluated_reads=["Deployment/invenio-web"]),
             observation(102),
             observation(103),
         ]
@@ -1742,6 +1835,323 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(out["detection_controller"], "hpa")
         self.assertEqual(out["recovery_controller"], "hpa")
         self.assertEqual(out["recovery_seconds"], 4)
+
+
+class CompletedObservationTimingTests(unittest.TestCase):
+    def setUp(self):
+        self.spec = contract()
+
+    def run_timeline(self, samples, scenario="B", arm="gitops",
+                     timeout=30, injected=None, baseline=None, evidence_at=None):
+        return harness.analyze_timeline(
+            contract=self.spec, samples=samples, injection=injected or injection(),
+            arm=arm, scenario=scenario, timeout=timeout, baseline=baseline,
+            evidence_at=evidence_at,
+        )
+
+    def test_capture_start_before_a_field_read_never_becomes_primary(self):
+        sample = observation(
+            100.0, deployment=web_deployment(image="drift:tag"),
+            argo={"invenio-bootstrap": harness.application_state(
+                      application(sync="OutOfSync")),
+                  "apps": harness.application_state(application("apps"))},
+            acquisition=acquisition_for(
+                100.0, read_finish=100.2,
+                starts={"Application/invenio-bootstrap": 100.15},
+                finishes={"Application/invenio-bootstrap": 100.2}),
+            evaluated_at=100.2, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"],
+        )
+        out = self.run_timeline([sample], injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertAlmostEqual(out["detection_seconds"], 0.2)
+        self.assertAlmostEqual(out["evidence_seconds"], 0.2)
+
+    def test_ineligible_earlier_evidence_candidate_is_skipped(self):
+        early = observation(
+            99.9, deployment=web_deployment(image="drift:tag"),
+            acquisition=acquisition_for(
+                99.9, read_finish=100.5,
+                starts={"Deployment/invenio-web": 99.9}),
+            evaluated_at=100.6, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        eligible = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline(
+            [early, eligible], timeout=30, evidence_at=point(101.5))
+        self.assertEqual(out["evidence_seconds"], 1.5)
+
+    def test_late_earlier_evidence_candidate_is_skipped(self):
+        late = observation(
+            100.0, deployment=web_deployment(image="drift:tag"),
+            acquisition=acquisition_for(
+                100.0, read_finish=100.5),
+            evaluated_at=131.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        eligible = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline(
+            [late, eligible], timeout=30, evidence_at=point(101.5))
+        self.assertEqual(out["evidence_seconds"], 1.5)
+
+    def test_gitops_evidence_is_not_synthesized_from_read_completion(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"))
+        out = self.run_timeline([sample], evidence_at=point(101.0))
+        self.assertIsNone(out["evidence_seconds"])
+        self.assertEqual(out["evidence_status"], "right_censored")
+
+    def test_gitops_late_evaluation_is_not_backdated(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=131.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline([sample], timeout=30, evidence_at=point(131.0))
+        self.assertIsNone(out["evidence_seconds"])
+        self.assertEqual(out["evidence_status"], "right_censored")
+
+    def test_gitops_timely_evaluation_uses_its_completion(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        out = self.run_timeline([sample], timeout=30, evidence_at=point(101.5))
+        self.assertEqual(out["evidence_seconds"], 1.5)
+
+    def test_hpa_late_evaluation_is_not_backdated(self):
+        drifted = web_deployment()
+        drifted["spec"]["replicas"] = 1
+        hpa = harness.hpa_state(
+            web_hpa(desired=2, current=2), drifted)
+        late = observation(
+            101.0, deployment=drifted, hpa=hpa,
+            evaluated_at=131.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web",
+                             "HorizontalPodAutoscaler/invenio-web-hpa"])
+        late_out = self.run_timeline(
+            [late], scenario="A", timeout=30, evidence_at=point(131.0))
+        self.assertIsNone(late_out["evidence_seconds"])
+        timely = observation(
+            101.0, deployment=drifted, hpa=hpa,
+            evaluated_at=101.5, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web",
+                             "HorizontalPodAutoscaler/invenio-web-hpa"])
+        timely_out = self.run_timeline(
+            [timely], scenario="A", timeout=30, evidence_at=point(101.5))
+        self.assertEqual(timely_out["evidence_seconds"], 1.5)
+
+    def test_transient_diff_without_evaluation_is_not_evidence(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.0, evaluated_signal=False,
+            evaluated_reads=[])
+        out = self.run_timeline([sample], evidence_at=point(101.0))
+        self.assertIsNone(out["evidence_seconds"])
+
+    def test_evidence_at_mismatching_sample_event_fails_closed(self):
+        sample = observation(
+            101.0, deployment=web_deployment(image="drift:tag"),
+            evaluated_at=101.0, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"])
+        with self.assertRaises(harness.InstrumentationError):
+            self.run_timeline([sample], evidence_at=point(102.0))
+
+    def test_read_starting_before_t0_is_excluded(self):
+        sample = observation(
+            99.9, deployment=web_deployment(image="drift:tag"),
+            acquisition=acquisition_for(
+                99.9, read_finish=100.2,
+                starts={"Application/invenio-bootstrap": 99.9}),
+        )
+        out = self.run_timeline([sample], injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertIsNone(out["detection_seconds"])
+        self.assertEqual(out["detection_status"], "right_censored")
+
+    def test_read_finishing_after_the_deadline_is_excluded(self):
+        sample = observation(
+            100.0, deployment=web_deployment(image="drift:tag"),
+            argo={"invenio-bootstrap": harness.application_state(
+                      application(sync="OutOfSync")),
+                  "apps": harness.application_state(application("apps"))},
+            acquisition=acquisition_for(
+                100.0, read_finish=101.0001,
+                starts={"Application/invenio-bootstrap": 100.1}),
+        )
+        out = self.run_timeline([sample], timeout=1, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertIsNone(out["detection_seconds"])
+        self.assertIsNone(out["evidence_seconds"])
+
+    def test_read_completing_exactly_at_the_deadline_is_eligible(self):
+        sample = observation(
+            100.0, deployment=web_deployment(image="drift:tag"),
+            argo={"invenio-bootstrap": harness.application_state(
+                      application(sync="OutOfSync")),
+                  "apps": harness.application_state(application("apps"))},
+            acquisition=acquisition_for(
+                100.0, read_finish=101.0,
+                starts={"Application/invenio-bootstrap": 100.1},
+                finishes={"Application/invenio-bootstrap": 101.0}),
+        )
+        out = self.run_timeline([sample], timeout=1, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertEqual(out["detection_seconds"], 1.0)
+
+    def test_capture_entirely_after_the_deadline_is_diagnostic_only(self):
+        sample = observation(
+            102.0, deployment=web_deployment(image="drift:tag"),
+            argo={"invenio-bootstrap": harness.application_state(
+                      application(sync="OutOfSync")),
+                  "apps": harness.application_state(application("apps"))},
+            acquisition=acquisition_for(102.0, read_finish=102.2))
+        out = self.run_timeline([sample], timeout=1, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertIsNone(out["detection_seconds"])
+        self.assertIsNone(out["evidence_seconds"])
+        self.assertIsNone(out["recovery_seconds"])
+        self.assertIsNone(out["r1_first"])
+        self.assertEqual(out["r1_first_reason"], "no_eligible_capture")
+        self.assertEqual(out["status"], "right_censored")
+
+    def test_a_valid_read_before_command_acknowledgement_is_eligible(self):
+        sample = observation(
+            100.0, deployment=web_deployment(image="drift:tag"),
+            argo={"invenio-bootstrap": harness.application_state(
+                      application(sync="OutOfSync")),
+                  "apps": harness.application_state(application("apps"))},
+            acquisition=acquisition_for(
+                100.0, read_finish=100.2,
+                starts={"Application/invenio-bootstrap": 100.1},
+                finishes={"Application/invenio-bootstrap": 100.2}),
+            evaluated_at=100.2, evaluated_signal=True,
+            evaluated_reads=["Deployment/invenio-web"],
+        )
+        out = self.run_timeline([sample], injected=injection(
+            started=100.0, ack=100.5, verified=100.6, accepted=True),
+            evidence_at=point(100.2))
+        self.assertAlmostEqual(out["detection_seconds"], 0.2)
+        self.assertAlmostEqual(out["evidence_seconds"], 0.2)
+
+    def test_late_confirmation_is_not_observed_recovery(self):
+        first = observation(101.0)
+        second = observation(
+            102.0, acquisition=acquisition_for(
+                102.0, read_finish=102.06))
+        out = self.run_timeline([first, second], timeout=2, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertIsNone(out["recovery_seconds"])
+        self.assertEqual(out["recovery_status"], "right_censored")
+        self.assertEqual(out["t_r_first_seconds"], 1.0)
+        self.assertIsNone(out["t_r_confirmed_seconds"])
+        self.assertEqual(out["recovery_confirmation"], "late_confirmation")
+        self.assertEqual(out["status"], "right_censored")
+
+    def test_confirmation_uses_read_completion_not_capture_start(self):
+        first = observation(
+            101.0, acquisition=acquisition_for(101.0, read_finish=101.1))
+        second = observation(
+            102.0, acquisition=acquisition_for(102.0, read_finish=102.1))
+        out = self.run_timeline([first, second], timeout=30, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertAlmostEqual(out["recovery_seconds"], 1.1)
+        self.assertAlmostEqual(out["t_r_first_seconds"], 1.1)
+        self.assertAlmostEqual(out["t_r_confirmed_seconds"], 2.1)
+        self.assertEqual(out["recovery_pair"][0].mono, 101.1)
+        self.assertEqual(out["recovery_pair"][1].mono, 102.1)
+        self.assertEqual(out["recovery_confirmation"], "confirmed")
+
+    def test_a_mismatch_breaks_the_confirmation_pair(self):
+        samples = [
+            observation(101.0),
+            observation(102.0, deployment=web_deployment(image="drift:tag")),
+            observation(103.0),
+            observation(104.0),
+        ]
+        out = self.run_timeline(samples, timeout=30, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertEqual(out["recovery_seconds"], 3.0)
+        self.assertEqual(out["t_r_first_seconds"], 3.0)
+        self.assertEqual(out["t_r_confirmed_seconds"], 4.0)
+
+    def test_r1_first_and_last_require_eligible_completed_reads(self):
+        before = observation(99.9, acquisition=acquisition_for(
+            99.9, read_finish=100.2,
+            starts={"Deployment/invenio-web": 99.9}))
+        eligible = observation(101.0)
+        late = observation(105.0, acquisition=acquisition_for(
+            105.0, read_finish=105.5))
+        out = self.run_timeline([before, eligible, late], timeout=5,
+                                injected=injection(
+                                    started=100.0, ack=100.1, verified=100.2,
+                                    accepted=True))
+        self.assertEqual(out["r1_first"], 100)
+        self.assertEqual(out["r1_last"], 100)
+        self.assertEqual(out["r1_first_details"]["total"], 4)
+        self.assertEqual(out["r1_last_details"]["total"], 4)
+
+    def test_no_eligible_observation_leaves_r1_null_with_a_reason(self):
+        sample = observation(99.9, acquisition=acquisition_for(
+            99.9, read_finish=100.5,
+            starts={"Deployment/invenio-web": 99.9}))
+        out = self.run_timeline([sample], timeout=5, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertIsNone(out["r1_first"])
+        self.assertIsNone(out["r1_last"])
+        self.assertEqual(out["r1_first_reason"], "no_eligible_capture")
+        self.assertEqual(out["r1_last_reason"], "no_eligible_capture")
+
+    def test_malformed_acquisition_bounds_fail_closed(self):
+        sample = observation(101.0, acquisition=acquisition_for(101.0))
+        sample.acquisition["reads"]["Deployment/invenio-web"][
+            "finished_mono"] = float("nan")
+        with self.assertRaises(harness.InstrumentationError):
+            self.run_timeline([sample])
+
+    def test_missing_detection_with_confirmed_recovery_stays_unobserved(self):
+        samples = [observation(101.0), observation(102.0)]
+        out = self.run_timeline(samples, timeout=30, injected=injection(
+            started=100.0, ack=100.1, verified=100.2, accepted=True))
+        self.assertIsNone(out["detection_seconds"])
+        self.assertEqual(out["detection_status"], "unobserved_before_stop")
+        self.assertEqual(out["status"], "observed")
+        self.assertEqual(out["recovery_seconds"], 1.0)
+
+    def test_visibility_boundary_recovery_ignores_extra_objects(self):
+        samples = [
+            observation(101.0,
+                        extras=["exp-invenio-drift/Deployment/invenio-web"]),
+            observation(102.0),
+            observation(103.0),
+        ]
+        out = self.run_timeline(samples, scenario="F", timeout=30,
+                                injected=injection(
+                                    started=100.0, ack=100.1, verified=100.2,
+                                    accepted=True))
+        self.assertEqual(out["status"], "observed")
+        self.assertEqual(out["recovery_seconds"], 2.0)
+        self.assertIsNone(out["detection_ref"])
+
+    def test_imperative_evidence_is_not_inferred_without_the_checker(self):
+        samples = [
+            observation(101.0, deployment=web_deployment(image="drift:tag")),
+            observation(102.0),
+            observation(103.0),
+        ]
+        out = self.run_timeline(
+            samples, arm="imperative", timeout=30,
+            injected=injection(started=100.0, ack=100.1, verified=100.2,
+                               accepted=True))
+        self.assertIsNone(out["detection_seconds"])
+        self.assertIsNone(out["evidence_seconds"])
+        self.assertEqual(out["detection_status"], "unobserved_before_stop")
+        self.assertEqual(out["evidence_status"], "unobserved_before_stop")
+        self.assertEqual(out["status"], "observed")
+        self.assertEqual(out["recovery_seconds"], 2.0)
 
 
 class OutputTests(unittest.TestCase):
@@ -1893,10 +2303,13 @@ class AdvancingClock:
 
 
 class DeterministicSampler:
-    def __init__(self, capture, clock, interval):
+    def __init__(self, capture, clock, interval, join_timeout=10.0,
+                 guarded=False):
         self.capture = capture
         self.clock = clock
         self.interval = interval
+        self.join_timeout = join_timeout
+        self.guarded = guarded
         self.samples = []
         self.error = None
 
@@ -1912,7 +2325,9 @@ class DeterministicSampler:
         return list(self.samples)
 
     def stop(self):
-        pass
+        return {"joined": True, "in_flight": False, "error": None,
+                "late_result": False, "late_result_at": None,
+                "late_error": None, "stopped_at_deadline": False}
 
 
 class LiveRunnerTests(unittest.TestCase):
@@ -1927,7 +2342,8 @@ class LiveRunnerTests(unittest.TestCase):
         }
         apps = {"apps": application("apps"),
                 "invenio-bootstrap": application()}
-        fake = FakeKubectl(apps=apps, objects=objects)
+        clock = AdvancingClock()
+        fake = FakeKubectl(apps=apps, objects=objects, clock=clock)
         with tempfile.TemporaryDirectory() as directory:
             path, digest = write_render(directory)
             args = harness.parse_args([
@@ -1944,7 +2360,7 @@ class LiveRunnerTests(unittest.TestCase):
             frozen = harness.load_declaration(
                 path, digest, "b" * 40, "invenio")
             runner = harness.LiveRunner(
-                args, {"declaration": frozen}, fake, AdvancingClock())
+                args, {"declaration": frozen}, fake, clock)
             with mock.patch("harness.Sampler", DeterministicSampler), \
                     mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
@@ -1957,7 +2373,16 @@ class LiveRunnerTests(unittest.TestCase):
             self.assertGreater(row["kubectl_cmds"], 0)
             self.assertEqual(row["arm_restore_status"], "restored")
             self.assertEqual(row["cleanup_status"], "ok")
+            self.assertTrue(row["postcondition"]["verified"])
+            self.assertTrue(row["postcondition"]["acquisition"]["reads"])
             self.assertEqual(row["r1_baseline"], 100.0)
+            self.assertEqual(row["timing_convention"],
+                             harness.TIMING_CONVENTION)
+            self.assertEqual(row["recovery_confirmation"], "confirmed")
+            self.assertIsNotNone(row["t_r_first_mono"])
+            self.assertIsNotNone(row["t_r_confirmed_mono"])
+            self.assertIsNotNone(row["t_e_store_mono"])
+            self.assertGreaterEqual(row["t_e_store_mono"], row["t_e_mono"])
             self.assertEqual(row["r1_baseline_details"]["score"], 100)
             self.assertEqual(row["r1_first_details"]["total"], 4)
             self.assertEqual(row["r1_last_details"]["total"], 4)
@@ -1965,6 +2390,17 @@ class LiveRunnerTests(unittest.TestCase):
                                 row["r1_last_details"]["resources"]))
             self.assertFalse((Path(directory) / "live-1" / "commands.jsonl")
                              .read_text().strip() == "")
+            samples = [json.loads(line) for line in
+                       (Path(directory) / "live-1" / "samples.jsonl")
+                       .read_text().splitlines()]
+            self.assertTrue(samples)
+            self.assertTrue(all("acquisition" in sample for sample in samples))
+            self.assertTrue(all(sample["acquisition"]["reads"]
+                                for sample in samples))
+            sampler = json.loads(
+                (Path(directory) / "live-1" / "sampler.json").read_text())
+            self.assertTrue(sampler["joined"])
+            self.assertFalse(sampler["in_flight"])
             for app in fake.apps.values():
                 self.assertEqual(app["spec"]["syncPolicy"]["automated"],
                                  {"prune": True, "selfHeal": True})
@@ -1982,7 +2418,8 @@ class LiveRunnerTests(unittest.TestCase):
         }
         apps = {"apps": application("apps"),
                 "invenio-bootstrap": application()}
-        fake = FakeKubectl(apps=apps, objects=objects)
+        clock = AdvancingClock()
+        fake = FakeKubectl(apps=apps, objects=objects, clock=clock)
         fake.pods = lambda namespace: [dict(UNREADY_POD)]
         with tempfile.TemporaryDirectory() as directory:
             path, digest = write_render(directory)
@@ -1999,7 +2436,7 @@ class LiveRunnerTests(unittest.TestCase):
             frozen = harness.load_declaration(
                 path, digest, "b" * 40, "invenio")
             runner = harness.LiveRunner(
-                args, {"declaration": frozen}, fake, AdvancingClock())
+                args, {"declaration": frozen}, fake, clock)
             with mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
                 code = runner.run()
@@ -2028,7 +2465,8 @@ class LiveRunnerTests(unittest.TestCase):
             ("Service", "invenio-web", "invenio"): web_service(),
             ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
         }
-        fake = FakeKubectl(objects=objects)
+        clock = AdvancingClock()
+        fake = FakeKubectl(objects=objects, clock=clock)
         with tempfile.TemporaryDirectory() as directory:
             path, digest = write_render(directory)
             args = harness.parse_args([
@@ -2042,7 +2480,7 @@ class LiveRunnerTests(unittest.TestCase):
                 "--out", directory, "--run-id", "no-declaration",
             ])
             runner = harness.LiveRunner(
-                args, {}, fake, AdvancingClock())
+                args, {}, fake, clock)
             with mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
                 code = runner.run()
@@ -2058,6 +2496,7 @@ class LiveRunnerTests(unittest.TestCase):
 
     def test_g_baseline_refusal_preserves_a_preexisting_annotation(self):
         sealed = sealed_secret({harness.DRIFT_ANNOTATION: "preexisting"})
+        clock = AdvancingClock()
         fake = FakeKubectl(objects={
             ("Deployment", "invenio-web", "invenio"): web_deployment(),
             ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
@@ -2065,7 +2504,7 @@ class LiveRunnerTests(unittest.TestCase):
             ("SealedSecret", "invenio-app-secrets", "invenio"): sealed,
             ("Service", "invenio-web", "invenio"): web_service(),
             ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
-        })
+        }, clock=clock)
         with tempfile.TemporaryDirectory() as directory:
             path, digest = write_render(directory)
             args = harness.parse_args([
@@ -2081,7 +2520,7 @@ class LiveRunnerTests(unittest.TestCase):
             frozen = harness.load_declaration(
                 path, digest, "b" * 40, "invenio")
             runner = harness.LiveRunner(
-                args, {"declaration": frozen}, fake, AdvancingClock())
+                args, {"declaration": frozen}, fake, clock)
             with mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
                 code = runner.run()
@@ -2108,6 +2547,7 @@ class LiveRunnerTests(unittest.TestCase):
                     result.stderr = "annotation rejected"
                 return result
 
+        clock = AdvancingClock()
         fake = FailedGAnnotationKubectl(objects={
             ("Deployment", "invenio-web", "invenio"): web_deployment(),
             ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
@@ -2115,7 +2555,7 @@ class LiveRunnerTests(unittest.TestCase):
             ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
             ("Service", "invenio-web", "invenio"): web_service(),
             ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
-        })
+        }, clock=clock)
         with tempfile.TemporaryDirectory() as directory:
             path, digest = write_render(directory)
             args = harness.parse_args([
@@ -2125,13 +2565,13 @@ class LiveRunnerTests(unittest.TestCase):
                 "--render-file", str(path),
                 "--source-revision", "b" * 40, "--render-sha256", digest,
                 "--timeout", "1", "--sample-interval", "0.01",
-                "--baseline-timeout", "1", "--reset-timeout", "1",
+                "--baseline-timeout", "5", "--reset-timeout", "1",
                 "--out", directory, "--run-id", "g-partial",
             ])
             frozen = harness.load_declaration(
                 path, digest, "b" * 40, "invenio")
             runner = harness.LiveRunner(
-                args, {"declaration": frozen}, fake, AdvancingClock())
+                args, {"declaration": frozen}, fake, clock)
             with mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
                 code = runner.run()
@@ -2158,7 +2598,8 @@ class LiveRunnerTests(unittest.TestCase):
             ("Service", "invenio-web", "invenio"): web_service(),
             ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
         }
-        fake = FakeKubectl(objects=objects)
+        clock = AdvancingClock()
+        fake = FakeKubectl(objects=objects, clock=clock)
         with tempfile.TemporaryDirectory() as directory:
             path, digest = write_render(directory)
             args = harness.parse_args([
@@ -2168,13 +2609,13 @@ class LiveRunnerTests(unittest.TestCase):
                 "--render-file", str(path),
                 "--source-revision", "b" * 40, "--render-sha256", digest,
                 "--timeout", "1", "--sample-interval", "0.01",
-                "--baseline-timeout", "1", "--reset-timeout", "1",
+                "--baseline-timeout", "5", "--reset-timeout", "1",
                 "--out", directory, "--run-id", "diverged",
             ])
             frozen = harness.load_declaration(
                 path, digest, "b" * 40, "invenio")
             runner = harness.LiveRunner(
-                args, {"declaration": frozen}, fake, AdvancingClock())
+                args, {"declaration": frozen}, fake, clock)
             with mock.patch("time.sleep", lambda _: None), \
                     mock.patch("sys.stdout", new_callable=io.StringIO):
                 code = runner.run()
@@ -2198,6 +2639,90 @@ class LiveRunnerTests(unittest.TestCase):
 
 
 class SamplerLifecycleTests(unittest.TestCase):
+    def test_real_capture_stops_between_reads_after_stop(self):
+        import threading
+
+        class BlockingServiceKubectl(FakeKubectl):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.blocked = threading.Event()
+                self.release = threading.Event()
+
+            def read(self, kind, name=None, namespace=None, selector=None, guard=None):
+                if kind == "Service":
+                    self.blocked.set()
+                    self.release.wait(2)
+                return super().read(kind, name, namespace, selector)
+
+        clock = AdvancingClock()
+        fake = BlockingServiceKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }, clock=clock)
+        snapshotter = harness.Snapshotter(
+            fake, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4")
+        sampler = harness.Sampler(
+            snapshotter.capture, clock, 0.01, join_timeout=0.01, guarded=True)
+        sampler.start()
+        self.assertTrue(fake.blocked.wait(2))
+        state = sampler.stop()
+        self.assertFalse(state["joined"])
+        self.assertTrue(state["in_flight"])
+        fake.release.set()
+        sampler.join(timeout=2)
+        self.assertEqual(sampler.snapshot(), [])
+        self.assertIsNotNone(sampler.stopped_capture)
+        self.assertIn("Service/invenio-web", sampler.stopped_capture["reads"])
+        read_kinds = {record["kind"] for record in fake.reads}
+        self.assertNotIn("HorizontalPodAutoscaler", read_kinds)
+        self.assertNotIn("Application", read_kinds)
+
+    def test_real_capture_stops_between_reads_at_deadline(self):
+        import threading
+
+        class BlockingServiceKubectl(FakeKubectl):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.blocked = threading.Event()
+                self.release = threading.Event()
+
+            def read(self, kind, name=None, namespace=None, selector=None, guard=None):
+                if kind == "Service":
+                    self.blocked.set()
+                    self.release.wait(2)
+                return super().read(kind, name, namespace, selector)
+
+        clock = AdvancingClock()
+        fake = BlockingServiceKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }, clock=clock)
+        snapshotter = harness.Snapshotter(
+            fake, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4")
+        sampler = harness.Sampler(
+            snapshotter.capture, clock, 0.01, join_timeout=1, guarded=True)
+        sampler.start()
+        self.assertTrue(fake.blocked.wait(2))
+        sampler.deadline = 0.0
+        fake.release.set()
+        sampler.join(timeout=2)
+        self.assertTrue(sampler.stopped_at_deadline)
+        self.assertEqual(sampler.snapshot(), [])
+        self.assertIsNotNone(sampler.stopped_capture)
+        read_kinds = {record["kind"] for record in fake.reads}
+        self.assertNotIn("HorizontalPodAutoscaler", read_kinds)
+        self.assertNotIn("Application", read_kinds)
+
     def test_sampler_stop_does_not_shadow_thread_stop(self):
         sampler = harness.Sampler(
             lambda: {"ok": True}, harness.FakeClock([1.0]), 0.01,
@@ -2206,6 +2731,441 @@ class SamplerLifecycleTests(unittest.TestCase):
         self.assertTrue(sampler.wait_ready(timeout=2))
         sampler.stop()
         self.assertFalse(sampler.is_alive())
+
+    def test_stop_before_first_sample_reports_an_unfinished_join(self):
+        import threading
+
+        class BlockingCapture:
+            def __init__(self):
+                self.entered = threading.Event()
+                self.release = threading.Event()
+
+            def __call__(self):
+                self.entered.set()
+                self.release.wait(2)
+                return {"ok": True}
+
+        capture = BlockingCapture()
+        sampler = harness.Sampler(capture, harness.FakeClock([1.0]), 0.01,
+                                  join_timeout=0.01)
+        sampler.start()
+        self.assertTrue(capture.entered.wait(2))
+        state = sampler.stop()
+        self.assertFalse(state["joined"])
+        self.assertTrue(state["in_flight"])
+        capture.release.set()
+        sampler.join(timeout=2)
+        self.assertEqual(sampler.snapshot(), [])
+
+    def test_completion_during_stop_is_retained_before_finalization(self):
+        import threading
+
+        class ReleaseCapture:
+            def __init__(self):
+                self.entered = threading.Event()
+                self.release = threading.Event()
+
+            def __call__(self):
+                self.entered.set()
+                self.release.wait(2)
+                return {"ok": True}
+
+        capture = ReleaseCapture()
+        sampler = harness.Sampler(capture, harness.FakeClock([1.0]), 0.01,
+                                  join_timeout=2)
+        sampler.start()
+        self.assertTrue(capture.entered.wait(2))
+        capture.release.set()
+        state = sampler.stop()
+        self.assertTrue(state["joined"])
+        self.assertFalse(state["in_flight"])
+        self.assertEqual(sampler.snapshot(), [{"ok": True}])
+
+    def test_late_exception_is_surfaced_and_never_appended(self):
+        import threading
+
+        class LateFailure:
+            def __init__(self):
+                self.entered = threading.Event()
+                self.release = threading.Event()
+
+            def __call__(self):
+                self.entered.set()
+                self.release.wait(2)
+                raise RuntimeError("late read failure")
+
+        capture = LateFailure()
+        sampler = harness.Sampler(capture, harness.FakeClock([1.0]), 0.01,
+                                  join_timeout=0.01)
+        sampler.start()
+        self.assertTrue(capture.entered.wait(2))
+        state = sampler.stop()
+        self.assertFalse(state["joined"])
+        capture.release.set()
+        sampler.join(timeout=2)
+        self.assertEqual(sampler.snapshot(), [])
+        self.assertIsNotNone(sampler.late_error)
+
+    def test_deadline_stops_new_reads(self):
+        calls = []
+
+        def capture():
+            calls.append(True)
+            return {"ok": True}
+
+        sampler = harness.Sampler(capture, harness.FakeClock([2.0]), 0.01)
+        sampler.deadline = 1.0
+        sampler.start()
+        sampler.join(timeout=2)
+        self.assertEqual(calls, [])
+        self.assertTrue(sampler.stopped_at_deadline)
+
+
+class AcquisitionBoundsTests(unittest.TestCase):
+    def objects(self):
+        return {
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }
+
+    def test_capture_records_completed_read_bounds(self):
+        clock = AdvancingClock()
+        fake = FakeKubectl(objects=self.objects(), clock=clock)
+        sample = harness.Snapshotter(
+            fake, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4").capture()
+        self.assertIn("reads", sample.acquisition)
+        self.assertGreater(sample.acquisition["finished_mono"],
+                           sample.at.mono)
+        self.assertTrue(sample.acquisition["reads"])
+        self.assertNotIn("stdout", json.dumps(sample.acquisition))
+
+    def test_read_retry_keeps_the_successful_attempt_bounds(self):
+        kubectl = harness.Kubectl(harness.FakeClock([10.0]))
+        bad = result(code=1, stderr="Unexpected error when reading response body",
+                     started=point(10), finished=point(11))
+        good = result(stdout='{"kind":"ConfigMap","metadata":{"name":"x"}}',
+                      started=point(12), finished=point(13))
+        with mock.patch.object(kubectl, "run", side_effect=[bad, good]):
+            payload, bounds = kubectl.read("ConfigMap", "x", "invenio")
+        self.assertEqual(payload["metadata"]["name"], "x")
+        self.assertEqual(bounds["started_mono"], 12)
+        self.assertEqual(bounds["finished_mono"], 13)
+        self.assertEqual(len(bounds["attempts"]), 2)
+        self.assertFalse(bounds["attempts"][0]["ok"])
+        self.assertTrue(bounds["attempts"][1]["ok"])
+
+    def test_failed_read_retains_safe_partial_acquisition(self):
+        clock = AdvancingClock()
+
+        class FailingKubectl(FakeKubectl):
+            def read(self, kind, name=None, namespace=None, selector=None, guard=None):
+                if kind == "Service":
+                    started = self._now()
+                    finished = self._now()
+                    record = {
+                        "kind": kind, "name": name, "namespace": namespace,
+                        "started_utc": started.utc,
+                        "started_mono": started.mono,
+                        "finished_utc": finished.utc,
+                        "finished_mono": finished.mono,
+                        "ok": False, "present": False,
+                        "attempts": [],
+                    }
+                    error = harness.InstrumentationError("service read failed")
+                    error.read_bounds = record
+                    raise error
+                return super().read(kind, name, namespace, selector)
+
+        fake = FailingKubectl(objects=self.objects(), clock=clock)
+        snapshotter = harness.Snapshotter(
+            fake, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4")
+        with self.assertRaises(harness.InstrumentationError) as caught:
+            snapshotter.capture()
+        acquisition = caught.exception.acquisition
+        self.assertFalse(acquisition["reads"]["Service/invenio-web"]["ok"])
+        self.assertIn("Deployment/invenio-web", acquisition["reads"])
+        serialized = json.dumps(acquisition)
+        self.assertNotIn("PLAINTEXT-MUST-NOT-LEAK", serialized)
+
+
+class RetryCancellationTests(unittest.TestCase):
+    def snapshotter(self, kubectl, clock):
+        return harness.Snapshotter(
+            kubectl, "invenio", "exp-invenio-drift", clock,
+            configmap_name="invenio-app-config-6dg2chdbh4")
+
+    def transient(self):
+        return mock.Mock(returncode=1, stdout="", stderr="connection reset")
+
+    def test_stop_during_first_transient_request_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        stop = {"value": False}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            stop["value"] = True
+            return self.transient()
+
+        def guard():
+            return "stop" if stop["value"] else None
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "stop")
+        record = caught.exception.acquisition["reads"][
+            "Deployment/invenio-web"]
+        self.assertFalse(record["ok"])
+        self.assertEqual(len(record["attempts"]), 1)
+
+    def test_deadline_during_first_transient_request_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        deadline = {"value": clock.now().mono + 0.5}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            clock.value += 1.0
+            return self.transient()
+
+        def guard():
+            return "deadline" if clock.now().mono >= deadline["value"] else None
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "deadline")
+
+    def test_stop_during_backoff_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        stop = {"value": False}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            return self.transient()
+
+        def guard():
+            return "stop" if stop["value"] else None
+
+        def backoff(_seconds):
+            stop["value"] = True
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run), \
+                mock.patch.object(harness.time, "sleep", side_effect=backoff):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "stop")
+
+    def test_deadline_during_backoff_prevents_retry(self):
+        clock = AdvancingClock()
+        kubectl = harness.Kubectl(clock)
+        deadline = {"value": clock.now().mono + 0.5}
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            return self.transient()
+
+        def guard():
+            return "deadline" if clock.now().mono >= deadline["value"] else None
+
+        def backoff(_seconds):
+            clock.value += 1.0
+
+        with mock.patch.object(harness.subprocess, "run", side_effect=run), \
+                mock.patch.object(harness.time, "sleep", side_effect=backoff):
+            with self.assertRaises(harness.CaptureStopped) as caught:
+                self.snapshotter(kubectl, clock).capture(guard=guard)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(caught.exception.reason, "deadline")
+
+
+class PostconditionTimingTests(unittest.TestCase):
+    def test_capture_completing_after_the_reset_deadline_is_not_accepted(self):
+        clock = ReadinessClock()
+
+        class LateSnapshotter:
+            namespace = "invenio"
+
+            def capture(self):
+                clock.advance(2)
+                return observation()
+
+        args = harness.parse_args([
+            "--arm", "gitops", "--scenario", "B", "--rep", "1",
+            "--namespace", "invenio", "--app", "invenio-bootstrap",
+            "--reset-timeout", "1", "--sample-interval", "0.01",
+        ])
+        runner = harness.LiveRunner(args, {}, FakeKubectl(), clock)
+        postcondition = runner._postcondition(
+            LateSnapshotter(), contract(), "B", "gitops")
+        self.assertFalse(postcondition["verified"])
+        self.assertEqual(postcondition["reason"], "deadline")
+        self.assertIn("acquisition", postcondition)
+        self.assertGreater(
+            postcondition["acquisition"]["finished_mono"],
+            postcondition["deadline_mono"])
+
+
+class SamplerFailureLiveTests(unittest.TestCase):
+    def runner(self, directory, sampler, run_id, arm="gitops", scenario="B",
+               timeout="1"):
+        path, digest = write_render(directory)
+        args = harness.parse_args([
+            "--arm", arm, "--scenario", scenario, "--rep", "1",
+            "--live", "--confirm-single-stack", "--namespace", "invenio",
+            "--app", "invenio-bootstrap", "--render-file", str(path),
+            "--source-revision", "b" * 40, "--render-sha256", digest,
+            "--timeout", timeout, "--sample-interval", "0.01",
+            "--imperative-interval", "0.01", "--baseline-timeout", "5",
+            "--reset-timeout", "1", "--out", directory, "--run-id", run_id,
+        ])
+        frozen = harness.load_declaration(
+            path, digest, "b" * 40, "invenio")
+        clock = AdvancingClock()
+        fake = FakeKubectl(objects={
+            ("Deployment", "invenio-web", "invenio"): web_deployment(),
+            ("ConfigMap", "invenio-app-config-6dg2chdbh4", "invenio"):
+                web_configmap(),
+            ("SealedSecret", "invenio-app-secrets", "invenio"): sealed_secret(),
+            ("Service", "invenio-web", "invenio"): web_service(),
+            ("HorizontalPodAutoscaler", "invenio-web-hpa", "invenio"): web_hpa(),
+        }, clock=clock)
+        return harness.LiveRunner(
+            args, {"declaration": frozen}, fake, clock), sampler
+
+    def run_with(self, context, directory, run_id):
+        runner, sampler = context
+        with mock.patch("harness.Sampler", return_value=sampler), \
+                mock.patch("time.sleep", lambda _: None), \
+                mock.patch("sys.stdout", new_callable=io.StringIO):
+            code = runner.run()
+        row = json.loads(
+            (Path(directory) / (run_id + ".jsonl")).read_text())
+        return code, row
+
+    def test_live_collector_stamps_evaluation_after_a_slow_comparison(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runner, _ = self.runner(
+                directory, None, "slow-evaluator", timeout="3")
+            fake = runner.kubectl
+            clock = runner.clock
+            deployment_key = ("Deployment", "invenio-web", "invenio")
+
+            def capture():
+                at = clock.now().mono
+                deployment = copy.deepcopy(fake.objects[deployment_key])
+                return observation(
+                    at, deployment=deployment,
+                    acquisition=acquisition_for(at, read_finish=at))
+
+            sampler = DeterministicSampler(capture, clock, 0.01)
+            original = harness.field_diffs
+            calls = {"count": 0}
+
+            def slow(contract, sample):
+                result = original(contract, sample)
+                if calls["count"] == 0:
+                    clock.value += 0.2
+                calls["count"] += 1
+                return result
+
+            with mock.patch.object(harness, "field_diffs", side_effect=slow), \
+                    mock.patch("harness.Sampler", return_value=sampler), \
+                    mock.patch("time.sleep", lambda _: None), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = runner.run()
+            row = json.loads(
+                (Path(directory) / "slow-evaluator.jsonl").read_text())
+            samples = [json.loads(line) for line in
+                       (Path(directory) / "slow-evaluator" / "samples.jsonl")
+                       .read_text().splitlines()]
+            signal = next(sample for sample in samples
+                          if sample["evaluated_signal"])
+            read_finish = max(record["finished_mono"]
+                              for record in signal["acquisition"]["reads"].values())
+            self.assertEqual(code, 1)
+            self.assertGreater(signal["evaluated_at"]["mono"], read_finish)
+            self.assertGreater(signal["evaluated_at"]["mono"],
+                               signal["at"]["mono"])
+            self.assertGreater(row["evidence_seconds"], 0)
+            self.assertAlmostEqual(
+                row["t_e_mono"], signal["evaluated_at"]["mono"])
+            self.assertIsNotNone(row["t_e_store_mono"])
+
+    def test_sampler_error_after_injection_is_an_instrumentation_failure(self):
+        class ErroringSampler(DeterministicSampler):
+            def snapshot(self):
+                sample = super().snapshot()
+                self.error = RuntimeError("late read failure")
+                return sample
+
+            def stop(self):
+                return {"joined": True, "in_flight": False,
+                        "error": str(self.error), "late_result": False,
+                        "late_error": None, "stopped_at_deadline": False}
+
+        with tempfile.TemporaryDirectory() as directory:
+            runner, _ = self.runner(directory, None, "sampler-error")
+            context = (runner, ErroringSampler(
+                lambda: observation(1.0), runner.clock, 0.01))
+            code, row = self.run_with(context, directory, "sampler-error")
+        self.assertEqual(code, 1)
+        self.assertEqual(row["status"], "instrumentation_failure")
+        self.assertIn("late read failure", row["error"])
+        self.assertNotEqual(row["status"], "right_censored")
+
+    def test_initial_wait_failure_is_an_explicit_failure(self):
+        class NoSampleSampler(DeterministicSampler):
+            def wait_ready(self, timeout=10):
+                return False
+
+            def snapshot(self):
+                return []
+
+            def stop(self):
+                return {"joined": True, "in_flight": False,
+                        "error": None, "late_result": False,
+                        "late_error": None, "stopped_at_deadline": False}
+
+        with tempfile.TemporaryDirectory() as directory:
+            runner, _ = self.runner(directory, None, "no-sample")
+            context = (runner, NoSampleSampler(lambda: None,
+                                               runner.clock, 0.01))
+            code, row = self.run_with(context, directory, "no-sample")
+        self.assertEqual(code, 1)
+        self.assertEqual(row["status"], "instrumentation_failure")
+        self.assertIn("initial sample", row["error"])
+
+    def test_in_flight_collector_is_an_explicit_failure(self):
+        class InFlightSampler(DeterministicSampler):
+            def stop(self):
+                return {"joined": False, "in_flight": True,
+                        "error": None, "late_result": False,
+                        "late_error": None, "stopped_at_deadline": False}
+
+        with tempfile.TemporaryDirectory() as directory:
+            runner, _ = self.runner(directory, None, "in-flight")
+            context = (runner, InFlightSampler(lambda: observation(1.0),
+                                               runner.clock, 0.01))
+            code, row = self.run_with(context, directory, "in-flight")
+        self.assertEqual(code, 1)
+        self.assertEqual(row["status"], "instrumentation_failure")
+        self.assertIn("did not join", row["error"])
 
 
 if __name__ == "__main__":

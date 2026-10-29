@@ -10,11 +10,15 @@ python3 experiments/analysis/summarize.py --in /path/hasil-v2.jsonl
 ```
 
 Ringkasan stdlib memisahkan skenario, lengan, kelompok analisis, data sintetis,
-revisi sumber dan digest render. A tetap `hpa_control`, F `visibility_boundary`,
-B--E/G `managed_drift`; tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap
-metrik, jumlah teramati dan tersensor tetap dilaporkan. Median hanya untuk bagian
-teramati dan **bukan** estimasi yang sudah disesuaikan terhadap penyensoran.
-Tidak ada uji inferensial otomatis sebelum metode/keluarga uji disetujui.
+revisi sumber, digest render, dan `timing_convention`. Dataset yang mencampur
+legacy dan baris bermarker, atau memakai marker tak dikenal, ditolak agar tidak
+dipool. A tetap `hpa_control`, F `visibility_boundary`, B--E/G `managed_drift`;
+tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap metrik, jumlah
+teramati, tersensor, dan hilang (`unobserved_before_stop`) tetap dilaporkan;
+missing hanya diterima dengan provenance recovery dini. Median hanya untuk
+bagian teramati dan **bukan** estimasi yang sudah disesuaikan terhadap
+penyensoran. Tidak ada uji inferensial otomatis sebelum metode/keluarga uji
+disetujui.
 
 Kegagalan injeksi, instrumentasi dan reset disimpan pada ledger run tersendiri
 dengan alasan serta referensi bukti; jangan membuangnya untuk membentuk dataset
@@ -59,7 +63,7 @@ summary, dan tidak dihitung sebagai eksklusi di sini.
 | `live_overview.tex` | jumlah baris R2, run teramati/tersensor, populasi, eksklusi, `R3: not measured` |
 | `live_exclusions.tex` | baris yang dieksklusi beserta alasan |
 | `live_r1.tex` | median baseline/first/last per skenario, lengan, fase; jumlah observasi |
-| `live_survival.tex` | Kaplan--Meier, median, RMST, jumlah event/tersensor, horizon |
+| `live_survival.tex` | Kaplan--Meier, median, RMST, jumlah event/tersensor/hilang/eksklusi, horizon |
 | `live_tests.tex` | Wilcoxon berpasangan atau Mann--Whitney eksploratif, $p$ mentah dan Holm |
 | `live_effects.tex` | Cliff's $\delta$, selisih median berpasangan, rank-biserial, CI bootstrap |
 
@@ -87,7 +91,9 @@ Cara membaca hasil:
 - **Penyensoran.** Waktu tersensor tidak pernah diisi nol. Kaplan--Meier dan
   RMST memakai horizon batas penyensoran terkecil per kelompok; median `--`
   berarti tidak tercapai dalam horizon. RMST adalah deskripsi hingga horizon,
-  bukan uji superioritas.
+  bukan uji superioritas. Endpoint `unobserved_before_stop` tidak dihitung
+  sebagai tersensor dan tidak masuk kurva; bila seluruh endpoint hilang, hasilnya
+  tidak terestimasi.
 - **R1.** Baseline/first/last dilaporkan sebagai median bagian teramati dengan
   jumlah observasi; nilai hilang tidak diimputasi. R1 tidak diuji.
 - **Klaim.** `claim_status` selalu `exploratory_case_study` dan
@@ -97,11 +103,35 @@ Cara membaca hasil:
 - **R3.** `R3: not measured`; tidak ada klaim audit atau keterlacakan.
 
 Input divalidasi secara *fail-closed*: skema, pemetaan lengan, fase/rep,
-revisi/render, status metrik, dan nilai tersensor yang tidak konsisten
-ditolak. Batas penyensoran divalidasi per baris; horizon RMST adalah batas
-terkecil per kelompok. Ketidakcocokan `rows.jsonl` dengan `analysis.jsonl` juga
-ditolak agar tidak ada baris yang hilang diam-diam. Analisis tidak mencetak
+revisi/render, status metrik, batas monotonik/durasi, dan nilai tersensor yang
+tidak konsisten ditolak. Baris baru
+(`completed-observation-v1`) wajib membawa `t0/t_a`, endpoint/konfirmasi yang
+lengkap, serta `window_completed`/`window_end_*`; endpoint primer, evaluasi, dan
+konfirmasi harus selesai tidak melewati `window_end` maupun deadline, sedangkan
+`t_a` dan `t_e_store` boleh tumpang tindih/tertulis setelah stop secara
+diagnostik. Baris `right_censored` hanya diterima bila jendela benar-benar
+mencapai deadline. Baris legacy tanpa marker tetap divalidasi dengan aturan lama
+dan tidak diwajibkan memiliki bound baru; c69 tetap dapat divalidasi sebagai
+legacy tanpa inferensi komparatif. Dataset yang mencampur baris bermarker dan
+legacy, marker tak dikenal, atau marker `rows.jsonl` yang berbeda dari
+`analysis.jsonl` ditolak. Untuk marker `completed-observation-v1`, field
+dukungan/window/diagnostik eksplisit harus ada di kedua sisi; satu sisi yang
+hilang ditolak sebelum perbandingan nilai. Baris legacy hanya membandingkan
+irisan field yang tersedia dan tidak dipaksa memiliki field baru. `rows.jsonl`
+juga harus setuju pada window, konfirmasi, durasi store, dan identitas
+read/ref pendukung bila field itu tersedia. Batas penyensoran divalidasi per
+baris; horizon RMST adalah batas terkecil per kelompok. Analisis tidak mencetak
 nilai baris mentah; hanya metadata yang diizinkan yang masuk artefak eksklusi.
+
+`unobserved_before_stop` hanya diterima dengan nilai `null` dan provenance
+recovery dini yang valid (run `observed`, `stop_reason: recovery`, recovery
+teramati). Endpoint yang hilang tidak masuk Kaplan--Meier/RMST maupun input uji
+numerik, dan tidak dianggap tersensor. Kelompok yang seluruh endpoint-nya hilang
+dilaporkan **tidak terestimasi** (bukan "semua tersensor"); tabel survival
+menampilkan kolom `Hilang` dan `Eksklusi`, sedangkan `pairing.reason` membedakan
+`missing_blocks` dari `censored_blocks`. Uji tetap *complete-case*/observed-only:
+missingness dan penyensoran tidak disesuaikan, dan keluarga Holm 12 hipotesis
+tidak berubah.
 
 ### Identitas retry
 

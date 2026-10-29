@@ -95,6 +95,7 @@ def harness_row(scenario, arm, rep, *, status="observed", detection=2.0,
         "run_id": None,
         "synthetic": False,
         "formal_execution_approved": False,
+        "timing_convention": analyze_live.TIMING_CONVENTION,
         "env": arm,
         "arm": arm,
         "scenario": scenario,
@@ -114,6 +115,11 @@ def harness_row(scenario, arm, rep, *, status="observed", detection=2.0,
         "arm_restore_status": "restored",
         "mutations_executed": 0 if status == "baseline_failure" else 1,
         "postcondition": {"verified": True},
+        "detection_reads": [],
+        "evidence_reads": [],
+        "recovery_reads": [],
+        "t_e_store_mono": None,
+        "t_e_store_utc": None,
         "t0_utc": None,
     }
     for metric, value in (("detection", detection), ("evidence", evidence),
@@ -125,6 +131,27 @@ def harness_row(scenario, arm, rep, *, status="observed", detection=2.0,
             row[metric + "_seconds"], row[metric + "_status"] = observation(
                 value, censor)
     row.update(overrides)
+    if row.get("timing_convention") == analyze_live.TIMING_CONVENTION:
+        row["window_completed"] = True
+        row["t0_mono"] = 100.0
+        row["t_a_mono"] = 100.1
+        row["t_d_mono"] = (None if row["detection_seconds"] is None
+                           else 100.0 + row["detection_seconds"])
+        row["t_e_mono"] = (None if row["evidence_seconds"] is None
+                           else 100.0 + row["evidence_seconds"])
+        row["t_r_mono"] = (None if row["recovery_seconds"] is None
+                           else 100.0 + row["recovery_seconds"])
+        row["t_r_first_mono"] = row["t_r_mono"]
+        row["t_r_confirmed_mono"] = (
+            None if row["t_r_mono"] is None else row["t_r_mono"] + 1.0)
+        row["recovery_confirmation"] = (
+            "confirmed" if row["recovery_seconds"] is not None else "none")
+        row["stop_reason"] = ("recovery" if row["recovery_seconds"] is not None
+                              else "timeout")
+        row["window_end_mono"] = (
+            100.0 + row["censor_seconds"]
+            if row["recovery_seconds"] is None
+            else row["t_r_mono"] + 1.0)
     return row
 
 
@@ -183,7 +210,177 @@ def survival(result, scenario, arm, metric):
     raise AssertionError(f"missing survival entry {scenario}/{arm}/{metric}")
 
 
+def completed_row(scenario, arm, rep, *, detection=2.0, evidence=3.0,
+                  recovery=5.0, detection_status=None, evidence_status=None,
+                  stop_reason=None, convention=analyze_live.TIMING_CONVENTION,
+                  **overrides):
+    row = make_row(scenario, arm, rep, detection=detection,
+                   evidence=evidence, recovery=recovery, **overrides)
+    row["timing_convention"] = convention
+    if detection is None:
+        row["detection_status"] = detection_status or "unobserved_before_stop"
+    if evidence is None:
+        row["evidence_status"] = evidence_status or "unobserved_before_stop"
+    row["stop_reason"] = stop_reason or (
+        "recovery" if recovery is not None else "timeout")
+    row["t0_mono"] = 100.0
+    row["t_a_mono"] = 100.1
+    row["t_d_mono"] = None if detection is None else 100.0 + detection
+    row["t_e_mono"] = None if evidence is None else 100.0 + evidence
+    row["t_r_mono"] = None if recovery is None else 100.0 + recovery
+    row["t_r_first_mono"] = row["t_r_mono"]
+    row["t_r_confirmed_mono"] = (
+        None if recovery is None else 100.0 + recovery + 1.0)
+    row["recovery_confirmation"] = (
+        "confirmed" if recovery is not None else "none")
+    row["t_e_store_mono"] = (
+        None if evidence is None else 100.0 + evidence + 0.1)
+    row["window_completed"] = True
+    row["window_end_mono"] = (
+        100.0 + row["censor_seconds"] if recovery is None
+        else 100.0 + recovery + 1.0)
+    return row
+
+
+class LegacyTimingTests(unittest.TestCase):
+    def test_preserved_legacy_rows_without_confirmation_bounds_still_validate(self):
+        row = make_row("B", "gitops", 1)
+        row.update({
+            "t0_mono": 100.0, "t_a_mono": 100.1,
+            "t_d_mono": 102.0, "t_e_mono": 103.0, "t_r_mono": 105.0,
+        })
+        meta = analyze_live.validate_rows([row])
+        self.assertEqual(meta["timing_convention"], None)
+        self.assertEqual(meta["analysis_rows"], 1)
+
+    def test_new_convention_rows_without_bounds_are_rejected(self):
+        row = make_row("B", "gitops", 1)
+        row["timing_convention"] = analyze_live.TIMING_CONVENTION
+        row["window_completed"] = True
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_new_right_censored_row_requires_deadline_completion(self):
+        row = completed_row("B", "gitops", 1, recovery=None)
+        row["window_end_mono"] = 105.0
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+        row["window_end_mono"] = 110.0
+        self.assertEqual(analyze_live.validate_rows([row])["analysis_rows"], 1)
+
+    def test_new_observed_row_requires_confirmation_bounds(self):
+        row = completed_row("B", "gitops", 1)
+        row["t_r_confirmed_mono"] = None
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+        row = completed_row("B", "gitops", 1)
+        row["recovery_confirmation"] = "late_confirmation"
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_excluded_preinjection_raw_row_may_lack_timing(self):
+        analysis = [completed_row("B", "gitops", 1)]
+        raw = [dict(analysis[0]), {
+            "run_id": "legacy-batch-gitops-B-r02",
+            "batch_id": "legacy-batch",
+            "batch_phase": "R2",
+            "batch_mode": "live",
+            "scenario": "B",
+            "arm": "gitops",
+            "env": "gitops",
+            "rep": 2,
+            "status": "baseline_failure",
+            "timing_convention": analyze_live.TIMING_CONVENTION,
+        }]
+        analysis[0]["batch_id"] = "legacy-batch"
+        analysis[0]["run_id"] = "legacy-batch-gitops-B-r01"
+        raw[0]["batch_id"] = "legacy-batch"
+        raw[0]["run_id"] = "legacy-batch-gitops-B-r01"
+        result = analyze_live._exclusions(analysis, raw)
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["by_reason"],
+                         {"status_not_analyzable": 1})
+
+
+class ProvenanceConsistencyTests(unittest.TestCase):
+    def test_endpoint_after_window_end_is_rejected_by_batch_and_analyzer(self):
+        analysis_rows, _, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        row = dict(analysis_rows[0])
+        row["detection_seconds"] = 9.0
+        row["t_d_mono"] = 109.0
+        self.assertIsNotNone(run_matrix._analysis_problem(row))
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([row])
+
+    def test_batch_and_analyzer_reject_tampered_duration_and_confirmation(self):
+        analysis_rows, _, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        cases = (
+            {"detection_seconds": 9.0},
+            {"injection_seconds": 9.0},
+            {"t_r_confirmed_mono": 104.0},
+            {"window_end_mono": 105.5},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                row = dict(analysis_rows[0])
+                row.update(override)
+                self.assertIsNotNone(run_matrix._analysis_problem(row))
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([row])
+
+    def test_new_raw_missing_explicit_support_field_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-presence-check", ["observed"])
+        for field in ("evidence_reads", "window_end_mono",
+                      "recovery_confirmation"):
+            with self.subTest(field=field):
+                raw = [dict(row) for row in raw_rows]
+                del raw[0][field]
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live._exclusions(analysis_rows, raw)
+
+    def test_new_analysis_missing_explicit_support_field_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-presence-check", ["observed"])
+        for field in ("evidence_reads", "window_end_mono",
+                      "recovery_confirmation"):
+            with self.subTest(field=field):
+                analysis = [dict(row) for row in analysis_rows]
+                del analysis[0][field]
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live._exclusions(analysis, raw_rows)
+
+    def test_raw_window_end_disagreement_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        raw = [dict(row) for row in raw_rows]
+        raw[0]["window_end_mono"] += 1.0
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live._exclusions(analysis_rows, raw)
+
+    def test_raw_supporting_identity_disagreement_is_rejected(self):
+        analysis_rows, raw_rows, _ = runner_view(
+            "lead-valid-provenance", ["observed"])
+        cases = (
+            {"recovery_confirmation": "none"},
+            {"evidence_reads": ["Service/invenio-web"]},
+            {"t_e_store_mono": 104.0},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                raw = [dict(row) for row in raw_rows]
+                raw[0].update(override)
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live._exclusions(analysis_rows, raw)
+
+
 class LiveAnalysisTest(unittest.TestCase):
+    def test_timing_convention_matches_the_runner_contract(self):
+        self.assertEqual(analyze_live.TIMING_CONVENTION,
+                         run_matrix.TIMING_CONVENTION)
+
     def test_complete_pairs_use_wilcoxon_signed_rank(self):
         result = analyze_live.analyze(paired_batch(), bootstrap=200, seed=7)
         item = entry(result, "B", "detection")
@@ -406,6 +603,19 @@ class LiveAnalysisTest(unittest.TestCase):
             for path in paths.values():
                 self.assertNotIn("supersecretvalue", Path(path).read_text())
 
+    def test_excluded_counts_normalize_the_imperative_arm(self):
+        rows = paired_batch(reps=range(1, 3))
+        raw = [dict(row) for row in rows]
+        raw.append(make_row("B", "imperative", 3,
+                            status="instrumentation_failure"))
+        result = analyze_live.analyze(
+            rows, raw_rows=raw, bootstrap=100, seed=1)
+        overview = next(item for item in result["overview"]
+                        if item["scenario"] == "B" and item["arm"] == "manual")
+        self.assertEqual(overview["metrics"]["detection"]["excluded"], 1)
+        curve = survival(result, "B", "manual", "detection")
+        self.assertEqual(curve["excluded_runs"], 1)
+
     def test_mixed_censor_limits_are_administratively_censored(self):
         rows = []
         for rep in range(1, 6):
@@ -454,6 +664,106 @@ class LiveAnalysisTest(unittest.TestCase):
                          "live_effects.tex"):
                 self.assertTrue((output / name).is_file(), name)
             self.assertNotIn("secret", result.stdout + result.stderr)
+
+
+    def test_missing_detection_at_confirmed_early_recovery_is_not_censored(self):
+        rows = []
+        for rep in range(1, 6):
+            rows.append(completed_row("B", "imperative", rep,
+                                      detection=None, evidence=None))
+            rows.append(completed_row("B", "gitops", rep,
+                                      detection=None, evidence=None,
+                                      recovery=5.1))
+        result = analyze_live.analyze(
+            rows, raw_rows=[dict(row) for row in rows],
+            bootstrap=100, seed=1)
+        item = entry(result, "B", "detection")
+        self.assertEqual(item["pairing"]["method"], "unpaired")
+        self.assertEqual(item["pairing"]["reason"], "missing_blocks")
+        self.assertEqual(item["pairing"]["missing_blocks"], 5)
+        self.assertEqual(item["endpoints"]["manual"]["missing"], 5)
+        self.assertEqual(item["endpoints"]["gitops"]["missing"], 5)
+        self.assertEqual(item["test"]["name"], "not_estimable")
+        self.assertIsNone(item["test"]["p_value"])
+        self.assertIn("Missing endpoints", item["note"])
+        curve = survival(result, "B", "manual", "detection")
+        self.assertEqual(curve["missing"], 5)
+        self.assertEqual(curve["censored"], 0)
+        self.assertEqual(curve["n"], 0)
+        self.assertFalse(curve["estimable"])
+        self.assertIsNone(curve["rmst_seconds"])
+        self.assertIn("not estimable", curve["note"])
+        self.assertNotIn("all observations censored", curve["note"])
+        recovery = entry(result, "B", "recovery")
+        self.assertEqual(recovery["test"]["name"], "wilcoxon_signed_rank")
+        self.assertEqual(result["batch"]["timing_convention"],
+                         analyze_live.TIMING_CONVENTION)
+
+    def test_missing_metric_without_early_stop_provenance_is_rejected(self):
+        for override in ({"stop_reason": "timeout"},
+                         {"recovery_status": "right_censored"},
+                         {"status": "right_censored"}):
+            with self.subTest(override=override):
+                row = completed_row("B", "gitops", 1, detection=None)
+                row.update(override)
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([row])
+
+    def test_mixed_and_unknown_timing_conventions_fail_closed(self):
+        rows = [completed_row("B", "gitops", 1),
+                make_row("B", "imperative", 1)]
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows(rows)
+        unknown = completed_row("B", "gitops", 1,
+                                convention="legacy-observation-v0")
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.validate_rows([unknown])
+
+    def test_raw_and_analysis_timing_markers_must_agree(self):
+        rows = [completed_row("B", "gitops", 1)]
+        raw = [dict(rows[0])]
+        del raw[0]["timing_convention"]
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(rows, raw_rows=raw, bootstrap=100, seed=1)
+        raw = [dict(rows[0])]
+        raw[0]["timing_convention"] = "legacy-observation-v0"
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(rows, raw_rows=raw, bootstrap=100, seed=1)
+        excluded = completed_row("B", "gitops", 2)
+        excluded["status"] = "invalid_injection"
+        excluded["timing_convention"] = "legacy-observation-v0"
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(rows, raw_rows=[dict(rows[0]), excluded],
+                                 bootstrap=100, seed=1)
+        raw = [dict(rows[0])]
+        raw[0]["t_d_mono"] = 101.0
+        with self.assertRaises(analyze_live.LiveAnalysisError):
+            analyze_live.analyze(rows, raw_rows=raw, bootstrap=100, seed=1)
+
+    def test_tampered_timing_bounds_fail_closed(self):
+        cases = (
+            {"t_d_mono": 101.0},
+            {"t_r_mono": 111.0},
+            {"t_r_confirmed_mono": 104.0},
+            {"t_a_mono": 99.0},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                row = completed_row("B", "gitops", 1)
+                row.update(override)
+                with self.assertRaises(analyze_live.LiveAnalysisError):
+                    analyze_live.validate_rows([row])
+
+    def test_survival_table_reports_missing_and_excluded_endpoints(self):
+        rows = [completed_row("B", "gitops", rep, detection=None)
+                for rep in range(1, 4)]
+        result = analyze_live.analyze(rows, bootstrap=100, seed=1)
+        with tempfile.TemporaryDirectory() as directory:
+            paths = analyze_live.write_outputs(result, Path(directory))
+            survival_tex = Path(paths["survival"]).read_text()
+            self.assertIn("Hilang", survival_tex)
+            self.assertIn("Eksklusi", survival_tex)
+            self.assertIn("Tidak terestimasi", survival_tex)
 
 
 class RetryIdentityTest(unittest.TestCase):
@@ -726,6 +1036,67 @@ class RawAnalysisConsistencyTest(unittest.TestCase):
                     analyze_live.analyze(
                         analysis_rows, raw_rows=raw_rows, bootstrap=100,
                         seed=1)
+
+    def test_runner_row_with_missing_detection_survives_into_analysis(self):
+        payload = {
+            "stop_reason": "recovery",
+            "detection_seconds": None,
+            "detection_status": "unobserved_before_stop",
+            "evidence_seconds": None,
+            "evidence_status": "unobserved_before_stop",
+            "recovery_seconds": 5.0,
+            "recovery_status": "observed",
+        }
+        analysis_rows, raw_rows, _ = runner_view(
+            "review-batch", ["observed"], metrics={0: payload})
+        self.assertEqual(analysis_rows[0]["timing_convention"],
+                         analyze_live.TIMING_CONVENTION)
+        result = analyze_live.analyze(
+            analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+        self.assertEqual(result["batch"]["analysis_rows"], 1)
+        item = entry(result, "C", "detection")
+        self.assertEqual(item["endpoints"]["gitops"]["missing"], 1)
+        self.assertEqual(item["pairing"]["reason"], "unmatched_arm_blocks")
+        curve = survival(result, "C", "gitops", "detection")
+        self.assertFalse(curve["estimable"])
+        self.assertEqual(curve["censored"], 0)
+        self.assertIsNone(curve["rmst_seconds"])
+
+    def test_runner_rows_preserve_missing_endpoints_end_to_end(self):
+        analysis_rows, raw_rows = [], []
+        payload = {
+            "stop_reason": "recovery",
+            "detection_seconds": None,
+            "detection_status": "unobserved_before_stop",
+            "evidence_seconds": None,
+            "evidence_status": "unobserved_before_stop",
+            "recovery_seconds": 5.0,
+            "recovery_status": "observed",
+        }
+        for arm in ("imperative", "gitops"):
+            for rep in range(1, 6):
+                selected, raw, _ = runner_view(
+                    "review-batch", ["observed"], arm=arm, rep=rep,
+                    metrics={0: payload})
+                analysis_rows.extend(selected)
+                raw_rows.extend(raw)
+        result = analyze_live.analyze(
+            analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+        item = entry(result, "C", "detection")
+        self.assertEqual(item["pairing"]["reason"], "missing_blocks")
+        self.assertEqual(item["pairing"]["missing_blocks"], 5)
+        self.assertEqual(item["endpoints"]["manual"]["missing"], 5)
+        self.assertEqual(item["endpoints"]["gitops"]["missing"], 5)
+        self.assertIsNone(item["test"]["p_value"])
+        for arm in ("manual", "gitops"):
+            curve = survival(result, "C", arm, "detection")
+            self.assertEqual(curve["missing"], 5)
+            self.assertEqual(curve["censored"], 0)
+            self.assertFalse(curve["estimable"])
+            self.assertIsNone(curve["rmst_seconds"])
+        recovery = entry(result, "C", "recovery")
+        self.assertEqual(recovery["test"]["name"], "wilcoxon_signed_rank")
+        self.assertEqual(result["batch"]["analysis_rows"], 10)
 
     def test_missing_legacy_eligibility_fields_remain_compatible(self):
         analysis_rows, raw_rows, _ = runner_view(
