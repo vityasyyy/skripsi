@@ -4,6 +4,8 @@ Lampiran ini memuat artefak, perintah, dan skema data yang benar-benar digunakan
 
 \section{Identitas Apparatus yang Dibekukan}
 
+Identitas yang mengikat seluruh data pada Bab IV dirangkum pada Tabel~\ref{tab:lampiran-identitas}. Nilai-nilai ini dibekukan sebelum pengumpulan dan tidak berubah selama eksperimen berlangsung.
+
 \begin{table}[H]
   \centering
   \small
@@ -62,7 +64,7 @@ python3 -B experiments/analysis/analyze_live.py \
 
 \section{Skema Data per Run}
 
-Setiap run menulis satu berkas baris JSON dengan bidang berikut. Bidang waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
+Setiap run menulis satu berkas baris JSON dengan bidang berikut, dirangkum pada Tabel~\ref{tab:lampiran-skema}. Bidang waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
 
 \begin{table}[H]
   \centering
@@ -98,7 +100,7 @@ Snapshot dan bukti disanitasi sebelum disimpan. Nilai Secret tidak dimasukkan ke
 
 \section{Pemetaan Keterbatasan dan Penanganannya}
 
-Tabel berikut menyatakan setiap keterbatasan, cara penanganan yang benar-benar dilakukan, dan sisa risiko yang tetap ada. Kolom terakhir penting: tidak ada keterbatasan yang diklaim hilang sepenuhnya.
+Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penanganan yang benar-benar dilakukan, dan sisa risiko yang tetap ada. Kolom terakhir penting: tidak ada keterbatasan yang diklaim hilang sepenuhnya.
 
 \begin{table}[H]
   \centering
@@ -115,7 +117,7 @@ Tabel berikut menyatakan setiap keterbatasan, cara penanganan yang benar-benar d
     \hline
     Tidak ada stack kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari keadaan klaster bersama \\
     \hline
-    Satu domain kegagalan penyimpanan & Dinyatakan bahwa penyimpanan primer dan cadangan berbagi server NFS yang sama & Pemulihan lintas kehilangan penyimpanan primer tidak diuji \\
+    Satu domain kegagalan penyimpanan & Dinyatakan bahwa penyimpanan primer dan cadangan berbagi server NFS yang sama; pemulihan byte berkas dari artefak cadangan diverifikasi terpisah (Tabel~\ref{tab:lampiran-recovery}) & Pemulihan lintas kehilangan penyimpanan primer tetap tidak diuji \\
     \hline
     Interval pengambilan sampel satu detik & Selisih deteksi dilaporkan bersama interpretasi bahwa nilainya bersesuaian dengan interval \textit{polling} & Komponen cadangan mekanisme dan ketanggapan pengendali belum terpisah sepenuhnya \\
     \hline
@@ -137,6 +139,36 @@ Tabel berikut menyatakan setiap keterbatasan, cara penanganan yang benar-benar d
     \hline
   \end{tabularx}
 \end{table}
+
+\section{Verifikasi Pemulihan Berkas dari Artefak Cadangan}
+
+Selain pengukuran waktu pada Bab IV, dilakukan satu pemeriksaan terpisah untuk menjawab pertanyaan yang tidak diukur oleh R1 maupun R2: apakah byte berkas benar-benar dapat dipulihkan dari artefak cadangan, bukan dari salinan sumber yang sedang aktif. Pemeriksaan ini menggunakan identitas khusus yang hanya boleh membaca bucket cadangan dan menulis ke bucket uji terpisah, tanpa hak menghapus.
+
+Pemulihan dilakukan dari titik cadangan \texttt{20261029T121353Z-4d0b1d71a53f} ke bucket uji privat, kemudian objek hasil pemulihan dibaca kembali dan di-\textit{hash} secara independen, bukan hanya mengandalkan laporan alat.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Hasil verifikasi pemulihan berkas dari artefak cadangan}
+  \label{tab:lampiran-recovery}
+  \begin{tabularx}{\textwidth}{|l|l|l|c|}
+    \hline
+    Pemeriksaan & Diharapkan & Teramati & Hasil \\
+    \hline
+    Jumlah objek & 1 & 1 & lulus \\
+    \hline
+    Ukuran & 65.536 byte & 65.536 byte & lulus \\
+    \hline
+    SHA-256 & \texttt{7daca209\ldots b27e4c2} & identik & lulus \\
+    \hline
+    MD5 & \texttt{8f1445ba\ldots 462f475} & identik & lulus \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+Hak akses identitas uji juga diperiksa secara langsung: membaca bucket cadangan diizinkan, menulis bucket uji diizinkan, dan menghapus ditolak. Penolakan tersebut merupakan bukti bahwa prinsip hak minimum benar-benar diterapkan, bukan hanya diklaim.
+
+Perlu ditegaskan batas hasil ini. Verifikasi membuktikan bahwa byte berkas dapat dipulihkan dari artefak cadangan dan bahwa integritasnya dapat diperiksa ulang. Verifikasi ini tidak membuktikan pemulihan tingkat aplikasi, karena pemulihan basis data dari cadangan yang dibuat setelah \textit{seed} diunggah belum berhasil diselesaikan pada pemeriksaan ini; kegagalan tersebut dilaporkan apa adanya dan tidak ditutupi. Verifikasi juga tidak membuktikan pemulihan dari kehilangan penyimpanan primer, karena penyimpanan primer dan cadangan berbagi server yang sama.
 
 \section{Cara Membaca Hasil}
 
