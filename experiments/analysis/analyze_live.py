@@ -8,7 +8,8 @@ result plus thesis-ready LaTeX tables. Standard library only.
 Statistical scope is frozen by Bab III:
 
 * B--E are the managed-drift efficacy population.
-* A is the HPA control, F the visibility boundary, G a descriptive non-Argo
+* A is the HPA control, F a declared Service drift reported separately, G a
+descriptive non-Argo
   case. They are reported separately and never pooled into efficacy.
 * R2 uses repetitions 1..10; R1 uses repetitions 11..15.
 * Observed times stay observed, right-censored times stay censored. A missing
@@ -1168,8 +1169,11 @@ def analyze(rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP,
                "claim": "none"},
         "notes": [
             "Exploratory single-case inference; no confirmatory claim.",
-            "A is the HPA control, F the visibility boundary, and G a "
-            "descriptive non-Argo case; only B-E enter efficacy.",
+            "A is the HPA control and G a descriptive non-Argo case; only B-E "
+            "enter efficacy.",
+            "F is a declared Service targetPort drift reported separately, not "
+            "pooled into efficacy: the twelve-hypothesis family was fixed before "
+            "collection, so adding F now would expand it post hoc.",
             "G is excluded from efficacy even though batch rows carry "
             "efficacy_eligible=true; the frozen method classifies G as "
             "descriptive non-Argo.",
