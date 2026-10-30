@@ -1,17 +1,151 @@
 \chapter{LAMPIRAN A}
 
-Lampiran ini disiapkan untuk artefak yang akan dipublikasikan setelah protokol ditinjau, apparatus divalidasi, dan pengumpulan data formal dilakukan. Pada draf ini, skrip, konfigurasi aktual, dan dataset tervalidasi belum dilampirkan. Ketiadaan artefak tersebut tidak menunjukkan bahwa pengujian telah berhasil atau gagal.
+Lampiran ini memuat artefak, perintah, dan skema data yang benar-benar digunakan pada pengumpulan data formal, beserta pemetaan antara keterbatasan penelitian dan cara penanganannya. Seluruh nilai yang dicantumkan telah disanitasi: tidak ada nilai Secret, kredensial, nama objek privat, maupun URL bertanda tangan di dalam lampiran ini.
 
-\section{Artefak Eksperimen yang Direncanakan}
+\section{Identitas Apparatus yang Dibekukan}
 
-Lampiran versi akhir dapat memuat sumber pemeriksa dan korektor imperatif berbasis \texttt{kubectl}, konfigurasi aplikasi ArgoCD, manifest dan inventaris workload formal, skema kolektor, serta prosedur pemulihan nilai dasar. Setiap artefak perlu diberi versi dan dikaitkan dengan konfigurasi aktual eksperimen. Materi pilot S1/S2 harus dipisahkan dari artefak dan data pengujian formal.
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Identitas apparatus pada pengumpulan formal}
+  \label{tab:lampiran-identitas}
+  \begin{tabularx}{\textwidth}{|l|X|}
+    \hline
+    Komponen & Nilai \\
+    \hline
+    Revisi sumber GitOps & \texttt{81ddd259780e0e6aef333811a0126f86d70a094e} \\
+    \hline
+    SHA-256 render & \texttt{a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703} \\
+    \hline
+    Jumlah objek render & 27 \\
+    \hline
+    Revisi instrumen & \texttt{3572f3c1c11d3abc8b63882c4348b1b803d4256f} \\
+    \hline
+    \textit{Image digest} aplikasi & \texttt{ghcr.io/vityasyyy/invenio-ugm@sha256:52645b7b\ldots f343a357} \\
+    \hline
+    \textit{Seed} & \texttt{20261029} \\
+    \hline
+    Jumlah sel & 210 (7 skenario $\times$ 2 mode $\times$ 15 pengulangan) \\
+    \hline
+    Konvensi waktu & \texttt{completed-observation-v1} \\
+    \hline
+  \end{tabularx}
+\end{table}
 
-\section{Skema Data dan Perlindungan Informasi}
+\section{Perintah Eksekusi}
 
-Skema log formal perlu menyimpan pengenal run, lingkungan, skenario pada berkas metadata terpisah dari masukan pengendali, status penerimaan injeksi, cap waktu monotonik dalam detik dan UTC untuk $t_0$, $t_a$, $t_d$, $t_e$, dan $t_r$, interval polling aktual, hasil kesetaraan dan kesehatan, status penyensoran, kesalahan, serta alasan run tidak valid. $t_a$ menyimpan waktu penerimaan respons API injeksi. Metadata pengenal skenario tidak boleh diberikan kepada mekanisme pendeteksi atau korektor.
+Pengumpulan dijalankan melalui satu perintah batch yang memakai ulang jalur harian pemeriksa, sehingga gerbang keamanan tetap berada di satu tempat. Kredensial dibaca dari berkas privat bermode 0600 di luar repositori dan disuntikkan ke lingkungan proses anak; nilainya tidak pernah dicetak, tidak ditulis ke berkas bukti, dan tidak muncul pada argumen perintah.
 
-Snapshot dan bukti harus disanitasi sebelum disimpan atau dibagikan. Nilai Secret tidak dimasukkan ke listing, tangkapan layar, log, atau dataset publik. Pencocokan Secret dilakukan di memori; artefak yang dibagikan hanya memuat identitas bidang dan hasil kesetaraan, tanpa nilai rahasia atau hash yang dapat dipakai untuk menebak isinya.
+\begin{verbatim}
+python3 -B experiments/live/run_matrix.py \
+  --batch-id formal-20261029 \
+  --arms imperative gitops \
+  --scenarios A B C D E F G \
+  --reps 15 --seed 20261029 \
+  --cooldown-seconds 60 --baseline-timeout 600 --baseline-retries 1 \
+  --namespace invenio --app invenio-bootstrap \
+  --live --confirm-single-stack --production-like \
+  --out experiments/formal-20261029 \
+  --render-file <frozen-render.json> \
+  --source-revision 81ddd259780e0e6aef333811a0126f86d70a094e \
+  --render-sha256 a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703
+\end{verbatim}
+
+Analisis dijalankan dengan perintah berikut; keluaran berupa satu berkas JSON dan enam tabel LaTeX.
+
+\begin{verbatim}
+python3 -B experiments/analysis/analyze_live.py \
+  --in experiments/formal-20261029/formal-20261029.analysis.jsonl \
+  --rows experiments/formal-20261029/formal-20261029.rows.jsonl \
+  --out experiments/analysis-formal-20261029 --seed 20261029
+\end{verbatim}
+
+\section{Skema Data per Run}
+
+Setiap run menulis satu berkas baris JSON dengan bidang berikut. Bidang waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Bidang utama pada berkas baris per run}
+  \label{tab:lampiran-skema}
+  \begin{tabularx}{\textwidth}{|l|X|}
+    \hline
+    Bidang & Isi \\
+    \hline
+    \texttt{run\_id}, \texttt{arm}, \texttt{scenario}, \texttt{rep} & Identitas run dan blok protokol (R2 untuk pengulangan 1--10, R1 untuk 11--15) \\
+    \hline
+    \texttt{status}, \texttt{stop\_reason} & Status terminal run dan alasan berhenti \\
+    \hline
+    \texttt{detection\_seconds}, \texttt{evidence\_seconds}, \texttt{recovery\_seconds} & Tiga luaran waktu; bernilai kosong bila tidak teramati, tidak pernah nol \\
+    \hline
+    \texttt{detection\_status}, \texttt{evidence\_status} & Teramati, tersensor kanan, atau tidak teramati sebelum berhenti \\
+    \hline
+    \texttt{r1\_baseline}, \texttt{r1\_first}, \texttt{r1\_last} & Skor kesetaraan bidang terpilih pada tiga titik \\
+    \hline
+    \texttt{timing\_convention} & Penanda konvensi waktu agar data antar-konvensi tidak tercampur \\
+    \hline
+    \texttt{baseline\_sha256} & Sidik jari keadaan dasar untuk mendeteksi perubahan apparatus \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+Setiap run juga menyimpan bukti pendukung berupa cuplikan keadaan dasar, kontrak deklarasi, catatan injeksi, cuplikan pengambilan sampel, kondisi pascasyarat, dan catatan pembersihan. Berkas-berkas ini yang memungkinkan audit ulang tanpa menjalankan eksperimen kembali.
+
+\section{Perlindungan Informasi}
+
+Snapshot dan bukti disanitasi sebelum disimpan. Nilai Secret tidak dimasukkan ke keluaran, tangkapan layar, log, maupun dataset. Pencocokan bidang dilakukan di memori; artefak yang dibagikan hanya memuat identitas bidang dan hasil kesetaraan, tanpa nilai rahasia maupun hash yang dapat dipakai untuk menebak isinya. Kredensial pengumpulan berada pada berkas privat di luar repositori dan tidak disertakan pada lampiran ini.
+
+\section{Pemetaan Keterbatasan dan Penanganannya}
+
+Tabel berikut menyatakan setiap keterbatasan, cara penanganan yang benar-benar dilakukan, dan sisa risiko yang tetap ada. Kolom terakhir penting: tidak ada keterbatasan yang diklaim hilang sepenuhnya.
+
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \caption{Keterbatasan, penanganan, dan sisa risiko}
+  \label{tab:lampiran-keterbatasan}
+  \begin{tabularx}{\textwidth}{|X|X|X|}
+    \hline
+    Keterbatasan & Penanganan dalam penelitian & Sisa risiko \\
+    \hline
+    Satu klaster, satu stack, satu implementasi GitOps & Seluruh klaim dibatasi pada apparatus yang diuji; identitas apparatus dibekukan dan dilaporkan & Generalisasi ke lingkungan lain tidak dapat ditarik \\
+    \hline
+    Kedua mode berurutan pada stack yang sama & Urutan berbasis \textit{seed}, gerbang kesiapan \textit{baseline}, prosedur reset, dan jeda 60 detik; urutan dilaporkan & Efek urutan dan beban latar tidak dihilangkan, hanya dimitigasi \\
+    \hline
+    Tidak ada stack kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari keadaan klaster bersama \\
+    \hline
+    Satu domain kegagalan penyimpanan & Dinyatakan bahwa penyimpanan primer dan cadangan berbagi server NFS yang sama & Pemulihan lintas kehilangan penyimpanan primer tidak diuji \\
+    \hline
+    Interval pengambilan sampel satu detik & Selisih deteksi dilaporkan bersama interpretasi bahwa nilainya bersesuaian dengan interval \textit{polling} & Komponen cadangan mekanisme dan ketanggapan pengendali belum terpisah sepenuhnya \\
+    \hline
+    Ketidakpastian jam antar-host & Batas kesegaran 30 detik diterapkan secara konservatif; sampel dari masa depan dianggap anomali dan menghentikan run & Selang waktu absolut tidak disertifikasi secara numerik \\
+    \hline
+    Sensoring kanan & Dilaporkan sebagai tersensor, tidak diimputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
+    \hline
+    Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang \\
+    \hline
+    Keluarga uji dua belas hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
+    \hline
+    Uji berpasangan tidak selalu dapat dipakai & Aturan cadangan Mann--Whitney ditetapkan sebelum analisis dan dilaporkan terbuka & Daya statistik pada C dan D lebih rendah \\
+    \hline
+    R3 tidak diukur & Dilaporkan sebagai tidak diukur, bukan nol dan bukan tidak ada perbedaan & Pertanyaan keterlacakan tidak terjawab \\
+    \hline
+    Kesetaraan bukan kebenaran semantik & Dinyatakan bahwa skor mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi & Konfigurasi yang salah dapat dicapai dengan rapi oleh kedua mode \\
+    \hline
+    Protokol belum ditinjau pembimbing & Dinyatakan sebagai studi kasus eksploratif, bukan konfirmatori & Posisi metodologis menunggu tinjauan \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\section{Cara Membaca Hasil}
+
+Untuk pembaca yang tidak terbiasa dengan statistik, dua panduan berikut membantu menafsirkan Bab IV secara tepat.
+
+Pertama, nilai $p$ yang kecil menunjukkan bahwa perbedaan yang teramati sulit dijelaskan oleh kebetulan, tetapi tidak menunjukkan besarnya perbedaan. Karena itu setiap perbandingan disertai ukuran efek. Pada penelitian ini seluruh perbandingan deteksi memiliki ukuran efek maksimum, sedangkan pemulihan tidak, dan justru perbedaan pada kolom ukuran efek itulah temuan yang paling penting.
+
+Kedua, pengamatan tersensor bukan pengamatan gagal. Apabila pemulihan belum terjadi sampai batas pengamatan, yang diketahui adalah bahwa waktunya melebihi batas tersebut; nilainya tidak diketahui dan tidak diisi dengan angka karangan. Pada penelitian ini seluruh sensoring pemulihan berasal dari satu skenario pada satu mode, sehingga kejadian tersebut dilaporkan sebagai temuan, bukan dibuang.
 
 \section{Status Lampiran}
 
-Seluruh item pada lampiran ini masih berupa kebutuhan artefak, bukan skrip atau konfigurasi yang telah diverifikasi. Isi lampiran hanya dapat dilengkapi berdasarkan bukti yang benar-benar dihasilkan oleh eksperimen dan telah ditinjau untuk mencegah kebocoran informasi sensitif.
+Seluruh artefak yang dirujuk pada lampiran ini telah dihasilkan oleh eksperimen dan telah disanitasi. Dataset mentah, berkas bukti per run, dan tabel LaTeX hasil analisis disimpan di luar naskah ini bersama checksum masing-masing, sehingga integritasnya dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen yang dipublikasikan.

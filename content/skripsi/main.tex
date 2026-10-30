@@ -86,12 +86,37 @@
 %------------------------------------------------------------
 % Daftar Lambang dan Singkatan (DAFTAR SIMBOL)
 %------------------------------------------------------------
-\nomenclature{GitOps}{Paradigma manajemen \textit{deployment} yang menggunakan repositori Git sebagai \textit{single source of truth} dengan agen \textit{reconciliation} otomatis}
-\nomenclature{IaC}{\textit{Infrastructure-as-Code}: praktik mendefinisikan dan mengelola infrastruktur melalui berkas konfigurasi yang diberi versi}
-\nomenclature{ArgoCD}{Alat GitOps \textit{pull-based} yang melakukan \textit{continuous reconciliation} terhadap \textit{state} klaster Kubernetes}
-\nomenclature{R1}{Metrik konsistensi \textit{deployment}}
-\nomenclature{R2}{Metrik waktu deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi}
+\nomenclature{ArgoCD}{Alat GitOps \textit{pull-based} yang membandingkan keadaan klaster dengan deklarasi di Git lalu melakukan rekonsiliasi otomatis}
+\nomenclature{Cliff's $\delta$}{Ukuran efek nonparametrik berkisar $-1$ sampai $1$; nilai $1$ berarti seluruh pengamatan satu kelompok lebih besar daripada kelompok lain}
+\nomenclature{ConfigMap}{Objek Kubernetes yang menyimpan konfigurasi non-rahasia sebagai pasangan kunci--nilai}
+\nomenclature{\textit{Control loop}}{Siklus berulang "amati--bandingkan--perbaiki" yang menjadi dasar kerja pengendali Kubernetes}
+\nomenclature{Declarative}{Pendekatan yang menyatakan keadaan akhir yang diinginkan, bukan langkah-langkah untuk mencapainya}
+\nomenclature{\textit{Deployment}}{Objek Kubernetes yang mengelola replika Pod dan pembaruan bertahap}
+\nomenclature{\textit{Drift}}{Penyimpangan keadaan nyata klaster dari keadaan yang dideklarasikan}
+\nomenclature{GitOps}{Paradigma pengelolaan infrastruktur yang menjadikan repositori Git sebagai satu-satunya sumber kebenaran, dengan agen otomatis yang menyelaraskan klaster}
+\nomenclature{Holm}{Metode koreksi nilai $p$ untuk banyak pengujian sekaligus agar peluang positif palsu tetap terkendali}
+\nomenclature{HPA}{\textit{Horizontal Pod Autoscaler}: pengendali Kubernetes yang menambah atau mengurangi jumlah replika berdasarkan beban}
+\nomenclature{IaC}{\textit{Infrastructure-as-Code}: praktik mendefinisikan infrastruktur melalui berkas konfigurasi yang diberi versi}
+\nomenclature{\textit{Imperative}}{Pendekatan yang menjalankan perintah eksplisit untuk mengubah keadaan, bukan menyatakan keadaan akhir}
+\nomenclature{Kaplan--Meier}{Metode estimasi kurva kelangsungan hidup yang memperhitungkan pengamatan tersensor}
+\nomenclature{\textit{Manifest}}{Berkas YAML yang mendeklarasikan satu atau beberapa objek Kubernetes}
+\nomenclature{\textit{Namespace}}{Pemisahan logis sumber daya di dalam satu klaster Kubernetes}
+\nomenclature{\textit{Pod}}{Unit terkecil yang dijalankan Kubernetes, berisi satu atau beberapa kontainer}
+\nomenclature{\textit{Polling}}{Pemeriksaan berkala pada selang waktu tetap, berbeda dari pengamatan berkelanjutan}
+\nomenclature{\textit{Prune}}{Penghapusan otomatis objek yang tidak lagi ada dalam deklarasi}
+\nomenclature{R1}{Metrik kesetaraan konfigurasi pada himpunan bidang yang ditetapkan, dilaporkan terpisah dari kesehatan layanan}
+\nomenclature{R2}{Metrik waktu: deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi penuh}
 \nomenclature{R3}{Bukti keterlacakan; tidak diukur dalam studi ini karena audit API server tidak tersedia (lihat Bab V)}
+\nomenclature{\textit{Reconciliation}}{Proses membandingkan keadaan nyata dengan deklarasi lalu membawanya kembali selaras}
+\nomenclature{RMST}{\textit{Restricted Mean Survival Time}: rata-rata waktu bertahan pada horizon tertentu, tahan terhadap penyensoran}
+\nomenclature{\textit{SealedSecret}}{Objek Kubernetes yang menyimpan rahasia terenkripsi sehingga aman disimpan di Git}
+\nomenclature{\textit{Self-heal}}{Pemulihan otomatis oleh agen rekonsiliasi ketika keadaan nyata menyimpang}
+\nomenclature{Tersensor (kanan)}{Pengamatan yang berakhir sebelum peristiwa terjadi; diketahui nilainya melebihi batas pengamatan, tetapi nilainya tidak diketahui}
+\nomenclature{\textit{Single source of truth}}{Satu lokasi tunggal yang dianggap otoritatif untuk suatu konfigurasi}
+\nomenclature{\textit{Stack}}{Kumpulan layanan yang dijalankan bersama untuk membentuk satu sistem aplikasi}
+\nomenclature{\textit{State} (keadaan)}{Kondisi nyata objek di klaster pada suatu waktu}
+\nomenclature{\textit{Ukuran efek}}{Besaran perbedaan antar kelompok, dilaporkan bersama nilai $p$ agar signifikansi tidak disalahartikan sebagai kepraktisan}
+\nomenclature{\textit{Wilcoxon signed-rank}}{Uji nonparametrik berpasangan untuk membandingkan dua kondisi pada subjek yang sama}
 
 % Preliminary Pages (Skripsi: lengkap)
 \cover
@@ -112,14 +137,22 @@ Isi Prakata di sini...
 \lambang
 
 \abstractind
-Skripsi ini merancang studi kasus komparatif terkontrol atas dua mode pengelolaan pada satu stack InvenioRDM produksi-like: mode imperatif terotomasi berbasis \texttt{kubectl} dan mode GitOps berbasis ArgoCD. Pada mode imperatif, \textit{auto-sync}/\textit{self-heal} ArgoCD dijeda, pemeriksa dan \textit{runbook} otomatis menjalankan koreksi \texttt{kubectl}, lalu ArgoCD dipulihkan; ini bukan \textit{deployment} terpisah dan bukan studi waktu reaksi manusia. Kedua mode berjalan berurutan pada stack yang sama; tidak ada stack kembar \texttt{exp-*} dan tidak ada eksekusi paralel A/B, sehingga non-isolasi terhadap beban latar dan dependensi bersama menjadi keterbatasan eksplisit. HPA normal dipertahankan pada kedua mode, sehingga skenario A menjadi kontrol HPA dan \texttt{/spec/replicas} dikecualikan dari R1 statis; skenario F diperlakukan terpisah sebagai batas visibilitas sumber daya di luar cakupan aplikasi; skenario G adalah kasus deskriptif yang bukan \textit{self-heal} ArgoCD. Metrik yang dirancang mencakup kesetaraan bidang konfigurasi dan kesehatan secara terpisah (R1), waktu deteksi, waktu ketersediaan bukti penyimpangan, dan waktu pemulihan konfigurasi penuh (R2). R3 tidak diukur karena audit API server tidak tersedia dan tidak dilaporkan sebagai nol atau tidak ada perbedaan. Sampel formal adalah $7 \times 2 \times 15 = 210$ run (10 R2 dan 5 R1 per sel) dengan sampling satu detik serta pembekuan revisi sumber, render, image digest, dan versi runtime. Protokol dan apparatus masih menunggu tinjauan serta validasi, dan data formal belum tersedia. Oleh sebab itu, skripsi ini belum melaporkan hasil komparatif atau kesimpulan empiris.
+Skripsi ini membandingkan dua mode pengelolaan konfigurasi pada satu stack InvenioRDM produksi-like: mode imperatif terotomasi berbasis \texttt{kubectl} dan mode GitOps berbasis ArgoCD. Pada mode imperatif, \textit{auto-sync}/\textit{self-heal} ArgoCD dijeda, pemeriksa dan \textit{runbook} otomatis menjalankan koreksi \texttt{kubectl}, lalu ArgoCD dipulihkan; ini bukan \textit{deployment} terpisah dan bukan studi waktu reaksi manusia. Kedua mode berjalan berurutan pada stack yang sama, dengan tujuh skenario \textit{drift} dan lima belas pengulangan per skenario per mode, sehingga total 210 sel. Apparatus dibekukan sebelum pengumpulan pada revisi sumber \texttt{81ddd25}, SHA-256 render \texttt{a5efd711}, dan \textit{image digest} tetap.
+
+Dari 210 sel, 207 baris dianalisis dan empat dikecualikan sebagai kegagalan instrumentasi serta lingkungan yang dilaporkan terbuka. Pada RQ1, kedua mode mengembalikan skor kesetaraan bidang terpilih ke keadaan yang dideklarasikan pada skenario A--F; skenario G merupakan satu-satunya asimetri karena mode GitOps tidak mengembalikan anotasi di luar himpunan bidang yang dikelolanya. Pada RQ2, seluruh dua belas perbandingan B--E menolak hipotesis nol setelah koreksi Holm, tetapi selisih waktu deteksi sekitar empat detik bersesuaian dengan interval \textit{polling} pemeriksa imperatif, sehingga perbedaan tersebut terutama mencerminkan mekanisme pengamatan. Ukuran efek pemulihan jauh lebih kecil ($\delta = 0{,}48$ untuk B dan $0{,}75$ untuk C) daripada deteksi, sehingga keunggulan waktu terkonsentrasi di awal siklus rekonsiliasi dan menyusut di akhir.
+
+R3 tidak diukur karena audit API server tidak tersedia. Penelitian ini merupakan studi kasus eksploratif pada satu klaster dengan mode berurutan, sehingga tidak menyimpulkan keunggulan umum salah satu mode, tidak menyimpulkan kelayakan adopsi, dan tidak membuktikan kebenaran semantik konfigurasi yang dideklarasikan.
 
 \vspace{0.5cm}
 \noindent\textbf{Kata Kunci:} penyimpangan konfigurasi, Kubernetes, GitOps, otomasi imperatif, studi kasus komparatif terkontrol
 \endabstractind
 
 \abstracteng
-This thesis designs a controlled single-case comparative study of two management modes on one production-like InvenioRDM stack: an automated imperative mode based on \texttt{kubectl} and a GitOps mode based on ArgoCD. In the imperative mode, ArgoCD auto-sync/self-heal is paused, an automated checker and runbook perform \texttt{kubectl} corrections, and ArgoCD is then restored; this is not a separate deployment and not a human-reaction-time study. Both modes run sequentially on the same stack; there is no \texttt{exp-*} twin and no parallel A/B execution, so non-isolation from background load and shared dependencies is an explicit limitation. Normal HPA operation is retained in both modes, so scenario A is an HPA control and \texttt{/spec/replicas} is excluded from static R1; scenario F is a visibility-boundary case for resources outside the application scope; scenario G is a descriptive case that is not an ArgoCD self-heal case. The measures comprise configuration-field equality and health reported separately (R1), time to detection, availability of verifiable deviation evidence, and full configuration restoration (R2). R3 is not measured because Kubernetes API-server audit is unavailable and is not reported as zero or as no difference. The formal sample is 7 x 2 x 15 = 210 runs (10 R2 and 5 R1 per cell) with one-second sampling and frozen source revision, render, image digests, and runtime versions. The protocol and apparatus remain subject to review and validation, and no formal dataset is available. Accordingly, no comparative findings or empirical conclusions are reported in this draft.
+This thesis compares two configuration-management modes on one production-like InvenioRDM stack: an automated imperative mode based on \texttt{kubectl} and a GitOps mode based on ArgoCD. In the imperative mode, ArgoCD auto-sync/self-heal is paused, an automated checker and runbook perform \texttt{kubectl} corrections, and ArgoCD is then restored; this is neither a separate deployment nor a human-reaction-time study. Both modes run sequentially on the same stack across seven drift scenarios with fifteen repetitions per scenario per mode, totalling 210 cells. The apparatus was frozen before collection at source revision \texttt{81ddd25}, render SHA-256 \texttt{a5efd711}, and a fixed image digest.
+
+Of the 210 cells, 207 rows were analysed and four were excluded as openly reported instrumentation and environmental failures. For RQ1, both modes returned the selected-field equality score to the declared state for scenarios A--F; scenario G is the sole asymmetry because the GitOps mode did not revert an annotation outside its managed field set. For RQ2, all twelve B--E comparisons rejected the null after Holm correction, but the roughly four-second detection gap matches the imperative checker polling interval, so that difference mainly reflects the observation mechanism. Recovery effect sizes are materially smaller ($\delta = 0.48$ for B and $0.75$ for C) than detection, so the timing advantage is concentrated at the start of the reconciliation cycle and shrinks at the end.
+
+R3 was not measured because Kubernetes API-server audit was unavailable. This is an exploratory single-case study on one cluster with sequential arms; it therefore claims neither general superiority of either mode, nor adoption suitability, nor semantic correctness of the declared configuration.
 
 \vspace{0.5cm}
 \noindent\textbf{Keywords:} configuration drift, Kubernetes, GitOps, automated imperative management, controlled single-case comparative study
