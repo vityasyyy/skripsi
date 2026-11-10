@@ -9,7 +9,7 @@ Penelitian ini membandingkan mode imperatif terotomasi berbasis \texttt{kubectl}
 
 Pada skenario B hingga F, kedua mode mengembalikan skor kesetaraan bidang terpilih dari 100 pada keadaan dasar. Skor turun ke 75 saat drift terdeteksi, lalu kembali ke 100 setelah pemulihan. Skenario A tetap 100 sepanjang pengamatan karena \texttt{/spec/replicas} dimiliki HPA dan dikecualikan dari pemeriksaan statis. Dengan demikian, untuk himpunan bidang yang dideklarasikan, kedua mode mencapai keadaan akhir yang setara pada skenario yang diuji B--F.
 
-Pada batch ini, satu-satunya asimetri yang konsisten adalah skenario G, tetapi mekanismenya tidak diatribusikan. Mode GitOps tidak mengembalikan anotasi pada SealedSecret ke keadaan yang dideklarasikan, sedangkan mode imperatif melakukannya. Keluaran baris mencatat \texttt{recovery\_controller} sebagai \texttt{unattributed}. Penelitian ini tidak menyimpulkan apakah ketiadaan pemulihan disebabkan cakupan bidang ArgoCD, perilaku pengendali SealedSecret, atau faktor lain. Temuan ini menunjukkan bahwa kesetaraan akhir bergantung pada apa yang didefinisikan sebagai keadaan yang diinginkan dan pada mekanisme yang diperiksa, bukan semata pada label mode.
+Pada batch ini, satu-satunya asimetri yang konsisten adalah skenario G, tetapi penyebabnya tidak diatribusikan. Mode GitOps tidak mengembalikan anotasi pada SealedSecret ke keadaan yang dideklarasikan, sedangkan mode imperatif melakukannya. Keluaran baris mencatat \texttt{recovery\_controller} sebagai \texttt{unattributed}. Penelitian ini tidak menyimpulkan apakah ketiadaan pemulihan disebabkan cakupan bidang ArgoCD, perilaku pengendali SealedSecret, atau faktor lain. Temuan ini menunjukkan bahwa kesetaraan akhir bergantung pada apa yang didefinisikan sebagai keadaan yang diinginkan dan pada mekanisme yang diperiksa, bukan semata pada label mode.
 
 Perlu ditegaskan bahwa kesetaraan skor tidak membuktikan kebenaran semantik konfigurasi, dan kedua mode dapat mencapai keadaan yang identik serta sama-sama salah apabila deklarasi sumbernya keliru. Penelitian ini mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi itu sendiri.
 
@@ -65,7 +65,7 @@ R3 tidak diukur karena audit API server Kubernetes tidak tersedia. Pengukuran ke
 
 Prioritas pertama adalah replikasi pada beberapa klaster dan stack independen, karena studi ini hanya menggunakan satu stack berurutan. Replikasi pada setidaknya tiga stack paralel yang terisolasi memungkinkan pemisahan efek urutan dari efek mode serta uji berpasangan yang sebenarnya alih-alih blok berurutan. Selain itu, replikasi memungkinkan estimasi varians antar-stack, yang tidak dapat diperoleh dari satu kasus.
 
-Prioritas berikutnya adalah membandingkan lebih dari satu implementasi GitOps, misalnya Flux atau ArgoCD dengan konfigurasi manajemen bidang yang berbeda, menggunakan definisi metrik yang sama. Pola G yang dilaporkan pada Bagian~\ref{subsec:jawaban-rq1} dapat diuji dengan cara ini: perbandingan beberapa implementasi menunjukkan seberapa umum pola tersebut, tanpa mengklaim penyebabnya.
+Prioritas berikutnya adalah membandingkan lebih dari satu implementasi GitOps, misalnya Flux atau ArgoCD dengan konfigurasi manajemen bidang yang berbeda, menggunakan definisi metrik yang sama. Pola G yang dilaporkan pada Bagian~\ref{subsec:jawaban-rq1} dapat diuji dengan cara ini: perbandingan beberapa implementasi dapat menunjukkan seberapa umum pola tersebut, tanpa mengklaim penyebabnya.
 
 \subsection{Pengukuran yang dapat diperluas dengan sumber daya tambahan}
 
