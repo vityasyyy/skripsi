@@ -18,10 +18,10 @@ Penelitian ini diarahkan oleh pertanyaan berikut.
 
 \begin{enumerate}
   \item \textbf{RQ1:} Bagaimana kesetaraan bidang konfigurasi yang ditetapkan dan kesehatan layanan berubah setelah intervensi dan prosedur koreksi pada mode imperatif terotomasi berbasis \texttt{kubectl} dibandingkan dengan mode GitOps berbasis ArgoCD? Kedua luaran dilaporkan secara terpisah.
-  \item \textbf{RQ2:} Bagaimana distribusi waktu deteksi, waktu hingga tersedia bukti yang dapat diverifikasi, dan waktu pemulihan konfigurasi penuh berbeda antara kedua mode pada setiap skenario?
+  \item \textbf{RQ2:} Bagaimana distribusi waktu deteksi, waktu hingga tersedia bukti yang dapat diverifikasi, dan waktu pemulihan konfigurasi penuh berbeda antara kedua mode untuk setiap skenario yang dilaporkan dan dianalisis?
 \end{enumerate}
 
-RQ1 dan RQ2 dijawab per skenario, dengan HPA normal tetap aktif pada kedua mode. A menjadi kontrol HPA, bukan bukti bahwa ArgoCD memulihkan replika yang diabaikan. A, \textit{drift} Service F, dan kasus deskriptif G dilaporkan terpisah dari estimasi B--E. Tidak adanya status OutOfSync bukan berarti waktu deteksi nol, dan R3 tidak diukur karena audit API server tidak tersedia; R3 juga tidak dilaporkan sebagai nol atau sebagai tidak ada perbedaan. Protokol telah dijalankan pada satu stack produksi-like, tetapi posisi hasil tetap eksploratif karena tidak ada bukti persetujuan pembimbing yang diverifikasi.
+RQ1 dan RQ2 dijawab per skenario, dengan HPA normal tetap aktif pada kedua mode. A menjadi kontrol HPA, bukan bukti bahwa ArgoCD memulihkan replika yang diabaikan. A, \textit{drift} Service F, dan kasus deskriptif G dilaporkan terpisah dari estimasi B--E. Tidak adanya status OutOfSync bukan berarti waktu deteksi nol, dan R3 tidak diukur karena audit API server tidak tersedia; R3 juga tidak dilaporkan sebagai nol atau sebagai tidak ada perbedaan. Protokol telah dijalankan pada satu stack produksi-like. Posisi hasil tetap eksploratif karena desain satu kasus, mode berurutan, dan urutan lengan tetap; tidak ada bukti persetujuan pembimbing yang diverifikasi, dan naskah tidak mengklaim persetujuan tersebut.
 
 \section{Batasan Masalah}
 
@@ -38,11 +38,11 @@ Ruang lingkup penelitian dibatasi sebagai berikut.
 
 \section{Tujuan Penelitian}
 
-Penelitian ini bertujuan merancang dan mengevaluasi perbedaan operasional antara mode imperatif terotomasi berbasis \texttt{kubectl} dan mode GitOps berbasis ArgoCD. Evaluasi dijalankan pada beban uji formal multi-service InvenioRDM, dengan RQ1 dioperasionalkan melalui kesetaraan konfigurasi dan kesehatan yang terpisah. RQ2 dioperasionalkan melalui waktu deteksi, bukti, dan pemulihan konfigurasi, sedangkan R3 tidak diukur; tujuan ini tidak menyatakan sebelumnya mode mana yang lebih baik.
+Penelitian ini bertujuan merancang dan mengevaluasi perbedaan operasional antara mode imperatif terotomasi berbasis \texttt{kubectl} dan mode GitOps berbasis ArgoCD. Evaluasi dijalankan pada beban uji formal multi-service InvenioRDM. Apparatus divalidasi melalui Pilot 3 pada revisi instrumen \texttt{3572f3c} dan dibekukan sebelum pengumpulan; pengumpulan formal kemudian selesai pada 210 sel. Posisi hasil tetap eksploratif karena desain satu kasus dan urutan lengan tetap. Persetujuan pembimbing tidak diverifikasi dalam pekerjaan ini, dan naskah tidak mengklaim protokol telah disetujui pembimbing. RQ1 dioperasionalkan melalui kesetaraan konfigurasi dan kesehatan yang terpisah, sedangkan RQ2 melalui waktu deteksi, bukti, dan pemulihan konfigurasi; R3 tidak diukur. Tujuan ini tidak menyatakan sebelumnya mode mana yang lebih baik.
 
 \section{Manfaat Penelitian}
 
-Berdasarkan data yang telah dikumpulkan, penelitian ini diharapkan dapat:
+Berdasarkan data formal yang telah dikumpulkan pada apparatus yang divalidasi (Bab III--IV), penelitian ini diharapkan dapat:
 \begin{enumerate}
   \item memberikan deskripsi empiris yang dibatasi pada \textit{workload}, skenario, dan konfigurasi yang benar-benar diuji;
   \item mendokumentasikan definisi pengukuran serta aturan penanganan data tersensor agar dapat ditinjau dan direplikasi; dan
