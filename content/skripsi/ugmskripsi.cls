@@ -416,8 +416,9 @@ dalam naskah ini dan disebutkan dalam daftar pustaka.
 %------------------------------------------------------------
 \def\lambang{%
   \clearpage\thispagestyle{chapterheading}%
-  \printnomenclature%
-\addcontentsline{toc}{chapter}{\nomenclaturename}
+  \phantomsection
+  \addcontentsline{toc}{chapter}{\nomenclaturename}%
+  \printnomenclature
 }
 
 %------------------------------------------------------------

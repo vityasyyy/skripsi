@@ -38,7 +38,7 @@
 \usepackage{float}
 \usepackage{listings}
 \usepackage{xcolor}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{url}
 \usepackage{xurl}
 \usepackage{enumitem}
@@ -143,8 +143,12 @@
 Isi Prakata di sini...
 
 \tableofcontents
+\clearpage
+\phantomsection
 \addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
+\clearpage
+\phantomsection
 \addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
 \lambang
@@ -183,6 +187,9 @@ R3 was not measured because Kubernetes API-server audit was unavailable. This is
 %------------------------------------------------------------
 % Bibliography
 %------------------------------------------------------------
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{\bibname}
 \bibliography{references}
 
 %------------------------------------------------------------
