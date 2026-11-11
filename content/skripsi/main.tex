@@ -98,9 +98,9 @@
 \makeatletter
 \patchcmd{\endabstractind}{\par\vfil\null\end{singlespace}}{\par\end{singlespace}}{}{\errmessage{abstractind end patch failed}}
 \patchcmd{\endabstracteng}{\par\vfil\null\end{singlespace}}{\par\end{singlespace}}{}{\errmessage{abstracteng end patch failed}}
-\patchcmd{\abstractind}{\vspace{1.0cm}}{\vspace{0.6cm}}{}{\errmessage{abstractind title spacing patch failed}}
+\patchcmd{\abstractind}{\vspace{1.0cm}}{\vspace{0.45cm}}{}{\errmessage{abstractind title spacing patch failed}}
 \patchcmd{\abstractind}{\vspace{0.5cm}}{\vspace{0.3cm}}{}{\errmessage{abstractind author spacing patch failed}}
-\patchcmd{\abstracteng}{\vspace{1.0cm}}{\vspace{0.6cm}}{}{\errmessage{abstracteng title spacing patch failed}}
+\patchcmd{\abstracteng}{\vspace{1.0cm}}{\vspace{0.45cm}}{}{\errmessage{abstracteng title spacing patch failed}}
 \patchcmd{\abstracteng}{\vspace{0.5cm}}{\vspace{0.3cm}}{}{\errmessage{abstracteng author spacing patch failed}}
 \makeatother
 \sloppy
@@ -163,22 +163,22 @@ Isi Prakata di sini...
 \lambang
 
 \abstractind
-Skripsi ini membandingkan mode imperatif terotomasi berbasis \texttt{kubectl} dan mode GitOps berbasis ArgoCD pada stack InvenioRDM produksi-like. Mode imperatif menjeda \textit{auto-sync}/\textit{self-heal} ArgoCD; pemeriksa dan \textit{runbook} otomatis menjalankan koreksi \texttt{kubectl}, lalu ArgoCD dipulihkan. Kedua mode berurutan pada stack yang sama, bukan \textit{deployment} terpisah atau studi reaksi manusia. Desain: tujuh skenario \textit{drift}, lima belas pengulangan per skenario per mode (210 sel). Apparatus dibekukan sebelum koleksi (revisi \texttt{81ddd25}, SHA-256 render \texttt{a5efd711}, \textit{image digest} tetap).
+Skripsi ini membandingkan mode imperatif terotomasi berbasis \texttt{kubectl} dan mode GitOps berbasis ArgoCD pada stack InvenioRDM produksi-like. Mode imperatif menjeda \textit{auto-sync}/\textit{self-heal} ArgoCD; pemeriksa/\textit{runbook} otomatis menjalankan koreksi \texttt{kubectl}, lalu ArgoCD dipulihkan. Kedua mode berurutan pada stack yang sama, bukan \textit{deployment} terpisah atau studi reaksi manusia. Desain: tujuh skenario \textit{drift}, lima belas pengulangan per skenario per mode (210 sel). Apparatus dibekukan sebelum koleksi (revisi \texttt{81ddd25}, SHA-256 render \texttt{a5efd711}, \textit{image digest} tetap).
 
-Dari 210 sel, 207 dianalisis; empat baris mentah dikecualikan (dua kegagalan instrumentasi, satu sel dihentikan dengan kode keluar bukan nol, satu kegagalan \textit{baseline} pra-injeksi yang diulang) dan dilaporkan terbuka tanpa imputasi. Pada RQ1, skor kesetaraan bidang terpilih pada B--F turun dari 100 ke 75 lalu kembali ke 100 pada kedua mode; A tetap 100 sepanjang pengamatan karena \texttt{/spec/replicas} dimiliki HPA. G satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret, sedangkan imperatif melakukannya; mekanisme tidak diatribusikan dan G deskriptif. Pada RQ2, seluruh dua belas perbandingan B--E menolak hipotesis nol setelah koreksi Holm ($p$ terkoreksi 0,0054--0,0195). Selisih median deteksi dan bukti teramati B dan E berkisar 4,0--4,3 detik, sedangkan pemeriksa imperatif memakai interval nominal 5 detik; pemeriksaan berkala adalah faktor desain yang mungkin menyumbang, tetapi kontribusi kausalnya tidak dapat diisolasi. Ukuran efek pemulihan lebih kecil pada B ($\delta = 0{,}48$) dan C ($\delta = 0{,}75$), tetapi tetap tinggi pada D ($\delta = 1{,}00$) dan E ($\delta = 0{,}86$); keunggulan waktu tidak menyusut seragam di akhir siklus.
+Dari 210 sel, 207 dianalisis; empat baris mentah dikecualikan (dua kegagalan instrumentasi, satu sel dihentikan kode keluar bukan nol, satu kegagalan \textit{baseline} pra-injeksi yang diulang; kegagalan dikecualikan, ulangan dianalisis) dan dilaporkan terbuka tanpa imputasi. Pada RQ1, skor kesetaraan bidang terpilih pada B--F turun dari 100 ke 75 lalu kembali ke 100 pada kedua mode; A tetap 100 sepanjang pengamatan karena \texttt{/spec/replicas} dimiliki HPA. G satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret, sedangkan imperatif melakukannya; mekanisme tidak diatribusikan dan G deskriptif. Pada RQ2, seluruh dua belas perbandingan B--E menolak hipotesis nol setelah koreksi Holm ($p$ terkoreksi 0,0054--0,0195). Selisih median deteksi dan bukti B dan E berkisar 4,0--4,3 detik, sedangkan pemeriksa imperatif memakai interval nominal 5 detik; pemeriksaan berkala adalah faktor desain yang mungkin menyumbang, tetapi kontribusi kausalnya tidak dapat diisolasi. Ukuran efek pemulihan lebih kecil pada B ($\delta = 0{,}48$) dan C ($\delta = 0{,}75$), tetapi tetap tinggi pada D ($\delta = 1{,}00$) dan E ($\delta = 0{,}86$); keunggulan waktu tidak menyusut seragam di akhir siklus.
 
-R3 tidak diukur karena audit API server tidak tersedia. Studi kasus ini eksploratif pada satu klaster dengan mode berurutan dan urutan lengan tetap; observasi tidak independen dan $p$ tidak ditafsirkan sebagai estimasi populasi. Batch ini adalah eksperimen historis yang selesai Oktober 2026; perubahan setelahnya tidak mengubah data. Studi ini tidak menyimpulkan keunggulan umum salah satu mode, kelayakan adopsi, atau kebenaran semantik konfigurasi yang dideklarasikan.
-\par\vspace{0.2cm}
+R3 tidak diukur karena audit API server tidak tersedia. Studi kasus ini eksploratif pada satu klaster dengan mode berurutan dan urutan lengan tetap; observasi tidak independen dan $p$ tidak ditafsirkan sebagai estimasi populasi. Batch ini eksperimen historis yang selesai Oktober 2026; perubahan setelahnya tidak mengubah data. Studi ini tidak menyimpulkan keunggulan umum salah satu mode, kelayakan adopsi, atau kebenaran semantik konfigurasi yang dideklarasikan.
+\par\vspace{0.1cm}
 \noindent\textbf{Kata Kunci:} penyimpangan konfigurasi, Kubernetes, GitOps, otomasi imperatif, studi kasus komparatif terkontrol
 \endabstractind
 
 \abstracteng
 This thesis compares an automated imperative \texttt{kubectl} mode and an ArgoCD GitOps mode on one production-like InvenioRDM stack. The imperative mode pauses ArgoCD \textit{auto-sync}/\textit{self-heal}; a checker and \textit{runbook} run automated \texttt{kubectl} corrections, then ArgoCD is restored. Both modes run sequentially on the same stack, not separate \textit{deployments} or a human-reaction-time study. Seven \textit{drift} scenarios with fifteen repetitions per scenario per mode yield 210 cells. The apparatus was frozen before collection (revision \texttt{81ddd25}, render SHA-256 \texttt{a5efd711}, fixed \textit{image digest}).
 
-Of 210 cells, 207 were analysed; four raw rows were excluded (two instrumentation failures, one non-zero-exit cell, one retried pre-injection \textit{baseline} failure) and are reported openly without imputation. For RQ1, B--F equality scores fell from 100 to 75 and returned to 100 in both modes; A remained 100 throughout because \texttt{/spec/replicas} is HPA-owned. G is the sole asymmetry: GitOps did not revert the SealedSecret annotation while imperative did; the mechanism is unattributed, so G is descriptive. For RQ2, all twelve B--E comparisons rejected the null after Holm correction (adjusted $p$ 0.0054--0.0195). The paired detection and evidence differences observed for B and E are 4.0--4.3 s, whereas the imperative checker used a nominal 5 s interval; periodic checking is a plausible contributing design factor, but its causal contribution cannot be isolated. Recovery effect sizes are smaller for B ($\delta = 0.48$) and C ($\delta = 0.75$) but remain high for D ($\delta = 1.00$) and E ($\delta = 0.86$); the timing advantage does not shrink uniformly at the end of the cycle.
+Of 210 cells, 207 were analysed; four raw rows were excluded (two instrumentation failures, one non-zero-exit cell, one failed pre-injection \textit{baseline} attempt retried; failed attempt excluded, retry analysed) and are reported openly without imputation. For RQ1, B--F equality scores fell from 100 to 75 and returned to 100 in both modes; A remained 100 throughout because \texttt{/spec/replicas} is HPA-owned. G is the sole asymmetry: GitOps did not revert the SealedSecret annotation while imperative did; the mechanism is unattributed, so G is descriptive. For RQ2, all twelve B--E comparisons rejected the null after Holm correction (adjusted $p$ 0.0054--0.0195). The paired detection and evidence differences observed for B and E are 4.0--4.3 s, whereas the imperative checker used a nominal 5 s interval; periodic checking is a plausible contributing design factor, but its causal contribution cannot be isolated. Recovery effect sizes are smaller for B ($\delta = 0.48$) and C ($\delta = 0.75$) but remain high for D ($\delta = 1.00$) and E ($\delta = 0.86$); the timing advantage does not shrink uniformly at the end of the cycle.
 
 R3 was not measured because Kubernetes API-server audit was unavailable. This is an exploratory single-case study on one cluster with sequential arms and a fixed arm order; observations are not independent and $p$ values are not population estimates. The batch is the historical experiment completed October 2026; later changes do not alter the data. The study claims neither general superiority of either mode, nor adoption suitability, nor semantic correctness of the declared configuration.
-\par\vspace{0.2cm}
+\par\vspace{0.1cm}
 \noindent\textbf{Keywords:} configuration drift, Kubernetes, GitOps, automated imperative management, controlled single-case comparative study
 \endabstracteng
 
@@ -203,6 +203,10 @@ R3 was not measured because Kubernetes API-server audit was unavailable. This is
 % Appendices
 %------------------------------------------------------------
 \appendix
+\renewcommand{\thesection}{\thechapter.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\thetable}{\thechapter.\arabic{table}}
+\renewcommand{\thefigure}{\thechapter.\arabic{figure}}
 \include{lampiran/lampiran-a}
 
 \end{document}
