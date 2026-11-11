@@ -51,7 +51,7 @@ clean-proposal:
 	cd content/proposal && rm -f *.aux *.log *.out *.toc *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz *.bbl *.blg *.glo || true
 
 clean-skripsi:
-	cd content/skripsi && rm -f *.aux *.log *.out *.toc *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz *.bbl *.blg *.glo *.gls *.nlo *.nls *.ist || true
+	cd content/skripsi && rm -f *.aux *.log *.out *.toc *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz *.bbl *.blg *.glo *.gls *.nlo *.nls main.ist || true
 
 clean-presentation:
 	cd presentation/proposal/diagrams && rm -f *.aux *.log *.out *.fls *.fdb_latexmk *.synctex.gz || true

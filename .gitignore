@@ -18,6 +18,7 @@
 **/*.ind
 **/*.ilg
 **/*.ist
+!content/skripsi/nomencl.ist
 **/*.loa
 
 # Local reference PDFs (pedoman & contoh)

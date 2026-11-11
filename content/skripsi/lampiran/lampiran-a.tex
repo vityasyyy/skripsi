@@ -1,4 +1,7 @@
-\chapter{LAMPIRAN A}
+\stepcounter{chapter}
+\phantomsection
+\chapter*{LAMPIRAN A}
+\addcontentsline{toc}{chapter}{LAMPIRAN A}
 
 Lampiran ini memuat artefak, perintah, dan skema data yang benar-benar digunakan pada pengumpulan data formal, beserta pemetaan antara keterbatasan penelitian dan cara penanganannya. Seluruh nilai yang dicantumkan telah disanitasi: tidak ada nilai Secret, kredensial, nama objek privat, maupun URL bertanda tangan di dalam lampiran ini.
 
@@ -17,13 +20,13 @@ Identitas yang mengikat seluruh data pada Bab IV dirangkum pada Tabel~\ref{tab:l
     \hline
     Revisi sumber GitOps & \texttt{81ddd259780e0e6aef333811a0126f86d70a094e} \\
     \hline
-    SHA-256 render & \texttt{a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703} \\
+    SHA-256 render & \texttt{\seqsplit{a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703}} \\
     \hline
     Jumlah objek render & 27 \\
     \hline
     Revisi instrumen & \texttt{3572f3c1c11d3abc8b63882c4348b1b803d4256f} \\
     \hline
-    \textit{Image digest} aplikasi & \texttt{ghcr.io/vityasyyy/invenio-ugm@sha256:52645b7b\ldots f343a357} \\
+    \textit{Image digest} aplikasi & \texttt{\seqsplit{ghcr.io/vityasyyy/invenio-ugm@sha256:52645b7b}\ldots\seqsplit{f343a357}} \\
     \hline
     \textit{Seed} & \texttt{20261029} \\
     \hline
@@ -38,40 +41,42 @@ Identitas yang mengikat seluruh data pada Bab IV dirangkum pada Tabel~\ref{tab:l
 
 Pengumpulan dijalankan melalui satu perintah batch yang memakai ulang jalur harian pemeriksa, sehingga gerbang keamanan tetap berada di satu tempat. Kredensial dibaca dari berkas privat bermode 0600 di luar repositori dan disuntikkan ke lingkungan proses anak; nilainya tidak pernah dicetak, tidak ditulis ke berkas bukti, dan tidak muncul pada argumen perintah.
 
-\begin{verbatim}
+\begin{lstlisting}[breaklines=true,basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,numbers=none]
 python3 -B experiments/live/run_matrix.py \
   --batch-id formal-20261029 \
   --arms imperative gitops \
   --scenarios A B C D E F G \
   --reps 15 --seed 20261029 \
-  --cooldown-seconds 60 --baseline-timeout 600 --baseline-retries 1 \
+  --cooldown-seconds 60 --baseline-timeout 600 \
+  --baseline-retries 1 \
   --namespace invenio --app invenio-bootstrap \
   --live --confirm-single-stack --production-like \
   --out experiments/formal-20261029 \
   --render-file <frozen-render.json> \
   --source-revision 81ddd259780e0e6aef333811a0126f86d70a094e \
-  --render-sha256 a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703
-\end{verbatim}
+  --render-sha256 \
+  a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703
+\end{lstlisting}
 
 Analisis dijalankan dengan perintah berikut; keluaran berupa satu berkas JSON dan enam tabel LaTeX.
 
-\begin{verbatim}
+\begin{lstlisting}[breaklines=true,basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,numbers=none]
 python3 -B experiments/analysis/analyze_live.py \
   --in experiments/formal-20261029/formal-20261029.analysis.jsonl \
   --rows experiments/formal-20261029/formal-20261029.rows.jsonl \
   --out experiments/analysis-formal-20261029 --seed 20261029
-\end{verbatim}
+\end{lstlisting}
 
 \section{Skema Data per Run}
 
 Setiap run menulis satu berkas baris JSON dengan bidang berikut, dirangkum pada Tabel~\ref{tab:lampiran-skema}. Bidang waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
 
-\begin{table}[H]
+\begin{table}[htbp]
   \centering
   \small
   \caption{Bidang utama pada berkas baris per run}
   \label{tab:lampiran-skema}
-  \begin{tabularx}{\textwidth}{|l|X|}
+  \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{5.4cm}|>{\raggedright\arraybackslash}X|}
     \hline
     Bidang & Isi \\
     \hline
@@ -102,49 +107,53 @@ Snapshot dan bukti disanitasi sebelum disimpan. Nilai Secret tidak dimasukkan ke
 
 Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penanganan yang benar-benar dilakukan, dan sisa risiko yang tetap ada. Kolom terakhir penting: tidak ada keterbatasan yang diklaim hilang sepenuhnya.
 
-\begin{table}[H]
-  \centering
-  \scriptsize
+\begin{longtable}{|>{\raggedright\arraybackslash}p{3.35cm}|>{\raggedright\arraybackslash}p{5.75cm}|>{\raggedright\arraybackslash}p{3.85cm}|}
   \caption{Keterbatasan, penanganan, dan sisa risiko}
-  \label{tab:lampiran-keterbatasan}
-  \begin{tabularx}{\textwidth}{|X|X|X|}
-    \hline
-    Keterbatasan & Penanganan dalam penelitian & Sisa risiko \\
-    \hline
-    Satu klaster, satu stack, satu implementasi GitOps & Seluruh klaim dibatasi pada apparatus yang diuji; identitas apparatus dibekukan dan dilaporkan & Generalisasi ke lingkungan lain tidak dapat ditarik \\
-    \hline
-    Kedua mode berurutan pada stack yang sama & Urutan berbasis \textit{seed}, gerbang kesiapan \textit{baseline}, prosedur reset, dan jeda 60 detik; urutan dilaporkan & Efek urutan dan beban latar tidak dihilangkan, hanya dimitigasi \\
-    \hline
-    Tidak ada stack kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari keadaan klaster bersama \\
-    \hline
-    Satu domain kegagalan penyimpanan & Dinyatakan bahwa penyimpanan primer dan cadangan berbagi server NFS yang sama; pemulihan byte berkas dari artefak cadangan diverifikasi terpisah (Tabel~\ref{tab:lampiran-recovery}) & Pemulihan lintas kehilangan penyimpanan primer tetap tidak diuji \\
-    \hline
-    Interval pengambilan sampel satu detik & Selisih deteksi dilaporkan bersama interpretasi bahwa nilainya bersesuaian dengan interval \textit{polling} & Komponen cadangan mekanisme dan ketanggapan pengendali belum terpisah sepenuhnya \\
-    \hline
-    Ketidakpastian jam antar-host & Batas kesegaran 30 detik diterapkan secara konservatif; sampel dari masa depan dianggap anomali dan menghentikan run & Selang waktu absolut tidak disertifikasi secara numerik \\
-    \hline
-    Sensoring kanan & Dilaporkan sebagai tersensor, tidak diimputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
-    \hline
-    Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang \\
-    \hline
-    Keluarga uji dua belas hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
-    \hline
-    Uji berpasangan tidak selalu dapat dipakai & Aturan cadangan Mann--Whitney ditetapkan sebelum analisis dan dilaporkan terbuka & Daya statistik pada C dan D lebih rendah \\
-    \hline
-    R3 tidak diukur & Dilaporkan sebagai tidak diukur, bukan nol dan bukan tidak ada perbedaan & Pertanyaan keterlacakan tidak terjawab \\
-    \hline
-    Kesetaraan bukan kebenaran semantik & Dinyatakan bahwa skor mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi & Konfigurasi yang salah dapat dicapai dengan rapi oleh kedua mode \\
-    \hline
-    Protokol belum ditinjau pembimbing & Dinyatakan sebagai studi kasus eksploratif, bukan konfirmatori & Posisi metodologis menunggu tinjauan \\
-    \hline
-  \end{tabularx}
-\end{table}
+  \label{tab:lampiran-keterbatasan}\\
+  \hline
+  Keterbatasan & Penanganan dalam penelitian & Sisa risiko \\
+  \hline
+  \endfirsthead
+  \multicolumn{3}{l}{\scriptsize\itshape Lanjutan Tabel~\ref{tab:lampiran-keterbatasan}}\\
+  \hline
+  Keterbatasan & Penanganan dalam penelitian & Sisa risiko \\
+  \hline
+  \endhead
+  \hline
+  \endfoot
+  Satu klaster, satu stack, satu implementasi GitOps & Seluruh klaim dibatasi pada apparatus yang diuji; identitas apparatus dibekukan dan dilaporkan & Generalisasi ke lingkungan lain tidak dapat ditarik \\
+  \hline
+  Kedua mode berurutan pada stack yang sama & Urutan berbasis \textit{seed}, gerbang kesiapan \textit{baseline}, prosedur reset, dan jeda 60 detik; urutan dilaporkan & Efek urutan dan beban latar tidak dihilangkan, hanya dimitigasi \\
+  \hline
+  Tidak ada stack kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari keadaan klaster bersama \\
+  \hline
+  Satu domain kegagalan penyimpanan & Dinyatakan bahwa penyimpanan primer dan cadangan berbagi server NFS yang sama; pemulihan byte berkas dari artefak cadangan diverifikasi terpisah (Tabel~\ref{tab:lampiran-recovery}) & Pemulihan lintas kehilangan penyimpanan primer tetap tidak diuji \\
+  \hline
+  Interval pengambilan sampel satu detik & Selisih deteksi teramati (4{,}0--4{,}3 detik pada B dan E) dibedakan dari interval nominal pemeriksa 5 detik; pemeriksaan berkala dilaporkan sebagai faktor yang mungkin, bukan kontribusi kausal yang terisolasi & Komponen cadangan mekanisme dan ketanggapan pengendali belum terpisah sepenuhnya \\
+  \hline
+  Ketidakpastian jam antar-host & Batas kesegaran 30 detik diterapkan secara konservatif; sampel dari masa depan dianggap anomali dan menghentikan run & Selang waktu absolut tidak disertifikasi secara numerik \\
+  \hline
+  Sensoring kanan & Dilaporkan sebagai tersensor, tidak diimputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
+  \hline
+  Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang \\
+  \hline
+  Keluarga uji dua belas hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
+  \hline
+  Uji berpasangan tidak selalu dapat dipakai & Aturan cadangan Mann--Whitney ditetapkan sebelum analisis dan dilaporkan terbuka & Daya statistik pada C dan D lebih rendah \\
+  \hline
+  R3 tidak diukur & Dilaporkan sebagai tidak diukur, bukan nol dan bukan tidak ada perbedaan & Pertanyaan keterlacakan tidak terjawab \\
+  \hline
+  Kesetaraan bukan kebenaran semantik & Dinyatakan bahwa skor mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi & Konfigurasi yang salah dapat dicapai dengan rapi oleh kedua mode \\
+  \hline
+  Protokol belum ditinjau pembimbing & Dinyatakan sebagai studi kasus eksploratif, bukan konfirmatori & Posisi metodologis menunggu tinjauan \\
+  \hline
+\end{longtable}
 
 \section{Verifikasi Pemulihan Berkas dari Artefak Cadangan}
 
 Selain pengukuran waktu pada Bab IV, dilakukan satu pemeriksaan terpisah untuk menjawab pertanyaan yang tidak diukur oleh R1 maupun R2: apakah byte berkas benar-benar dapat dipulihkan dari artefak cadangan, bukan dari salinan sumber yang sedang aktif. Pemeriksaan ini menggunakan identitas khusus yang hanya boleh membaca bucket cadangan dan menulis ke bucket uji terpisah, tanpa hak menghapus.
 
-Pemulihan dilakukan dari titik cadangan \texttt{20261029T121353Z-4d0b1d71a53f} ke bucket uji privat, kemudian objek hasil pemulihan dibaca kembali dan di-\textit{hash} secara independen, bukan hanya mengandalkan laporan alat.
+Pemulihan dilakukan dari titik cadangan \texttt{\seqsplit{20261029T121353Z-4d0b1d71a53f}} ke bucket uji privat, kemudian objek hasil pemulihan dibaca kembali dan di-\textit{hash} secara independen, bukan hanya mengandalkan laporan alat.
 
 \begin{table}[H]
   \centering
