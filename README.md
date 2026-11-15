@@ -102,6 +102,10 @@ Setiap push ke `main`/`master` yang mengubah berkas LaTeX, `Makefile`, atau work
 
 ## Topik Penelitian
 
+- **Teknologi:** Kubernetes, ArgoCD, InvenioRDM, Helm, kubectl
+
+---
+
 ## Deck Sidang
 
 `presentation/skripsi/main.pdf` adalah deck sidang skripsi 22 halaman. Build lokal: `make presentation-skripsi`; build Docker: `make presentation-skripsi-docker`.
@@ -109,7 +113,6 @@ Setiap push ke `main`/`master` yang mengubah berkas LaTeX, `Makefile`, atau work
 ## Release
 
 Push ke `main` yang menyentuh konten tugas akhir menjalankan empat kompilasi dan membuat release **Tugas Akhir** dengan aset `proposal.pdf`, `skripsi.pdf`, `proposal-presentation.pdf`, dan `skripsi-presentation.pdf`.
-- **Teknologi:** Kubernetes, ArgoCD, InvenioRDM, Helm, kubectl
 
 ---
 
