@@ -520,7 +520,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         15 pengulangan per sel & Bukan jaminan daya statistik per skenario \\
         R1 mengukur kesetaraan bidang & Tidak menilai kebenaran semantik atau keamanan konfigurasi \\
         Atribusi pelaku mutasi tidak diukur & Audit API server tidak tersedia; pelaku mutasi tidak dapat dihubungkan dengan perubahan \\
-        G dan HPA & G tidak dapat digeneralisasi; HPA dibatasi 4 replika \\
+        G dan HPA & G tidak dapat digeneralisasi; HPA dibatasi 2-4 replika \\
         \bottomrule
     \end{tabular}
     \vspace{0.08cm}
@@ -538,7 +538,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
     \scriptsize
     \begin{itemize}\setlength{\itemsep}{5pt}
         \item Pada skenario B sampai F, kedua mode menurunkan skor dari 100 ke 75 saat drift terdeteksi, lalu kembali ke 100 setelah pemulihan.
-        \item Skenario A tetap 100 karena \texttt{/spec/replicas} dimiliki HPA. Ini kontrol HPA, bukan bukti keunggulan ArgoCD.
+        \item Skenario A tetap 100 karena \texttt{/spec/replicas} dimiliki HPA. Ini kontrol HPA, bukan ukuran efikasi ArgoCD atau prosedur imperatif.
         \item Skenario G adalah satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret dalam 300 detik, sedangkan prosedur imperatif melakukannya.
         \item Mekanisme G tidak diatribusikan, sehingga G dilaporkan deskriptif dan tidak digabungkan ke estimasi efikasi B-E.
         \item Kesetaraan skor tidak membuktikan kebenaran semantik. Kedua mode dapat mencapai keadaan yang identik dan sama-sama salah bila deklarasi sumbernya keliru.
