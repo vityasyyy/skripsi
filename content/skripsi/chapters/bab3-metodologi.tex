@@ -27,9 +27,7 @@ Setiap sel mengikuti urutan yang sama. Gerbang kondisi dasar diperiksa, lalu sat
 
 Satu \textit{seed}, yaitu 20261029, mengacak urutan lengan dan skenario satu kali sebelum pengumpulan. Urutan lengan yang terwujud adalah GitOps lalu imperatif, sedangkan urutan skenario yang terwujud adalah E, A, G, D, C, F, B. Pengulangan berjalan berurutan, sehingga desain ini bukan eksperimen yang diacak penuh per sel. Objek yang diukur adalah respons \textit{drift} pada \textit{stack} yang telah berjalan, bukan \textit{deployment} awal dari keadaan kosong.
 
-\input{diagrams/fig-deployment-reconciliation}
-
-Gambar~\ref{fig:alur-deployment-rekonsiliasi} menunjukkan bahwa injeksi, mekanisme pengelolaan, dan evaluator merupakan bagian yang dibedakan secara eksplisit. Hasil hanya ditafsirkan untuk konfigurasi apparatus yang dicatat saat pengumpulan. HPA adalah pengendali bersama pada kedua mode.
+Injeksi, mekanisme pengelolaan, dan evaluator merupakan bagian yang dibedakan secara eksplisit. Hasil hanya ditafsirkan untuk konfigurasi apparatus yang dicatat saat pengumpulan. HPA adalah pengendali bersama pada kedua mode.
 
 \section{Alur Penelitian}
 
@@ -92,9 +90,7 @@ Intervensi adalah satu perubahan terkontrol terhadap keadaan sumber daya dalam s
   \end{tabularx}
 \end{table}
 
-\input{diagrams/fig-drift-scenarios}
-
-Gambar~\ref{fig:skenario-drift} memperlihatkan bahwa pemisahan analisis mengikuti kepemilikan bidang: A berada di bawah kendali HPA, sedangkan B--G menyentuh bidang yang dibekukan pada kontrak R1. Karena itu, menggabungkan A, F, atau G ke keluarga efikasi B--E akan mengaburkan mekanisme yang sebenarnya dinilai.
+Pemisahan analisis mengikuti kepemilikan bidang: A berada di bawah kendali HPA, sedangkan B--G menyentuh bidang yang dibekukan pada kontrak R1. Karena itu, menggabungkan A, F, atau G ke keluarga efikasi B--E akan mengaburkan mekanisme yang sebenarnya dinilai.
 
 Pada skenario A, \texttt{/spec/replicas} web dimiliki HPA dan dikecualikan dari kesetaraan statis, sehingga respons diukur terhadap keputusan HPA yang teramati, bukan angka replika tetap. Tidak adanya status OutOfSync tidak berarti deteksi nol, dan HPA dapat memulihkan replika tanpa sinyal ArgoCD. Hasil A dilaporkan sebagai kontrol HPA terpisah dan tidak dipakai sebagai ukuran efikasi ArgoCD atau imperatif. HPA web dibatasi 2--4 replika dan pada beban tinggi pernah mencapai plafon 4, sehingga A hanya menguji pemulihan replika yang diturunkan ke 1, di bawah minimum 2. HPA mengembalikannya ke rentang 2--4. A tidak menguji perilaku di atas \texttt{maxReplicas}=4 dan tidak dapat memisahkan kerja HPA dari efek beban yang sedang berlangsung.
 Pada skenario F, intervensi adalah perubahan \texttt{targetPort} pada \texttt{Service/invenio-web} yang dideklarasikan. Bidang tersebut berada dalam jangkauan kedua mode. Pemulihan F juga mensyaratkan tidak ada residu di namespace karantina \texttt{exp-invenio-drift}, dan pemeriksaan residu merupakan pengamanan apparatus, bukan intervensi tambahan. F dilaporkan terpisah karena keluarga dua belas hipotesis B sampai E telah ditetapkan sebelum pengumpulan.

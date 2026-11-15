@@ -1,0 +1,14 @@
+flowchart LR
+  A["Bekukan<br/>apparatus<br/>dan validasi"] --> B["Pilih lengan<br/>dan skenario"] --> C["Injeksi<br/>satu drift"] --> D["Amati,<br/>perbaiki,<br/>pulihkan"] --> E["Reset, jeda<br/>60 s, ulangi"]
+  E -. "210 sel" .-> B
+  E --> F["Analisis<br/>R1 dan R2"]
+  classDef prep fill:#eef2f7,stroke:#64748b,color:#14212b;
+  classDef obs fill:#e8f0ff,stroke:#2563eb,color:#14212b;
+  classDef fix fill:#e7f7ed,stroke:#15803d,color:#14212b;
+  classDef reset fill:#fff4d6,stroke:#a16207,color:#14212b;
+  classDef analysis fill:#f1eaff,stroke:#6d28d9,color:#14212b;
+  class A,B prep;
+  class C obs;
+  class D fix;
+  class E reset;
+  class F analysis;

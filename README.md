@@ -74,7 +74,7 @@ skripsi/
 │       │   ├── bab4-hasil-analisis.tex
 │       │   └── bab5-kesimpulan-saran.tex
 │       ├── figures/
-│       ├── diagrams/                # Diagram TikZ dari proposal
+│       ├── diagrams/                # Diagram Mermaid (SVG/PDF) dan legenda logo
 │       ├── lampiran/
 │       └── references.bib
 │
