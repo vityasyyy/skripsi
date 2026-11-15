@@ -3,7 +3,7 @@
 \chapter*{LAMPIRAN A}
 \addcontentsline{toc}{chapter}{LAMPIRAN A}
 
-Lampiran ini memuat artefak, perintah, dan skema data yang benar-benar digunakan pada pengumpulan data formal, beserta pemetaan antara keterbatasan penelitian dan cara penanganannya. Seluruh nilai yang dicantumkan telah disanitasi: tidak ada nilai Secret, kredensial, nama objek privat, maupun URL bertanda tangan di dalam lampiran ini.
+Lampiran ini memuat artefak, perintah, dan skema data yang digunakan pada pengumpulan data formal, beserta pemetaan antara keterbatasan penelitian dan cara penanganannya. Seluruh nilai yang dicantumkan telah disanitasi: tidak ada nilai Secret, kredensial, nama objek privat, maupun URL bertanda tangan di dalam lampiran ini.
 
 \section{Identitas Apparatus yang Dibekukan}
 
@@ -30,7 +30,13 @@ Identitas yang mengikat seluruh data pada Bab IV dirangkum pada Tabel~\ref{tab:l
     \hline
     \textit{Seed} & \texttt{20261029} \\
     \hline
+    Konteks runtime & Kubernetes 1.32.6/RKE2, containerd, Ubuntu 24.04 \\
+    \hline
     Jumlah sel & 210 (7 skenario $\times$ 2 mode $\times$ 15 pengulangan) \\
+    \hline
+    Urutan mode & GitOps, lalu imperatif (berurutan, tidak paralel) \\
+    \hline
+    Urutan skenario & E, A, G, D, C, F, B \\
     \hline
     Konvensi waktu & \texttt{completed-observation-v1} \\
     \hline
@@ -141,11 +147,7 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \hline
   Uji berpasangan tidak selalu dapat dipakai & Aturan cadangan Mann--Whitney ditetapkan sebelum analisis dan dilaporkan terbuka & Daya statistik pada C dan D lebih rendah \\
   \hline
-  R3 tidak diukur & Dilaporkan sebagai tidak diukur, bukan nol dan bukan tidak ada perbedaan & Pertanyaan keterlacakan tidak terjawab \\
-  \hline
   Kesetaraan bukan kebenaran semantik & Dinyatakan bahwa skor mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi & Konfigurasi yang salah dapat dicapai dengan rapi oleh kedua mode \\
-  \hline
-  Protokol belum ditinjau pembimbing & Dinyatakan sebagai studi kasus eksploratif, bukan konfirmatori & Posisi metodologis menunggu tinjauan \\
   \hline
 \end{longtable}
 
@@ -189,4 +191,4 @@ Kedua, pengamatan tersensor bukan pengamatan gagal. Apabila pemulihan belum terj
 
 \section{Status Lampiran}
 
-Seluruh artefak yang dirujuk pada lampiran ini telah dihasilkan oleh eksperimen dan telah disanitasi. Dataset mentah, berkas bukti per run, dan tabel LaTeX hasil analisis disimpan di luar naskah ini bersama checksum masing-masing, sehingga integritasnya dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen yang dipublikasikan.
+Seluruh artefak yang dirujuk pada lampiran ini telah dihasilkan oleh eksperimen dan telah disanitasi. Dataset mentah, berkas bukti per run, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum masing-masing, sehingga integritasnya dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen yang dipublikasikan.
