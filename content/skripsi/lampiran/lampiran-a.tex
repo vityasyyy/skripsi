@@ -73,6 +73,8 @@ python3 -B experiments/analysis/analyze_live.py \
   --out experiments/analysis-formal-20261029 --seed 20261029
 \end{lstlisting}
 
+Analisis sensitivitas untuk \texttt{gitops-C-r02} dijalankan terpisah dengan skrip di \path{experiments/sensitivity/}. Skrip tersebut hanya membaca berkas mentah beku dan tidak mengubah analisis primer; hasilnya dilaporkan pada Bab IV.
+
 \section{Skema Data per Run}
 
 Setiap run menulis satu berkas baris JSON dengan bidang berikut, dirangkum pada Tabel~\ref{tab:lampiran-skema}. Bidang waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
@@ -141,7 +143,7 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \hline
   Sensoring kanan & Dilaporkan sebagai tersensor, tidak diimputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
   \hline
-  Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang \\
+  Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; satu \textit{run} lengkap dengan \textit{non-zero exit code} diuji pada analisis sensitivitas Bab IV; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang; kesimpulan C lebih sensitif terhadap satu baris \\
   \hline
   Keluarga uji dua belas hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
   \hline
