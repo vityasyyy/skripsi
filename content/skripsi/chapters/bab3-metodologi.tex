@@ -42,6 +42,8 @@ Konteks \textit{deployment}, termasuk versi runtime, berasal dari catatan pengum
 
 \input{diagrams/fig-runtime-architecture}
 
+Gambar~\ref{fig:arsitektur-runtime} memisahkan jalur deklarasi dari jalur pengamatan: Git menyimpan deklarasi dan ArgoCD merekonsiliasinya, sedangkan Prometheus dan penyimpanan persisten berada di luar kontrak R1. Pemisahan itu mencegah kesetaraan konfigurasi tertukar dengan kesehatan layanan atau isi penyimpanan.
+
 \subsection{Gerbang Kesiapan}
 \label{sec:gerbang-kesiapan}
 Pengulangan hanya dimulai setelah seluruh prasyarat berikut diperiksa dan dicatat. Manifest dan inventaris sumber daya telah dibekukan, \textit{stack} berada pada kesetaraan nilai yang ditetapkan, dan kesehatan layanan memenuhi kriteria kesiapan. Selain itu, \textit{auto-sync}, \textit{self-heal}, cakupan aplikasi, dan kebijakan \textit{prune} ArgoCD telah diverifikasi, termasuk prosedur penjedaan dan pemulihan untuk mode imperatif. Pemeriksa imperatif, pengumpul bukti, dan pembanding bidang telah lulus validasi offline. Jam pencatat waktu tersinkronisasi. Tidak ada pengujian atau perubahan lain pada lingkup sumber daya yang diamati.
@@ -85,6 +87,8 @@ Intervensi adalah satu perubahan terkontrol terhadap keadaan sumber daya dalam s
 
 \input{diagrams/fig-drift-scenarios}
 
+Gambar~\ref{fig:skenario-drift} memperlihatkan bahwa pemisahan analisis mengikuti kepemilikan bidang: A berada di bawah kendali HPA, sedangkan B--G menyentuh bidang yang dibekukan pada kontrak R1. Karena itu, menggabungkan A, F, atau G ke keluarga efikasi B--E akan mengaburkan mekanisme yang sebenarnya dinilai.
+
 Pada skenario A, \texttt{/spec/replicas} web dimiliki HPA dan dikecualikan dari kesetaraan statis, sehingga respons diukur terhadap keputusan HPA yang teramati, bukan angka replika tetap. Tidak adanya status OutOfSync tidak berarti deteksi nol, dan HPA dapat memulihkan replika tanpa sinyal ArgoCD. Hasil A dilaporkan sebagai kontrol HPA terpisah dan tidak dipakai sebagai ukuran efikasi ArgoCD atau imperatif. HPA web dibatasi 2--4 replika dan pada beban tinggi pernah mencapai plafon 4, sehingga A hanya menguji pemulihan replika yang diturunkan ke 1, di bawah minimum 2. HPA mengembalikannya ke rentang 2--4. A tidak menguji perilaku di atas \texttt{maxReplicas}=4 dan tidak dapat memisahkan kerja HPA dari efek beban yang sedang berlangsung.
 Pada skenario F, intervensi adalah perubahan \texttt{targetPort} pada \texttt{Service/invenio-web} yang dideklarasikan. Bidang tersebut berada dalam jangkauan kedua mode. Pemulihan F juga mensyaratkan tidak ada residu di namespace karantina \texttt{exp-invenio-drift}, dan pemeriksaan residu merupakan pengamanan apparatus, bukan intervensi tambahan. F dilaporkan terpisah karena keluarga dua belas hipotesis B sampai E telah ditetapkan sebelum pengumpulan.
 
@@ -120,6 +124,8 @@ Semua waktu berasal dari satu kolektor pada host pencatat, dan setiap kejadian d
 Durasi utama adalah waktu deteksi $t_d-t_0$, waktu ketersediaan bukti $t_e-t_0$, dan waktu pemulihan konfigurasi penuh $t_r-t_0$. Selang $t_e-t_d$ didefinisikan bertanda: nilai positif berarti bukti tersedia setelah sinyal deteksi, nilai nol berarti keduanya selesai bersamaan, dan nilai negatif berarti bukti teramati sebelum sinyal deteksi. Nilai negatif bukan durasi yang tidak fisis dan tidak dibulatkan menjadi nol. $t_r$ berarti pemulihan kesetaraan inventaris dan bidang yang diukur, bukan klaim bahwa seluruh layanan sehat atau tidak mengalami dampak lain.
 
 \input{diagrams/fig-measurement-timeline}
+
+Gambar~\ref{fig:timeline-pengukuran} menempatkan $t_d$, $t_e$, dan $t_r$ pada satu garis waktu dari $t_0$, sehingga urutan kejadian dapat dibaca tanpa menyamakan ketiganya dengan jenis respons yang sama. Posisi $t_e$ yang dapat mendahului $t_d$ berasal dari dua jalur pengamatan, bukan dari pemulihan yang terjadi lebih awal.
 
 Pemeriksa imperatif berjalan pada interval nominal lima detik, terpisah dari sampler satu detik dan dari interval rekonsiliasi internal ArgoCD. Waktu deteksi GitOps dibatasi oleh resolusi sampler dan oleh kapan ArgoCD melaporkan status yang berbeda. Interval rekonsiliasi internal ArgoCD tidak diukur secara terpisah, sehingga kontribusinya tidak dapat dipisahkan dari resolusi sampler. Kedua prosedur berjalan otomatis tanpa waktu reaksi manusia dan tanpa jeda buatan. Karena $t_d$ dan $t_e$ berasal dari sumber pengamatan yang berbeda, $t_e$ dapat mendahului $t_d$, dan pada data ini terdapat empat baris analisis GitOps dengan $t_e<t_d$. Kesehatan layanan dilaporkan terpisah.
 
