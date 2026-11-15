@@ -40,6 +40,7 @@ skripsi:
 		makeindex -s nomencl.ist -o main.nls main.nlo && \
 		pdflatex -interaction=nonstopmode main.tex && \
 		pdflatex -interaction=nonstopmode main.tex && \
+		pdflatex -interaction=nonstopmode main.tex && \
 		pdflatex -interaction=nonstopmode main.tex
 
 skripsi-diagrams:
@@ -89,7 +90,7 @@ proposal-docker: build-docker
 	docker run --rm -v $(PWD)/content:/workspace/content $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c "cd /workspace/content/proposal && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex"
 
 skripsi-docker: build-docker
-	docker run --rm -v $(PWD)/content:/workspace/content $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c "cd /workspace/content/skripsi && pdflatex -interaction=nonstopmode main.tex && bibtex main && makeindex -s nomencl.ist -o main.nls main.nlo && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex"
+	docker run --rm -v $(PWD)/content:/workspace/content $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c "cd /workspace/content/skripsi && pdflatex -interaction=nonstopmode main.tex && bibtex main && makeindex -s nomencl.ist -o main.nls main.nlo && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex"
 
 presentation-diagrams-docker: build-docker
 	docker run --rm -v $(PWD)/presentation:/workspace/presentation $(DOCKER_IMAGE):$(DOCKER_TAG) sh -c 'cd /workspace/presentation/proposal/diagrams && for f in *.tex; do xelatex -interaction=nonstopmode -halt-on-error "$$f" || exit 1; done'
