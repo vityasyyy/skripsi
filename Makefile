@@ -1,7 +1,7 @@
 # Skripsi Makefile
 # Supports local compilation (requires texlive) and Docker compilation
 
-.PHONY: help proposal skripsi presentation presentation-diagrams clean clean-proposal clean-skripsi clean-presentation proposal-docker skripsi-docker presentation-docker presentation-diagrams-docker shell
+.PHONY: help proposal skripsi skripsi-diagrams presentation presentation-diagrams clean clean-proposal clean-skripsi clean-presentation proposal-docker skripsi-docker presentation-docker presentation-diagrams-docker shell
 
 help:
 	@echo "Skripsi - Build Options"
@@ -10,6 +10,7 @@ help:
 	@echo "Local Compilation (requires texlive):"
 	@echo "  make proposal          - Compile content/proposal/main.tex"
 	@echo "  make skripsi           - Compile content/skripsi/main.tex"
+	@echo "  make skripsi-diagrams  - Render skripsi diagrams from local HTML/CSS (requires Chrome)"
 	@echo "  make presentation      - Compile diagrams then presentation/proposal/main.tex (xelatex)"
 	@echo "  make presentation-diagrams - Compile only presentation diagrams"
 	@echo "  make clean             - Remove build artifacts"
@@ -36,6 +37,9 @@ skripsi:
 		makeindex -s nomencl.ist -o main.nls main.nlo && \
 		pdflatex -interaction=nonstopmode main.tex && \
 		pdflatex -interaction=nonstopmode main.tex
+
+skripsi-diagrams:
+	cd content/skripsi/diagrams/src && ./render.sh
 
 presentation-diagrams:
 	cd presentation/proposal/diagrams && \

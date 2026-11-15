@@ -20,59 +20,15 @@ Urutan lengan adalah GitOps lebih dahulu, lalu imperatif, ditetapkan sebelum pen
 
 Setiap sel didahului gerbang kondisi dasar, dan jeda 60 detik diterapkan pada transisi normal. Manifest mencatat 207 jeda 60 detik yang diterapkan, termasuk satu jeda menuju upaya ulang \texttt{C-r08}. Tiga transisi antarsel yang bertepatan dengan penghentian atau restart pengumpulan tidak memiliki catatan jeda. Karena itu, penelitian ini tidak mengklaim bahwa setiap sel dipisahkan tepat 60 detik.
 
-\begin{figure}[H]
-  \centering
-  \begin{tikzpicture}[
-    box/.style={draw, rounded corners, align=center, text width=6.2cm, minimum height=10mm, font=\small},
-    flow/.style={-{Stealth[length=2mm]}, thick},
-    node distance=6mm
-  ]
-    \node[box] (stack) {Satu stack InvenioRDM\\produksi-like, namespace \texttt{invenio}};
-    \node[box, below=of stack] (git) {Blok GitOps\\ArgoCD aktif};
-    \node[box, below=of git] (resetA) {Reset dan verifikasi\\kondisi dasar};
-    \node[box, below=of resetA] (imp) {Blok imperatif\\\textit{auto-sync}/\textit{self-heal} ArgoCD dijeda\\pemeriksa + \textit{runbook} \texttt{kubectl}};
-    \node[box, below=of imp] (restore) {Pemulihan ArgoCD\\dan verifikasi};
-    \node[box, below=of restore] (eval) {Evaluator bersama\\R1 kesetaraan bidang\\R2 deteksi, bukti, pemulihan\\kesehatan terpisah};
-    \draw[flow] (stack) -- (git);
-    \draw[flow] (git) -- (resetA);
-    \draw[flow] (resetA) -- (imp);
-    \draw[flow] (imp) -- (restore);
-    \draw[flow] (restore) -- (eval);
-  \end{tikzpicture}
-  \caption{Rancangan dua mode pengelolaan berurutan pada satu stack InvenioRDM: GitOps lebih dahulu, lalu imperatif; mode imperatif adalah penjedaan ArgoCD per run, bukan \textit{deployment} terpisah.}
-  \label{fig:arsitektur-eksperimen}
-\end{figure}
+\input{diagrams/fig-deployment-reconciliation}
 
-Gambar~\ref{fig:arsitektur-eksperimen} menunjukkan bahwa injeksi, mekanisme pengelolaan, dan evaluator merupakan bagian yang dibedakan secara eksplisit. Hasil hanya ditafsirkan untuk konfigurasi apparatus yang dicatat saat pengumpulan. HPA adalah pengendali bersama pada kedua mode.
+Gambar~\ref{fig:alur-deployment-rekonsiliasi} menunjukkan bahwa injeksi, mekanisme pengelolaan, dan evaluator merupakan bagian yang dibedakan secara eksplisit. Hasil hanya ditafsirkan untuk konfigurasi apparatus yang dicatat saat pengumpulan. HPA adalah pengendali bersama pada kedua mode.
 
 \section{Alur Penelitian}
 
 Pengumpulan data berlangsung pada 29--30 Oktober 2026 (UTC), melalui pembakuan protokol, pembekuan sumber dan versi, validasi instrumen pada \textit{stack} yang sama, pengumpulan data, dan analisis per skenario. Validasi instrumen tidak digabungkan ke data formal, dan data validasi hanya dipakai untuk memastikan pemeriksa, kolektor, dan pembanding bidang bekerja sesuai definisi.
 
-\begin{figure}[H]
-  \centering
-  \begin{tikzpicture}[
-    process-box/.style={draw, rounded corners, align=center, text width=4.6cm, minimum height=10mm, font=\small},
-    flow/.style={-{Stealth[length=2mm]}, thick},
-    node distance=5mm
-  ]
-    \node[process-box] (freeze) {Pembekuan apparatus};
-    \node[process-box, below=of freeze] (ready) {Gerbang kesiapan stack};
-    \node[process-box, below=of ready] (git) {Blok GitOps: injeksi\\dan pengukuran per run};
-    \node[process-box, below=of git] (resetA) {Reset dan verifikasi\\kondisi dasar};
-    \node[process-box, below=of resetA] (imp) {Blok imperatif: ArgoCD dijeda,\\injeksi dan pengukuran per run};
-    \node[process-box, below=of imp] (restore) {Pemulihan ArgoCD};
-    \node[process-box, below=of restore] (analyze) {Analisis per skenario\\dan penanganan tersensor};
-    \draw[flow] (freeze) -- (ready);
-    \draw[flow] (ready) -- (git);
-    \draw[flow] (git) -- (resetA);
-    \draw[flow] (resetA) -- (imp);
-    \draw[flow] (imp) -- (restore);
-    \draw[flow] (restore) -- (analyze);
-  \end{tikzpicture}
-  \caption{Bagan alir pengumpulan data: pembekuan apparatus, blok GitOps, reset, blok imperatif, pemulihan ArgoCD, lalu analisis.}
-  \label{fig:bagan-alir-eksperimen}
-\end{figure}
+\input{diagrams/fig-pipeline}
 
 Gambar~\ref{fig:bagan-alir-eksperimen} menempatkan pembekuan apparatus dan validasi sebelum pengumpulan. Pemulihan kondisi dasar disyaratkan di antara pengulangan. Tidak ada jeda buatan setelah injeksi untuk menunggu respons manusia, dan batas pengamatan 300 detik dipakai pada setiap pengujian.
 
@@ -84,9 +40,10 @@ Rancangan dibatasi pada satu klaster Kubernetes, satu \textit{stack} InvenioRDM 
 
 Konteks \textit{deployment}, termasuk versi runtime, berasal dari catatan pengumpulan dan tidak diverifikasi ulang di luar pengumpulan; rinciannya dicatat pada Lampiran A. Application \texttt{argocd/apps/invenio-bootstrap.yaml} memilih \texttt{k8s/apps/invenio/kustomization.yaml}, dan tidak dibuat sumber manifest kedua yang dapat diedit di repositori penelitian.
 
-\section{Gerbang Kesiapan}
-\label{sec:gerbang-kesiapan}
+\input{diagrams/fig-runtime-architecture}
 
+\subsection{Gerbang Kesiapan}
+\label{sec:gerbang-kesiapan}
 Pengulangan hanya dimulai setelah seluruh prasyarat berikut diperiksa dan dicatat. Manifest dan inventaris sumber daya telah dibekukan, \textit{stack} berada pada kesetaraan nilai yang ditetapkan, dan kesehatan layanan memenuhi kriteria kesiapan. Selain itu, \textit{auto-sync}, \textit{self-heal}, cakupan aplikasi, dan kebijakan \textit{prune} ArgoCD telah diverifikasi, termasuk prosedur penjedaan dan pemulihan untuk mode imperatif. Pemeriksa imperatif, pengumpul bukti, dan pembanding bidang telah lulus validasi offline. Jam pencatat waktu tersinkronisasi. Tidak ada pengujian atau perubahan lain pada lingkup sumber daya yang diamati.
 
 Gerbang menetapkan pemakaian CPU dan memori node kurang dari 70\%, sehingga nilai 70,0\% atau lebih ditolak; memori dihitung dari \textit{working set} metrics-server dibagi \textit{allocatable}. Usia sampel maksimum 30 detik dan jendela agregasi maksimum 30 detik, sedangkan nilai operasional yang dipakai adalah pengamatan nominal 1 detik, pemeriksa imperatif nominal 5 detik, horizon pengamatan 300 detik, dan jeda antar-run 60 detik. \textit{Timeout baseline} 600 detik ditetapkan pada skrip peluncuran, dan nilai 1, 5, serta 300 detik berasal dari nilai bawaan instrumen, bukan dari daftar identitas beku.
@@ -126,8 +83,9 @@ Intervensi adalah satu perubahan terkontrol terhadap keadaan sumber daya dalam s
   \end{tabularx}
 \end{table}
 
-Pada skenario A, \texttt{/spec/replicas} web dimiliki HPA dan dikecualikan dari kesetaraan statis, sehingga respons diukur terhadap keputusan HPA yang teramati, bukan angka replika tetap. Tidak adanya status OutOfSync tidak berarti deteksi nol, dan HPA dapat memulihkan replika tanpa sinyal ArgoCD. HPA web dibatasi 2 sampai 4 replika dan pernah mencapai plafon 4 pada beban tinggi. Skenario A hanya menguji pemulihan replika yang diturunkan ke 1, di bawah minimum 2. A tidak menguji perilaku di atas \texttt{maxReplicas}=4 dan tidak dapat memisahkan kerja HPA dari efek beban yang sedang berlangsung.
+\input{diagrams/fig-drift-scenarios}
 
+Pada skenario A, \texttt{/spec/replicas} web dimiliki HPA dan dikecualikan dari kesetaraan statis, sehingga respons diukur terhadap keputusan HPA yang teramati, bukan angka replika tetap. Tidak adanya status OutOfSync tidak berarti deteksi nol, dan HPA dapat memulihkan replika tanpa sinyal ArgoCD. Hasil A dilaporkan sebagai kontrol HPA terpisah dan tidak dipakai sebagai ukuran efikasi ArgoCD atau imperatif. HPA web dibatasi 2--4 replika dan pada beban tinggi pernah mencapai plafon 4, sehingga A hanya menguji pemulihan replika yang diturunkan ke 1, di bawah minimum 2. HPA mengembalikannya ke rentang 2--4. A tidak menguji perilaku di atas \texttt{maxReplicas}=4 dan tidak dapat memisahkan kerja HPA dari efek beban yang sedang berlangsung.
 Pada skenario F, intervensi adalah perubahan \texttt{targetPort} pada \texttt{Service/invenio-web} yang dideklarasikan. Bidang tersebut berada dalam jangkauan kedua mode. Pemulihan F juga mensyaratkan tidak ada residu di namespace karantina \texttt{exp-invenio-drift}, dan pemeriksaan residu merupakan pengamanan apparatus, bukan intervensi tambahan. F dilaporkan terpisah karena keluarga dua belas hipotesis B sampai E telah ditetapkan sebelum pengumpulan.
 
 Pada skenario G, perubahan berupa anotasi metadata pada SealedSecret, dan nilai \texttt{spec.encryptedData} tidak dibaca atau ditulis. Pemulihan pada lengan imperatif dilakukan oleh pemeriksa generik yang membandingkan keadaan aktual dengan deklarasi, sedangkan pada lengan GitOps anotasi tidak dipulihkan dalam 300 detik dan kontroler pemulihannya tidak teratribusi. Penelitian ini tidak menyimpulkan apakah ketiadaan pemulihan disebabkan cakupan bidang ArgoCD, perilaku pengendali SealedSecret, atau faktor lain, sehingga G dianalisis secara deskriptif dan tidak dipool ke estimasi efikasi B sampai E.
@@ -160,6 +118,8 @@ Semua waktu berasal dari satu kolektor pada host pencatat, dan setiap kejadian d
 \end{itemize}
 
 Durasi utama adalah waktu deteksi $t_d-t_0$, waktu ketersediaan bukti $t_e-t_0$, dan waktu pemulihan konfigurasi penuh $t_r-t_0$. Selang $t_e-t_d$ didefinisikan bertanda: nilai positif berarti bukti tersedia setelah sinyal deteksi, nilai nol berarti keduanya selesai bersamaan, dan nilai negatif berarti bukti teramati sebelum sinyal deteksi. Nilai negatif bukan durasi yang tidak fisis dan tidak dibulatkan menjadi nol. $t_r$ berarti pemulihan kesetaraan inventaris dan bidang yang diukur, bukan klaim bahwa seluruh layanan sehat atau tidak mengalami dampak lain.
+
+\input{diagrams/fig-measurement-timeline}
 
 Pemeriksa imperatif berjalan pada interval nominal lima detik, terpisah dari sampler satu detik dan dari interval rekonsiliasi internal ArgoCD. Waktu deteksi GitOps dibatasi oleh resolusi sampler dan oleh kapan ArgoCD melaporkan status yang berbeda. Interval rekonsiliasi internal ArgoCD tidak diukur secara terpisah, sehingga kontribusinya tidak dapat dipisahkan dari resolusi sampler. Kedua prosedur berjalan otomatis tanpa waktu reaksi manusia dan tanpa jeda buatan. Karena $t_d$ dan $t_e$ berasal dari sumber pengamatan yang berbeda, $t_e$ dapat mendahului $t_d$, dan pada data ini terdapat empat baris analisis GitOps dengan $t_e<t_d$. Kesehatan layanan dilaporkan terpisah.
 

@@ -60,8 +60,9 @@ Utami dan Al Fatta membahas model \textit{deployment} deklaratif berbasis tarik 
 
 Perbandingan penelitian perlu dibaca sesuai tujuan, alat, lingkungan, konfigurasi, dan hasil yang dilaporkan. Penelitian ini tidak menyatakan bahwa studi terdahulu tidak terkontrol, tidak memakai statistik, atau tidak memiliki \textit{baseline}, karena pernyataan seperti itu memerlukan pemeriksaan penuh terhadap setiap sumber, bukan hanya abstrak.
 
-\section{Metode Eksperimental Terkontrol}
+\input{diagrams/fig-control-loop}
 
+\section{Metode Eksperimental Terkontrol}
 Evaluasi empiris pada riset sistem dan infrastruktur memerlukan desain yang memitigasi ancaman terhadap validitas \citep{wohlin2012experimentation}, dan penelitian ini merupakan studi kasus komparatif terkontrol \citep{runeson2009case}. Satu kasus diamati pada kondisi dasar, satu intervensi, dan kondisi pascaintervensi. Dua mode pengelolaan dijalankan berurutan. \citet{limoncelli2018} menjelaskan bahwa penelitian sistem perlu membangun lingkungan yang dapat direproduksi, mengendalikan variabel pengganggu, dan menetapkan metrik sebelum menyimpulkan hubungan kausal.
 
 Rancangan penelitian ini menetapkan prosedur imperatif terotomasi dan GitOps sebagai dua perlakuan pada satu \textit{stack}. Kesetaraan \textit{workload}, nilai dasar, inventaris pengukuran, dan prosedur injeksi dirancang untuk mengurangi perbedaan yang tidak relevan. Kedua implementasi tetap berbeda dalam lebih dari satu komponen teknis. Tidak ada isolasi penuh, sehingga hasil tidak diatribusikan sebagai efek universal paradigma dan interpretasinya dibatasi pada prosedur dan kasus yang diuji \citep{wohlin2012experimentation}.

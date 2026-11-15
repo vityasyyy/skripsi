@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Pipeline eksperimen</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .diagram { height: 1150px; padding: 54px 64px 40px; }
+
+  .stage {
+    position: absolute;
+    width: 330px;
+    height: 246px;
+    padding: 62px 20px 16px;
+    border-top: 7px solid #94a3b8;
+  }
+  .stage .num {
+    position: absolute;
+    top: 14px;
+    left: 18px;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: #eef2f6;
+    color: #334155;
+    font-size: 22px;
+    font-weight: 800;
+  }
+  .stage h2 { margin: 0 0 8px; font-size: 28px; line-height: 1.1; letter-spacing: -0.2px; }
+  .stage p { margin: 0; color: #52606d; font-size: 23px; line-height: 1.28; }
+  .stage.prep { border-top-color: #475569; }
+  .stage.obs { border-top-color: #7c3aed; }
+  .stage.repair { border-top-color: #15803d; }
+  .stage.reset { border-top-color: #b45309; }
+  .stage.analysis { border-top-color: #1d4ed8; }
+  .stage.obs .num { background: #f1eaff; color: #6d28d9; }
+  .stage.repair .num { background: #e7f7ed; color: #166534; }
+  .stage.reset .num { background: #fff4d6; color: #a16207; }
+  .stage.analysis .num { background: #e8f0ff; color: #1d4ed8; }
+
+  .r1 { top: 250px; }
+  .r2 { top: 516px; }
+  .r3 { top: 782px; }
+  .c1 { left: 64px; }
+  .c2 { left: 424px; }
+  .c3 { left: 784px; }
+  .c4 { left: 1144px; }
+
+  .bottom-note {
+    position: absolute;
+    left: 64px;
+    right: 64px;
+    bottom: 38px;
+    display: flex;
+    gap: 22px;
+    align-items: center;
+    padding: 16px 20px;
+    border: 1.6px dashed #cbd5e1;
+    border-radius: 13px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 23px;
+    line-height: 1.3;
+  }
+  .bottom-note strong { color: #14212b; }
+</style>
+</head>
+<body>
+<div class="diagram">
+  <div class="kicker">Bab III: Protokol pengulangan</div>
+  <h1>Pipeline eksperimen dari baseline sampai analisis</h1>
+  <p class="subtitle">Satu sel menjalankan satu lengan dan satu skenario. Pengamatan berjalan sebelum injeksi, dan setiap perpindahan sel melewati reset serta jeda yang dicatat.</p>
+
+  <svg class="wires" viewBox="0 0 1600 1150" aria-hidden="true">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"></path>
+      </marker>
+    </defs>
+    <g fill="none" stroke="#94a3b8" stroke-width="3.2" marker-end="url(#arrow)">
+      <path d="M394 373 H424"></path>
+      <path d="M754 373 H784"></path>
+      <path d="M1114 373 H1144"></path>
+      <path d="M1474 373 H1500 V639 H1478"></path>
+      <path d="M1144 639 H1118"></path>
+      <path d="M784 639 H758"></path>
+      <path d="M424 639 H398"></path>
+      <path d="M64 639 H38 V905 H60"></path>
+      <path d="M394 905 H424"></path>
+      <path d="M754 905 H784"></path>
+      <path d="M1114 905 H1144"></path>
+    </g>
+  </svg>
+
+  <article class="stage card prep r1 c1">
+    <div class="num">1</div>
+    <h2>Bekukan apparatus dan baseline</h2>
+    <p>Revisi sumber, render SHA-256, digest, seed, dan gerbang baseline.</p>
+  </article>
+  <article class="stage card prep r1 c2">
+    <div class="num">2</div>
+    <h2>Pilih lengan dan skenario</h2>
+    <p>GitOps lalu imperatif; urutan skenario mengikuti seed yang dicatat.</p>
+  </article>
+  <article class="stage card prep r1 c3">
+    <div class="num">3</div>
+    <h2>Aktifkan pengamatan</h2>
+    <p>Sampler 1 s dan pemeriksa imperatif 5 s berjalan bersamaan.</p>
+  </article>
+  <article class="stage card prep r1 c4">
+    <div class="num">4</div>
+    <h2>Injeksi satu drift</h2>
+    <p><strong>t0</strong> sebelum perintah; <strong>ta</strong> setelah verifikasi baca balik.</p>
+  </article>
+
+  <article class="stage card obs r2 c4">
+    <div class="num">5</div>
+    <h2>Deteksi <strong>td</strong></h2>
+    <p>Sinyal pertama yang memenuhi jendela pengamatan.</p>
+  </article>
+  <article class="stage card obs r2 c3">
+    <div class="num">6</div>
+    <h2>Bukti <strong>te</strong></h2>
+    <p>Perbedaan bidang dan identitas objek; <strong>te</strong> dapat mendahului <strong>td</strong>.</p>
+  </article>
+  <article class="stage card repair r2 c2">
+    <div class="num">7</div>
+    <h2>Repair</h2>
+    <p>Runbook <strong>kubectl</strong> tetap atau <em>self-heal</em> ArgoCD.</p>
+  </article>
+  <article class="stage card repair r2 c1">
+    <div class="num">8</div>
+    <h2>Pemulihan <strong>tr</strong></h2>
+    <p>Observasi pertama ketika seluruh bidang kembali cocok.</p>
+  </article>
+
+  <article class="stage card repair r3 c1">
+    <div class="num">9</div>
+    <h2>Konfirmasi dua observasi</h2>
+    <p>Observasi cocok kedua; waktu yang dilaporkan tetap <strong>tr</strong>.</p>
+  </article>
+  <article class="stage card reset r3 c2">
+    <div class="num">10</div>
+    <h2>Reset dan verifikasi</h2>
+    <p>Inventaris, kesehatan, HPA, dan tanpa residu diperiksa ulang.</p>
+  </article>
+  <article class="stage card reset r3 c3">
+    <div class="num">11</div>
+    <h2>Jeda 60 s lalu ulangi</h2>
+    <p>Transisi normal 60 s; tiga batas batch tanpa catatan jeda dilaporkan.</p>
+  </article>
+  <article class="stage card analysis r3 c4">
+    <div class="num">12</div>
+    <h2>Analisis R1/R2</h2>
+    <p>210 sel total; nilai hilang tidak diimputasi sebagai nol.</p>
+  </article>
+
+  <div class="bottom-note">
+    <span><strong>Batas 300 s.</strong> Bila td, te, atau tr belum terjadi, hasilnya tersensor kanan, bukan nol.</span>
+    <span><strong>210 sel</strong> = 7 skenario x 2 mode x 15 pengulangan.</span>
+  </div>
+</div>
+</body>
+</html>
