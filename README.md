@@ -2,7 +2,7 @@
 
 > Studi Kasus InvenioRDM | Departemen Ilmu Komputer dan Elektronika, FMIPA UGM
 
-Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma deployment manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM. Baseline manual direpresentasikan oleh prosedur imperatif terotomasi berbasis kubectl; waktu reaksi manusia tidak diukur.
+Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma deployment manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM. Baseline manual direpresentasikan oleh prosedur imperatif terotomasi berbasis kubectl; baseline ini konservatif karena mewakili versi tercepat prosedur manual, dan waktu reaksi manusia tidak diukur.
 
 > **Status metode:** Kedua mode dijalankan berurutan pada satu stack InvenioRDM produksi-like; HPA normal aktif pada kedua mode dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Harness live dan protokol kolektor ada di [`experiments/live/README.md`](experiments/live/README.md) dan [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md).
 
@@ -74,7 +74,7 @@ skripsi/
 │       │   ├── bab4-hasil-analisis.tex
 │       │   └── bab5-kesimpulan-saran.tex
 │       ├── figures/
-│       ├── diagrams/                # Diagram TikZ dari proposal
+│       ├── diagrams/                # Diagram Mermaid (SVG/PDF) dan legenda logo
 │       ├── lampiran/
 │       └── references.bib
 │

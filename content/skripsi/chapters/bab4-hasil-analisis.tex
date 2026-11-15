@@ -3,7 +3,7 @@
 \section{Data dan Keterlaksanaan}
 \label{sec:akuntansi-sel}
 
-Pengumpulan data menghasilkan 210 sel dari tujuh skenario, dua mode, dan lima belas pengulangan. Seluruh 210 sel mencapai status terminal tanpa sel tertunda. Kedua mode yang dianalisis adalah prosedur imperatif terotomasi berbasis \texttt{kubectl} dan GitOps berbasis ArgoCD. Berkas mentah memuat 211 baris upaya karena satu sel, \texttt{gitops-C-r08}, gagal pada \textit{baseline} pra-injeksi dan diulang satu kali. Analisis menerima 207 baris dan mengecualikan empat baris mentah. Tabel~\ref{tab:akuntansi-sel} merangkum akuntansinya.
+Pengumpulan data menghasilkan 210 sel dari tujuh skenario, dua mode, dan lima belas pengulangan. Dari jumlah itu, 140 sel R2 (pengulangan 1--10) dipakai untuk luaran waktu, dan 70 sel R1 (pengulangan 11--15) dipakai untuk kesetaraan bidang. Seluruh 210 sel mencapai status terminal tanpa sel tertunda. Kedua mode yang dianalisis adalah prosedur imperatif terotomasi berbasis \texttt{kubectl} dan GitOps berbasis ArgoCD. Berkas mentah memuat 211 baris upaya karena satu sel, \texttt{gitops-C-r08}, gagal pada \textit{baseline} pra-injeksi dan diulang satu kali. Analisis menerima 207 baris dan mengecualikan empat baris mentah. Tabel~\ref{tab:akuntansi-sel} merangkum akuntansinya.
 
 \begin{table}[H]
   \centering
@@ -27,9 +27,11 @@ Pengumpulan data menghasilkan 210 sel dari tujuh skenario, dua mode, dan lima be
   \end{tabularx}
 \end{table}
 
-Empat baris yang dikecualikan bukan empat sel yang hilang. Tiga sel tidak menghasilkan baris analisis. \texttt{gitops-C-r01} dan \texttt{imperative-G-r05} berstatus \texttt{instrumentation\_failure} karena kolektor tidak menghasilkan sampel awal, atau pembacaan metrik node gagal ketika metrics-server tidak tersedia. \texttt{gitops-C-r02} tercatat \texttt{observed}, tetapi proses pengumpulan berhenti dengan kode keluar bukan nol dan barisnya diklasifikasikan \texttt{batch\_stop}. Baris keempat adalah upaya pertama \texttt{gitops-C-r08} yang gagal \textit{baseline} karena Application \texttt{invenio-bootstrap} tidak Synced/Healthy. Kegagalan itu terjadi sebelum injeksi dan diulang sekali sesuai aturan, sehingga tiga sel tidak menghasilkan baris analisis sedangkan \texttt{gitops-C-r08} tetap dianalisis melalui upaya ulang. Tidak ada nilai yang diimputasi, tidak ada observasi tersensor yang diubah menjadi kegagalan, dan tidak ada nilai hilang yang diganti nol.
+Empat baris yang dikecualikan bukan empat sel yang hilang. Tiga sel tidak menghasilkan baris analisis. \texttt{gitops-C-r01} dan \texttt{imperative-G-r05} berstatus \texttt{instrumentation\_failure} karena kolektor tidak menghasilkan sampel awal, atau pembacaan metrik node gagal ketika metrics-server tidak tersedia. \texttt{gitops-C-r02} adalah \textit{run} yang lengkap dan teramati; proses \textit{harness}-nya berakhir dengan \textit{non-zero exit code}. Baris itu dikecualikan sebagai \texttt{batch\_stop} untuk menjaga validitas batch secara konservatif, bukan karena sel gagal atau karena ukuran efeknya. Analisis sensitivitas yang menyertakan baris tersebut menurunkan ukuran efek pemulihan C dari 0,75 menjadi 0,64. Baris keempat adalah upaya pertama \texttt{gitops-C-r08} yang gagal \textit{baseline} karena Application \texttt{invenio-bootstrap} tidak Synced/Healthy. Kegagalan itu terjadi sebelum injeksi dan diulang sekali sesuai aturan, sehingga tiga sel tidak menghasilkan baris analisis sedangkan \texttt{gitops-C-r08} tetap dianalisis melalui upaya ulang. Tidak ada nilai yang diimputasi, tidak ada observasi tersensor yang diubah menjadi kegagalan, dan tidak ada nilai hilang yang diganti nol.
 
 Lingkungan, manifest, \textit{image}, dan instrumen dibekukan sebelum pengumpulan, dan identitas teknis lengkap untuk reproduksi dicatat pada Lampiran A. Pembekuan tersebut menjaga agar data berasal dari apparatus yang sama, tetapi tidak memperluas cakupan generalisasi.
+
+\input{diagrams/fig-analysis-flow}
 
 \section{Kesetaraan Konfigurasi dan Kesehatan (R1)}
 
@@ -63,7 +65,7 @@ R1 membandingkan skor kesetaraan bidang terpilih pada empat sumber daya yang did
 
 Pada skenario B sampai F, drift terdeteksi pada kedua mode, dan skor turun menjadi 75 lalu kembali ke 100 setelah pemulihan. Skenario A tetap 100 sepanjang pengamatan, konsisten dengan keputusan mengecualikan \texttt{/spec/replicas} dari deklarasi karena bidang tersebut dimiliki HPA, bukan oleh mekanisme rekonsiliasi konfigurasi. F masuk ke tabel R1 karena bidang Service diperiksa, tetapi waktu F tidak masuk keluarga efikasi B sampai E.
 
-Skenario G merupakan satu-satunya asimetri: mode GitOps tidak mengembalikan anotasi pada SealedSecret ke keadaan yang dideklarasikan, sedangkan pemeriksa imperatif melakukannya. Temuan ini bukan kegagalan instrumentasi karena barisnya tercatat tersensor kanan, bukan error, dan mekanisme penyebabnya tidak diatribusikan. Keluaran baris mencatat \texttt{recovery\_controller} sebagai \texttt{unattributed}, dan penelitian ini tidak menyimpulkan apakah ketiadaan pemulihan disebabkan cakupan bidang ArgoCD, perilaku pengendali SealedSecret, atau faktor lain, sehingga G dilaporkan sebagai kasus deskriptif dan tidak digabungkan ke populasi efikasi.
+Skenario G merupakan satu-satunya asimetri: mode GitOps tidak mengembalikan anotasi pada SealedSecret ke keadaan yang dideklarasikan, sedangkan pemeriksa imperatif melakukannya. Temuan ini bukan kegagalan instrumentasi karena barisnya tercatat tersensor kanan, bukan error, dan mekanisme penyebabnya tidak diatribusikan. Kemungkinan mekanisme yang konsisten dengan data adalah ArgoCD tidak menganggap anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen \textit{harness} melihat anotasi itu, sedangkan pengendali GitOps tidak memulihkannya. Mekanisme tersebut tidak diukur, sehingga atribusi formal tetap \texttt{unattributed} dan G bukan bukti masalah izin. G dilaporkan sebagai kasus batas deskriptif dan tidak digabungkan ke populasi efikasi.
 
 Kesehatan layanan tidak diubah menjadi skor dan tidak dipakai untuk mengubah nilai R1. Status Running dan Ready dipakai pada gerbang kesiapan sebelum injeksi dan pada verifikasi setelah pemulihan. Karena itu, R1 menjawab kesetaraan bidang konfigurasi, bukan kesehatan layanan secara umum, dan kesetaraan skor juga tidak membuktikan kebenaran semantik konfigurasi; kedua mode dapat mencapai keadaan yang identik dan sama-sama salah apabila deklarasi sumbernya keliru.
 
@@ -147,14 +149,51 @@ Pola yang paling menonjol adalah perbedaan antara deteksi dan pemulihan. Pada pe
 
 Ukuran efek pemulihan lebih kecil daripada deteksi dan bukti pada skenario B ($\delta = 0{,}48$) dan C ($\delta = 0{,}75$). Pola itu tidak seragam karena pada D dan E ukuran efek pemulihan tetap tinggi ($\delta = 1{,}00$ dan $0{,}86$; $\Delta$ median 5,05 dan 3,03 detik). Karena itu, pernyataan bahwa pemulihan lebih sulit dipisahkan antarmode hanya berlaku untuk B dan C, bukan untuk seluruh skenario.
 
+\subsection{Analisis Sensitivitas: Menyertakan \texttt{gitops-C-r02}}
+\label{subsec:sensitivitas-c}
+
+Analisis primer mengecualikan \texttt{gitops-C-r02} sebagai \texttt{batch\_stop} karena proses \textit{harness} berakhir dengan \textit{non-zero exit code}. Baris itu sendiri lengkap dan teramati: deteksi 0,98 detik, bukti 1,16 detik, pemulihan 5,77 detik, dan R1 100/75/100. Analisis sensitivitas menyertakan baris mentah tersebut pada perbandingan skenario C, tanpa mengubah berkas analisis beku. Karena \texttt{gitops-C-r01} tetap tidak tersedia, pasangan lengkap tidak terbentuk dan uji C tetap memakai Mann--Whitney U dengan 10 nilai imperatif versus 9 nilai GitOps.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Analisis sensitivitas skenario C dengan \texttt{gitops-C-r02} disertakan}
+  \label{tab:sensitivitas-c}
+  \begin{tabularx}{\textwidth}{|c|c|c|c|c|X|}
+    \hline
+    Luaran & $n$ (imperatif vs GitOps) & $p$ & $p$ (Holm) & $\delta$ & IK 95\% $\delta$ \\
+    \hline
+    Deteksi & 10 vs 9 & 0{,}0003 & 0{,}0034 & 1{,}00 & $[1{,}00;\,1{,}00]$ \\
+    \hline
+    Bukti & 10 vs 9 & 0{,}0003 & 0{,}0034 & 1{,}00 & $[1{,}00;\,1{,}00]$ \\
+    \hline
+    Pemulihan & 10 vs 9 & 0{,}0200 & 0{,}0391 & 0{,}64 & $[0{,}11;\,1{,}00]$ \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize Nilai $p$ bersifat dua sisi dan dikoreksi Holm pada keluarga dua belas hipotesis yang sama. Tabel ini adalah analisis sensitivitas; analisis primer tetap memakai 207 baris. Pada keluarga sensitivitas, nilai Holm pemulihan B juga naik dari 0,0195 menjadi 0,0391.\normalsize
+
+Pada deteksi dan bukti, ukuran efek tetap maksimum dan nilai $p$ terkoreksi turun menjadi 0,0034. Pada pemulihan, nilai $p$ terkoreksi naik menjadi 0,0391, ukuran efek turun dari 0,75 menjadi 0,64, dan batas bawah IK turun dari 0,25 menjadi 0,11. Kedua belas perbandingan tetap menolak hipotesis nol pada $\alpha=0{,}05$, sehingga arah kesimpulan tidak berubah. Namun klaim bahwa keunggulan pemulihan pada skenario C besar menjadi lebih lemah dan lebih sensitif terhadap satu baris. R1 skenario C tidak berubah karena \texttt{gitops-C-r02} berada pada blok R2.
+
+\noindent\footnotesize Skrip analisis sensitivitas berada di \path{experiments/sensitivity/} dan hanya membaca berkas mentah beku; berkas analisis primer tidak diubah.\normalsize
+
 \section{Pembahasan}
 
 Pada R1, kedua mode memulihkan bidang terkelola pada skenario B sampai F. Perbedaan muncul pada G ketika anotasi SealedSecret tidak dikembalikan oleh GitOps dalam 300 detik. Temuan itu menunjukkan bahwa kesetaraan akhir bergantung pada cakupan bidang yang diperiksa dan mekanisme yang bertanggung jawab, bukan hanya pada label mode. Skenario A tidak dapat dibaca sebagai keberhasilan ArgoCD karena replika dikendalikan HPA. Skenario F juga tidak boleh dilebur ke estimasi efikasi B sampai E karena keluarga uji telah ditetapkan sebelum pengumpulan.
 
 Pada R2, keunggulan waktu terbesar muncul pada deteksi dan ketersediaan bukti. Besarnya selisih sejalan dengan pemeriksaan berkala sebagai faktor desain, tetapi penelitian ini tidak dapat memisahkan kontribusi pemeriksaan berkala dari faktor lain. Pada pemulihan, keunggulan menyusut untuk B dan C tetapi tetap besar untuk D dan E. Kecepatan deteksi tidak otomatis berarti kecepatan pemulihan. Pemilihan mode sebaiknya mempertimbangkan skenario drift, lama penyimpangan yang dapat ditoleransi, dan jalur pemulihan yang tersedia.
 
-\input{diagrams/fig-analysis-flow}
-
 Gambar~\ref{fig:alur-analisis} menunjukkan bahwa akuntansi baris diselesaikan sebelum cabang R1 dan R2 dibentuk, sehingga tiga sel tanpa baris analisis tetap terlihat dan tidak diisi ulang. Pemisahan 5 pengulangan R1 dari 10 pengulangan R2 juga menjelaskan mengapa jumlah sel kedua cabang berbeda meskipun keduanya bertumpu pada himpunan baris yang telah diaudit.
 
 \section{Batas Interpretasi}
+
+\subsection{Kasus Batas G}
+
+Skenario G tidak membuktikan bahwa ArgoCD gagal memulihkan seluruh \textit{drift}. Temuan ini menunjukkan bahwa anotasi tambahan di luar bidang yang dikelola dapat bertahan meskipun objek lain sudah selaras. Mekanisme yang paling mungkin adalah cakupan \textit{diff} dan \textit{client-side apply}, tetapi mekanisme itu tidak diukur. Tidak ada bukti bahwa G disebabkan masalah izin, sehingga G tidak boleh dibaca sebagai kegagalan otorisasi. Batas ini sejalan dengan literatur GitOps: rekonsiliasi hanya menegakkan bidang yang dideklarasikan dan tercakup oleh pengendali \citep{argocd2024}.
+
+\subsection{Batas Klaim}
+
+Klaim penelitian ini dibatasi pada apparatus, protokol, dan cakupan bidang yang diuji. Besaran perbedaan waktu berlaku untuk satu \textit{stack} dan urutan lengan tetap; nilai $p$ bukan estimasi populasi. Analisis sensitivitas tidak mengubah arah kesimpulan, tetapi menunjukkan bahwa ukuran efek pemulihan pada skenario C bergantung pada satu baris. Karena itu, hasil tidak dapat dibaca sebagai keunggulan universal GitOps atau sebagai bukti bahwa prosedur imperatif selalu lebih lambat pada semua tahap.
+
+Batas ini juga berlaku pada cara membaca hasil. Keunggulan deteksi tidak otomatis berarti keunggulan pemulihan, dan dua skenario dengan efek pemulihan lebih kecil menunjukkan bahwa satu angka ringkas tidak cukup. Pembaca perlu memisahkan klaim deteksi, bukti, dan pemulihan, lalu membatasi klaim itu pada apparatus dan skenario yang diuji.

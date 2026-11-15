@@ -1,0 +1,26 @@
+flowchart LR
+  GIT["Repositori Git<br/>deklarasi beku"]
+  subgraph K8S["Klaster Kubernetes RKE2"]
+    ARGO["ArgoCD<br/>namespace argocd<br/>auto-sync, self-heal"]
+    WEB["InvenioRDM<br/>namespace invenio<br/>web, worker, scheduler<br/>HPA 2-4 replika"]
+    DATA["Layanan data<br/>PostgreSQL, OpenSearch,<br/>Redis"]
+    STORE["MinIO dan PVC<br/>penyimpanan persisten"]
+    PROM["Prometheus<br/>pemantauan metrik"]
+  end
+  GIT --> ARGO
+  ARGO --> WEB
+  WEB -->|"state"| DATA
+  WEB -->|"berkas"| STORE
+  WEB -. "metrik" .-> PROM
+  classDef ext fill:#eef2f7,stroke:#64748b,color:#14212b;
+  classDef gitops fill:#e8f0ff,stroke:#2563eb,color:#14212b;
+  classDef app fill:#e8f0ff,stroke:#2563eb,color:#14212b;
+  classDef data fill:#e7f7ed,stroke:#15803d,color:#14212b;
+  classDef obs fill:#f1eaff,stroke:#6d28d9,color:#14212b;
+  classDef store fill:#fff4d6,stroke:#a16207,color:#14212b;
+  class GIT ext;
+  class ARGO gitops;
+  class WEB app;
+  class DATA data;
+  class PROM obs;
+  class STORE store;

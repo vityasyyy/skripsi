@@ -73,6 +73,8 @@ python3 -B experiments/analysis/analyze_live.py \
   --out experiments/analysis-formal-20261029 --seed 20261029
 \end{lstlisting}
 
+Analisis sensitivitas untuk \texttt{gitops-C-r02} dijalankan terpisah dengan skrip di \path{experiments/sensitivity/}. Skrip tersebut hanya membaca berkas mentah beku dan tidak mengubah analisis primer; hasilnya dilaporkan pada Bab IV.
+
 \section{Skema Data per Run}
 
 Setiap run menulis satu berkas baris JSON dengan bidang berikut, dirangkum pada Tabel~\ref{tab:lampiran-skema}. Bidang waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
@@ -141,7 +143,7 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \hline
   Sensoring kanan & Dilaporkan sebagai tersensor, tidak diimputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
   \hline
-  Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang \\
+  Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; satu \textit{run} lengkap dengan \textit{non-zero exit code} diuji pada analisis sensitivitas Bab IV; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang; kesimpulan C lebih sensitif terhadap satu baris \\
   \hline
   Keluarga uji dua belas hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
   \hline
@@ -191,7 +193,7 @@ Kedua, pengamatan tersensor bukan pengamatan gagal. Apabila pemulihan belum terj
 
 \section{Sumber dan Lisensi Logo Diagram}
 
-Logo pada diagram disimpan lokal di \path{content/skripsi/diagrams/src/logos/} dan tidak diambil dari URL saat render. Semua logo digunakan tanpa modifikasi untuk mengidentifikasi komponen yang digambarkan; tidak ada klaim afiliasi atau dukungan. Tabel~\ref{tab:lampiran-logo} mencatat sumber dan ketentuan pemakaiannya.
+Direktori logo adalah \path{content/skripsi/diagrams/logos/}. Logo pada diagram tidak diambil dari URL saat render. Semua logo digunakan tanpa perubahan bentuk untuk mengidentifikasi komponen yang digambarkan; tidak ada klaim afiliasi atau dukungan. Logo InvenioRDM dipakai sebagai citra raster berlatar gelap agar bagian putihnya tetap terlihat. Mermaid tidak memuat logo lokal dengan path relatif saat render offline, sehingga logo menjadi legenda LaTeX di bawah gambar arsitektur. Tabel~\ref{tab:lampiran-logo} mencatat sumber dan ketentuan pemakaiannya.
 
 \begin{table}[H]
   \centering
@@ -202,17 +204,17 @@ Logo pada diagram disimpan lokal di \path{content/skripsi/diagrams/src/logos/} d
     \hline
     Logo & Berkas dan sumber & Lisensi atau ketentuan \\
     \hline
-    Kubernetes & \path{logos/kubernetes.svg}; CNCF artwork, \url{https://github.com/cncf/artwork} & Logo proyek CNCF; pedoman penggunaan merek The Linux Foundation. \\
+    Kubernetes & \path{logos/kubernetes.png}; CNCF artwork, \url{https://github.com/cncf/artwork} & Logo proyek CNCF; pedoman penggunaan merek The Linux Foundation. \\
     \hline
-    Argo CD & \path{logos/argo.svg}; CNCF artwork, \url{https://github.com/cncf/artwork} & Logo proyek Argo; pedoman penggunaan merek The Linux Foundation. \\
+    Argo CD & \path{logos/argocd.png}; CNCF artwork, \url{https://github.com/cncf/artwork} & Logo proyek Argo; pedoman penggunaan merek The Linux Foundation. \\
     \hline
-    Git & \path{logos/git.svg}; \url{https://git-scm.com/downloads/logos} & Logo Git oleh Jason Long; CC BY 3.0. \\
+    Git & \path{logos/git.png}; \url{https://git-scm.com/downloads/logos} & Logo Git oleh Jason Long; CC BY 3.0. \\
     \hline
-    InvenioRDM & \path{logos/invenio-rdm.svg}; \url{https://inveniosoftware.org/about/} & CC BY 4.0; CERN dan kontributor Invenio. \\
+    InvenioRDM & \path{logos/invenio-rdm.png}; raster dari \url{https://inveniosoftware.org/about/} & CC BY 4.0; CERN dan kontributor Invenio. \\
     \hline
-    Prometheus & \path{logos/prometheus.svg}; \url{https://github.com/prometheus/prometheus} & Logo proyek Prometheus; pedoman penggunaan merek The Linux Foundation. \\
+    Prometheus & \path{logos/prometheus.png}; \url{https://github.com/prometheus/prometheus} & Logo proyek Prometheus; pedoman penggunaan merek The Linux Foundation. \\
     \hline
-    MinIO & \path{logos/minio.svg}; \url{https://github.com/minio/minio} & Logo MinIO, Inc.; digunakan untuk identifikasi komponen. \\
+    MinIO & \path{logos/minio.png}; \url{https://github.com/minio/minio} & Logo MinIO, Inc.; digunakan untuk identifikasi komponen. \\
     \hline
   \end{tabularx}
 \end{table}

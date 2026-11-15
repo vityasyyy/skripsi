@@ -1,6 +1,19 @@
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{diagrams/fig-runtime-architecture.png}
-  \caption{Arsitektur runtime apparatus: Git sebagai sumber deklarasi, ArgoCD di dalam klaster, namespace \texttt{invenio} berisi InvenioRDM dan layanan data, Prometheus untuk metrik, serta MinIO dan PVC sebagai penyimpanan persisten.}
+  \includegraphics[width=\textwidth]{diagrams/fig-runtime-architecture.pdf}
+
+  \vspace{4pt}
+  {\scriptsize
+  \begin{tabular}{@{}cccccc@{}}
+    \includegraphics[height=9pt]{diagrams/logos/kubernetes.png} &
+    \includegraphics[height=9pt]{diagrams/logos/argocd.png} &
+    \includegraphics[height=9pt]{diagrams/logos/git.png} &
+    \includegraphics[height=9pt]{diagrams/logos/invenio-rdm.png} &
+    \includegraphics[height=9pt]{diagrams/logos/prometheus.png} &
+    \includegraphics[height=9pt]{diagrams/logos/minio.png} \\
+    Kubernetes & ArgoCD & Git & InvenioRDM & Prometheus & MinIO
+  \end{tabular}}
+
+  \caption{Arsitektur runtime apparatus: Git sebagai sumber deklarasi, ArgoCD di namespace \texttt{argocd}, InvenioRDM di namespace \texttt{invenio}, layanan data PostgreSQL, OpenSearch, dan Redis, Prometheus untuk pemantauan metrik, serta MinIO dan PVC sebagai penyimpanan persisten. Logo komponen dicantumkan sebagai legenda di bawah gambar.}
   \label{fig:arsitektur-runtime}
 \end{figure}
