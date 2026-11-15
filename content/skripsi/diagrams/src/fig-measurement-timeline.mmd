@@ -1,0 +1,15 @@
+sequenceDiagram
+  participant H as Harness
+  participant K as API Kubernetes
+  participant S as Sampler 1 s
+  participant P as Pemeriksa 5 s
+  participant A as ArgoCD
+  H->>K: t0: injeksi
+  K-->>H: ta: baca balik
+  S->>S: sampel 1 s
+  P->>P: bandingkan 5 s
+  A->>A: baca status
+  Note over S,P: sampler 1 s aktif sampai 300 s, pemeriksa 5 s pada mode imperatif
+  Note over K,A: td dari pemeriksa, status ArgoCD, atau HPA, te dapat mendahului td
+  Note over H,A: tr observasi cocok pertama, tr+1 observasi kedua
+  Note over H,A: 300 s tanpa dua observasi cocok: tersensor kanan, bukan nol

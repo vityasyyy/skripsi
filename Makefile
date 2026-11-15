@@ -10,7 +10,7 @@ help:
 	@echo "Local Compilation (requires texlive):"
 	@echo "  make proposal          - Compile content/proposal/main.tex"
 	@echo "  make skripsi           - Compile content/skripsi/main.tex"
-	@echo "  make skripsi-diagrams  - Render skripsi diagrams from local HTML/CSS (requires Chrome)"
+	@echo "  make skripsi-diagrams  - Render skripsi diagrams from local Mermaid sources (requires mmdc 11.15+ and Chrome)"
 	@echo "  make presentation      - Compile diagrams then presentation/proposal/main.tex (xelatex)"
 	@echo "  make presentation-skripsi - Compile diagrams then presentation/skripsi/main.tex (xelatex)"
 	@echo "  make presentation-diagrams - Compile only presentation diagrams"

@@ -1,0 +1,18 @@
+flowchart TB
+  subgraph IMP["Imperatif: pemeriksa 5 s dan runbook kubectl"]
+    direction LR
+    I1["Amati state aktual"] --> I2["Bandingkan dengan<br/>inventaris dan nilai deklarasi"] --> I3["Jalankan runbook<br/>kubectl tetap"]
+    I3 -. "setiap 5 s" .-> I1
+  end
+  subgraph GIT["GitOps: pengendali ArgoCD"]
+    direction LR
+    G1["Amati status live"] --> G2["Bandingkan dengan<br/>render deklarasi Git"] --> G3["Sync atau self-heal"]
+    G3 -. "berkelanjutan" .-> G1
+  end
+  IMP ~~~ GIT
+  classDef imp fill:#eef2f7,stroke:#64748b,color:#14212b;
+  classDef git fill:#e8f0ff,stroke:#2563eb,color:#14212b;
+  class I1,I2,I3 imp;
+  class G1,G2,G3 git;
+  style IMP fill:#ffffff,stroke:#94a3b8,stroke-dasharray:5 3
+  style GIT fill:#ffffff,stroke:#60a5fa,stroke-dasharray:5 3
