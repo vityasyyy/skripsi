@@ -1,0 +1,65 @@
+\documentclass[tikz,border=6pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{metricyellow}{RGB}{251,192,45}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.30cm,
+    box/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8,
+                text width=2.3cm, minimum height=1.62cm, align=center,
+                line width=0.8pt, font=\scriptsize, inner sep=3pt},
+    note/.style={rectangle, rounded corners=3pt, draw=gray!45, fill=gray!4,
+                 text width=4.0cm, align=left, font=\scriptsize, inner sep=5pt},
+    arrow/.style={-{Latex[length=2mm]}, line width=0.9pt, draw=gray!65}
+]
+
+\node[box=gitopsblue, text width=2.5cm] (stack) {
+    \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
+    \textbf{Satu stack}\\
+    InvenioRDM\\
+    27 objek render
+};
+\node[box=gitopsblue, right=of stack] (gitops) {
+    \includegraphics[height=9pt]{logos/argocd.png}\\[1pt]
+    \textbf{Lengan GitOps}\\
+    ArgoCD aktif\\
+    15 run
+};
+\node[box=manualgray, right=of gitops] (reset) {
+    \textbf{Reset baseline}\\
+    verifikasi inventaris\\
+    jeda 60 detik
+};
+\node[box=manualgray, right=of reset] (imperative) {
+    \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
+    \textbf{Lengan imperatif}\\
+    ArgoCD dijeda\\
+    checker + runbook
+};
+\node[box=metricyellow!85!black, right=of imperative, text width=2.5cm] (eval) {
+    \textbf{Evaluator}\\
+    R1 kesetaraan\\
+    R2 tiga waktu\\
+    kesehatan terpisah
+};
+
+\draw[arrow] (stack) -- (gitops);
+\draw[arrow] (gitops) -- (reset);
+\draw[arrow] (reset) -- (imperative);
+\draw[arrow] (imperative) -- (eval);
+
+\node[note, below=0.42cm of stack.south west, anchor=north west] (n1)
+    {\textbf{Bukan dua deployment.}\\Satu stack dipakai bergantian.};
+\node[note, below=0.42cm of reset.south, anchor=north] (n2)
+    {\textbf{HPA aktif di kedua lengan.}\\Skenario A adalah kontrol HPA.};
+\node[note, below=0.42cm of eval.south east, anchor=north east] (n3)
+    {\textbf{Tanpa waktu reaksi manusia.}\\Urutan lengan tetap dan tidak diacak.};
+
+\end{tikzpicture}
+\end{document}

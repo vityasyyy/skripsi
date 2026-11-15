@@ -7,6 +7,7 @@ on:
       - 'content/proposal/**'
       - 'content/skripsi/**'
       - 'presentation/proposal/**'
+      - 'presentation/skripsi/**'
       - 'docker/Dockerfile'
       - '.github/workflows/compile-latex.yml'
       - 'Makefile'
@@ -16,13 +17,14 @@ on:
       - 'content/proposal/**'
       - 'content/skripsi/**'
       - 'presentation/proposal/**'
+      - 'presentation/skripsi/**'
       - 'docker/Dockerfile'
       - '.github/workflows/compile-latex.yml'
       - 'Makefile'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   compile-proposal:
@@ -76,11 +78,34 @@ jobs:
           path: content/skripsi/main.pdf
           retention-days: 90
 
+  compile-presentation-skripsi:
+    runs-on: ubuntu-latest
+    name: Compile Skripsi Presentation
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile skripsi presentation with Docker
+        run: make presentation-skripsi-docker
+
+      - name: Upload skripsi presentation PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: skripsi-presentation-pdf
+          path: presentation/skripsi/build/main.pdf
+          retention-days: 90
+
   release:
-    needs: [compile-proposal, compile-skripsi, compile-presentation]
+    needs:
+      - compile-proposal
+      - compile-skripsi
+      - compile-presentation
+      - compile-presentation-skripsi
     runs-on: ubuntu-latest
     name: Create Release
     if: github.event_name == 'push'
+    permissions:
+      contents: write
     steps:
       - name: Download proposal PDF
         uses: actions/download-artifact@v4
@@ -94,24 +119,33 @@ jobs:
           name: skripsi-pdf
           path: skripsi-artifact
 
-      - name: Download presentation PDF
+      - name: Download proposal presentation PDF
         uses: actions/download-artifact@v4
         with:
           name: presentation-pdf
-          path: presentation-artifact
+          path: proposal-presentation-artifact
+
+      - name: Download skripsi presentation PDF
+        uses: actions/download-artifact@v4
+        with:
+          name: skripsi-presentation-pdf
+          path: skripsi-presentation-artifact
 
       - name: Rename PDFs for release
         run: |
           cp proposal-artifact/main.pdf proposal.pdf
           cp skripsi-artifact/main.pdf skripsi.pdf
-          cp presentation-artifact/main.pdf presentation.pdf
+          cp proposal-presentation-artifact/main.pdf proposal-presentation.pdf
+          cp skripsi-presentation-artifact/main.pdf skripsi-presentation.pdf
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: proposal-v${{ github.run_number }}
-          name: Proposal #${{ github.run_number }}
+          tag_name: tugas-akhir-v${{ github.run_number }}
+          name: Tugas Akhir
+          fail_on_unmatched_files: true
           files: |
             proposal.pdf
             skripsi.pdf
-            presentation.pdf
+            proposal-presentation.pdf
+            skripsi-presentation.pdf
