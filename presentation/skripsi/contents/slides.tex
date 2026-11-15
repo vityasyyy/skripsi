@@ -1,0 +1,718 @@
+\usetheme{ugm1}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{fix-cm}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,calc,arrows.meta}
+
+\hypersetup{
+    pdftitle={Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes},
+    pdfauthor={Muhammad Argya Vityasy},
+    pdfsubject={Sidang Skripsi},
+}
+\pdfstringdefDisableCommands{\def\translate#1{#1}}
+
+\definecolor{gitopsblue}{RGB}{51,108,229}
+\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{driftred}{RGB}{229,115,115}
+\definecolor{okgreen}{RGB}{76,175,80}
+
+% Judul lengkap harus muat di halaman sampul tema.
+\setbeamerfont{title}{size=\fontsize{13pt}{14.2}\selectfont,family=\gamasans,series=\bfseries}
+
+% -------------------------------------------------------
+% Presentation metadata
+% -------------------------------------------------------
+\title{\texorpdfstring{\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000 Perbandingan Terkontrol Paradigma \textit{Deployment} Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}{Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}}
+\subtitle{Sidang Skripsi\texorpdfstring{\\}{} Studi Kasus InvenioRDM}
+\author{Muhammad Argya Vityasy\texorpdfstring{\\[3pt]}{, }%
+NIM: 23/522547/PA/22475\texorpdfstring{\\[2pt]}{, }%
+Dosen Pembimbing: Guntur Budi Herwanto, S.Kom., M.Cs.\texorpdfstring{\\[2pt]}{, }%
+Dosen Penguji 1: Dr.\ techn.\ Kabul Kurniawan, S.Kom., M.Cs.\texorpdfstring{\\[2pt]}{, }%
+Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
+\date{2026}
+
+\graphicspath{{diagrams/}{../proposal/diagrams/}}
+\newcommand{\fullslidediagram}[2][0.68\textheight]{%
+    \includegraphics[width=0.96\textwidth,height=#1,keepaspectratio]{#2}%
+}
+\newcommand{\slidelead}[1]{%
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \small\bfseries #1
+    \end{beamercolorbox}
+}
+\newcommand{\smallnote}[1]{%
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.16cm, center, rounded=true]{frametitle}
+        \scriptsize #1
+    \end{beamercolorbox}
+}
+\setbeamertemplate{frametitle}{%
+    \vspace*{0.52cm}\hspace*{-0.25cm}%
+    \begin{beamercolorbox}[wd=0.82\textwidth, dp=0.12cm]{frametitle}
+        \usebeamerfont{frametitle}\insertframetitle\strut
+    \end{beamercolorbox}%
+    \vspace*{0.10cm}%
+}
+
+\begin{document}
+
+% =============================================
+% 1. Title
+% =============================================
+\begin{frame}
+    \titlepage
+\end{frame}
+
+% =============================================
+% 2. Problem
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Penyimpangan Konfigurasi Bukan Cacat Statis}
+    \begin{columns}[T]
+        \begin{column}{0.50\textwidth}
+            \scriptsize
+            \textbf{Drift} adalah ketidakcocokan keadaan aktual klaster dengan deklarasi acuan,
+            bukan penilaian atas kebenaran acuan.
+            \vspace{0.06cm}
+
+            \textbf{Dampaknya nyata:}
+            \begin{itemize}\setlength{\itemsep}{1pt}
+                \item 719 \textit{defect} konfigurasi pada 2.260 skrip Kubernetes;
+                      533 di antaranya (74,1\%) menyebabkan \textit{crash}, operasi salah, atau \textit{outage} (Zhang dkk., 2026).
+                \item \textit{Security misconfiguration} pada manifest \textit{open-source} berulang dalam 11 kategori (Rahman dkk., 2023).
+            \end{itemize}
+            \vspace{0.04cm}
+            \textbf{Pertanyaannya:} bagaimana dua prosedur pengelolaan merespons drift yang sama?
+        \end{column}
+        \begin{column}{0.46\textwidth}
+            \centering
+            \includegraphics[width=\columnwidth,height=0.50\textheight,keepaspectratio]{motivation-drift}
+        \end{column}
+    \end{columns}
+    \vspace{0.04cm}
+    \slidelead{Drift mengubah keadaan operasional yang harus dipulihkan.}
+\end{frame}
+}
+
+% =============================================
+% 3. Gap
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Celah: Perbandingan Terkontrol pada Workload Nyata}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Perbandingan sudah ada}
+            \begin{itemize}\setlength{\itemsep}{3pt}
+                \item Shrestha dan Ali (2024) membandingkan GitOps dan Ansible pada waktu induksi, deteksi, serta pemulihan.
+                \item Kagganti Nataraja (2025) menguji perbandingan terkontrol pada Minikube satu node.
+                \item Matubber (2025) mengevaluasi GitOps dengan pembanding semi-terotomasi.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Yang belum dipisahkan}
+            \begin{itemize}\setlength{\itemsep}{3pt}
+                \item Kesetaraan konfigurasi dari kesehatan layanan.
+                \item Sinyal deteksi dari ketersediaan bukti dan pemulihan.
+                \item \textit{Baseline} manual yang tetap dari kecepatan operator.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{0.10cm}
+    \slidelead{Kebutuhan: workload multi-service nyata, prosedur yang dapat diulang, dan metrik yang ditetapkan sebelum pengumpulan.}
+    \vspace{0.06cm}
+    \smallnote{Kontribusi bersifat terbatas: perbandingan pada apparatus yang diuji, bukan klaim superioritas universal.}
+\end{frame}
+}
+
+% =============================================
+% 4. Research questions
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Rumusan Masalah}
+    \vspace{0.04cm}
+    \slidelead{Bagaimana dua prosedur pengelolaan merespons penyimpangan konfigurasi pada satu stack InvenioRDM?}
+    \vspace{0.08cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.14cm, center, rounded=true]{structure}
+                \small\bfseries RQ1
+            \end{beamercolorbox}
+            \vspace{0.05cm}
+            \scriptsize
+            Bagaimana kesetaraan bidang konfigurasi yang ditetapkan dan kesehatan layanan berubah
+            setelah injeksi dan koreksi pada mode imperatif terotomasi dibandingkan dengan mode GitOps?
+            Kedua luaran dilaporkan secara terpisah.
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.14cm, center, rounded=true]{structure}
+                \small\bfseries RQ2
+            \end{beamercolorbox}
+            \vspace{0.05cm}
+            \scriptsize
+            Bagaimana distribusi waktu deteksi, waktu tersedianya bukti yang dapat diverifikasi,
+            dan waktu pemulihan konfigurasi penuh berbeda antara kedua mode pada setiap skenario?
+        \end{column}
+    \end{columns}
+    \vspace{0.12cm}
+    \smallnote{R1 = kesetaraan bidang; R2 = tiga luaran waktu. Skenario A, F, dan G dilaporkan terpisah. Atribusi pelaku mutasi tidak diukur karena audit API server tidak tersedia.}
+\end{frame}
+}
+
+% =============================================
+% 5. Design
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Desain: Satu Stack, Dua Lengan Berurutan}
+    \centering
+    \includegraphics[width=0.98\textwidth,height=0.40\textheight,keepaspectratio]{design}
+    \vspace{0.04cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Yang dikendalikan:} manifest, \textit{image}, instrumen, HPA, tujuh skenario, dan kondisi dasar.
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Yang membedakan:} mekanisme pengelolaan. ArgoCD aktif pada lengan GitOps;
+            ArgoCD dijeda dan pemeriksa \texttt{kubectl} bekerja pada lengan imperatif.
+        \end{column}
+    \end{columns}
+    \vspace{0.04cm}
+    \slidelead{Estimand: selisih antarmode pada apparatus ini, bukan efek universal paradigma.}
+\end{frame}
+}
+
+% =============================================
+% 6. Pipeline
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Pipeline Pengumpulan dan Analisis}
+    \centering
+    \includegraphics[width=0.98\textwidth,height=0.32\textheight,keepaspectratio]{pipeline}
+    \vspace{0.06cm}
+    \begin{columns}[T]
+        \begin{column}{0.32\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{structure}
+                \scriptsize\bfseries 210 sel
+            \end{beamercolorbox}
+            \vspace{0.03cm}
+            \scriptsize 7 skenario $\times$ 2 mode $\times$ 15 pengulangan: 10 protokol R2 dan 5 protokol R1.
+        \end{column}
+        \begin{column}{0.32\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{structure}
+                \scriptsize\bfseries 207 dianalisis
+            \end{beamercolorbox}
+            \vspace{0.03cm}
+            \scriptsize Empat baris mentah dikecualikan; tiga sel tanpa baris analisis; satu sel dianalisis lewat upaya ulang.
+        \end{column}
+        \begin{column}{0.32\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{structure}
+                \scriptsize\bfseries Analisis
+            \end{beamercolorbox}
+            \vspace{0.03cm}
+            \scriptsize Wilcoxon atau Mann-Whitney, koreksi Holm, Cliff's $\delta$, Kaplan-Meier dan RMST.
+        \end{column}
+    \end{columns}
+    \vspace{0.06cm}
+    \smallnote{Bekukan apparatus, gerbang kesiapan, jeda 60 detik, dan horizon pengamatan 300 detik. Tidak ada imputasi nilai hilang.}
+\end{frame}
+}
+
+% =============================================
+% 7. Drift scenarios
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Tujuh Skenario Penyimpangan}
+    \centering
+    \scriptsize
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.25cm}>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{5.25cm}@{}}
+        \toprule
+        \textbf{Skenario} & \textbf{Intervensi} & \textbf{Batas interpretasi} \\
+        \midrule
+        A & Menurunkan replika web ke 1 & Kontrol HPA; replika dikecualikan dari R1 \\
+        B & Mengubah tag \textit{image} kontainer web & Drift terkelola pada bidang \textit{image} \\
+        C & Mengubah nilai \texttt{INSTANCE\_TAGLINE} pada ConfigMap & Drift terkelola; deklarasi tidak diubah \\
+        D & Menghapus Deployment web & Pemulihan dinilai terhadap inventaris dan nilai dasar \\
+        E & Mengubah limit memori dari \texttt{2Gi} menjadi \texttt{1536Mi} & Hanya bidang yang ditetapkan yang dinilai \\
+        F & Mengubah \texttt{targetPort} Service dari \texttt{http} menjadi \texttt{65535} & Drift Service; dilaporkan terpisah dari keluarga B-E \\
+        G & Menambahkan anotasi metadata pada SealedSecret & Kasus deskriptif; mekanisme tidak diatribusikan \\
+        \bottomrule
+    \end{tabular}
+    \vspace{0.10cm}
+    \smallnote{A adalah kontrol HPA. F tidak masuk keluarga efikasi B-E. G tidak dipakai sebagai uji \textit{self-heal} ArgoCD.}
+\end{frame}
+}
+
+% =============================================
+% 8. R1 metric
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{R1: Kesetaraan Bidang Terpilih}
+    \begin{columns}[T]
+        \begin{column}{0.50\textwidth}
+            \scriptsize
+            \textbf{Empat sumber daya yang diperiksa}
+            \begin{itemize}\setlength{\itemsep}{1pt}
+                \item \texttt{Deployment/invenio-web}
+                \item \texttt{ConfigMap/}\\
+                      \texttt{invenio-app-config-6dg2chdbh4}
+                \item \texttt{Service/invenio-web}
+                \item \texttt{SealedSecret/invenio-app-secrets}
+            \end{itemize}
+            \vspace{0.06cm}
+            \textbf{Tiga titik pengamatan:} kondisi dasar, sampel lengkap pertama setelah injeksi, dan sampel lengkap terakhir.
+            \vspace{0.06cm}
+
+            \textbf{Bidang dinamis} seperti \texttt{/spec/replicas} dikecualikan karena dimiliki HPA.
+            Kesehatan layanan dilaporkan terpisah dan tidak masuk skor.
+        \end{column}
+        \begin{column}{0.46\textwidth}
+            \centering
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.28cm, center, rounded=true]{structure}
+                \normalsize
+                \[
+                    R1_{eq} =
+                    \frac{\text{cocok}}{\text{4}}
+                    \times 100\%
+                \]
+            \end{beamercolorbox}
+            \vspace{0.10cm}
+            \scriptsize
+            Cocok berarti jumlah sumber daya yang sesuai inventaris. Satu ketidakcocokan menghasilkan skor 75.
+            Status \textit{Synced} ArgoCD bukan pengganti aturan kesetaraan.
+        \end{column}
+    \end{columns}
+    \vspace{0.06cm}
+    \slidelead{Kesetaraan bidang tidak menilai kebenaran semantik.}
+\end{frame}
+}
+
+% =============================================
+% 9. R2 metric
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{R2: Deteksi, Bukti, dan Pemulihan}
+    \centering
+    \scriptsize
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.1cm}>{\raggedright\arraybackslash}p{9.8cm}@{}}
+        \toprule
+        \textbf{Kejadian} & \textbf{Definisi operasional} \\
+        \midrule
+        $t_0$ & Tepat sebelum perintah injeksi pertama dijalankan. \\
+        $t_d$ & Selesainya pembacaan atau evaluasi sinyal deteksi pertama yang memenuhi jendela. \\
+        $t_e$ & Selesainya evaluasi perbedaan bidang pertama yang mengidentifikasi sumber daya dan bidang berbeda. \\
+        $t_r$ & Observasi pertama ketika inventaris dan seluruh bidang R1 kembali cocok, dikonfirmasi observasi berikutnya. \\
+        \bottomrule
+    \end{tabular}
+    \par\vspace{0.22cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Durasi utama:} $t_d-t_0$, $t_e-t_0$, dan $t_r-t_0$.
+            Selang $t_e-t_d$ bertanda; nilai negatif berarti bukti mendahului sinyal deteksi dan tidak dibulatkan menjadi nol.
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Penyensoran:} titik akhir yang tidak tercapai dalam 300 detik dicatat tersensor kanan.
+            Waktu hilang tidak diimputasi nol dan bukan kegagalan instrumen.
+        \end{column}
+    \end{columns}
+    \vspace{0.06cm}
+    \smallnote{Sampler berjalan pada interval nominal 1 detik; pemeriksa imperatif pada interval nominal 5 detik.}
+\end{frame}
+}
+
+% =============================================
+% 10. Data and analysis
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Pengumpulan dan Analisis}
+    \begin{columns}[T]
+        \begin{column}{0.46\textwidth}
+            \centering
+            \scriptsize
+            \begin{tabular}{@{}lr@{}}
+                \toprule
+                \textbf{Kategori} & \textbf{Jumlah} \\
+                \midrule
+                Sel direncanakan & 210 \\
+                Sel terminal & 210 \\
+                Baris mentah & 211 \\
+                Baris analisis & 207 \\
+                Baris dieksklusi & 4 \\
+                \bottomrule
+            \end{tabular}
+            \par\vspace{0.10cm}
+            \raggedright
+            193 sel \textit{observed}, 15 tersensor kanan, dan 2 kegagalan instrumentasi.
+            Tiga sel tidak menghasilkan baris analisis; satu sel dianalisis lewat upaya ulang.
+            Tidak ada nilai yang diimputasi.
+        \end{column}
+        \begin{column}{0.50\textwidth}
+            \scriptsize
+            \textbf{Uji komparatif}
+            \begin{itemize}\setlength{\itemsep}{2pt}
+                \item Wilcoxon \textit{signed-rank} bila pasangan lengkap; Mann-Whitney U sebagai cadangan eksploratif.
+                \item Dua belas hipotesis B-E untuk deteksi, bukti, dan pemulihan; $\alpha=0{,}05$ dengan koreksi Holm.
+                \item Cliff's $\delta$ dengan interval kepercayaan \textit{bootstrap}; Kaplan-Meier dan RMST untuk data tersensor.
+            \end{itemize}
+            \vspace{0.04cm}
+            A, F, dan G dilaporkan di luar keluarga efikasi B-E.
+            Kegagalan dan penyensoran dilaporkan terbuka.
+        \end{column}
+    \end{columns}
+    \vspace{0.06cm}
+    \slidelead{Tidak ada nilai yang diimputasi; kegagalan dan penyensoran dilaporkan terbuka.}
+\end{frame}
+}
+
+% =============================================
+% 11. R1 results
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Hasil R1: Pola yang Sama, Satu Asimetri}
+    \centering
+    \scriptsize
+    \begin{tabular}{@{}cccc@{}}
+        \toprule
+        \textbf{Skenario} & \textbf{GitOps} & \textbf{Imperatif} & \textbf{Catatan} \\
+        \midrule
+        A & 100 / 100 / 100 & 100 / 100 / 100 & Replika dimiliki HPA \\
+        B & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
+        C & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
+        D & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
+        E & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
+        F & 100 / 75 / 100 & 100 / 75 / 100 & Drift Service \\
+        G & 100 / 75 / \textbf{75} & 100 / 75 / 100 & Anotasi SealedSecret \\
+        \bottomrule
+    \end{tabular}
+    \vspace{0.06cm}
+
+    \raggedleft\scriptsize Format: kondisi dasar / pascainjeksi / pascapemulihan. $n=5$ per skenario per mode.
+    \vspace{0.10cm}
+
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \raggedright\scriptsize
+            B sampai F kembali ke 100 pada kedua mode. A tetap 100 karena \texttt{/spec/replicas} dikecualikan dari pemeriksaan statis.
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \raggedright\scriptsize
+            G satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret dalam 300 detik. Mekanisme penyebabnya tidak diatribusikan.
+        \end{column}
+    \end{columns}
+    \vspace{0.04cm}
+    \slidelead{Pada bidang yang diuji, kedua mode mencapai keadaan akhir yang setara, dengan satu pengecualian deskriptif.}
+\end{frame}
+}
+
+% =============================================
+% 12. R2 results
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Hasil R2: Dua Belas Perbandingan Menolak H0}
+    \centering
+    \scriptsize
+    \begin{tabular}{@{}lcccc@{}}
+        \toprule
+        \textbf{Skenario} & \textbf{Deteksi $\delta$} & \textbf{Bukti $\delta$} & \textbf{Pemulihan $\delta$} & \textbf{$p$ Holm} \\
+        \midrule
+        B & 1,00 & 1,00 & 0,48 & 0,0176-0,0195 \\
+        C & 1,00 & 1,00 & 0,75 & 0,0054-0,0176 \\
+        D & 1,00 & 1,00 & 1,00 & 0,0054-0,0176 \\
+        E & 1,00 & 1,00 & 0,86 & 0,0176 \\
+        \bottomrule
+    \end{tabular}
+    \vspace{0.08cm}
+
+    \raggedleft\scriptsize
+    $n=10$ pasangan kecuali C (8 versus 10), D deteksi (4 versus 10), dan D bukti (8 versus 10).
+    \vspace{0.08cm}
+
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \raggedright\scriptsize
+            Semua dua belas perbandingan menolak hipotesis nol setelah koreksi Holm.
+            Nilai $p$ terkoreksi berkisar 0,0054 sampai 0,0195.
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \raggedright\scriptsize
+            Arah selisih positif berarti mode imperatif lebih lambat.
+            Uji Mann-Whitney dipakai pada C dan sebagian D karena pasangan lengkap tidak tersedia.
+        \end{column}
+    \end{columns}
+    \vspace{0.04cm}
+    \slidelead{Efek deteksi dan bukti maksimum; efek pemulihan lebih kecil pada B dan C, tetapi tetap tinggi pada D dan E.}
+\end{frame}
+}
+
+% =============================================
+% 13. R2 pattern
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Deteksi Cepat, Pemulihan Tidak Selalu}
+    \begin{columns}[T]
+        \begin{column}{0.55\textwidth}
+            \centering
+            \includegraphics[width=\columnwidth,height=0.62\textheight,keepaspectratio]{r2-gaps}
+        \end{column}
+        \begin{column}{0.41\textwidth}
+            \scriptsize
+            \textbf{Pola utama}
+            \begin{itemize}\setlength{\itemsep}{3pt}
+                \item Selisih median deteksi dan bukti B serta E: 4,0 sampai 4,3 detik.
+                \item Pemeriksa imperatif memakai interval nominal 5 detik.
+                      Kontribusi kausalnya tidak dapat diisolasi.
+                \item Pemulihan B 2,95 detik dan E 3,03 detik; D tetap 5,05 detik.
+                \item Deteksi cepat bukan jaminan pemulihan cepat.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{0.02cm}
+    \smallnote{Pola konsisten dengan mekanisme pengamatan, bukan bukti bahwa seluruh selisih berasal dari mekanisme itu.}
+\end{frame}
+}
+
+% =============================================
+% 14. Limitations
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Keterbatasan yang Membatasi Klaim}
+    \centering
+    \scriptsize
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{7.2cm}@{}}
+        \toprule
+        \textbf{Keterbatasan} & \textbf{Dampak pada klaim} \\
+        \midrule
+        Satu klaster, satu stack, satu implementasi GitOps & Tidak dapat digeneralisasi ke semua organisasi atau alat GitOps \\
+        Lengan berurutan dan urutan tetap & Efek periode dan efek urutan tidak dapat dipisahkan dari efek mode \\
+        Sampler 1 detik, pemeriksa 5 detik, horizon 300 detik & Ketelitian waktu terbatas pada resolusi instrumen \\
+        15 pengulangan per sel & Bukan jaminan daya statistik per skenario \\
+        R1 mengukur kesetaraan bidang & Tidak menilai kebenaran semantik atau keamanan konfigurasi \\
+        Atribusi pelaku mutasi tidak diukur & Audit API server tidak tersedia; pelaku mutasi tidak dapat dihubungkan dengan perubahan \\
+        G dan HPA & G tidak dapat digeneralisasi; HPA dibatasi 4 replika \\
+        \bottomrule
+    \end{tabular}
+    \vspace{0.08cm}
+    \slidelead{Hasil berlaku untuk apparatus, protokol, dan cakupan bidang yang benar-benar diuji.}
+\end{frame}
+}
+
+% =============================================
+% 15. Conclusion RQ1
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Kesimpulan RQ1: Kesetaraan Bidang}
+    \scriptsize
+    \begin{itemize}\setlength{\itemsep}{5pt}
+        \item Pada skenario B sampai F, kedua mode menurunkan skor dari 100 ke 75 saat drift terdeteksi, lalu kembali ke 100 setelah pemulihan.
+        \item Skenario A tetap 100 karena \texttt{/spec/replicas} dimiliki HPA. Ini kontrol HPA, bukan bukti keunggulan ArgoCD.
+        \item Skenario G adalah satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret dalam 300 detik, sedangkan prosedur imperatif melakukannya.
+        \item Mekanisme G tidak diatribusikan, sehingga G dilaporkan deskriptif dan tidak digabungkan ke estimasi efikasi B-E.
+        \item Kesetaraan skor tidak membuktikan kebenaran semantik. Kedua mode dapat mencapai keadaan yang identik dan sama-sama salah bila deklarasi sumbernya keliru.
+    \end{itemize}
+    \vspace{0.12cm}
+    \slidelead{Pada cakupan bidang yang diuji, kedua mode mencapai keadaan akhir yang setara, dengan satu pengecualian deskriptif.}
+\end{frame}
+}
+
+% =============================================
+% 16. Conclusion RQ2
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Kesimpulan RQ2: Tiga Waktu yang Berbeda}
+    \scriptsize
+    \begin{itemize}\setlength{\itemsep}{5pt}
+        \item Dua belas perbandingan B sampai E menolak hipotesis nol setelah koreksi Holm, dengan $p$ terkoreksi 0,0054 sampai 0,0195.
+        \item Deteksi dan bukti mencapai ukuran efek maksimum ($\delta=1{,}00$). Selisih median B dan E berada pada 4,0 sampai 4,3 detik, dekat dengan interval nominal pemeriksa 5 detik.
+        \item Pemulihan lebih sulit dipisahkan pada B ($\delta=0{,}48$) dan C ($\delta=0{,}75$), tetapi tetap besar pada D ($\delta=1{,}00$) dan E ($\delta=0{,}86$).
+        \item Kecepatan deteksi tidak otomatis berarti kecepatan pemulihan. Pemilihan mode perlu mempertimbangkan skenario drift dan lama penyimpangan yang dapat ditoleransi.
+        \item Tidak ada klaim superioritas umum, kelayakan adopsi, atau kesetaraan semantik konfigurasi.
+    \end{itemize}
+    \vspace{0.12cm}
+    \slidelead{Kecepatan deteksi bukan pengganti jalur pemulihan yang teruji.}
+\end{frame}
+}
+
+% =============================================
+% 17. Future work
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Pekerjaan Lanjutan}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Memisahkan variabel}
+            \begin{itemize}\setlength{\itemsep}{4pt}
+                \item Replikasi pada tiga stack terisolasi untuk memisahkan efek urutan dari efek mode.
+                \item Sampling sub-detik dan jam presisi untuk memisahkan mekanisme pengamatan dari ketanggapan pengendali.
+                \item Menambah pengulangan berdasarkan daya yang teramati.
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \scriptsize
+            \textbf{Memperluas cakupan}
+            \begin{itemize}\setlength{\itemsep}{4pt}
+                \item Beban pengguna yang realistis dan pengukuran kesehatan layanan.
+                \item Perbandingan beberapa implementasi GitOps, misalnya Flux dan ArgoCD.
+                \item Infrastruktur cadangan independen dan skenario drift berganda.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{0.16cm}
+    \slidelead{Prioritas: memisahkan variabel yang belum dapat dipisahkan, bukan menambah pengamatan pada apparatus yang sama.}
+\end{frame}
+}
+
+% =============================================
+% 18. Closing
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Terima Kasih}
+    \vspace{0.16cm}
+    \begin{enumerate}\setlength{\itemsep}{7pt}
+        \item \textbf{Perbandingan terkontrol pada workload multi-service nyata:} satu stack InvenioRDM, dua lengan berurutan, tujuh skenario drift.
+        \item \textbf{Protokol yang dapat diaudit:} definisi R1 dan R2, penanganan data tersensor, dan keluarga uji yang ditetapkan sebelum pengumpulan.
+        \item \textbf{Hasil yang dibatasi:} kesetaraan bidang tercapai pada B sampai F, dengan satu asimetri deskriptif pada G; deteksi cepat tidak selalu diikuti pemulihan cepat.
+    \end{enumerate}
+    \vspace{0.18cm}
+    \begin{beamercolorbox}[wd=0.92\textwidth, sep=0.20cm, center, rounded=true]{structure}
+        \normalsize\bfseries Diskusi dan pertanyaan
+    \end{beamercolorbox}
+\end{frame}
+}
+
+% =============================================
+% BACKUP SLIDES
+% =============================================
+\appendix
+
+% ---------------------------------------------
+% B1: Why only R1 and R2
+% ---------------------------------------------
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Backup: Batas Pengukuran}
+    \small
+    \begin{itemize}\setlength{\itemsep}{6pt}
+        \item Atribusi pelaku mutasi memerlukan audit API server untuk menghubungkan perubahan dengan pelakunya.
+        \item Audit API server tidak tersedia pada lingkungan penelitian, sehingga atribusi tidak dapat diukur.
+        \item Memaksakan metrik atribusi akan menghasilkan klaim yang tidak dapat diverifikasi. Karena itu, atribusi dilaporkan sebagai keterbatasan.
+        \item R1 dan R2 tetap dapat diukur dengan aturan yang sama pada kedua mode dan didefinisikan sebelum pengumpulan.
+    \end{itemize}
+    \vspace{0.12cm}
+    \slidelead{Ketiadaan atribusi adalah batas apparatus, bukan hasil yang disembunyikan.}
+\end{frame}
+}
+
+% ---------------------------------------------
+% B2: Cell accounting
+% ---------------------------------------------
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Backup: Akuntansi Sel dan Data Tersensor}
+    \centering
+    \scriptsize
+    \begin{tabular}{@{}lr>{\raggedright\arraybackslash}p{8.2cm}@{}}
+        \toprule
+        \textbf{Kategori} & \textbf{Jumlah} & \textbf{Komposisi} \\
+        \midrule
+        Sel direncanakan & 210 & 7 skenario $\times$ 2 mode $\times$ 15 pengulangan \\
+        Sel terminal & 210 & 193 \textit{observed}, 15 tersensor kanan, 2 kegagalan instrumentasi \\
+        Baris mentah & 211 & 210 sel ditambah satu upaya \textit{baseline} yang gagal \\
+        Baris analisis & 207 & 192 \textit{observed}, 15 tersensor kanan \\
+        Baris dieksklusi & 4 & 2 kegagalan instrumentasi, 1 \textit{batch stop}, 1 \textit{baseline failure} \\
+        \bottomrule
+    \end{tabular}
+    \par\vspace{0.30cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \raggedright\scriptsize
+            Tiga sel tidak menghasilkan baris analisis. Satu sel, \texttt{gitops-C-r08}, dianalisis melalui upaya ulang setelah kegagalan \textit{baseline} pra-injeksi.
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \raggedright\scriptsize
+            Seluruh 15 kejadian sensoring pemulihan berasal dari mode GitOps pada skenario G. Tidak ada nilai tersensor yang diubah menjadi kegagalan atau nol.
+        \end{column}
+    \end{columns}
+\end{frame}
+}
+
+% ---------------------------------------------
+% B3: Scenario G
+% ---------------------------------------------
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Backup: Mengapa Skenario G Deskriptif?}
+    \small
+    \begin{itemize}\setlength{\itemsep}{6pt}
+        \item Intervensi G adalah anotasi metadata pada SealedSecret; nilai \texttt{spec.encryptedData} tidak dibaca atau ditulis.
+        \item Lengan imperatif memulihkan anotasi melalui pemeriksa generik. Lengan GitOps tidak memulihkannya dalam 300 detik.
+        \item Keluaran baris mencatat \texttt{recovery\_controller} sebagai \texttt{unattributed}.
+        \item Penelitian ini tidak menyimpulkan apakah penyebabnya cakupan bidang ArgoCD, perilaku pengendali SealedSecret, atau faktor lain.
+        \item Karena mekanismenya tidak teratribusi, G tidak dipakai sebagai uji \textit{self-heal} dan tidak digabungkan ke keluarga B-E.
+    \end{itemize}
+\end{frame}
+}
+
+% ---------------------------------------------
+% B4: Main references
+% ---------------------------------------------
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Backup: Rujukan Utama}
+    \scriptsize
+    \begin{itemize}\setlength{\itemsep}{4pt}
+        \item Kagganti Nataraja, P. (2025). \textit{A Security-Centric Analysis of Declarative and Imperative Deployment Approaches in Kubernetes-Based Application Environments}. National College of Ireland.
+        \item Matubber, M. E. (2025). \textit{Managing 5G Kubernetes Infrastructures Using GitOps Principles}. KTH Royal Institute of Technology.
+        \item Pohjola, O. (2025). \textit{Mitigating Configuration Drift in Infrastructure-as-Code Systems}. Aalto University.
+        \item Rahman, A., Shamim, S. I., Bose, D. B., dkk. (2023). Security Misconfigurations in Open Source Kubernetes Manifests: An Empirical Study. \textit{ACM TOSEM}.
+        \item Shrestha, R. dan Ali, A. A. N. (2024). Configuration Management in Kubernetes Environments: A GitOps Approach. \textit{IEEE/ACM UCC}.
+        \item Zhang, Y., Paul, U., d'Amorim, M., dan Rahman, A. (2026). Configuration Defects in Kubernetes. \textit{IEEE TSE}, 52(3), 1125-1144.
+    \end{itemize}
+\end{frame}
+}
+
+\end{document}
