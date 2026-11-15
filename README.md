@@ -1,10 +1,10 @@
-# Skripsi: Perbandingan Terkontrol Prosedur Imperatif Terotomasi dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes
+# Skripsi: Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes
 
 > Studi Kasus InvenioRDM | Departemen Ilmu Komputer dan Elektronika, FMIPA UGM
 
-Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol prosedur imperatif terotomasi dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM.
+Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma deployment manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM. Baseline manual direpresentasikan oleh prosedur imperatif terotomasi berbasis kubectl; waktu reaksi manusia tidak diukur.
 
-> **Status metode:** Proposal yang telah diterima tetap dapat ditelusuri melalui riwayat Git. Penyesuaian metode pada `content/proposal/` dan `content/skripsi/` adalah **draf untuk tinjauan pemilik/pembimbing**, bukan persetujuan eksperimen formal. Mode imperatif terotomasi dan GitOps dijalankan berurutan pada satu stack InvenioRDM produksi-like; HPA normal aktif pada kedua mode dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. R3 tidak diukur karena audit API server tidak tersedia. Harness live dan protokol kolektor ada di [`experiments/live/README.md`](experiments/live/README.md) dan [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md); hasil pilot bukan data formal.
+> **Status metode:** Kedua mode dijalankan berurutan pada satu stack InvenioRDM produksi-like; HPA normal aktif pada kedua mode dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Harness live dan protokol kolektor ada di [`experiments/live/README.md`](experiments/live/README.md) dan [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md).
 
 ---
 
@@ -26,12 +26,16 @@ Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi*
 # Lokal
 make proposal          # Kompilasi proposal
 make skripsi           # Kompilasi skripsi
-make all               # Kompilasi keduanya
+make presentation      # Kompilasi deck proposal
+make presentation-skripsi # Kompilasi deck sidang skripsi
+make all               # Kompilasi proposal, skripsi, dan kedua deck
 make clean             # Bersihkan file build
 
 # Docker (tidak perlu texlive)
 make proposal-docker
 make skripsi-docker
+make presentation-docker
+make presentation-skripsi-docker
 make all-docker
 ```
 
@@ -74,6 +78,10 @@ skripsi/
 │       ├── lampiran/
 │       └── references.bib
 │
+├── presentation/
+│   ├── proposal/                    # Deck proposal
+│   └── skripsi/                     # Deck sidang skripsi
+│
 ├── docker/
 │   └── Dockerfile                  # LaTeX build image
 ├── .github/
@@ -88,16 +96,23 @@ skripsi/
 
 ## CI/CD
 
-Setiap push ke `main`/`master` yang mengubah file `.tex`, `.bib`, atau `.cls` akan memicu GitHub Actions untuk mengompilasi proposal dan skripsi secara otomatis. PDF hasil kompilasi tersedia sebagai artifact yang bisa diunduh dari halaman Actions.
+Setiap push ke `main`/`master` yang mengubah berkas LaTeX, `Makefile`, atau workflow akan memicu GitHub Actions untuk mengompilasi proposal, skripsi, deck proposal, dan deck sidang skripsi. Empat PDF tersedia sebagai artifact di halaman Actions. Pada push, workflow juga membuat rilis GitHub bernama **Tugas Akhir** dengan aset `proposal.pdf`, `skripsi.pdf`, `proposal-presentation.pdf`, dan `skripsi-presentation.pdf`.
 
 ---
 
 ## Topik Penelitian
 
-- **Judul:** Perbandingan Terkontrol Prosedur Imperatif Terotomasi dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes: Studi Kasus InvenioRDM
-- **Pendekatan:** Studi kasus komparatif terkontrol dengan dua mode pengelolaan berurutan pada satu stack InvenioRDM produksi-like; tidak ada stack kembar atau eksekusi paralel
-- **Metrik:** R1 konsistensi deployment dan R2 waktu deteksi, ketersediaan bukti, serta pemulihan drift. R3 (traceability) tidak diukur karena audit API server tidak tersedia dan dilaporkan sebagai keterbatasan
 - **Teknologi:** Kubernetes, ArgoCD, InvenioRDM, Helm, kubectl
+
+---
+
+## Deck Sidang
+
+`presentation/skripsi/main.pdf` adalah deck sidang skripsi 22 halaman. Build lokal: `make presentation-skripsi`; build Docker: `make presentation-skripsi-docker`.
+
+## Release
+
+Push ke `main` yang menyentuh konten tugas akhir menjalankan empat kompilasi dan membuat release **Tugas Akhir** dengan aset `proposal.pdf`, `skripsi.pdf`, `proposal-presentation.pdf`, dan `skripsi-presentation.pdf`.
 
 ---
 
