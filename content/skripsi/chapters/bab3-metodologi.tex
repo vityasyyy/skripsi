@@ -20,6 +20,8 @@ Unit analisis adalah satu injeksi penyimpangan yang diterima pada satu mode dala
 
 Kedua mode memakai beban uji, nilai dasar, definisi bidang yang diperiksa, serta prosedur injeksi dan pengukuran yang setara, dan injeksi dilakukan satu per satu, bukan serentak. \textit{Seed} \texttt{20261029} mengacak urutan lengan dan satu permutasi skenario, sehingga urutan lengan menjadi GitOps lalu imperatif dan urutan skenario E, A, G, D, C, F, B sama untuk kedua lengan. Urutan tersebut tidak diacak ulang per blok, dan setiap sel didahului gerbang kondisi dasar. Manifest mencatat 207 jeda 60 detik yang diterapkan, termasuk satu jeda menuju upaya retry \texttt{C-r08}, sedangkan tiga transisi antarsel yang bertepatan dengan penghentian/restart batch tidak memiliki catatan jeda. Karena itu, naskah tidak mengklaim setiap sel dipisahkan 60 detik. Pengendali koreksi hanya menerima keadaan aktual dan deklarasi yang diperlukan untuk membandingkannya. Identitas skenario tidak diteruskan sebagai label, termasuk pada skenario SealedSecret. Rancangan ini membandingkan dua implementasi operasional yang telah ditentukan, tetapi tidak mengisolasi seluruh faktor yang mungkin membedakan setiap produk atau organisasi.
 
+\input{diagrams/fig-deployment-reconciliation}
+
 \begin{figure}[H]
   \centering
   \begin{tikzpicture}[
@@ -49,30 +51,7 @@ Gambar~\ref{fig:arsitektur-eksperimen} menunjukkan bahwa injeksi, mekanisme peng
 
 Tahapan yang dijalankan meliputi pembakuan protokol, pembekuan sumber dan versi, validasi instrumen melalui tiga pilot pada stack yang sama, pengumpulan formal pada 29--30 Oktober 2026 (UTC), dan analisis per skenario, dengan Pilot 3 sebagai pilot yang relevan dengan definisi final. Pilot 1 dan Pilot 2 diarsipkan karena apparatus atau definisi skenarionya berubah. Tidak ada pilot yang dipool ke batch formal. Surrogat S1/S2 merupakan artefak historis/offline, dan keduanya tidak dipakai dalam desain formal serta tidak masuk ke sampel formal.
 
-\begin{figure}[H]
-  \centering
-  \begin{tikzpicture}[
-    process-box/.style={draw, rounded corners, align=center, text width=4.6cm, minimum height=10mm, font=\small},
-    flow/.style={-{Stealth[length=2mm]}, thick},
-    node distance=5mm
-  ]
-    \node[process-box] (freeze) {Pembekuan apparatus};
-    \node[process-box, below=of freeze] (ready) {Gerbang kesiapan stack};
-    \node[process-box, below=of ready] (git) {Blok GitOps: injeksi\\dan pengukuran per run};
-    \node[process-box, below=of git] (resetA) {Reset dan verifikasi\\kondisi dasar};
-    \node[process-box, below=of resetA] (imp) {Blok imperatif: ArgoCD dijeda,\\injeksi dan pengukuran per run};
-    \node[process-box, below=of imp] (restore) {Pemulihan ArgoCD};
-    \node[process-box, below=of restore] (analyze) {Analisis per skenario\\dan penanganan tersensor};
-    \draw[flow] (freeze) -- (ready);
-    \draw[flow] (ready) -- (git);
-    \draw[flow] (git) -- (resetA);
-    \draw[flow] (resetA) -- (imp);
-    \draw[flow] (imp) -- (restore);
-    \draw[flow] (restore) -- (analyze);
-  \end{tikzpicture}
-  \caption{Bagan alir pelaksanaan batch formal: pembekuan apparatus, blok GitOps, reset, blok imperatif, pemulihan ArgoCD, lalu analisis; tanpa surrogat.}
-  \label{fig:bagan-alir-eksperimen}
-\end{figure}
+\input{diagrams/fig-pipeline}
 
 Gambar~\ref{fig:bagan-alir-eksperimen} menempatkan pembekuan apparatus dan validasi sebelum pengumpulan data formal, serta mensyaratkan pemulihan kondisi dasar di antara pengulangan. Tidak ada jeda buatan setelah injeksi untuk menunggu respons manusia, dan batas pengamatan 300 detik dipakai pada setiap run.
 
@@ -83,6 +62,8 @@ Pengujian formal menggunakan beban uji komposit multi-service InvenioRDM, dan re
 Rancangan membatasi pengujian pada satu klaster Kubernetes, satu stack InvenioRDM produksi-like di namespace \texttt{invenio}, dan satu implementasi GitOps, yaitu ArgoCD. Tidak ada stack atau \textit{deployment} kembar, dan tidak ada eksekusi paralel; nama \texttt{exp-invenio-drift} muncul sebagai namespace karantina yang diperiksa agar tidak berisi residu, bukan sebagai lengan kedua. Spesifikasi yang tercatat adalah konteks yang dilaporkan pemilik, bukan hasil verifikasi ulang pada saat batch. Nilai yang pernah disebut sebagai sasaran pada draf sebelumnya tidak dipakai sebagai fakta eksperimen. Karena satu stack dipakai bergantian, komponen infrastruktur bersama tidak dapat diisolasi dari perlakuan, dan injeksi serta koreksi dibatasi pada objek dalam kontrak bidang.
 
 Konteks \textit{deployment} yang dilaporkan pemilik adalah Kubernetes 1.32.6/RKE2, containerd, dan Ubuntu 24.04; naskah tidak mengklaim verifikasi ulang runtime di luar catatan batch. Penunjuk \texttt{experiments/deployment-source.json} memuat revisi referensi \texttt{6cacea6642a7c1690243d3b54130fa08216a9595} dan secara eksplisit berstatus \texttt{reference\_only\_not\_a\_deployed\_revision\_attestation}. Batch formal mencatat revisi sumber GitOps \texttt{81ddd25\ldots} dan render SHA-256 \texttt{a5efd711\ldots}, dengan nilai lengkapnya pada Bab IV; revisi referensi bukan atestasi revisi yang diterapkan. Application \texttt{argocd/apps/invenio-bootstrap.yaml} memilih \texttt{k8s/apps/invenio/kustomization.yaml}, dan tidak dibuat sumber manifest editable kedua di repositori penelitian.
+
+\input{diagrams/fig-runtime-architecture}
 
 \subsection{Gerbang Kesiapan}
 
@@ -122,6 +103,8 @@ Intervensi adalah satu perubahan terkontrol terhadap keadaan sumber daya dalam s
   \end{tabularx}
 \end{table}
 
+\input{diagrams/fig-drift-scenarios}
+
 Pada skenario A, \texttt{/spec/replicas} web dimiliki HPA dan dikecualikan dari kesetaraan statis, sehingga respons diukur terhadap keputusan HPA yang teramati, bukan angka replika tetap. Tidak adanya status OutOfSync tidak berarti deteksi nol, dan HPA dapat memulihkan replika tanpa sinyal ArgoCD. Hasil A dilaporkan sebagai kontrol HPA terpisah dan tidak dipakai sebagai ukuran efikasi ArgoCD atau imperatif. HPA web dibatasi 2--4 replika dan pada beban tinggi pernah mencapai plafon 4, sehingga A hanya menguji pemulihan replika yang diturunkan ke 1, di bawah minimum 2. HPA mengembalikannya ke rentang 2--4. A tidak menguji perilaku di atas \texttt{maxReplicas}=4. A juga tidak dapat memisahkan kerja HPA dari efek beban yang sedang berlangsung.
 
 Pada skenario F, intervensi adalah perubahan \texttt{targetPort} pada \texttt{Service/invenio-web} yang dideklarasikan, bukan pembuatan sumber daya di luar cakupan aplikasi. Bidang tersebut berada dalam jangkauan kedua mode, dan pemulihan F juga mensyaratkan tidak ada residu di namespace karantina \texttt{exp-invenio-drift}; pemeriksaan residu ini adalah pengamanan apparatus, bukan intervensi tambahan. F dilaporkan terpisah dan tidak digabungkan ke estimasi utama B--E karena keluarga dua belas hipotesis telah ditetapkan sebelum pengumpulan. Label internal \texttt{visibility\_boundary} pada keluaran analisis adalah sisa definisi lama. Label itu tidak dipakai sebagai deskripsi intervensi dalam naskah.
@@ -156,6 +139,8 @@ Semua waktu berasal dari satu kolektor pada host pencatat, dan setiap kejadian d
 \end{itemize}
 
 Durasi utama adalah waktu deteksi $t_d-t_0$, waktu ketersediaan bukti $t_e-t_0$, dan waktu pemulihan konfigurasi penuh $t_r-t_0$. Selang $t_e-t_d$ didefinisikan bertanda dan dapat dilaporkan: nilai positif berarti bukti tersedia setelah sinyal deteksi, nilai nol berarti keduanya selesai bersamaan, dan nilai negatif berarti bukti teramati sebelum sinyal deteksi. Nilai negatif bukan durasi yang tidak fisis dan tidak boleh dibulatkan menjadi nol. $t_r$ berarti pemulihan kesetaraan inventaris dan bidang yang diukur, bukan klaim bahwa seluruh layanan sehat atau tidak mengalami dampak lain.
+
+\input{diagrams/fig-measurement-timeline}
 
 Sinyal deteksi mode imperatif berasal dari pemeriksaan otomatis terhadap keadaan aktual pada interval nominal lima detik; setelah sinyal muncul, prosedur koreksi tetap menerapkan deklarasi yang diinginkan menggunakan tindakan \texttt{kubectl} yang telah ditetapkan. Mode GitOps menggunakan rekonsiliasi ArgoCD. Sampler satu detik mengamati status aplikasi, sehingga waktu deteksi GitOps dibatasi oleh resolusi sampler dan oleh kapan ArgoCD melaporkan status yang berbeda. Interval rekonsiliasi internal ArgoCD tidak diukur secara terpisah, sehingga kontribusinya tidak dapat dipisahkan dari resolusi sampler. Kedua prosedur berjalan otomatis tanpa waktu reaksi manusia dan tanpa jeda buatan. Keputusan koreksi menggunakan hasil perbandingan umum, bukan label A--G yang disembunyikan dari responden.
 

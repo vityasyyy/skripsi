@@ -69,6 +69,8 @@ Pengendali deklaratif secara berkala membandingkan keadaan aktual dengan keadaan
 
 Perintah imperatif tidak dengan sendirinya menyediakan rekonsiliasi berkelanjutan, tetapi prosedur imperatif dapat diotomasi dengan pemeriksaan berkala dan tindakan koreksi yang telah ditentukan. Penelitian ini membandingkan prosedur \texttt{kubectl} terotomasi dengan ArgoCD, bukan respons manusia. Karena itu, perbedaan waktu tidak ditafsirkan sebagai perbedaan kecepatan operator.
 
+\input{diagrams/fig-control-loop}
+
 \subsection{\textit{Audit Trail} sebagai \textit{Social Control Mechanism}}
 
 Riwayat Git dapat menyediakan metadata dan perubahan deklarasi \citep{chacon2014git}, sedangkan log pengendali dan audit API dapat memberi bukti tambahan tentang penerapan aktual. Riwayat tersebut tidak otomatis membuktikan siapa yang melakukan perubahan pada klaster atau apakah semua tindakan terekam. Kelengkapan bergantung pada tata kelola repositori, identitas, konfigurasi audit, dan pengumpulan bukti. Namun, R3 tidak diukur dalam penelitian ini karena audit API server Kubernetes tidak tersedia. Keterlacakan dibahas sebagai keterbatasan dan pekerjaan lanjutan, bukan sebagai hasil.

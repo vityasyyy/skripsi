@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Dua siklus kendali</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .diagram { height: 1010px; padding: 54px 64px 48px; }
+
+  .panel {
+    position: absolute;
+    top: 226px;
+    width: 720px;
+    height: 670px;
+    padding: 26px 28px 24px;
+  }
+  .panel.left { left: 64px; border-top: 8px solid #475569; }
+  .panel.right { left: 816px; border-top: 8px solid #2563eb; }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 92px;
+    padding-bottom: 18px;
+    border-bottom: 1.5px solid #e2e8f0;
+  }
+  .panel-head .logos { display: flex; align-items: center; gap: 10px; }
+  .panel-head h2 { margin: 0; font-size: 33px; line-height: 1.1; letter-spacing: -0.3px; }
+  .panel-head .mode { margin-top: 5px; color: #64748b; font-size: 22px; }
+
+  .meta { display: flex; gap: 10px; margin: 16px 0 12px; flex-wrap: wrap; }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    min-height: 104px;
+    padding: 14px 18px;
+    border: 1.5px solid #dde5ee;
+    border-left: 7px solid #94a3b8;
+    border-radius: 13px;
+    background: #fbfdff;
+  }
+  .panel.right .step { border-left-color: #60a5fa; }
+  .step .num {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    background: #eef2f6;
+    color: #334155;
+    font-size: 25px;
+    font-weight: 800;
+  }
+  .panel.right .step .num { background: #e8f0ff; color: #1d4ed8; }
+  .step h3 { margin: 0 0 3px; font-size: 28px; line-height: 1.1; }
+  .step p { margin: 0; color: #52606d; font-size: 24px; line-height: 1.25; }
+
+  .return {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 48px;
+    margin-top: 12px;
+    border: 1.6px dashed #94a3b8;
+    border-radius: 999px;
+    color: #334155;
+    font-size: 23px;
+    font-weight: 700;
+    background: #f8fafc;
+  }
+  .return .glyph { font-size: 27px; line-height: 1; }
+
+  .footer-notes { position: absolute; left: 64px; right: 64px; bottom: 38px; padding-top: 18px; border-top: 1.5px solid #e2e8f0; }
+</style>
+</head>
+<body>
+<div class="diagram">
+  <div class="kicker">Bab II: Dasar teori</div>
+  <h1>Dua siklus kendali untuk keadaan yang sama</h1>
+  <p class="subtitle">Keduanya mengamati keadaan aktual, membandingkannya dengan acuan, lalu bertindak. Yang berbeda adalah pemicu, sumber acuan, dan bentuk tindakan korektifnya.</p>
+
+  <section class="panel card left">
+    <div class="panel-head">
+      <div class="logos"><img class="logo k8s" src="logos/kubernetes.svg" alt="Kubernetes"></div>
+      <div>
+        <h2>Imperatif terotomasi</h2>
+        <div class="mode">Pemeriksa dan runbook <strong>kubectl</strong></div>
+      </div>
+    </div>
+    <div class="meta">
+      <span class="badge slate">Pemicu: pemeriksa 5 s</span>
+      <span class="badge slate">Acuan: inventaris dan nilai deklarasi</span>
+    </div>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div><h3>Amati</h3><p>Baca state aktual objek melalui API Kubernetes.</p></div>
+    </div>
+    <div class="arrow-down"></div>
+    <div class="step">
+      <div class="num">2</div>
+      <div><h3>Bandingkan</h3><p>Cocokkan objek dan bidang dengan inventaris serta nilai yang diinginkan.</p></div>
+    </div>
+    <div class="arrow-down"></div>
+    <div class="step">
+      <div class="num">3</div>
+      <div><h3>Perbaiki</h3><p>Jalankan prosedur koreksi <strong>kubectl</strong> yang telah ditetapkan.</p></div>
+    </div>
+    <div class="return"><span class="glyph">&#8634;</span> Kembali ke langkah 1 pada pemeriksaan berikutnya</div>
+  </section>
+
+  <section class="panel card right">
+    <div class="panel-head">
+      <div class="logos">
+        <img class="logo git" src="logos/git.svg" alt="Git">
+        <img class="logo argo" src="logos/argo.svg" alt="Argo CD">
+      </div>
+      <div>
+        <h2>GitOps</h2>
+        <div class="mode">Rekonsiliasi otomatis oleh <strong>ArgoCD</strong></div>
+      </div>
+    </div>
+    <div class="meta">
+      <span class="badge blue">Pemicu: pengendali ArgoCD</span>
+      <span class="badge blue">Acuan: deklarasi di Git</span>
+    </div>
+
+    <div class="step">
+      <div class="num">1</div>
+      <div><h3>Amati</h3><p>Baca status live aplikasi dan objek yang dikelolanya.</p></div>
+    </div>
+    <div class="arrow-down"></div>
+    <div class="step">
+      <div class="num">2</div>
+      <div><h3>Bandingkan</h3><p>Bandingkan state live dengan hasil render deklarasi di Git.</p></div>
+    </div>
+    <div class="arrow-down"></div>
+    <div class="step">
+      <div class="num">3</div>
+      <div><h3>Sinkronkan</h3><p>Terapkan deklarasi melalui <em>sync</em> atau <em>self-heal</em>.</p></div>
+    </div>
+    <div class="return"><span class="glyph">&#8634;</span> Rekonsiliasi berkelanjutan pada siklus pengendali</div>
+  </section>
+
+  <div class="footer-notes">
+    <span class="dot"></span>
+    <span>Keduanya berjalan otomatis tanpa waktu reaksi manusia yang diukur.</span>
+    <span class="dot"></span>
+    <span>Perbedaan waktu tidak ditafsirkan sebagai perbedaan kecepatan operator.</span>
+  </div>
+</div>
+</body>
+</html>
