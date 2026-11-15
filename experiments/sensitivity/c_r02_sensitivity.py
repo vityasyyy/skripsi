@@ -40,6 +40,27 @@ def _load_analyzer(path: Path):
     return module
 
 
+def _is_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _reject_frozen_output(out: Path | None, batch_dir: Path, analysis_json: Path):
+    if out is None:
+        return
+    for label, root in (
+        ("batch", batch_dir),
+        ("analysis", analysis_json.parent),
+    ):
+        if _is_within(out, root):
+            raise SystemExit(
+                f"refusing --out inside frozen {label} directory: {root}"
+            )
+
+
 def main(argv: list[str] | None = None) -> int:
     home = Path.home()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -66,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=20261029)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
+
+    _reject_frozen_output(args.out, args.batch_dir, args.analysis_json)
 
     analysis_module = _load_analyzer(args.analyzer)
     rows = _load_jsonl(args.batch_dir / "formal-20261029.analysis.jsonl")

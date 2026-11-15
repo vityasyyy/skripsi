@@ -27,7 +27,7 @@ Pengumpulan data menghasilkan 210 sel dari tujuh skenario, dua mode, dan lima be
   \end{tabularx}
 \end{table}
 
-Empat baris yang dikecualikan bukan empat sel yang hilang. Tiga sel tidak menghasilkan baris analisis. \texttt{gitops-C-r01} dan \texttt{imperative-G-r05} berstatus \texttt{instrumentation\_failure} karena kolektor tidak menghasilkan sampel awal, atau pembacaan metrik node gagal ketika metrics-server tidak tersedia. \texttt{gitops-C-r02} adalah \textit{run} yang lengkap dan teramati; proses \textit{harness}-nya berakhir dengan \textit{non-zero exit code}. Baris itu dikecualikan sebagai \texttt{batch\_stop} secara konservatif, bukan karena sel gagal. Baris keempat adalah upaya pertama \texttt{gitops-C-r08} yang gagal \textit{baseline} karena Application \texttt{invenio-bootstrap} tidak Synced/Healthy. Kegagalan itu terjadi sebelum injeksi dan diulang sekali sesuai aturan, sehingga tiga sel tidak menghasilkan baris analisis sedangkan \texttt{gitops-C-r08} tetap dianalisis melalui upaya ulang. Tidak ada nilai yang diimputasi, tidak ada observasi tersensor yang diubah menjadi kegagalan, dan tidak ada nilai hilang yang diganti nol.
+Empat baris yang dikecualikan bukan empat sel yang hilang. Tiga sel tidak menghasilkan baris analisis. \texttt{gitops-C-r01} dan \texttt{imperative-G-r05} berstatus \texttt{instrumentation\_failure} karena kolektor tidak menghasilkan sampel awal, atau pembacaan metrik node gagal ketika metrics-server tidak tersedia. \texttt{gitops-C-r02} adalah \textit{run} yang lengkap dan teramati; proses \textit{harness}-nya berakhir dengan \textit{non-zero exit code}. Baris itu dikecualikan sebagai \texttt{batch\_stop} untuk menjaga validitas batch secara konservatif, bukan karena sel gagal atau karena ukuran efeknya. Analisis sensitivitas yang menyertakan baris tersebut menurunkan ukuran efek pemulihan C dari 0,75 menjadi 0,64. Baris keempat adalah upaya pertama \texttt{gitops-C-r08} yang gagal \textit{baseline} karena Application \texttt{invenio-bootstrap} tidak Synced/Healthy. Kegagalan itu terjadi sebelum injeksi dan diulang sekali sesuai aturan, sehingga tiga sel tidak menghasilkan baris analisis sedangkan \texttt{gitops-C-r08} tetap dianalisis melalui upaya ulang. Tidak ada nilai yang diimputasi, tidak ada observasi tersensor yang diubah menjadi kegagalan, dan tidak ada nilai hilang yang diganti nol.
 
 Lingkungan, manifest, \textit{image}, dan instrumen dibekukan sebelum pengumpulan, dan identitas teknis lengkap untuk reproduksi dicatat pada Lampiran A. Pembekuan tersebut menjaga agar data berasal dari apparatus yang sama, tetapi tidak memperluas cakupan generalisasi.
 
@@ -65,7 +65,7 @@ R1 membandingkan skor kesetaraan bidang terpilih pada empat sumber daya yang did
 
 Pada skenario B sampai F, drift terdeteksi pada kedua mode, dan skor turun menjadi 75 lalu kembali ke 100 setelah pemulihan. Skenario A tetap 100 sepanjang pengamatan, konsisten dengan keputusan mengecualikan \texttt{/spec/replicas} dari deklarasi karena bidang tersebut dimiliki HPA, bukan oleh mekanisme rekonsiliasi konfigurasi. F masuk ke tabel R1 karena bidang Service diperiksa, tetapi waktu F tidak masuk keluarga efikasi B sampai E.
 
-Skenario G merupakan satu-satunya asimetri: mode GitOps tidak mengembalikan anotasi pada SealedSecret ke keadaan yang dideklarasikan, sedangkan pemeriksa imperatif melakukannya. Temuan ini bukan kegagalan instrumentasi karena barisnya tercatat tersensor kanan, bukan error, dan mekanisme penyebabnya tidak diatribusikan. Kemungkinan mekanisme yang konsisten dengan data adalah ArgoCD tidak menganggap anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen \textit{harness} melihat anotasi itu, sedangkan pengendali GitOps tidak. Mekanisme tersebut tidak diukur, sehingga atribusi formal tetap \texttt{unattributed} dan G bukan bukti masalah izin. G dilaporkan sebagai kasus batas deskriptif dan tidak digabungkan ke populasi efikasi.
+Skenario G merupakan satu-satunya asimetri: mode GitOps tidak mengembalikan anotasi pada SealedSecret ke keadaan yang dideklarasikan, sedangkan pemeriksa imperatif melakukannya. Temuan ini bukan kegagalan instrumentasi karena barisnya tercatat tersensor kanan, bukan error, dan mekanisme penyebabnya tidak diatribusikan. Kemungkinan mekanisme yang konsisten dengan data adalah ArgoCD tidak menganggap anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen \textit{harness} melihat anotasi itu, sedangkan pengendali GitOps tidak memulihkannya. Mekanisme tersebut tidak diukur, sehingga atribusi formal tetap \texttt{unattributed} dan G bukan bukti masalah izin. G dilaporkan sebagai kasus batas deskriptif dan tidak digabungkan ke populasi efikasi.
 
 Kesehatan layanan tidak diubah menjadi skor dan tidak dipakai untuk mengubah nilai R1. Status Running dan Ready dipakai pada gerbang kesiapan sebelum injeksi dan pada verifikasi setelah pemulihan. Karena itu, R1 menjawab kesetaraan bidang konfigurasi, bukan kesehatan layanan secara umum, dan kesetaraan skor juga tidak membuktikan kebenaran semantik konfigurasi; kedua mode dapat mencapai keadaan yang identik dan sama-sama salah apabila deklarasi sumbernya keliru.
 
@@ -161,7 +161,7 @@ Analisis primer mengecualikan \texttt{gitops-C-r02} sebagai \texttt{batch\_stop}
   \label{tab:sensitivitas-c}
   \begin{tabularx}{\textwidth}{|c|c|c|c|c|X|}
     \hline
-    Luaran & $n$ & $p$ & $p$ (Holm) & $\delta$ & IK 95\% $\delta$ \\
+    Luaran & $n$ (imperatif vs GitOps) & $p$ & $p$ (Holm) & $\delta$ & IK 95\% $\delta$ \\
     \hline
     Deteksi & 10 vs 9 & 0{,}0003 & 0{,}0034 & 1{,}00 & $[1{,}00;\,1{,}00]$ \\
     \hline
@@ -172,7 +172,7 @@ Analisis primer mengecualikan \texttt{gitops-C-r02} sebagai \texttt{batch\_stop}
   \end{tabularx}
 \end{table}
 
-\noindent\footnotesize Nilai $p$ bersifat dua sisi dan dikoreksi Holm pada keluarga dua belas hipotesis yang sama. Tabel ini adalah analisis sensitivitas; analisis primer tetap memakai 207 baris.\normalsize
+\noindent\footnotesize Nilai $p$ bersifat dua sisi dan dikoreksi Holm pada keluarga dua belas hipotesis yang sama. Tabel ini adalah analisis sensitivitas; analisis primer tetap memakai 207 baris. Pada keluarga sensitivitas, nilai Holm pemulihan B juga naik dari 0,0195 menjadi 0,0391.\normalsize
 
 Pada deteksi dan bukti, ukuran efek tetap maksimum dan nilai $p$ terkoreksi turun menjadi 0,0034. Pada pemulihan, nilai $p$ terkoreksi naik menjadi 0,0391, ukuran efek turun dari 0,75 menjadi 0,64, dan batas bawah IK turun dari 0,25 menjadi 0,11. Kedua belas perbandingan tetap menolak hipotesis nol pada $\alpha=0{,}05$, sehingga arah kesimpulan tidak berubah. Namun klaim bahwa keunggulan pemulihan pada skenario C besar menjadi lebih lemah dan lebih sensitif terhadap satu baris. R1 skenario C tidak berubah karena \texttt{gitops-C-r02} berada pada blok R2.
 
