@@ -114,16 +114,17 @@ all-docker: proposal-docker skripsi-docker presentation-docker presentation-skri
 # Experiment apparatus verification (dry-run/offline only; no cluster access)
 test-experiments:
 	python3 -m unittest discover -s experiments/tests -v
+	python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -v
 
 lint-experiments:
-	uv run --with ruff ruff check experiments
-	uv run --with ruff ruff format --check experiments
-	cd experiments && uv run --with mypy==1.19.1 mypy
+	uv run --with-requirements experiments/requirements-dev.txt ruff check experiments
+	uv run --with-requirements experiments/requirements-dev.txt ruff format --check experiments
+	cd experiments && uv run --with-requirements requirements-dev.txt mypy
 	shellcheck experiments/scripts/*.sh
 	bash -n experiments/scripts/*.sh
 
 coverage-experiments:
-	uv run --with coverage coverage run --rcfile=experiments/.coveragerc -m unittest discover -s experiments/tests
-	uv run --with coverage coverage report --rcfile=experiments/.coveragerc --fail-under=100
+	uv run --with-requirements experiments/requirements-dev.txt coverage run --rcfile=experiments/.coveragerc -m unittest discover -s experiments/tests
+	uv run --with-requirements experiments/requirements-dev.txt coverage report --rcfile=experiments/.coveragerc --fail-under=100
 
 check-experiments: test-experiments lint-experiments coverage-experiments

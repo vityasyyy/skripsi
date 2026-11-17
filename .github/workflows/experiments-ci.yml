@@ -47,6 +47,9 @@ jobs:
           PYTHONWARNINGS: error
         run: python -m unittest discover -s experiments/tests
 
+      - name: Run sensitivity tests
+        run: python -m unittest discover -s experiments/sensitivity -p 'test_*.py' -v
+
       - name: Enforce branch coverage
         run: |
           coverage run --rcfile=experiments/.coveragerc -m unittest discover -s experiments/tests

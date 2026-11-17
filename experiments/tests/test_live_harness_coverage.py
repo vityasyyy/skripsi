@@ -2029,6 +2029,23 @@ class RunnerHelperCoverageTests(unittest.TestCase):
         self.assertIsInstance(sampler.error, RuntimeError)
         self.assertIsNone(sampler.late_error)
 
+    def test_sampler_stop_between_checks_returns_before_capture(self):
+        sampler = harness.Sampler(observation, harness.Clock(), 0.01)
+        sampler.deadline = 1.0
+        calls = {"count": 0}
+
+        class StopClock:
+            def now(self):
+                calls["count"] += 1
+                if calls["count"] == 1:
+                    sampler._stop_event.set()
+                return point(0.0)
+
+        sampler.clock = StopClock()
+        sampler.capture = mock.Mock()
+        sampler.run()
+        sampler.capture.assert_not_called()
+
 
 class LiveRunnerBranchCoverageTests(unittest.TestCase):
     def runner(self, directory, run_id, *, timeout="0.1", arm="gitops", scenario="B"):

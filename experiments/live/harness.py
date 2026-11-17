@@ -2508,7 +2508,7 @@ def repair(
     kubectl: Kubectl,
     contract: Contract,
     observation: Observation,
-    _clock: Clock,
+    clock: Clock,  # noqa: ARG001 - kept for call-site symmetry
 ) -> list:
     """Reverse observed drift using the declared baselines."""
     commands = []
@@ -3363,7 +3363,7 @@ class Sampler(threading.Thread):
                 self.stopped_at_deadline = True
                 self._ready_event.set()
                 return
-            if self._stop_event.is_set():  # pragma: no cover - race re-check before capture
+            if self._stop_event.is_set():
                 return
             started = self.clock.now()
             try:

@@ -28,23 +28,29 @@ kolektor dan waktu UTC untuk audit.
 ## Revisi beku
 
 Instrumen formal dibekukan pada revisi
-`3572f3c1c11d3abc8b63882c4348b1b803d4256f` (`3572f3c`). `live/harness.py`
-tidak berubah sejak revisi itu; refactor pasca-koleksi bersifat
-mempertahankan perilaku. `tests/test_analysis_golden.py` mengunci ringkasan
-analisis sintetis (jumlah baris, median R1, p-value, ukuran efek, dan keputusan
-Holm) sebagai bukti semantik.
+`3572f3c1c11d3abc8b63882c4348b1b803d4256f` (`3572f3c`). Bentuk kode
+`live/harness.py` berubah pasca-koleksi (format, anotasi tipe, ekstraksi
+`_observe_until_recovery`/`_write_evidence`), tetapi perilaku instrumen
+dipertahankan dan diverifikasi oleh suite regresi serta
+`tests/test_analysis_golden.py`. Golden test mengunci ringkasan analisis
+sintetis (jumlah baris, median R1, p-value, ukuran efek, dan keputusan Holm)
+sebagai bukti semantik.
 
 ## Verifikasi instrumen
 
 ```bash
-make test-experiments       # 466 tes offline
+make test-experiments       # 467 tes offline (termasuk sensitivity)
 make lint-experiments       # Ruff, mypy, ShellCheck, bash -n
 make coverage-experiments   # 100% baris dan cabang
 make check-experiments      # agregat
 ```
 
 Versi alat pengembangan ada di [`requirements-dev.txt`](requirements-dev.txt);
-CI menjalankan gerbang yang sama pada Python 3.9 dan 3.12.
+CI menjalankan gerbang yang sama pada Python 3.9 dan 3.12. Gerbang cakupan
+mengukur enam modul yang diimpor suite offline (`analyze_live`, `summarize`,
+`convert`, `declaration`, `harness`, `run_matrix`). `scripts/`, `sensitivity/`,
+dan skrip analisis historis diuji lewat subprocess atau suite terpisah, tetapi
+tidak dihitung dalam gerbang baris karena tidak diimpor oleh suite tersebut.
 
 ## Dua mode berurutan pada satu stack
 

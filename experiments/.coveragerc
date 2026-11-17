@@ -1,7 +1,18 @@
 [run]
 branch = True
 source = experiments
-omit = experiments/tests/*
+# The offline suite imports six modules. Modules exercised only through a
+# subprocess, the frozen historical analyzer, or the standalone sensitivity
+# script are listed explicitly so the measured scope is auditable rather than
+# an accident of import discovery.
+omit =
+    experiments/tests/*
+    experiments/sensitivity/test_c_r02_sensitivity.py
+    experiments/sensitivity/c_r02_sensitivity.py
+    experiments/live/run_one.py
+    experiments/analysis/analyze.py
+    experiments/analysis/mockgen.py
+    experiments/scripts/*
 
 [report]
 fail_under = 100
