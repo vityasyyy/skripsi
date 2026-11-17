@@ -31,15 +31,14 @@ Instrumen formal dibekukan pada revisi
 `3572f3c1c11d3abc8b63882c4348b1b803d4256f` (`3572f3c`). Bentuk kode
 `live/harness.py` berubah pasca-koleksi (format, anotasi tipe, ekstraksi
 `_observe_until_recovery`/`_write_evidence`), tetapi perilaku instrumen
-dipertahankan dan diverifikasi oleh suite regresi serta
-`tests/test_analysis_golden.py`. Golden test mengunci ringkasan analisis
-sintetis (jumlah baris, median R1, p-value, ukuran efek, dan keputusan Holm)
-sebagai bukti semantik.
+dipertahankan dan diverifikasi oleh suite regresi. Golden test terpisah
+mengunci statistik `analyze_live` pada matriks sintetis (jumlah baris, median
+R1, p-value, ukuran efek, dan keputusan Holm).
 
 ## Verifikasi instrumen
 
 ```bash
-make test-experiments       # 467 tes offline (termasuk sensitivity)
+make test-experiments       # 470 tes offline (467 inti + 3 sensitivity)
 make lint-experiments       # Ruff, mypy, ShellCheck, bash -n
 make coverage-experiments   # 100% baris dan cabang
 make check-experiments      # agregat
