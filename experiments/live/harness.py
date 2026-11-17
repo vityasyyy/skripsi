@@ -390,7 +390,11 @@ class Http:
                     return response.status, response.read()
             except urlerror.HTTPError as error:
                 if error.code not in TRANSIENT_HTTP_STATUSES or attempt + 1 == HTTP_RETRY_ATTEMPTS:
-                    return error.code, error.read()
+                    try:
+                        body = error.read()
+                    finally:
+                        error.close()
+                    return error.code, body
                 error.close()
             except (urlerror.URLError, TimeoutError, ConnectionError) as error:
                 if attempt + 1 == HTTP_RETRY_ATTEMPTS:
