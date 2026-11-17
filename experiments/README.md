@@ -5,6 +5,47 @@ injeksi/polling/reset. Harness live yang terpisah ada di
 [`live/README.md`](live/README.md), dengan dry-run default dan `--live` eksplisit.
 Kelulusan fixture tidak menyatakan klaster atau aplikasi siap.
 
+## Peta kode dan aliran data
+
+| Modul | Tanggung jawab |
+|---|---|
+| `live/harness.py` | Kontrol lengan, snapshot, kontrak R1, injeksi/repair, sampler, timeline, dan bukti per run |
+| `live/run_matrix.py` | Perencanaan urutan batch 210 run, retry baseline, resume, dan output analisis |
+| `live/declaration.py` | Validasi render beku dan pemilihan empat resource terukur |
+| `live/convert.py` | Jembatan arsip JSONL ke kolom CSV historis |
+| `analysis/analyze_live.py` | Uji eksploratif R2, survival, R1 deskriptif, dan tabel LaTeX |
+| `analysis/summarize.py` | Ringkasan deskriptif v2 yang memisahkan sensor dan endpoint hilang |
+| `scripts/*.sh`, `scripts/instruments.py` | Validasi bukti offline; tidak menjalankan klaster |
+| `sensitivity/c_r02_sensitivity.py` | Analisis sensitivitas satu run C-r02 yang dieksklusi |
+
+Alur data: `run_matrix` merencanakan sel dan memanggil `LiveRunner` di
+`harness`; `LiveRunner` mengambil snapshot, menyuntikkan drift, memperbaiki,
+lalu menulis row JSONL/CSV dan artefak evidence per run. `analyze_live`
+membaca `<batch>.analysis.jsonl` (dan opsional `<batch>.rows.jsonl`) lalu
+menulis JSON serta tabel LaTeX. Semua pengukuran memakai jam monotonik
+kolektor dan waktu UTC untuk audit.
+
+## Revisi beku
+
+Instrumen formal dibekukan pada revisi
+`3572f3c1c11d3abc8b63882c4348b1b803d4256f` (`3572f3c`). `live/harness.py`
+tidak berubah sejak revisi itu; refactor pasca-koleksi bersifat
+mempertahankan perilaku. `tests/test_analysis_golden.py` mengunci ringkasan
+analisis sintetis (jumlah baris, median R1, p-value, ukuran efek, dan keputusan
+Holm) sebagai bukti semantik.
+
+## Verifikasi instrumen
+
+```bash
+make test-experiments       # 466 tes offline
+make lint-experiments       # Ruff, mypy, ShellCheck, bash -n
+make coverage-experiments   # 100% baris dan cabang
+make check-experiments      # agregat
+```
+
+Versi alat pengembangan ada di [`requirements-dev.txt`](requirements-dev.txt);
+CI menjalankan gerbang yang sama pada Python 3.9 dan 3.12.
+
 ## Dua mode berurutan pada satu stack
 
 Kapasitas terverifikasi hanya satu stack InvenioRDM penuh. Mode imperatif dan
