@@ -106,36 +106,42 @@
 %------------------------------------------------------------
 % Daftar Lambang dan Singkatan (DAFTAR SIMBOL)
 %------------------------------------------------------------
-\nomenclature[001]{ArgoCD}{Alat GitOps \textit{pull-based} yang membandingkan keadaan klaster dengan deklarasi di Git lalu melakukan rekonsiliasi otomatis}
-\nomenclature[002]{Cliff's $\delta$}{Ukuran efek nonparametrik berkisar $-1$ sampai $1$; nilai $1$ berarti seluruh pengamatan satu kelompok lebih besar daripada kelompok lain}
-\nomenclature[003]{ConfigMap}{Objek Kubernetes yang menyimpan konfigurasi non-rahasia sebagai pasangan kunci--nilai}
-\nomenclature[004]{\textit{Control loop}}{Siklus berulang "amati--bandingkan--perbaiki" yang menjadi dasar kerja pengendali Kubernetes}
-\nomenclature[005]{Declarative}{Pendekatan yang menyatakan keadaan akhir yang diinginkan, bukan langkah-langkah untuk mencapainya}
-\nomenclature[006]{\textit{Deployment}}{Objek Kubernetes yang mengelola replika Pod dan pembaruan bertahap}
-\nomenclature[007]{\textit{Drift}}{Penyimpangan keadaan nyata klaster dari keadaan yang dideklarasikan}
-\nomenclature[008]{GitOps}{Paradigma pengelolaan infrastruktur yang menjadikan repositori Git sebagai satu-satunya sumber kebenaran, dengan agen otomatis yang menyelaraskan klaster}
-\nomenclature[009]{Holm}{Metode koreksi nilai $p$ untuk banyak pengujian sekaligus agar peluang positif palsu tetap terkendali}
-\nomenclature[010]{HPA}{\textit{Horizontal Pod Autoscaler}: pengendali Kubernetes yang menambah atau mengurangi jumlah replika berdasarkan beban}
-\nomenclature[011]{IaC}{\textit{Infrastructure-as-Code}: praktik mendefinisikan infrastruktur melalui berkas konfigurasi yang diberi versi}
-\nomenclature[012]{\textit{Imperative}}{Pendekatan yang menjalankan perintah eksplisit untuk mengubah keadaan, bukan menyatakan keadaan akhir}
-\nomenclature[013]{Kaplan--Meier}{Metode estimasi kurva kelangsungan hidup yang memperhitungkan pengamatan tersensor}
-\nomenclature[014]{\textit{Manifest}}{Berkas YAML yang mendeklarasikan satu atau beberapa objek Kubernetes}
-\nomenclature[015]{\textit{Namespace}}{Pemisahan logis sumber daya di dalam satu klaster Kubernetes}
-\nomenclature[016]{\textit{Pod}}{Unit terkecil yang dijalankan Kubernetes, berisi satu atau beberapa kontainer}
-\nomenclature[017]{\textit{Polling}}{Pemeriksaan berkala pada selang waktu tetap, berbeda dari pengamatan berkelanjutan}
-\nomenclature[018]{\textit{Prune}}{Penghapusan otomatis objek yang tidak lagi ada dalam deklarasi}
-\nomenclature[019]{R1}{Metrik kesetaraan konfigurasi pada himpunan bidang yang ditetapkan, dilaporkan terpisah dari kesehatan layanan}
-\nomenclature[020]{R2}{Metrik waktu: deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi penuh}
-\nomenclature[021]{\textit{Reconciliation}}{Proses membandingkan keadaan nyata dengan deklarasi lalu membawanya kembali selaras}
-\nomenclature[022]{RMST}{\textit{Restricted Mean Survival Time}: rata-rata waktu bertahan pada horizon tertentu, tahan terhadap penyensoran}
-\nomenclature[023]{\textit{SealedSecret}}{Objek Kubernetes yang menyimpan rahasia terenkripsi sehingga aman disimpan di Git}
-\nomenclature[024]{\textit{Self-heal}}{Pemulihan otomatis oleh agen rekonsiliasi ketika keadaan nyata menyimpang}
-\nomenclature[025]{\textit{Single source of truth}}{Satu lokasi tunggal yang dianggap otoritatif untuk suatu konfigurasi}
-\nomenclature[026]{\textit{Stack}}{Kumpulan layanan yang dijalankan bersama untuk membentuk satu sistem aplikasi}
-\nomenclature[027]{\textit{State} (keadaan)}{Kondisi nyata objek di klaster pada suatu waktu}
-\nomenclature[028]{Tersensor (kanan)}{Pengamatan yang berakhir sebelum peristiwa terjadi; diketahui nilainya melebihi batas pengamatan, tetapi nilainya tidak diketahui}
-\nomenclature[029]{\textit{Ukuran efek}}{Besaran perbedaan antar kelompok, dilaporkan bersama nilai $p$ agar signifikansi tidak disalahartikan sebagai kepraktisan}
-\nomenclature[030]{\textit{Wilcoxon signed-rank}}{Uji nonparametrik berpasangan untuk membandingkan dua kondisi pada subjek yang sama}
+\nomenclature[001]{ArgoCD}{Alat GitOps \textit{pull-based} yang membandingkan kondisi klaster dengan deklarasi di Git lalu melakukan rekonsiliasi otomatis}
+\nomenclature[002]{\textit{Arm}}{Kelompok perlakuan dalam desain eksperimen; pada penelitian ini satu \textit{arm} adalah satu mode manajemen}
+\nomenclature[003]{\textit{Baseline}}{Prosedur atau kondisi acuan pembanding; nilai acuannya disebut nilai acuan}
+\nomenclature[004]{\textit{Batch}}{Kumpulan \textit{run} yang dijalankan dalam satu protokol pengumpulan}
+\nomenclature[005]{Cliff's $\delta$}{Ukuran efek nonparametrik berkisar $-1$ sampai $1$; nilai $1$ berarti seluruh pengamatan satu kelompok lebih besar daripada kelompok lain}
+\nomenclature[006]{ConfigMap}{Objek Kubernetes yang menyimpan konfigurasi non-rahasia sebagai pasangan kunci--nilai}
+\nomenclature[007]{\textit{Control loop}}{Siklus berulang "amati--bandingkan--perbaiki" yang menjadi dasar kerja pengendali Kubernetes}
+\nomenclature[008]{Declarative}{Pendekatan yang menyatakan \textit{desired state}, bukan langkah-langkah untuk mencapainya}
+\nomenclature[009]{\textit{Deployment}}{Objek Kubernetes yang mengelola replika Pod dan pembaruan bertahap}
+\nomenclature[010]{\textit{Drift}}{Penyimpangan \textit{actual state} klaster dari \textit{desired state}}
+\nomenclature[011]{\textit{Field}}{Pasangan kunci--nilai pada objek Kubernetes yang diperiksa kesetaraannya}
+\nomenclature[012]{GitOps}{Paradigma manajemen infrastruktur yang menjadikan repositori Git sebagai satu-satunya sumber kebenaran, dengan agen otomatis yang menyelaraskan klaster}
+\nomenclature[013]{Holm}{Metode koreksi nilai $p$ untuk banyak pengujian sekaligus agar peluang positif palsu tetap terkendali}
+\nomenclature[014]{HPA}{\textit{Horizontal Pod Autoscaler}: pengendali Kubernetes yang menambah atau mengurangi jumlah replika berdasarkan beban}
+\nomenclature[015]{IaC}{\textit{Infrastructure-as-Code}: praktik mendefinisikan infrastruktur melalui berkas konfigurasi yang diberi versi}
+\nomenclature[016]{\textit{Imperative}}{Pendekatan yang menjalankan perintah eksplisit untuk mengubah \textit{actual state}, bukan menyatakan \textit{desired state}}
+\nomenclature[017]{Kaplan--Meier}{Metode estimasi kurva kelangsungan hidup yang memperhitungkan pengamatan tersensor}
+\nomenclature[018]{\textit{Manifest}}{Berkas YAML yang mendeklarasikan satu atau beberapa objek Kubernetes}
+\nomenclature[019]{\textit{Namespace}}{Pemisahan logis sumber daya di dalam satu klaster Kubernetes}
+\nomenclature[020]{\textit{Pod}}{Unit terkecil yang dijalankan Kubernetes, berisi satu atau beberapa kontainer}
+\nomenclature[021]{\textit{Polling}}{Pemeriksaan berkala pada selang waktu tetap, berbeda dari pengamatan berkelanjutan}
+\nomenclature[022]{\textit{Production-like}}{Lingkungan yang menyerupai produksi dalam skala, konfigurasi, dan dependensi, tetapi bukan sistem produksi}
+\nomenclature[023]{\textit{Prune}}{Penghapusan otomatis objek yang tidak lagi ada dalam deklarasi}
+\nomenclature[024]{R1}{Metrik kesetaraan konfigurasi pada himpunan \textit{field} yang ditetapkan, dilaporkan terpisah dari kesehatan layanan}
+\nomenclature[025]{R2}{Metrik waktu: deteksi, ketersediaan bukti penyimpangan, dan pemulihan konfigurasi penuh}
+\nomenclature[026]{\textit{Reconciliation}}{Proses membandingkan \textit{actual state} dengan deklarasi lalu membawanya kembali selaras}
+\nomenclature[027]{RMST}{\textit{Restricted Mean Survival Time}: rata-rata waktu bertahan pada horizon tertentu, tahan terhadap penyensoran}
+\nomenclature[028]{\textit{Run}}{Satu eksekusi protokol untuk satu sel, dari pemeriksaan kesiapan sampai pemulihan kondisi awal}
+\nomenclature[029]{\textit{SealedSecret}}{Objek Kubernetes yang menyimpan rahasia terenkripsi sehingga aman disimpan di Git}
+\nomenclature[030]{\textit{Self-heal}}{Pemulihan otomatis oleh agen rekonsiliasi ketika \textit{actual state} menyimpang}
+\nomenclature[031]{\textit{Single source of truth}}{Satu lokasi tunggal yang dianggap otoritatif untuk suatu konfigurasi}
+\nomenclature[032]{\textit{Stack}}{Kumpulan layanan yang dijalankan bersama untuk membentuk satu sistem aplikasi}
+\nomenclature[033]{\textit{State}}{Kondisi objek klaster pada satu waktu; \textit{desired state} adalah deklarasi acuan dan \textit{actual state} adalah hasil pembacaan klaster}
+\nomenclature[034]{Tersensor (kanan)}{Pengamatan yang berakhir sebelum peristiwa terjadi; diketahui nilainya melebihi batas pengamatan, tetapi nilainya tidak diketahui}
+\nomenclature[035]{\textit{Ukuran efek}}{Besaran perbedaan antar kelompok, dilaporkan bersama nilai $p$ agar signifikansi tidak disalahartikan sebagai kepraktisan}
+\nomenclature[036]{\textit{Wilcoxon signed-rank}}{Uji nonparametrik berpasangan untuk membandingkan dua kondisi pada subjek yang sama}
 
 % Preliminary Pages (Skripsi: lengkap)
 \cover
@@ -155,25 +161,25 @@
 \lambang
 
 \abstractind
-Perbandingan ini mengukur \textit{baseline} manual sebagai \textit{runbook} imperatif berbasis \texttt{kubectl} yang otomatis, bukan operator manusia, sehingga perbandingan mengisolasi mekanisme dari kecepatan manusia. \textit{Baseline} tersebut konservatif karena mewakili versi otomatis yang dibakukan dari prosedur manual, bukan operator yang lambat. Skripsi ini membandingkan prosedur imperatif terotomasi dengan GitOps berbasis ArgoCD dalam merespons \textit{drift} pada Kubernetes. Kedua mode berjalan berurutan pada satu \textit{stack} InvenioRDM produksi-like yang telah berjalan.
+Perbandingan ini memakai \textit{baseline} manual berupa \textit{runbook} imperatif \texttt{kubectl} yang dijalankan otomatis, bukan operator manusia, sehingga mekanisme terpisah dari kecepatan manusia. \textit{Baseline} tersebut konservatif karena mewakili versi otomatis yang dibakukan dari prosedur manual, bukan operator yang lambat. Skripsi ini membandingkan prosedur imperatif otomatis dengan GitOps ArgoCD dalam merespons \textit{drift} pada Kubernetes. Kedua mode berjalan berurutan pada satu \textit{stack} InvenioRDM yang telah berjalan dan mirip produksi (\textit{production-like}).
 
-Desain memakai tujuh skenario \textit{drift} dan lima belas pengulangan per skenario per mode, sehingga total 210 sel. Tujuh skenario mencakup replika di bawah minimum HPA, perubahan \textit{tag} \textit{image}, perubahan \textit{tagline} ConfigMap, penghapusan \textit{Deployment}, batas memori, \texttt{targetPort} Service, dan anotasi SealedSecret.
+Desain memakai tujuh skenario \textit{drift} dan lima belas pengulangan per skenario per mode (210 sel). Tujuh skenario mencakup replika di bawah minimum \textit{Horizontal Pod Autoscaler} (HPA), perubahan \textit{tag} \textit{image}, perubahan \textit{tagline} ConfigMap, penghapusan \textit{Deployment}, batas memori, \texttt{targetPort} Service, dan anotasi SealedSecret.
 
-Dari 210 sel, 207 baris dianalisis. Tiga sel tidak menghasilkan baris analisis, dan baris mentah keempat adalah upaya \textit{baseline} yang gagal lalu diulang. Empat baris mentah dikecualikan. Analisis sensitivitas tidak mengubah arah kesimpulan, tetapi menurunkan ukuran efek pemulihan pada skenario \textit{tagline} ConfigMap dari 0,75 menjadi 0,64. Pada R1, skor lima skenario \textit{drift} yang diperiksa turun dari 100 ke 75 lalu kembali ke 100 pada kedua mode. Kontrol HPA tetap 100, dan anotasi SealedSecret menjadi satu-satunya asimetri yang dilaporkan sebagai kasus batas deskriptif.
+Dari 210 sel, 207 baris dianalisis. Tiga sel tidak menghasilkan baris analisis; baris mentah keempat adalah percobaan \textit{baseline} yang gagal lalu diulang. Empat baris mentah dikecualikan. Analisis sensitivitas tidak mengubah arah kesimpulan, tetapi menurunkan ukuran efek pemulihan pada skenario \textit{tagline} ConfigMap dari 0,75 menjadi 0,64. Pada R1, skor B--G turun dari 100 ke 75. Untuk B--F, skor kembali ke 100 pada kedua mode; untuk G, hanya mode imperatif yang kembali ke 100. Kontrol HPA (A) tetap 100; anotasi SealedSecret menjadi satu-satunya asimetri, dilaporkan sebagai kasus batas deskriptif.
 
-Pada R2, GitOps lebih cepat pada seluruh dua belas perbandingan waktu di empat skenario efikasi setelah koreksi Holm, dengan $p$ terkoreksi 0,0054 sampai 0,0195 pada analisis primer. Selisih median deteksi dan bukti pada dua skenario dengan pasangan lengkap, yaitu perubahan \textit{tag} \textit{image} dan batas memori, berkisar 4,0 sampai 4,3 detik. Ukuran efek pemulihan tidak seragam: 0,48 dan 0,75 pada dua skenario, 1,00 dan 0,86 pada dua lainnya. Keunggulan waktu tidak menyusut seragam di akhir siklus.
+Pada R2, GitOps lebih cepat pada seluruh dua belas perbandingan waktu di empat skenario efikasi setelah koreksi Holm, dengan $p$ terkoreksi 0,0054 sampai 0,0195 pada analisis primer. Selisih median deteksi dan bukti pada dua skenario dengan pasangan lengkap, yaitu perubahan \textit{tag} \textit{image} dan batas memori, berkisar 4,0--4,3 detik. Ukuran efek pemulihan tidak seragam: 0,48 dan 0,75 pada dua skenario, 1,00 dan 0,86 pada dua lainnya. Keunggulan waktu tidak menyusut seragam di akhir siklus.
 
-Studi ini eksploratif dengan mode berurutan dan urutan lengan tetap; observasi tidak independen dan $p$ bukan estimasi populasi. Hasil tidak menyimpulkan keunggulan umum, kelayakan adopsi, atau kebenaran semantik konfigurasi.
+Studi ini eksploratif dengan mode berurutan dan urutan mode tetap; observasi tidak independen dan $p$ bukan estimasi populasi. Hasil tidak menyimpulkan keunggulan umum, kelayakan adopsi, atau kebenaran semantik konfigurasi.
 \par\vspace{0.1cm}
-\noindent\textbf{Kata Kunci:} penyimpangan konfigurasi, Kubernetes, GitOps, \textit{baseline} manual, prosedur imperatif terotomasi, studi kasus komparatif terkontrol
+\noindent\textbf{Kata Kunci:} penyimpangan konfigurasi, Kubernetes, GitOps, \textit{baseline} manual, prosedur imperatif otomatis, studi kasus komparatif terkontrol
 \endabstractind
 
 \abstracteng
-This comparison measures the manual \textit{baseline} as an automated imperative \texttt{kubectl} \textit{runbook}, not a human operator, so the comparison isolates mechanism from human speed. The \textit{baseline} is conservative because it represents a standardized automated version of the manual procedure, not a slow operator. This thesis compares an automated imperative procedure with ArgoCD-based GitOps in responding to \textit{drift} on Kubernetes. Both modes run sequentially on one running production-like InvenioRDM \textit{stack}.
+The comparison uses an automated imperative \texttt{kubectl} \textit{runbook} as the manual \textit{baseline}, not a human operator, so it isolates mechanism from human speed. The \textit{baseline} is conservative because it represents a standardized automated version of the manual procedure, not a slow operator. This thesis compares that procedure with ArgoCD-based GitOps in responding to \textit{drift} on Kubernetes. Both modes ran sequentially on a single running production-like InvenioRDM \textit{stack}.
 
-The design uses seven \textit{drift} scenarios and fifteen repetitions per scenario per mode, for 210 cells. The seven scenarios cover a replica count below the HPA minimum, an \textit{image} \textit{tag}, a ConfigMap \textit{tagline}, a \textit{Deployment} deletion, a memory \textit{limit}, a Service \texttt{targetPort}, and a SealedSecret annotation.
+The design uses seven \textit{drift} scenarios and fifteen repetitions per scenario per mode, for 210 cells. The seven scenarios cover a replica count below the Horizontal Pod Autoscaler (HPA) minimum, an \textit{image} \textit{tag}, a ConfigMap \textit{tagline}, a \textit{Deployment} deletion, a memory \textit{limit}, a Service \texttt{targetPort}, and a SealedSecret annotation.
 
-Of 210 cells, 207 analysis rows remain. Three cells produced no analysis row, and the fourth raw row was a \textit{baseline} attempt that failed and was retried. Four raw rows were excluded. Sensitivity analysis does not change the direction, but it reduces the ConfigMap \textit{tagline} recovery effect size from 0.75 to 0.64. For R1, the equality score in the five examined \textit{drift} scenarios fell from 100 to 75 and returned to 100 in both modes. The HPA control remained 100, and the SealedSecret annotation was the only asymmetry, reported as a descriptive boundary.
+Of 210 cells, 207 have analysis rows. Three cells produced no analysis row; the fourth excluded raw row was a \textit{baseline} attempt that failed and was retried. Four raw rows were excluded in total. Sensitivity analysis did not change the direction, but it reduced the ConfigMap \textit{tagline} recovery effect size from 0.75 to 0.64. For R1, the equality score for B--G fell from 100 to 75. It returned to 100 in both modes for B--F, but only in the imperative mode for G. The HPA control (A) remained 100, and the SealedSecret annotation was the only asymmetry, reported as a descriptive boundary case.
 
 For R2, GitOps was faster in all twelve timing comparisons across the four efficacy scenarios after Holm correction, with Holm-adjusted $p$ from 0.0054 to 0.0195 in the primary analysis. The median detection and evidence gaps for the two fully paired scenarios, the \textit{image} \textit{tag} and memory \textit{limit} changes, ranged from 4.0 to 4.3 s. Recovery effect sizes were not uniform: 0.48 and 0.75 in two scenarios, 1.00 and 0.86 in two others. The timing advantage did not shrink uniformly.
 
