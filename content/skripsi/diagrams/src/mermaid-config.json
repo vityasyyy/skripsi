@@ -1,5 +1,6 @@
 {
   "theme": "base",
+  "look": "classic",
   "themeVariables": {
     "fontFamily": "Helvetica, Arial, sans-serif",
     "fontSize": "16px",

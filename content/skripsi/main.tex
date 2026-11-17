@@ -161,7 +161,7 @@
 \lambang
 
 \abstractind
-Perbandingan ini memakai \textit{baseline} manual berupa \textit{runbook} imperatif \texttt{kubectl} yang dijalankan otomatis, bukan operator manusia, sehingga mekanisme terpisah dari kecepatan manusia. \textit{Baseline} tersebut konservatif karena mewakili versi otomatis yang dibakukan dari prosedur manual, bukan operator yang lambat. Skripsi ini membandingkan prosedur imperatif otomatis dengan GitOps ArgoCD dalam merespons \textit{drift} pada Kubernetes. Kedua mode berjalan berurutan pada satu \textit{stack} InvenioRDM yang telah berjalan dan mirip produksi (\textit{production-like}).
+Perbandingan ini memakai \textit{runbook} imperatif \texttt{kubectl} yang dijalankan otomatis sebagai \textit{baseline} manual, bukan operator manusia, sehingga mekanisme terpisah dari kecepatan manusia. \textit{Baseline} tersebut konservatif karena mewakili versi otomatis yang dibakukan dari prosedur manual, bukan operator yang lambat. Skripsi ini membandingkan prosedur imperatif otomatis dengan GitOps ArgoCD dalam merespons \textit{drift} pada Kubernetes. Kedua mode berjalan berurutan pada satu \textit{stack} InvenioRDM yang telah berjalan dan mirip produksi (\textit{production-like}).
 
 Desain memakai tujuh skenario \textit{drift} dan lima belas pengulangan per skenario per mode (210 sel). Tujuh skenario mencakup replika di bawah minimum \textit{Horizontal Pod Autoscaler} (HPA), perubahan \textit{tag} \textit{image}, perubahan \textit{tagline} ConfigMap, penghapusan \textit{Deployment}, batas memori, \texttt{targetPort} Service, dan anotasi SealedSecret.
 

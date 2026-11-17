@@ -64,7 +64,7 @@ python3 -B experiments/live/run_matrix.py \
   a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703
 \end{lstlisting}
 
-Analisis dijalankan dengan perintah berikut; keluaran berupa satu berkas JSON dan enam tabel LaTeX.
+Analisis dijalankan dengan perintah berikut; hasil berupa satu berkas JSON dan enam tabel LaTeX.
 
 \begin{lstlisting}[breaklines=true,basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,numbers=none]
 python3 -B experiments/analysis/analyze_live.py \
@@ -109,7 +109,7 @@ Setiap \textit{run} juga menyimpan bukti pendukung berupa cuplikan kondisi awal,
 
 \section{Perlindungan Informasi}
 
-Snapshot dan bukti disanitasi sebelum disimpan. Nilai Secret tidak dimasukkan ke keluaran, tangkapan layar, log, maupun dataset. Pencocokan \textit{field} dilakukan di memori; artefak yang dibagikan hanya memuat identitas \textit{field} dan hasil kesetaraan, tanpa nilai rahasia maupun hash yang dapat dipakai untuk menebak isinya. Kredensial pengumpulan berada pada berkas privat di luar repositori dan tidak disertakan pada lampiran ini.
+Snapshot dan bukti disanitasi sebelum disimpan. Nilai Secret tidak dimasukkan ke hasil, tangkapan layar, log, maupun dataset. Pencocokan \textit{field} dilakukan di memori; artefak yang dibagikan hanya memuat identitas \textit{field} dan hasil kesetaraan, tanpa nilai rahasia maupun hash yang dapat dipakai untuk menebak isinya. Kredensial pengumpulan berada pada berkas privat di luar repositori dan tidak disertakan pada lampiran ini.
 
 \section{Pemetaan Keterbatasan dan Penanganannya}
 
@@ -141,7 +141,7 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \hline
   Ketidakpastian jam antar-host & Batas kesegaran 30 detik diterapkan secara konservatif; sampel dari masa depan dianggap anomali dan menghentikan \textit{run} & Selang waktu absolut tidak disertifikasi secara numerik \\
   \hline
-  Sensoring kanan & Dilaporkan sebagai tersensor, tidak diberi imputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
+  Sensoring kanan & Dilaporkan sebagai tersensor, tidak diberi imputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi metrik pemulihan \\
   \hline
   Empat baris dikecualikan & Setiap baris disebutkan dengan identitas \textit{run} dan alasan; satu \textit{run} lengkap dengan \textit{non-zero exit code} diuji pada analisis sensitivitas Bab IV; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang; kesimpulan C lebih sensitif terhadap satu baris \\
   \hline
@@ -226,4 +226,4 @@ Seluruh artefak yang dirujuk pada lampiran ini telah dihasilkan oleh eksperimen 
 \subsection{Ketersediaan Artefak dan \textit{Provenance}}
 \label{subsec:provenance}
 
-Revisi instrumen pengumpulan yang dibekukan adalah \texttt{3572f3c1c11d3abc8b63882c4348b1b803d4256f}. Revisi terakhir kode analisis adalah \texttt{a1d43ea}; revisi tersebut bukan revisi pengumpulan dan tidak menggantikan identitas instrumen. Dataset mentah, berkas bukti per \textit{run}, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum SHA-256 masing-masing. Dengan demikian, integritas berkas dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen, dan revisi instrumentasi dapat dibedakan dari kode yang dipakai setelah pengumpulan.
+Revisi instrumen pengumpulan yang dibekukan adalah \texttt{\seqsplit{3572f3c1c11d3abc8b63882c4348b1b803d4256f}}. Revisi terakhir kode analisis adalah \texttt{a1d43ea}; revisi tersebut bukan revisi pengumpulan dan tidak menggantikan identitas instrumen. Dataset mentah, berkas bukti per \textit{run}, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum SHA-256 masing-masing. Dengan demikian, integritas berkas dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen, dan revisi instrumentasi dapat dibedakan dari kode yang dipakai setelah pengumpulan.
