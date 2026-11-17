@@ -1200,6 +1200,17 @@ class AcquisitionTimelineCoverageTests(unittest.TestCase):
             ),
             (None, []),
         )
+        self.assertEqual(
+            harness._evaluation_evidence(
+                [no_event],
+                contract_obj,
+                "B",
+                -1.0,
+                1.0,
+                evidence_at=harness.Point(float("nan"), sample.at.utc),
+            ),
+            (None, []),
+        )
         sample.evaluated_at = event
         self.assertEqual(
             harness._evaluation_evidence([sample], contract_obj, "B", -1.0, 1.0), (event, keys)

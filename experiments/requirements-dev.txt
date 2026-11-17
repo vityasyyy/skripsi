@@ -1,3 +1,4 @@
-coverage==7.17.3
+coverage==7.17.3; python_version >= "3.11"
+coverage==7.10.7; python_version < "3.11"
 mypy==1.19.1
 ruff==0.17.5

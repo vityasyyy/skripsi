@@ -725,22 +725,22 @@ def _timing_problem(row: dict) -> str | None:
         if point is None:
             if value is not None or status == "observed":
                 return f"invalid_{metric}_observation"
-            continue
-        if (
-            type(point) not in (int, float)
-            or not math.isfinite(point)
-            or point < t0
-            or point > t0 + limit
-            or point > window_end
-        ):
-            return f"invalid_{metric}_observation"
-        if (
-            status != "observed"
-            or type(value) not in (int, float)
-            or not math.isfinite(cast(float, value))
-            or not math.isclose(cast(float, value), point - t0, rel_tol=1e-9, abs_tol=1e-9)
-        ):
-            return f"invalid_{metric}_observation"
+        else:
+            if (
+                type(point) not in (int, float)
+                or not math.isfinite(point)
+                or point < t0
+                or point > t0 + limit
+                or point > window_end
+            ):
+                return f"invalid_{metric}_observation"
+            if (
+                status != "observed"
+                or type(value) not in (int, float)
+                or not math.isfinite(cast(float, value))
+                or not math.isclose(cast(float, value), point - t0, rel_tol=1e-9, abs_tol=1e-9)
+            ):
+                return f"invalid_{metric}_observation"
     first = row.get("t_r_first_mono")
     confirmed = row.get("t_r_confirmed_mono")
     if first is not None:

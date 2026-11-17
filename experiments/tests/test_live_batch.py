@@ -1486,6 +1486,9 @@ class RunMatrixEdgeTests(unittest.TestCase):
             with self.subTest(index=index, expected=expected):
                 self.assertEqual(run_matrix._timing_problem(value), expected)
         self.assertIsNone(run_matrix._timing_problem(row()))
+        censored = row()
+        censored.update(detection_seconds=None, detection_status="right_censored", t_d_mono=None)
+        self.assertIsNone(run_matrix._timing_problem(censored))
 
     def test_analysis_problem_reports_each_invalid_shape(self):
         def row(**overrides):
