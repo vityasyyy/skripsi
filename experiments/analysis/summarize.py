@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Descriptive v2 evidence summaries; never pool controls or discard censoring."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import math
@@ -9,10 +11,10 @@ from pathlib import Path
 from statistics import median
 
 
-def summarize(rows):
-    groups = {}
-    identities = set()
-    conventions = set()
+def summarize(rows: list) -> dict:
+    groups: dict[tuple, list[dict]] = {}
+    identities: set[str] = set()
+    conventions: set[str | None] = set()
     for row in rows:
         if row["schema_version"] != 2 or row["run_id"] in identities:
             raise ValueError("wrong schema or duplicate run identity")
@@ -113,7 +115,7 @@ def summarize(rows):
     }
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--in", dest="source", type=Path, required=True)
     args = parser.parse_args()

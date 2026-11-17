@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import importlib.util
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
 
-def _load_module():
+def _load_module() -> types.ModuleType:
     path = Path(__file__).with_name("c_r02_sensitivity.py")
     spec = importlib.util.spec_from_file_location("c_r02_sensitivity", path)
     if spec is None or spec.loader is None:
@@ -19,10 +20,10 @@ def _load_module():
 
 
 class FrozenOutputGuardTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.module = _load_module()
 
-    def _assert_rejected(self, out: Path, batch: Path, analysis: Path):
+    def _assert_rejected(self, out: Path, batch: Path, analysis: Path) -> None:
         with self.assertRaises(SystemExit) as raised:
             self.module.main(
                 [
@@ -36,7 +37,7 @@ class FrozenOutputGuardTest(unittest.TestCase):
             )
         self.assertIn("frozen", str(raised.exception).lower())
 
-    def test_rejects_output_inside_batch_directory(self):
+    def test_rejects_output_inside_batch_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             batch = root / "batch"
@@ -45,7 +46,7 @@ class FrozenOutputGuardTest(unittest.TestCase):
             analysis.mkdir()
             self._assert_rejected(batch / "sensitivity.json", batch, analysis)
 
-    def test_rejects_output_inside_analysis_directory(self):
+    def test_rejects_output_inside_analysis_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             batch = root / "batch"
@@ -54,7 +55,7 @@ class FrozenOutputGuardTest(unittest.TestCase):
             analysis.mkdir()
             self._assert_rejected(analysis / "sensitivity.json", batch, analysis)
 
-    def test_accepts_output_outside_frozen_directories(self):
+    def test_accepts_output_outside_frozen_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             batch = root / "batch"

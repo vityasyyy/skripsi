@@ -51,7 +51,7 @@ R2_FAMILY = ["t0", "td", "trci", "t2", "kubectl_cmds"]
 ALPHA = 0.05
 
 
-def cell_values(df, skenario: str, env: str, metric: str) -> np.ndarray:
+def cell_values(df: pd.DataFrame, skenario: str, env: str, metric: str) -> np.ndarray:
     """Values for one (skenario, env, metric) cell with protocol rep filtering."""
     sel = (df["skenario"] == skenario) & (df["env"] == env)
     if metric in R1_METRICS:

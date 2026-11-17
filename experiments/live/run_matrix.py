@@ -26,9 +26,11 @@ import random
 import re
 import sys
 import time
+from collections.abc import Callable, Iterator
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 try:
     from . import convert, harness
@@ -107,13 +109,13 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _redact(value) -> str:
+def _redact(value: object) -> str:
     text = str(value)
     token = os.environ.get("INVENIO_TOKEN")
     return text.replace(token, "<redacted>") if token else text
 
 
-def _as_list(values, label):
+def _as_list(values: str | list[str], label: str) -> list[str]:
     if isinstance(values, str):
         values = [values]
     tokens = []
@@ -124,8 +126,8 @@ def _as_list(values, label):
     return tokens
 
 
-def parse_arms(values):
-    selected = set()
+def parse_arms(values: str | list[str]) -> list[str]:
+    selected: set[str] = set()
     for token in _as_list(values, "arms"):
         name = token.lower()
         if name not in ARMS:
@@ -134,8 +136,8 @@ def parse_arms(values):
     return [arm for arm in ARMS if arm in selected]
 
 
-def parse_scenarios(values):
-    selected = set()
+def parse_scenarios(values: str | list[str]) -> list[str]:
+    selected: set[str] = set()
     for token in _as_list(values, "scenarios"):
         normalized = token.upper()
         if re.fullmatch(r"[A-Z]-[A-Z]", normalized):
@@ -159,7 +161,7 @@ def phase_for(rep: int) -> str:
     raise ValueError(f"rep {rep} is outside the frozen 1..15 protocol")
 
 
-def build_plan(arms, scenarios, reps, seed):
+def build_plan(arms: list, scenarios: list, reps: int, seed: int) -> dict:
     """Return the frozen order: shuffled arms, one scenario permutation for both."""
     if not 1 <= reps <= DEFAULT_REPS:
         raise ValueError("reps must be between 1 and 15")
@@ -186,7 +188,7 @@ def build_plan(arms, scenarios, reps, seed):
     return {"arm_order": arm_order, "scenario_order": scenario_order, "runs": runs}
 
 
-def default_batch_id(args) -> str:
+def default_batch_id(args: argparse.Namespace) -> str:
     identity = {
         "arms": list(args.arms),
         "scenarios": list(args.scenarios),
@@ -204,7 +206,7 @@ def default_batch_id(args) -> str:
     return "fb-" + digest
 
 
-def run_id_for(batch_id, item) -> str:
+def run_id_for(batch_id: str, item: dict) -> str:
     return f"{batch_id}-{item['arm']}-{item['scenario']}-r{item['rep']:02d}"
 
 
@@ -212,19 +214,19 @@ def run_id_for_retry(run_id: str, retry: int) -> str:
     return f"{run_id}-retry{retry}"
 
 
-def run_slots(run_id: str, retries: int):
+def run_slots(run_id: str, retries: int) -> Iterator[str]:
     """Yield the base run id and its deterministic retry slots."""
     yield run_id
     for retry in range(1, retries + 1):
         yield run_id_for_retry(run_id, retry)
 
 
-def final_run_id(entry) -> str:
+def final_run_id(entry: dict) -> str:
     attempts = entry.get("attempts") or []
     return attempts[-1]["run_id"] if attempts else entry["run_id"]
 
 
-def _batch_paths(out, batch_id):
+def _batch_paths(out: str | Path, batch_id: str) -> dict[str, Path]:
     base = Path(out) / batch_id
     return {
         "manifest": Path(str(base) + ".manifest.json"),
@@ -235,11 +237,11 @@ def _batch_paths(out, batch_id):
     }
 
 
-def _row_path(out, run_id):
+def _row_path(out: str | Path, run_id: str) -> Path:
     return Path(out) / (run_id + ".jsonl")
 
 
-def _evidence_path(out, run_id):
+def _evidence_path(out: str | Path, run_id: str) -> Path:
     return Path(out) / run_id
 
 
@@ -250,29 +252,29 @@ def _write_text_atomic(path: Path, text: str) -> None:
     os.replace(temporary, path)
 
 
-def _write_json_atomic(path: Path, payload) -> None:
+def _write_json_atomic(path: Path, payload: object) -> None:
     _write_text_atomic(path, json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
 
 
-def _write_csv_atomic(rows, path: Path) -> None:
+def _write_csv_atomic(rows: list, path: Path) -> None:
     temporary = path.with_name(path.name + ".tmp")
     convert.write_csv(rows, temporary)
     os.replace(temporary, path)
 
 
-def _read_json(path: Path):
+def _read_json(path: Path) -> dict:
     return json.loads(Path(path).read_text())
 
 
-def _read_last_jsonl(path: Path):
+def _read_last_jsonl(path: Path) -> dict | None:
     lines = [line for line in Path(path).read_text().splitlines() if line.strip()]
     if not lines:
         return None
     return json.loads(lines[-1])
 
 
-def _counts(runs):
-    by_status = {}
+def _counts(runs: list) -> dict:
+    by_status: dict[str, int] = {}
     for run in runs:
         status = run.get("status", "unknown")
         by_status[status] = by_status.get(status, 0) + 1
@@ -285,7 +287,7 @@ def _counts(runs):
     }
 
 
-def parse_args(argv=None):
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     tokens = list(sys.argv[1:] if argv is None else argv)
     parser.add_argument("--arms", nargs="+", default=list(ARMS), metavar="ARM")
@@ -333,7 +335,7 @@ def parse_args(argv=None):
     return args
 
 
-def validate_batch_args(args):
+def validate_batch_args(args: argparse.Namespace) -> None:
     harness.validate_namespace(args.namespace)
     if not args.live:
         return
@@ -363,7 +365,7 @@ def validate_batch_args(args):
         raise BatchSafetyError(f"invalid frozen render: {error}") from None
 
 
-def _new_manifest(args, plan, batch_id):
+def _new_manifest(args: argparse.Namespace, plan: dict, batch_id: str) -> dict:
     runs = []
     for item in plan["runs"]:
         entry = dict(item)
@@ -413,7 +415,7 @@ def _new_manifest(args, plan, batch_id):
     }
 
 
-def _ensure_new_batch(args, plan, batch_id, paths):
+def _ensure_new_batch(args: argparse.Namespace, plan: dict, batch_id: str, paths: dict) -> None:
     for name, path in paths.items():
         if path.exists():
             raise BatchSafetyError(
@@ -432,14 +434,14 @@ def _ensure_new_batch(args, plan, batch_id, paths):
                 raise BatchSafetyError(f"refusing to overwrite existing run output {candidate}")
 
 
-def _ensure_run_slot(args, run_id):
+def _ensure_run_slot(args: argparse.Namespace, run_id: str) -> None:
     jsonl = _row_path(args.out, run_id)
     evidence = _evidence_path(args.out, run_id)
     if jsonl.exists() or (evidence.exists() and any(evidence.iterdir())):
         raise BatchSafetyError(f"refusing to overwrite existing run output {run_id}")
 
 
-def _validate_resume(args, plan, batch_id, paths):
+def _validate_resume(args: argparse.Namespace, plan: dict, batch_id: str, paths: dict) -> dict:
     if not paths["manifest"].exists():
         raise BatchSafetyError("--resume requires an existing manifest")
     try:
@@ -560,7 +562,7 @@ def _validate_resume(args, plan, batch_id, paths):
     return manifest
 
 
-def _validate_attempt(args, item, run_id, attempt):
+def _validate_attempt(args: argparse.Namespace, item: dict, run_id: str, attempt: dict) -> None:
     status = attempt.get("status")
     if status not in PENDING_STATUSES | TERMINAL_STATUSES:
         raise BatchSafetyError(f"manifest attempt {run_id} has unknown status {status!r}")
@@ -593,7 +595,7 @@ def _validate_attempt(args, item, run_id, attempt):
             raise BatchSafetyError(f"pending run {run_id} already has output; refusing overwrite")
 
 
-def _rebuild_rows(args, manifest, batch_id):
+def _rebuild_rows(args: argparse.Namespace, manifest: dict, batch_id: str) -> list:
     rows = []
     for entry in manifest["runs"]:
         for attempt in entry.get("attempts") or []:
@@ -602,11 +604,13 @@ def _rebuild_rows(args, manifest, batch_id):
             path = _row_path(args.out, attempt["run_id"])
             if not path.exists():
                 continue
-            rows.append(annotate_row(_read_last_jsonl(path), entry, args, batch_id, attempt))
+            rows.append(
+                annotate_row(cast(dict, _read_last_jsonl(path)), entry, args, batch_id, attempt)
+            )
     return rows
 
 
-def _resolve_batch_id(args, plan):
+def _resolve_batch_id(args: argparse.Namespace, plan: dict) -> str:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     if args.batch_id:
@@ -633,7 +637,9 @@ def _resolve_batch_id(args, plan):
     return batch_id
 
 
-def annotate_row(row, entry, args, batch_id, attempt=None):
+def annotate_row(
+    row: dict, entry: dict, args: argparse.Namespace, batch_id: str, attempt: dict | None = None
+) -> dict:
     annotated = dict(row)
     marker = annotated.get("timing_convention")
     if marker != TIMING_CONVENTION:
@@ -658,7 +664,7 @@ def annotate_row(row, entry, args, batch_id, attempt=None):
     return annotated
 
 
-def _timing_problem(row):
+def _timing_problem(row: dict) -> str | None:
     required = (
         "t0_mono",
         "t_a_mono",
@@ -671,12 +677,12 @@ def _timing_problem(row):
     )
     if any(field not in row for field in required):
         return "incomplete_timing_bounds"
-    limit = row.get("censor_seconds")
+    limit = cast(float, row.get("censor_seconds"))
     if type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0:
         return "invalid_censor_seconds"
-    t0 = row.get("t0_mono")
-    t_a = row.get("t_a_mono")
-    window_end = row.get("window_end_mono")
+    t0 = cast(float, row.get("t0_mono"))
+    t_a = cast(float, row.get("t_a_mono"))
+    window_end = cast(float, row.get("window_end_mono"))
     if (
         any(
             type(value) not in (int, float) or not math.isfinite(value)
@@ -719,8 +725,8 @@ def _timing_problem(row):
         if (
             status != "observed"
             or type(value) not in (int, float)
-            or not math.isfinite(value)
-            or not math.isclose(value, point - t0, rel_tol=1e-9, abs_tol=1e-9)
+            or not math.isfinite(cast(float, value))
+            or not math.isclose(cast(float, value), point - t0, rel_tol=1e-9, abs_tol=1e-9)
         ):
             return f"invalid_{metric}_observation"
     first = row.get("t_r_first_mono")
@@ -786,7 +792,7 @@ def _timing_problem(row):
     return None
 
 
-def _analysis_problem(row):
+def _analysis_problem(row: dict) -> str | None:
     status = row.get("status")
     if status not in ANALYSIS_STATUSES:
         return f"status:{status}"
@@ -828,7 +834,7 @@ def _analysis_problem(row):
         return "invalid_source_revision"
     if not re.fullmatch(r"[0-9a-f]{64}", str(row.get("render_sha256") or "")):
         return "invalid_render_sha256"
-    limit = row.get("censor_seconds")
+    limit = cast(float, row.get("censor_seconds"))
     if type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0:
         return "invalid_censor_seconds"
     for metric in ("detection", "evidence", "recovery"):
@@ -847,22 +853,22 @@ def _analysis_problem(row):
         if (
             metric_status == "observed"
             and type(value) in (int, float)
-            and math.isfinite(value)
-            and 0 <= value <= limit
+            and math.isfinite(cast(float, value))
+            and 0 <= cast(float, value) <= limit
         ):
             continue
         return f"invalid_{metric}_observation"
     return None
 
 
-def _analysis_row(row):
+def _analysis_row(row: dict) -> dict:
     mapped = dict(row)
     env = row.get("env") or row.get("arm")
     mapped["env"] = "manual" if env == "imperative" else env
     return mapped
 
 
-def _exclusion(entry, reason):
+def _exclusion(entry: dict, reason: str) -> dict:
     return {
         "run_id": entry["run_id"],
         "arm": entry["arm"],
@@ -874,7 +880,7 @@ def _exclusion(entry, reason):
     }
 
 
-def _analysis_view(manifest, rows):
+def _analysis_view(manifest: dict, rows: list) -> tuple[list, list]:
     by_id = {row.get("run_id"): row for row in rows}
     analysis_rows = []
     exclusions = []
@@ -894,7 +900,7 @@ def _analysis_view(manifest, rows):
     return analysis_rows, exclusions
 
 
-def _phase_summary(manifest, analysis_rows):
+def _phase_summary(manifest: dict, analysis_rows: list) -> dict:
     phases = {
         "R2": {"planned": 0, "recorded": 0, "observed": 0, "right_censored": 0, "excluded": 0},
         "R1": {"planned": 0, "recorded": 0, "observed": 0, "right_censored": 0, "excluded": 0},
@@ -915,8 +921,8 @@ def _phase_summary(manifest, analysis_rows):
     return phases
 
 
-def _censoring(analysis_rows):
-    result = {}
+def _censoring(analysis_rows: list) -> dict:
+    result: dict[str, dict] = {}
     for phase in ("R2", "R1"):
         phase_rows = [row for row in analysis_rows if row.get("batch_phase") == phase]
         result[phase] = {}
@@ -930,7 +936,7 @@ def _censoring(analysis_rows):
     return result
 
 
-def _summary(manifest, analysis_rows, exclusions):
+def _summary(manifest: dict, analysis_rows: list, exclusions: list) -> dict:
     return {
         "schema_version": BATCH_SCHEMA_VERSION,
         "batch_id": manifest["batch_id"],
@@ -966,7 +972,9 @@ def _summary(manifest, analysis_rows, exclusions):
     }
 
 
-def _write_batch_outputs(_args, _batch_id, paths, manifest, rows):
+def _write_batch_outputs(
+    _args: argparse.Namespace, _batch_id: str, paths: dict, manifest: dict, rows: list
+) -> dict:
     by_id = {row.get("run_id"): row for row in rows}
     ordered = []
     for entry in manifest["runs"]:
@@ -990,7 +998,9 @@ def _write_batch_outputs(_args, _batch_id, paths, manifest, rows):
     return summary
 
 
-def _run_one(args, item, run_id):
+def _run_one(
+    args: argparse.Namespace, item: dict, run_id: str
+) -> tuple[int, dict | None, str | None]:
     """Delegate one run to the existing harness entrypoint path."""
     argv = [
         "--arm",
@@ -1024,7 +1034,9 @@ def _run_one(args, item, run_id):
     return code, row, None
 
 
-def _classify(args, code, row, error):
+def _classify(
+    args: argparse.Namespace, code: int, row: object, error: str | None
+) -> tuple[str, str | None]:
     if error:
         return "failure", "runner_exception"
     if not isinstance(row, dict):
@@ -1048,7 +1060,7 @@ def _classify(args, code, row, error):
     return status, stop_reason
 
 
-def _baseline_retryable(status, row):
+def _baseline_retryable(status: str, row: object) -> bool:
     """A baseline failure is retryable only before any injection or mutation."""
     if status != "baseline_failure" or not isinstance(row, dict):
         return False
@@ -1064,7 +1076,7 @@ def _baseline_retryable(status, row):
     return row.get("mutations_executed") in (None, 0)
 
 
-def _next_pending_run_id(manifest, current):
+def _next_pending_run_id(manifest: dict, current: dict) -> str | None:
     seen = False
     for entry in manifest["runs"]:
         if entry is current:
@@ -1075,7 +1087,16 @@ def _next_pending_run_id(manifest, current):
     return None
 
 
-def _cooldown(args, batch_id, paths, manifest, rows, after_run_id, next_run_id, sleep):
+def _cooldown(
+    args: argparse.Namespace,
+    batch_id: str,
+    paths: dict,
+    manifest: dict,
+    rows: list,
+    after_run_id: str,
+    next_run_id: str,
+    sleep: Callable[[float], None],
+) -> None:
     record = {
         "after_run_id": after_run_id,
         "next_run_id": next_run_id,
@@ -1100,7 +1121,7 @@ def _cooldown(args, batch_id, paths, manifest, rows, after_run_id, next_run_id, 
     _write_batch_outputs(args, batch_id, paths, manifest, rows)
 
 
-def _print_result(paths, manifest, summary):
+def _print_result(paths: dict, manifest: dict, summary: dict) -> None:
     print(
         json.dumps(
             {
@@ -1118,7 +1139,12 @@ def _print_result(paths, manifest, summary):
     )
 
 
-def run_batch(args, run_one=None, sleep=None):
+def run_batch(
+    args: argparse.Namespace,
+    run_one: Callable[[argparse.Namespace, dict, str], tuple[int, dict | None, str | None]]
+    | None = None,
+    sleep: Callable[[float], None] | None = None,
+) -> int:
     sleep = sleep or time.sleep
     validate_batch_args(args)
     plan = build_plan(args.arms, args.scenarios, args.reps, args.seed)
@@ -1264,7 +1290,7 @@ def run_batch(args, run_one=None, sleep=None):
     return 1 if failures else 0
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     try:
         args = parse_args(argv)
         return run_batch(args)

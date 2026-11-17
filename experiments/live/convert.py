@@ -31,7 +31,7 @@ COLUMNS = [
 ]
 
 
-def _number(value):
+def _number(value: object) -> str:
     if value is None:
         return ""
     if type(value) is int:
@@ -41,7 +41,7 @@ def _number(value):
     return str(value)
 
 
-def _notes(row):
+def _notes(row: dict) -> str:
     parts = [
         "status=" + str(row.get("status", "")),
         "detection_controller=" + str(row.get("detection_controller")),
@@ -60,7 +60,7 @@ def _notes(row):
     return "; ".join(parts)
 
 
-def row_to_csv(row):
+def row_to_csv(row: dict) -> dict:
     env = row.get("env") or row.get("arm")
     if env == "imperative":
         env = "manual"
@@ -83,7 +83,7 @@ def row_to_csv(row):
     }
 
 
-def write_csv(rows, path):
+def write_csv(rows: list, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
@@ -93,7 +93,7 @@ def write_csv(rows, path):
             writer.writerow(row_to_csv(row))
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--in", dest="source", type=Path, required=True)
     parser.add_argument("--out", dest="target", type=Path, required=True)

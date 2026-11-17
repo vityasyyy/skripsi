@@ -14,6 +14,7 @@ import argparse
 import importlib.util
 import json
 import sys
+import types
 from pathlib import Path
 
 
@@ -32,7 +33,7 @@ def _load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def _load_analyzer(path: Path):
+def _load_analyzer(path: Path) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location("analyze_live_sensitivity", path)
     if spec is None or spec.loader is None:
         raise SystemExit(f"cannot load analyzer: {path}")
@@ -49,7 +50,7 @@ def _is_within(path: Path, root: Path) -> bool:
     return True
 
 
-def _reject_frozen_output(out: Path | None, batch_dir: Path, analysis_json: Path):
+def _reject_frozen_output(out: Path | None, batch_dir: Path, analysis_json: Path) -> None:
     if out is None:
         return
     for label, root in (

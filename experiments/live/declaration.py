@@ -62,7 +62,7 @@ class Declaration:
         }
 
 
-def _object_pairs(pairs):
+def _object_pairs(pairs: list) -> dict:
     result = {}
     for key, value in pairs:
         if key in result:
@@ -71,18 +71,20 @@ def _object_pairs(pairs):
     return result
 
 
-def _reject_constant(_value):
+def _reject_constant(_value: object) -> None:
     raise DeclarationError("render bundle contains a non-finite number")
 
 
-def _finite_float(text):
+def _finite_float(text: str) -> float:
     value = float(text)
     if not math.isfinite(value):
         raise DeclarationError("render bundle contains a non-finite number")
     return value
 
 
-def load(path, expected_sha256: str, expected_revision: str, namespace: str) -> Declaration:
+def load(
+    path: str | Path, expected_sha256: str, expected_revision: str, namespace: str
+) -> Declaration:
     try:
         data = Path(path).read_bytes()
     except OSError as error:
@@ -187,11 +189,11 @@ def selected_fields(doc: dict) -> dict:
     return {}
 
 
-def _mapping(value) -> dict:
+def _mapping(value: object) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def _container(doc: dict):
+def _container(doc: dict) -> dict | None:
     spec = _mapping(doc.get("spec"))
     template = _mapping(spec.get("template"))
     pod_spec = _mapping(template.get("spec"))
@@ -246,7 +248,7 @@ def _configmap_reference(container: dict) -> str:
     return names[0]
 
 
-def _validate_objects(objects) -> None:
+def _validate_objects(objects: list) -> None:
     for item in objects:
         if not isinstance(item, dict):
             raise DeclarationError("render bundle objects must be object dictionaries")
@@ -261,14 +263,14 @@ def _validate_objects(objects) -> None:
             raise DeclarationError("render bundle contains an object without a name")
 
 
-def _index_objects(objects):
-    index = {}
+def _index_objects(objects: list) -> dict:
+    index: dict[tuple[str, str], list[dict]] = {}
     for item in objects:
         index.setdefault((item["kind"], item["metadata"]["name"]), []).append(item)
     return index
 
 
-def _target(index, kind: str, name: str, namespace: str) -> dict:
+def _target(index: dict, kind: str, name: str, namespace: str) -> dict:
     matches = index.get((kind, name), [])
     if not matches:
         raise DeclarationError(f"frozen render is missing {kind}/{name}")
@@ -293,7 +295,7 @@ def _resource(doc: dict, namespace: str) -> dict:
     }
 
 
-def _validate_fields(resources) -> None:
+def _validate_fields(resources: tuple) -> None:
     for resource in resources:
         fields = resource["fields"]
         kind = resource["kind"]
@@ -345,7 +347,7 @@ def _validate_fields(resources) -> None:
                 raise DeclarationError(f"{resource['id']} already carries the drift annotation")
 
 
-def _require_fields(fields: dict, paths, identity: str) -> None:
+def _require_fields(fields: dict, paths: tuple, identity: str) -> None:
     for path in paths:
         if path not in fields or fields[path] is None:
             raise DeclarationError(f"{identity} is missing required field {path}")

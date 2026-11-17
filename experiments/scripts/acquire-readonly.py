@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Export selected non-secret observations; never authorize a run or modify a cluster."""
 
+from __future__ import annotations
+
 import argparse
 import contextlib
 import json
@@ -8,33 +10,34 @@ import re
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
 
-def quantity(value):
+def quantity(value: str) -> Decimal:
     match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(n|u|m|Ki|Mi|Gi|Ti|k|M|G|T)?", value)
     if not match:
         raise ValueError("unsupported Kubernetes quantity")
     factors = {
-        None: 1,
+        None: Decimal(1),
         "n": Decimal("1e-9"),
         "u": Decimal("1e-6"),
         "m": Decimal("1e-3"),
-        "Ki": 1024,
-        "Mi": 1024**2,
-        "Gi": 1024**3,
-        "Ti": 1024**4,
-        "k": 1000,
-        "M": 1000**2,
-        "G": 1000**3,
-        "T": 1000**4,
+        "Ki": Decimal(1024),
+        "Mi": Decimal(1024**2),
+        "Gi": Decimal(1024**3),
+        "Ti": Decimal(1024**4),
+        "k": Decimal(1000),
+        "M": Decimal(1000**2),
+        "G": Decimal(1000**3),
+        "T": Decimal(1000**4),
     }
     return Decimal(match[1]) * factors[match[2]]
 
 
-def selected_field(obj, kind, path):
+def selected_field(obj: dict, kind: str, path: str) -> object:
     safe = (
         (
             kind == "Deployment"
@@ -59,7 +62,7 @@ def selected_field(obj, kind, path):
     return value
 
 
-def unique(items, identity):
+def unique(items: list, identity: Callable[[dict], object]) -> dict:
     result = {}
     for item in items:
         key = identity(item)
@@ -69,7 +72,7 @@ def unique(items, identity):
     return result
 
 
-def export(bundle, namespace, run_id):
+def export(bundle: dict, namespace: str, run_id: str) -> dict:
     if not isinstance(run_id, str) or not run_id.strip():
         raise ValueError("run identity required for sample binding")
     spec = bundle["contract"]
@@ -171,7 +174,7 @@ def export(bundle, namespace, run_id):
     }
 
 
-def kubectl_json(arguments):
+def kubectl_json(arguments: list) -> object:
     output_flags = [] if "--raw" in arguments else ["-o", "json"]
     result = subprocess.run(
         ["kubectl", "--request-timeout=10s", *arguments, *output_flags],
@@ -183,7 +186,7 @@ def kubectl_json(arguments):
     return json.loads(result.stdout)
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--namespace", required=True)
     source = parser.add_mutually_exclusive_group(required=True)

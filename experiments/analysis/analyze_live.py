@@ -35,6 +35,7 @@ import re
 import sys
 from pathlib import Path
 from statistics import median
+from typing import TypedDict, cast
 
 SCENARIOS = tuple("ABCDEFG")
 EFFICACY_SCENARIOS = frozenset("BCDE")
@@ -152,15 +153,22 @@ REQUIRED_FIELDS = frozenset(
 )
 
 
+class _EndpointCounts(TypedDict):
+    observed: int
+    right_censored: int
+    missing: int
+    excluded: int | None
+
+
 class LiveAnalysisError(ValueError):
     """Input is not a valid batch analysis dataset."""
 
 
-def _number(value):
-    return type(value) in (int, float) and math.isfinite(value)
+def _number(value: object) -> bool:
+    return type(value) in (int, float) and math.isfinite(cast(float, value))
 
 
-def _load_jsonl(path):
+def _load_jsonl(path: str | Path) -> list[dict]:
     rows = []
     try:
         text = Path(path).read_text()
@@ -181,12 +189,12 @@ def _load_jsonl(path):
     return rows
 
 
-def _require(condition, message):
+def _require(condition: object, message: str) -> None:
     if not condition:
         raise LiveAnalysisError(message)
 
 
-def _validate_metric(row, metric):
+def _validate_metric(row: dict, metric: str) -> None:
     value = row.get(metric + "_seconds")
     status = row.get(metric + "_status")
     limit = row["censor_seconds"]
@@ -196,7 +204,10 @@ def _validate_metric(row, metric):
     )
     if status == "observed":
         _require(_number(value), f"{metric}_seconds is not a finite number")
-        _require(0 <= value <= limit, f"{metric}_seconds is outside [0, censor_seconds]")
+        _require(
+            0 <= cast(float, value) <= cast(float, limit),
+            f"{metric}_seconds is outside [0, censor_seconds]",
+        )
     elif status == "right_censored":
         _require(value is None, f"{metric}_seconds must be null when right_censored")
     else:
@@ -209,7 +220,7 @@ def _validate_metric(row, metric):
         )
 
 
-def _validate_timing(row, strict):
+def _validate_timing(row: dict, strict: bool) -> None:
     """Validate completed-observation bounds for new-convention rows.
 
     Legacy rows predate the convention and are validated by the older field
@@ -230,10 +241,10 @@ def _validate_timing(row, strict):
     )
     missing = [field for field in required if field not in row]
     _require(not missing, f"new-convention row is missing timing fields: {missing}")
-    t0 = row.get("t0_mono")
-    limit = row.get("censor_seconds")
+    t0 = cast(float, row.get("t0_mono"))
+    limit = cast(float, row.get("censor_seconds"))
     _require(_number(t0), "t0_mono is not finite")
-    t_a = row.get("t_a_mono")
+    t_a = cast(float, row.get("t_a_mono"))
     _require(_number(t_a) and t_a >= t0, "t_a_mono is not after t0_mono")
     if row.get("injection_seconds") is not None:
         _require(
@@ -244,7 +255,7 @@ def _validate_timing(row, strict):
         row.get("window_completed") is True,
         "new-convention row lacks completed observation-window provenance",
     )
-    window_end = row.get("window_end_mono")
+    window_end = cast(float, row.get("window_end_mono"))
     _require(
         _number(window_end) and window_end >= t0,
         "window_end_mono is not a finite completion after t0",
@@ -263,8 +274,8 @@ def _validate_timing(row, strict):
         )
     for metric in METRICS:
         key = {"detection": "t_d", "evidence": "t_e", "recovery": "t_r"}[metric]
-        point = row.get(key + "_mono")
-        value = row.get(metric + "_seconds")
+        point: float | None = row.get(key + "_mono")
+        value: float | None = row.get(metric + "_seconds")
         status = row.get(metric + "_status")
         if point is None:
             _require(
@@ -277,12 +288,13 @@ def _validate_timing(row, strict):
         _require(point <= t0 + limit, f"{key}_mono exceeds the censor limit")
         _require(point <= window_end, f"{key}_mono occurs after the observation window ended")
         _require(
-            _number(value) and math.isclose(value, point - t0, rel_tol=1e-9, abs_tol=1e-9),
+            _number(value)
+            and math.isclose(cast(float, value), point - t0, rel_tol=1e-9, abs_tol=1e-9),
             f"{metric}_seconds disagrees with its bounds",
         )
         _require(status == "observed", f"{key}_mono is present for a non-observed metric")
-    t_r_first = row.get("t_r_first_mono")
-    t_r_confirmed = row.get("t_r_confirmed_mono")
+    t_r_first: float | None = row.get("t_r_first_mono")
+    t_r_confirmed: float | None = row.get("t_r_confirmed_mono")
     if t_r_first is not None:
         _require(
             _number(t_r_first) and t0 <= t_r_first <= t0 + limit,
@@ -333,7 +345,7 @@ def _validate_timing(row, strict):
             and row.get("recovery_confirmation") != "confirmed",
             "unconfirmed recovery carries a primary recovery bound",
         )
-    store = row.get("t_e_store_mono")
+    store: float | None = row.get("t_e_store_mono")
     if store is not None:
         _require(
             _number(store) and row.get("t_e_mono") is not None and store >= row["t_e_mono"],
@@ -346,7 +358,7 @@ def _validate_timing(row, strict):
             )
 
 
-def _run_attempt(row, label, base_run_id):
+def _run_attempt(row: dict, label: str, base_run_id: str) -> int:
     """Attempt number encoded by the run id; retries use `-retry<N>`."""
     run_id = row["run_id"]
     if run_id == base_run_id:
@@ -355,10 +367,11 @@ def _run_attempt(row, label, base_run_id):
     _require(run_id.startswith(prefix), f"{label} has run_id/identity mismatch")
     match = RETRY_SUFFIX.fullmatch(run_id[len(prefix) :])
     _require(match is not None, f"{label} has malformed retry suffix")
+    assert match is not None
     return int(match.group(1))
 
 
-def _validate_attempt_metadata(row, label, base_run_id, attempt):
+def _validate_attempt_metadata(row: dict, label: str, base_run_id: str, attempt: int) -> None:
     """Check optional attempt fields; legacy unsuffixed rows omit them."""
     present = [field for field in ATTEMPT_FIELDS if field in row]
     _require(len(present) in (0, 2), f"{label} has incomplete attempt metadata")
@@ -375,13 +388,18 @@ def _validate_attempt_metadata(row, label, base_run_id, attempt):
     _require(value == attempt, f"{label} has inconsistent retry suffix")
 
 
-def validate_rows(rows):
+def validate_rows(rows: list) -> dict:
     """Validate one batch analysis dataset; raise on any inconsistency."""
     _require(isinstance(rows, list) and rows, "dataset must be a non-empty list")
-    batches, revisions, renders = set(), set(), set()
-    approvals, isolated, modes = set(), set(), set()
-    conventions = set()
-    seen_runs, seen_blocks = set(), set()
+    batches: set[str] = set()
+    revisions: set[str] = set()
+    renders: set[str] = set()
+    approvals: set[bool] = set()
+    isolated: set[bool] = set()
+    modes: set[str] = set()
+    conventions: set[str | None] = set()
+    seen_runs: set[str] = set()
+    seen_blocks: set[tuple[str, str, int]] = set()
     for index, row in enumerate(rows, 1):
         _require(isinstance(row, dict), f"row {index} is not an object")
         missing = sorted(REQUIRED_FIELDS - set(row))
@@ -502,7 +520,7 @@ def validate_rows(rows):
     }
 
 
-def _average_ranks(values):
+def _average_ranks(values: list) -> list[float]:
     order = sorted(range(len(values)), key=lambda index: values[index])
     ranks = [0.0] * len(values)
     start = 0
@@ -517,7 +535,7 @@ def _average_ranks(values):
     return ranks
 
 
-def cliffs_delta(first, second):
+def cliffs_delta(first: list, second: list) -> float | None:
     """P(first > second) - P(first < second), in [-1, 1]."""
     if not first or not second:
         return None
@@ -526,7 +544,7 @@ def cliffs_delta(first, second):
     return (greater - less) / (len(first) * len(second))
 
 
-def mann_whitney_u(first, second):
+def mann_whitney_u(first: list, second: list) -> dict:
     """Two-sided Mann--Whitney U via the tie-corrected normal approximation."""
     n1, n2 = len(first), len(second)
     if n1 < MIN_GROUP or n2 < MIN_GROUP:
@@ -571,7 +589,7 @@ def mann_whitney_u(first, second):
     }
 
 
-def wilcoxon_signed_rank(differences):
+def wilcoxon_signed_rank(differences: list) -> dict:
     """Two-sided Wilcoxon signed-rank test with exact p for n <= 16."""
     nonzero = [value for value in differences if value != 0]
     n = len(nonzero)
@@ -625,7 +643,7 @@ def wilcoxon_signed_rank(differences):
     }
 
 
-def kaplan_meier(events, censored, horizon):
+def kaplan_meier(events: list, censored: list, horizon: float) -> dict:
     """Kaplan--Meier curve and restricted mean survival to `horizon`.
 
     Events beyond the horizon are administratively censored at the horizon.
@@ -652,7 +670,7 @@ def kaplan_meier(events, censored, horizon):
             "rmst_seconds": None,
             "survival_at_horizon": None,
         }
-    timeline = {}
+    timeline: dict[float, list[int]] = {}
     observed = 0
     for value in events:
         if value > horizon:
@@ -691,13 +709,13 @@ def kaplan_meier(events, censored, horizon):
     }
 
 
-def holm_adjust(p_values, family_size):
+def holm_adjust(p_values: list, family_size: int) -> list[float | None]:
     """Holm step-down adjusted p-values, preserving input order."""
     _require(family_size >= len(p_values), "family size cannot be smaller than tested hypotheses")
     _require(
         all(_number(value) and 0 <= value <= 1 for value in p_values), "p-values must be in [0, 1]"
     )
-    adjusted = [None] * len(p_values)
+    adjusted: list[float | None] = [None] * len(p_values)
     running = 0.0
     for rank, index in enumerate(sorted(range(len(p_values)), key=lambda item: p_values[item]), 1):
         candidate = min(1.0, (family_size - rank + 1) * p_values[index])
@@ -706,7 +724,7 @@ def holm_adjust(p_values, family_size):
     return adjusted
 
 
-def _percentile(sorted_values, fraction):
+def _percentile(sorted_values: list, fraction: float) -> float | None:
     if not sorted_values:
         return None
     position = (len(sorted_values) - 1) * fraction
@@ -718,7 +736,9 @@ def _percentile(sorted_values, fraction):
     return sorted_values[lower] * (1 - weight) + sorted_values[upper] * weight
 
 
-def _bootstrap_cliff(first, second, resamples, seed, pairs=None):
+def _bootstrap_cliff(
+    first: list, second: list, resamples: int, seed: int, pairs: list | None = None
+) -> list[float | None] | None:
     if not first or not second:
         return None
     rng = random.Random(f"{seed}:cliff")
@@ -736,7 +756,7 @@ def _bootstrap_cliff(first, second, resamples, seed, pairs=None):
     return [_percentile(values, 0.025), _percentile(values, 0.975)]
 
 
-def _bootstrap_median(values, resamples, seed):
+def _bootstrap_median(values: list, resamples: int, seed: int) -> list[float | None] | None:
     if not values:
         return None
     rng = random.Random(f"{seed}:paired")
@@ -744,7 +764,9 @@ def _bootstrap_median(values, resamples, seed):
     return [_percentile(draws, 0.025), _percentile(draws, 0.975)]
 
 
-def _excluded_count(exclusions, scenario, arm, phase="R2"):
+def _excluded_count(
+    exclusions: dict | None, scenario: str, arm: str, phase: str = "R2"
+) -> int | None:
     if exclusions is None or exclusions.get("count") is None:
         return None
     return sum(
@@ -756,8 +778,8 @@ def _excluded_count(exclusions, scenario, arm, phase="R2"):
     )
 
 
-def _pairing(rows, metric):
-    arms = {"manual": {}, "gitops": {}}
+def _pairing(rows: list, metric: str) -> dict:
+    arms: dict[str, dict[int, dict]] = {"manual": {}, "gitops": {}}
     for row in rows:
         arms[row["env"]][row["rep"]] = row
     blocks = sorted(set(arms["manual"]) | set(arms["gitops"]))
@@ -815,12 +837,19 @@ def _pairing(rows, metric):
     }
 
 
-def _comparison(rows, scenario, metric, bootstrap, seed, exclusions=None):
+def _comparison(
+    rows: list,
+    scenario: str,
+    metric: str,
+    bootstrap: int,
+    seed: int,
+    exclusions: dict | None = None,
+) -> dict:
     pairing = _pairing(rows, metric)
     manual = {row["rep"]: row for row in rows if row["env"] == "manual"}
     gitops = {row["rep"]: row for row in rows if row["env"] == "gitops"}
-    observed = {"manual": [], "gitops": []}
-    counts = {}
+    observed: dict[str, list[float]] = {"manual": [], "gitops": []}
+    counts: dict[str, _EndpointCounts] = {}
     for arm, rows_by_rep in (("manual", manual), ("gitops", gitops)):
         counts[arm] = {
             "observed": 0,
@@ -837,8 +866,8 @@ def _comparison(rows, scenario, metric, bootstrap, seed, exclusions=None):
                 counts[arm]["right_censored"] += 1
             else:
                 counts[arm]["missing"] += 1
-    differences = []
-    pairs = []
+    differences: list[float] = []
+    pairs: list[tuple[float, float]] = []
     if pairing["method"] == "paired":
         for rep in sorted(set(manual) & set(gitops)):
             left = manual[rep][metric + "_seconds"]
@@ -911,8 +940,8 @@ def _comparison(rows, scenario, metric, bootstrap, seed, exclusions=None):
     }
 
 
-def _survival_entries(rows, exclusions=None):
-    groups = {}
+def _survival_entries(rows: list, exclusions: dict | None = None) -> list:
+    groups: dict[tuple[str, str], list[dict]] = {}
     for row in rows:
         groups.setdefault((row["scenario"], row["env"]), []).append(row)
     entries = []
@@ -970,8 +999,8 @@ def _survival_entries(rows, exclusions=None):
     return entries
 
 
-def _r1_entries(rows):
-    groups = {}
+def _r1_entries(rows: list) -> list:
+    groups: dict[tuple[str, str, str], list[dict]] = {}
     for row in rows:
         groups.setdefault((row["scenario"], row["env"], row["batch_phase"]), []).append(row)
     entries = []
@@ -993,7 +1022,7 @@ def _r1_entries(rows):
     return entries
 
 
-def _classify_raw(row):
+def _classify_raw(row: dict) -> str | None:
     """Conservative exclusion reason for a raw batch row; None if analyzable."""
     if row.get("batch_mode") == "dry_run" or row.get("status") == "dry_run":
         return "dry_run"
@@ -1021,11 +1050,11 @@ def _classify_raw(row):
         str(row.get("render_sha256"))
     ):
         return "invalid_provenance"
-    limit = row.get("censor_seconds")
+    limit = cast(float, row.get("censor_seconds"))
     if not (_number(limit) and limit > 0):
         return "invalid_censor_seconds"
     for metric in METRICS:
-        value = row.get(metric + "_seconds")
+        value: float | None = row.get(metric + "_seconds")
         status = row.get(metric + "_status")
         if status == "right_censored" and value is None:
             continue
@@ -1037,13 +1066,13 @@ def _classify_raw(row):
             and row.get("recovery_status") == "observed"
         ):
             continue
-        if status == "observed" and _number(value) and 0 <= value <= limit:
+        if status == "observed" and _number(value) and 0 <= cast(float, value) <= limit:
             continue
         return "invalid_metric_observation"
     return None
 
 
-def _raw_identity(row, index, batch_id):
+def _raw_identity(row: dict, index: int, batch_id: str) -> tuple[tuple[str, str, int], int]:
     """Return the raw row's cell and attempt, validated against its run id."""
     arm = row.get("arm")
     _require(isinstance(arm, str) and arm in ARM_ENV, f"raw row {index} has invalid arm")
@@ -1054,10 +1083,10 @@ def _raw_identity(row, index, batch_id):
     base_run_id = f"{batch_id}-{arm}-{scenario}-r{rep:02d}"
     attempt = _run_attempt(row, f"raw row {index}", base_run_id)
     _validate_attempt_metadata(row, f"raw row {index}", base_run_id, attempt)
-    return (arm, scenario, rep), attempt
+    return (cast(str, arm), cast(str, scenario), cast(int, rep)), attempt
 
 
-def _validate_analyzed_raw(raw, analysis, index):
+def _validate_analyzed_raw(raw: dict, analysis: dict, index: int) -> None:
     """Reject raw evidence that disagrees with its analyzed run."""
     raw_marker = raw.get("timing_convention")
     analysis_marker = analysis.get("timing_convention")
@@ -1103,7 +1132,7 @@ def _validate_analyzed_raw(raw, analysis, index):
                 _require(not row[field], f"{label} has {field}")
 
 
-def _raw_retry_violation(predecessor):
+def _raw_retry_violation(predecessor: dict) -> str | None:
     """Mirror the runner's pre-injection baseline retry policy."""
     if predecessor.get("status") != "baseline_failure":
         return "predecessor_not_baseline_failure"
@@ -1121,7 +1150,7 @@ def _raw_retry_violation(predecessor):
     return None
 
 
-def _validate_raw_chain(cells):
+def _validate_raw_chain(cells: dict) -> None:
     """Each attempt after 0 must follow one retryable baseline failure."""
     for cell, attempts in cells.items():
         attempts.sort(key=lambda item: item[0])
@@ -1141,7 +1170,7 @@ def _validate_raw_chain(cells):
             )
 
 
-def _exclusions(rows, raw_rows):
+def _exclusions(rows: list, raw_rows: list | None) -> dict:
     if raw_rows is None:
         return {
             "source": "not_provided",
@@ -1154,8 +1183,8 @@ def _exclusions(rows, raw_rows):
     batch_id = rows[0]["batch_id"]
     analysis_marker = rows[0].get("timing_convention")
     analyzed = {row["run_id"]: row for row in rows}
-    raw_ids = []
-    cells = {}
+    raw_ids: list[str] = []
+    cells: dict[tuple[str, str, int], list[tuple[int, dict, int]]] = {}
     for index, row in enumerate(raw_rows, 1):
         _require(isinstance(row, dict), f"raw row {index} is not an object")
         run_id = row.get("run_id")
@@ -1201,7 +1230,7 @@ def _exclusions(rows, raw_rows):
                 "reason": reason,
             }
         )
-    by_reason = {}
+    by_reason: dict[str, int] = {}
     for item in excluded:
         by_reason[item["reason"]] = by_reason.get(item["reason"], 0) + 1
     return {
@@ -1214,8 +1243,13 @@ def _exclusions(rows, raw_rows):
 
 
 def analyze(
-    rows, raw_rows=None, *, bootstrap=DEFAULT_BOOTSTRAP, seed=DEFAULT_SEED, alpha=DEFAULT_ALPHA
-):
+    rows: list,
+    raw_rows: list | None = None,
+    *,
+    bootstrap: int = DEFAULT_BOOTSTRAP,
+    seed: int = DEFAULT_SEED,
+    alpha: float = DEFAULT_ALPHA,
+) -> dict:
     """Return the complete analysis result; raise on invalid input."""
     _require(type(bootstrap) is int and bootstrap >= 100, "bootstrap must be an integer >= 100")
     _require(type(seed) is int and seed >= 0, "seed must be a non-negative integer")
@@ -1229,7 +1263,7 @@ def analyze(
             group = [row for row in r2_rows if row["scenario"] == scenario and row["env"] == arm]
             if not group:
                 continue
-            counts = {}
+            counts: dict[str, _EndpointCounts] = {}
             for metric in METRICS:
                 counts[metric] = {
                     "observed": sum(1 for row in group if row[metric + "_status"] == "observed"),
@@ -1260,7 +1294,9 @@ def analyze(
         for metric in METRICS:
             group = [row for row in r2_rows if row["scenario"] == scenario]
             efficacy.append(_comparison(group, scenario, metric, bootstrap, seed, exclusions))
-    p_values = [item["test"]["p_value"] for item in efficacy if item["test"]["p_value"] is not None]
+    p_values: list[float] = [
+        item["test"]["p_value"] for item in efficacy if item["test"]["p_value"] is not None
+    ]
     adjusted = holm_adjust(p_values, FAMILY_SIZE)
     position = 0
     for item in efficacy:
@@ -1268,8 +1304,9 @@ def analyze(
             item["holm_adjusted_p"] = None
             item["reject_holm"] = None
         else:
-            item["holm_adjusted_p"] = adjusted[position]
-            item["reject_holm"] = adjusted[position] < alpha
+            adjusted_p = cast(float, adjusted[position])
+            item["holm_adjusted_p"] = adjusted_p
+            item["reject_holm"] = adjusted_p < alpha
             position += 1
     ineligible = [scenario for scenario in SCENARIOS if scenario not in EFFICACY_SCENARIOS]
     return {
@@ -1372,7 +1409,7 @@ def analyze(
     }
 
 
-def _tex_escape(value):
+def _tex_escape(value: object) -> str:
     text = str(value).replace("\n", " ").replace("\r", " ").replace("\t", " ")
     replacements = {
         "\\": r"\textbackslash{}",
@@ -1389,13 +1426,13 @@ def _tex_escape(value):
     return "".join(replacements.get(char, char) for char in text)
 
 
-def _num(value, digits=3):
+def _num(value: float | None, digits: int = 3) -> str:
     if value is None:
         return "--"
     return f"{value:.{digits}f}".replace(".", ",")
 
 
-def _p(value):
+def _p(value: float | None) -> str:
     if value is None:
         return "--"
     if value < 0.001:
@@ -1403,7 +1440,7 @@ def _p(value):
     return f"{value:.3f}".replace(".", ",")
 
 
-def _interval(value, interval):
+def _interval(value: float | None, interval: list | None) -> str:
     if value is None:
         return "--"
     if interval is None:
@@ -1411,7 +1448,7 @@ def _interval(value, interval):
     return f"{_num(value)} [{_num(interval[0])}; {_num(interval[1])}]"
 
 
-def _overview_tex(result):
+def _overview_tex(result: dict) -> str:
     lines = [
         "% Generated by experiments/analysis/analyze_live.py; do not edit.",
         r"\begin{table}[H]",
@@ -1483,7 +1520,7 @@ def _overview_tex(result):
     return "\n".join(lines)
 
 
-def _exclusions_tex(result):
+def _exclusions_tex(result: dict) -> str:
     excluded = result["exclusions"]
     lines = [
         "% Generated by experiments/analysis/analyze_live.py; do not edit.",
@@ -1515,13 +1552,13 @@ def _exclusions_tex(result):
     return "\n".join(lines)
 
 
-def _r1_cell(block):
+def _r1_cell(block: dict) -> str:
     if block["present"] == 0:
         return "-- (0)"
     return f"{_num(block['median'])} ({block['present']})"
 
 
-def _r1_tex(result):
+def _r1_tex(result: dict) -> str:
     lines = [
         "% Generated by experiments/analysis/analyze_live.py; do not edit.",
         r"\begin{table}[H]",
@@ -1558,7 +1595,7 @@ def _r1_tex(result):
     return "\n".join(lines)
 
 
-def _survival_tex(result):
+def _survival_tex(result: dict) -> str:
     lines = [
         "% Generated by experiments/analysis/analyze_live.py; do not edit.",
         r"\begin{table}[H]",
@@ -1610,7 +1647,7 @@ def _survival_tex(result):
     return "\n".join(lines)
 
 
-def _tests_tex(result):
+def _tests_tex(result: dict) -> str:
     lines = [
         "% Generated by experiments/analysis/analyze_live.py; do not edit.",
         r"\begin{table}[H]",
@@ -1674,7 +1711,7 @@ def _tests_tex(result):
     return "\n".join(lines)
 
 
-def _effects_tex(result):
+def _effects_tex(result: dict) -> str:
     lines = [
         "% Generated by experiments/analysis/analyze_live.py; do not edit.",
         r"\begin{table}[H]",
@@ -1722,7 +1759,7 @@ def _effects_tex(result):
     return "\n".join(lines)
 
 
-def write_outputs(result, outdir, *, force=False):
+def write_outputs(result: dict, outdir: str | Path, *, force: bool = False) -> dict[str, str]:
     """Write JSON and LaTeX artifacts; refuse to overwrite without `force`."""
     directory = Path(outdir)
     directory.mkdir(parents=True, exist_ok=True)
@@ -1753,7 +1790,7 @@ def write_outputs(result, outdir, *, force=False):
     return {key: str(path) for key, path in paths.items()}
 
 
-def parse_args(argv=None):
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--in", dest="source", type=Path, required=True, help="<batch_id>.analysis.jsonl"
@@ -1781,7 +1818,7 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         rows = _load_jsonl(args.source)

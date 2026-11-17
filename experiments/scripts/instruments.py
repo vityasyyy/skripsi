@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Offline evidence evaluator. No cluster clients or mutation executor."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import math
 import re
 import sys
 from pathlib import Path
+from typing import cast
 
 
 class EvidenceError(ValueError):
@@ -21,20 +24,22 @@ class RecoveryError(EvidenceError):
     pass
 
 
-def require(condition, message):
+def require(condition: object, message: str) -> None:
     if not condition:
         raise EvidenceError(message)
 
 
-def number(value, label):
+def number(value: object, label: str) -> float:
     require(
-        type(value) in (int, float) and math.isfinite(value) and value >= 0,
+        type(value) in (int, float)
+        and math.isfinite(cast(float, value))
+        and cast(float, value) >= 0,
         f"{label}: expected finite nonnegative number",
     )
-    return value
+    return cast(float, value)
 
 
-def indexed(items, key, label):
+def indexed(items: list, key: str, label: str) -> dict:
     require(isinstance(items, list) and items, f"{label}: nonempty inventory required")
     result = {}
     for item in items:
@@ -47,7 +52,7 @@ def indexed(items, key, label):
     return result
 
 
-def contract(evidence):
+def contract(evidence: dict) -> dict:
     spec = evidence["contract"]
     require(
         re.fullmatch(r"[0-9a-f]{40}", spec["source_revision"]), "source revision must be pinned"
@@ -91,7 +96,7 @@ def contract(evidence):
     return spec
 
 
-def score(spec, snapshot):
+def score(spec: dict, snapshot: dict) -> float:
     require(not snapshot.get("error"), "instrumentation failure in snapshot")
     for key in ("source_revision", "render_sha256"):
         require(snapshot[key] == spec[key], f"snapshot {key} mismatch")
@@ -134,7 +139,7 @@ CHECKS = (
 )
 
 
-def baseline(evidence, snapshot):
+def baseline(evidence: dict, snapshot: dict) -> None:
     spec = contract(evidence)
     require(snapshot["run_id"] == evidence["run_id"], "baseline/reset belongs to another run")
     number(snapshot["at"], "baseline/reset time")
@@ -169,7 +174,7 @@ def baseline(evidence, snapshot):
         )
 
 
-def injection(evidence):
+def injection(evidence: dict) -> tuple[float, float]:
     event = evidence["injection"]
     require(
         type(event["count"]) is int and event["count"] == 1, "one injection per verified reset only"
@@ -249,7 +254,7 @@ def injection(evidence):
     return start, ack
 
 
-def hpa_restored(spec, sample):
+def hpa_restored(spec: dict, sample: dict) -> bool:
     targets = spec["hpa_targets"]
     require(
         isinstance(targets, list) and targets and len(set(targets)) == len(targets),
@@ -272,7 +277,7 @@ def hpa_restored(spec, sample):
     return restored
 
 
-def metrics(evidence):
+def metrics(evidence: dict) -> dict:
     baseline(evidence, evidence["baseline"])
     spec = contract(evidence)
     start, ack = injection(evidence)
@@ -301,7 +306,7 @@ def metrics(evidence):
     )
     events = evidence["events"]
     require(isinstance(events, list), "event stream required, even if empty")
-    found = {}
+    found: dict[str, float] = {}
     previous = start
     desired = {resource["id"]: resource["fields"] for resource in spec["resources"]}
     for event in events:
@@ -340,9 +345,9 @@ def metrics(evidence):
     samples = evidence["samples"]
     require(isinstance(samples, list) and samples, "observation snapshots required")
     previous = start
-    scores = []
-    recovery = None
-    candidate = None
+    scores: list[float] = []
+    recovery: float | None = None
+    candidate: float | None = None
     deleted = {
         change["resource"]
         for change in evidence["injection"]["changed_fields"]
@@ -404,13 +409,13 @@ def metrics(evidence):
         "source_revision": spec["source_revision"],
         "render_sha256": spec["render_sha256"],
     }
-    for name, at in (
+    for name, when in (
         ("detection", found.get("detection")),
         ("evidence", found.get("evidence")),
         ("recovery", recovery),
     ):
-        result[name + "_seconds"] = None if at is None else at - start
-        if at is not None:
+        result[name + "_seconds"] = None if when is None else when - start
+        if when is not None:
             result[name + "_status"] = "observed"
         elif stop_reason == "timeout":
             result[name + "_status"] = "right_censored"
@@ -419,7 +424,7 @@ def metrics(evidence):
     return result
 
 
-def correction_results(evidence, start, end):
+def correction_results(evidence: dict, start: float, end: float) -> tuple[float, int]:
     commands = evidence["recovery"]["commands"]
     require(isinstance(commands, list) and commands, "correction command results required")
     previous = start
@@ -439,7 +444,7 @@ def correction_results(evidence, start, end):
     return previous, len(commands)
 
 
-def recovery(evidence):
+def recovery(evidence: dict) -> dict:
     baseline(evidence, evidence["baseline"])
     start, ack = injection(evidence)
     end = number(evidence["observation_end"], "observation end")
@@ -450,7 +455,7 @@ def recovery(evidence):
     return {"status": "reset_verified_offline", "commands": count, "offline_only": True}
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Offline evidence validation only; live execution disabled."
     )
