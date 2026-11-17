@@ -1,4 +1,5 @@
 """Checks for the C-r02 sensitivity script's frozen-output guard."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -23,11 +24,16 @@ class FrozenOutputGuardTest(unittest.TestCase):
 
     def _assert_rejected(self, out: Path, batch: Path, analysis: Path):
         with self.assertRaises(SystemExit) as raised:
-            self.module.main([
-                "--batch-dir", str(batch),
-                "--analysis-json", str(analysis / "live_analysis.json"),
-                "--out", str(out),
-            ])
+            self.module.main(
+                [
+                    "--batch-dir",
+                    str(batch),
+                    "--analysis-json",
+                    str(analysis / "live_analysis.json"),
+                    "--out",
+                    str(out),
+                ]
+            )
         self.assertIn("frozen", str(raised.exception).lower())
 
     def test_rejects_output_inside_batch_directory(self):

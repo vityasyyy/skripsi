@@ -6,6 +6,7 @@ single real InvenioRDM stack (`invenio-web`, `invenio-web-hpa`,
 `invenio-app-config-<hash>`, `invenio-app-secrets`) and never the legacy NGINX
 surrogate subjects.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -52,12 +53,14 @@ DeclarationError = declaration.DeclarationError
 CONFIG_DRIFT = "drift-config-value"
 MEMORY_LIMIT_DRIFT = "1536Mi"
 MEMORY_LIMIT_DRIFT_FALLBACK = "1024Mi"
-_RESOURCE_QUANTITY_PATHS = frozenset({
-    "/spec/template/spec/containers/web/resources/requests/cpu",
-    "/spec/template/spec/containers/web/resources/requests/memory",
-    "/spec/template/spec/containers/web/resources/limits/cpu",
-    "/spec/template/spec/containers/web/resources/limits/memory",
-})
+_RESOURCE_QUANTITY_PATHS = frozenset(
+    {
+        "/spec/template/spec/containers/web/resources/requests/cpu",
+        "/spec/template/spec/containers/web/resources/requests/memory",
+        "/spec/template/spec/containers/web/resources/limits/cpu",
+        "/spec/template/spec/containers/web/resources/limits/memory",
+    }
+)
 SEED_RECORD = "4ben9-bgh38"
 SEED_FILE = "seed.bin"
 SEED_SIZE = 65536
@@ -209,8 +212,10 @@ class Contract:
         return {
             "namespace": self.namespace,
             "quarantine_namespace": self.quarantine_namespace,
-            "resources": [{key: copy.deepcopy(value) for key, value in resource.items()}
-                          for resource in self.resources],
+            "resources": [
+                {key: copy.deepcopy(value) for key, value in resource.items()}
+                for resource in self.resources
+            ],
             "hpa_targets": list(self.hpa_targets),
             "configmap_name": self.configmap_name,
             "source_revision": self.source_revision,
@@ -237,10 +242,12 @@ class Injection:
             "started_mono": self.started.mono,
             "acknowledged_utc": self.acknowledged.utc,
             "acknowledged_mono": self.acknowledged.mono,
-            "verification_started_utc": (self.verification_started.utc
-                                         if self.verification_started else None),
-            "verification_started_mono": (self.verification_started.mono
-                                          if self.verification_started else None),
+            "verification_started_utc": (
+                self.verification_started.utc if self.verification_started else None
+            ),
+            "verification_started_mono": (
+                self.verification_started.mono if self.verification_started else None
+            ),
             "verified_utc": self.verified.utc if self.verified else None,
             "verified_mono": self.verified.mono if self.verified else None,
             "accepted": self.accepted,
@@ -267,10 +274,12 @@ class ImperativeRun:
             "detection_at_mono": self.detection_at.mono if self.detection_at else None,
             "evidence_at_utc": self.evidence_at.utc if self.evidence_at else None,
             "evidence_at_mono": self.evidence_at.mono if self.evidence_at else None,
-            "evidence_store_at_utc": (self.evidence_store_at.utc
-                                      if self.evidence_store_at else None),
-            "evidence_store_at_mono": (self.evidence_store_at.mono
-                                       if self.evidence_store_at else None),
+            "evidence_store_at_utc": (
+                self.evidence_store_at.utc if self.evidence_store_at else None
+            ),
+            "evidence_store_at_mono": (
+                self.evidence_store_at.mono if self.evidence_store_at else None
+            ),
             "evidence_ref": self.evidence_ref,
             "detection_reads": list(self.detection_reads),
             "evidence_reads": list(self.evidence_reads),
@@ -312,12 +321,12 @@ class CleanupReport:
 def validate_namespace(namespace: str) -> str:
     if namespace == "invenio":
         return namespace
-    if (len(namespace or "") <= 63
-            and re.fullmatch(r"exp-[a-z0-9]([-a-z0-9]*[a-z0-9])?", namespace or "")):
+    if len(namespace or "") <= 63 and re.fullmatch(
+        r"exp-[a-z0-9]([-a-z0-9]*[a-z0-9])?", namespace or ""
+    ):
         return namespace
     raise SafetyError(
-        "namespace must be 'invenio' or an 'exp-*' experiment namespace; "
-        f"refusing {namespace!r}"
+        f"namespace must be 'invenio' or an 'exp-*' experiment namespace; refusing {namespace!r}"
     )
 
 
@@ -358,8 +367,7 @@ class Http:
     def __init__(self, token: str, base_url: str = DEFAULT_INVENIO_URL, timeout: float = 15):
         parsed = urlparse.urlparse(base_url)
         if parsed.scheme != "https" and parsed.hostname not in ("localhost", "127.0.0.1"):
-            raise SafetyError(
-                "Invenio URL must use HTTPS unless it is a loopback address")
+            raise SafetyError("Invenio URL must use HTTPS unless it is a loopback address")
         self._token = token
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
@@ -370,17 +378,18 @@ class Http:
 
     def get(self, path: str, accept: str = "application/json"):
         url = self.base_url + path if path.startswith("/") else path
-        headers = {"Authorization": "Bearer " + self._token,
-                   "Accept": accept,
-                   "User-Agent": USER_AGENT}
+        headers = {
+            "Authorization": "Bearer " + self._token,
+            "Accept": accept,
+            "User-Agent": USER_AGENT,
+        }
         for attempt in range(HTTP_RETRY_ATTEMPTS):
             request = urlrequest.Request(url, headers=headers)
             try:
                 with self._opener.open(request, timeout=self.timeout) as response:
                     return response.status, response.read()
             except urlerror.HTTPError as error:
-                if (error.code not in TRANSIENT_HTTP_STATUSES
-                        or attempt + 1 == HTTP_RETRY_ATTEMPTS):
+                if error.code not in TRANSIENT_HTTP_STATUSES or attempt + 1 == HTTP_RETRY_ATTEMPTS:
                     return error.code, error.read()
                 error.close()
             except (urlerror.URLError, TimeoutError, ConnectionError) as error:
@@ -389,19 +398,16 @@ class Http:
                         f"Invenio API request failed: {type(error).__name__}"
                     ) from None
             except OSError as error:
-                raise HarnessError(
-                    f"Invenio API request failed: {type(error).__name__}"
-                ) from None
+                raise HarnessError(f"Invenio API request failed: {type(error).__name__}") from None
             time.sleep(HTTP_RETRY_BACKOFF_SECONDS[attempt])
 
 
-def verify_seed(http, record: str, file_name: str, expected_size: int,
-                expected_md5: str, expected_sha256: str) -> dict:
+def verify_seed(
+    http, record: str, file_name: str, expected_size: int, expected_md5: str, expected_sha256: str
+) -> dict:
     status, body = http.get(f"/api/records/{record}/draft")
     if status != 200:
-        raise SeedVerificationError(
-            f"seed draft endpoint returned HTTP {status}; failing closed"
-        )
+        raise SeedVerificationError(f"seed draft endpoint returned HTTP {status}; failing closed")
     try:
         draft = json.loads(body)
     except (TypeError, ValueError):
@@ -412,9 +418,7 @@ def verify_seed(http, record: str, file_name: str, expected_size: int,
 
     status, body = http.get(f"/api/records/{record}/draft/files")
     if status != 200:
-        raise SeedVerificationError(
-            f"seed file listing returned HTTP {status}; failing closed"
-        )
+        raise SeedVerificationError(f"seed file listing returned HTTP {status}; failing closed")
     try:
         listing = json.loads(body)
         entries = listing.get("entries", [])
@@ -438,9 +442,7 @@ def verify_seed(http, record: str, file_name: str, expected_size: int,
         accept="*/*",
     )
     if status != 200:
-        raise SeedVerificationError(
-            f"seed content endpoint returned HTTP {status}; failing closed"
-        )
+        raise SeedVerificationError(f"seed content endpoint returned HTTP {status}; failing closed")
     if len(content) != expected_size:
         raise SeedVerificationError("seed content size mismatch")
     if expected_md5 and hashlib.md5(content).hexdigest() != expected_md5.lower():
@@ -493,8 +495,14 @@ def sanitize_object(obj: dict) -> dict:
         result.pop("binaryData", None)
     elif kind == "Service":
         spec = result.get("spec", {})
-        for key in ("clusterIP", "clusterIPs", "ipFamilies", "ipFamilyPolicy",
-                    "internalTrafficPolicy", "healthCheckNodePort"):
+        for key in (
+            "clusterIP",
+            "clusterIPs",
+            "ipFamilies",
+            "ipFamilyPolicy",
+            "internalTrafficPolicy",
+            "healthCheckNodePort",
+        ):
             spec.pop(key, None)
     elif kind == "Deployment":
         template = result.get("spec", {}).get("template", {})
@@ -522,8 +530,7 @@ def recovery_manifest(manifest: dict, hpa_owned: bool = False) -> dict:
 
 
 def _container(doc: dict, name: str = "web") -> dict | None:
-    containers = (doc.get("spec", {}).get("template", {}).get("spec", {})
-                  .get("containers", []))
+    containers = doc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
     return next((item for item in containers if item.get("name") == name), None)
 
 
@@ -535,8 +542,9 @@ def resource_id(doc: dict) -> str:
     return f"{doc.get('kind')}/{(doc.get('metadata') or {}).get('name')}"
 
 
-def observation_from_objects(objects, at: Point, argo=None, hpa=None,
-                             extras=None, acquisition=None) -> Observation:
+def observation_from_objects(
+    objects, at: Point, argo=None, hpa=None, extras=None, acquisition=None
+) -> Observation:
     resources = {}
     for doc in objects:
         if not isinstance(doc, dict) or not doc.get("kind"):
@@ -552,9 +560,14 @@ def observation_from_objects(objects, at: Point, argo=None, hpa=None,
             "fields": _resource_fields(doc),
             "manifest": sanitize_object(doc),
         }
-    return Observation(at=at, resources=resources, extra_resources=list(extras or []),
-                       argo=copy.deepcopy(argo or {}), hpa=copy.deepcopy(hpa),
-                       acquisition=copy.deepcopy(acquisition or {}))
+    return Observation(
+        at=at,
+        resources=resources,
+        extra_resources=list(extras or []),
+        argo=copy.deepcopy(argo or {}),
+        hpa=copy.deepcopy(hpa),
+        acquisition=copy.deepcopy(acquisition or {}),
+    )
 
 
 def application_state(app: dict) -> dict:
@@ -564,8 +577,7 @@ def application_state(app: dict) -> dict:
     operation = status.get("operationState") or {}
     conditions = []
     for condition in status.get("conditions") or []:
-        conditions.append({"type": condition.get("type"),
-                           "status": condition.get("status")})
+        conditions.append({"type": condition.get("type"), "status": condition.get("status")})
     return {
         "name": (app.get("metadata") or {}).get("name"),
         "sync": sync.get("status"),
@@ -580,8 +592,9 @@ def hpa_state(hpa: dict, deployment: dict) -> dict:
     spec = hpa.get("spec") or {}
     status = hpa.get("status") or {}
     conditions = status.get("conditions") or []
-    able = any(item.get("type") == "AbleToScale" and item.get("status") == "True"
-               for item in conditions)
+    able = any(
+        item.get("type") == "AbleToScale" and item.get("status") == "True" for item in conditions
+    )
     target = spec.get("scaleTargetRef") or {}
     deployment_spec = deployment.get("spec") or {} if deployment else {}
     return {
@@ -603,12 +616,15 @@ def _canonical(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
-def build_contract(frozen: Declaration, observation: Observation,
-                   namespace: str, quarantine_namespace: str,
-                   app=DEFAULT_APP) -> Contract:
+def build_contract(
+    frozen: Declaration,
+    observation: Observation,
+    namespace: str,
+    quarantine_namespace: str,
+    app=DEFAULT_APP,
+) -> Contract:
     if not isinstance(frozen, Declaration):
-        raise InstrumentationError(
-            "contract requires an independently loaded frozen declaration")
+        raise InstrumentationError("contract requires an independently loaded frozen declaration")
     if not re.fullmatch(r"[0-9a-f]{40}", frozen.source_revision):
         raise InstrumentationError("source revision must be 40 lowercase hex")
     if not re.fullmatch(r"[0-9a-f]{64}", frozen.render_sha256):
@@ -616,7 +632,8 @@ def build_contract(frozen: Declaration, observation: Observation,
     observed_revision = (observation.argo.get(app) or {}).get("revision")
     if observed_revision != frozen.source_revision:
         raise InstrumentationError(
-            "frozen source revision does not match the observed Argo revision")
+            "frozen source revision does not match the observed Argo revision"
+        )
     hpa_targets = []
     if observation.hpa and observation.hpa.get("target"):
         hpa_targets.append(observation.hpa["target"])
@@ -624,21 +641,24 @@ def build_contract(frozen: Declaration, observation: Observation,
     for declared in frozen.resources:
         if declared["namespace"] != namespace:
             raise InstrumentationError(
-                f"declared {declared['id']} is not in namespace {namespace!r}")
-        resource = {key: copy.deepcopy(declared[key])
-                    for key in ("id", "kind", "name", "namespace", "fields")}
+                f"declared {declared['id']} is not in namespace {namespace!r}"
+            )
+        resource = {
+            key: copy.deepcopy(declared[key])
+            for key in ("id", "kind", "name", "namespace", "fields")
+        }
         manifest = sanitize_object(declared["manifest"])
         if resource["kind"] == "Deployment":
             manifest.get("spec", {}).pop("replicas", None)
         resource["manifest"] = manifest
         resources.append(resource)
     if len(resources) != 4:
-        raise InstrumentationError(
-            "frozen declaration must select exactly four scoped resources")
+        raise InstrumentationError("frozen declaration must select exactly four scoped resources")
     digest_payload = {
-        "resources": [{key: resource[key] for key in
-                       ("id", "kind", "name", "namespace", "fields")}
-                      for resource in resources],
+        "resources": [
+            {key: resource[key] for key in ("id", "kind", "name", "namespace", "fields")}
+            for resource in resources
+        ],
         "hpa_targets": hpa_targets,
         "configmap_name": frozen.configmap_name,
         "source_revision": frozen.source_revision,
@@ -652,8 +672,7 @@ def build_contract(frozen: Declaration, observation: Observation,
         configmap_name=frozen.configmap_name,
         source_revision=frozen.source_revision,
         render_sha256=frozen.render_sha256,
-        baseline_sha256=hashlib.sha256(
-            _canonical(digest_payload).encode()).hexdigest(),
+        baseline_sha256=hashlib.sha256(_canonical(digest_payload).encode()).hexdigest(),
         baseline_hpa=copy.deepcopy(observation.hpa),
     )
 
@@ -675,26 +694,33 @@ def _normalized_value(path: str, value):
 
 
 def _field_matches(path: str, expected, actual) -> bool:
-    return _same(_normalized_value(path, expected),
-                 _normalized_value(path, actual))
+    return _same(_normalized_value(path, expected), _normalized_value(path, actual))
 
 
 def _resource_diffs(expected: dict, actual: dict | None) -> list:
     if actual is None:
-        return [{"resource": expected["id"], "missing": True,
-                 "path": None, "expected": "present", "actual": "missing"}]
+        return [
+            {
+                "resource": expected["id"],
+                "missing": True,
+                "path": None,
+                "expected": "present",
+                "actual": "missing",
+            }
+        ]
     values = actual.get("fields") or {}
     diffs = []
     for path, expected_value in expected["fields"].items():
         actual_value = values.get(path, MISSING)
-        if (actual_value is MISSING
-                or not _field_matches(path, expected_value, actual_value)):
-            diffs.append({
-                "resource": expected["id"],
-                "path": path,
-                "expected": expected_value,
-                "actual": None if actual_value is MISSING else actual_value,
-            })
+        if actual_value is MISSING or not _field_matches(path, expected_value, actual_value):
+            diffs.append(
+                {
+                    "resource": expected["id"],
+                    "path": path,
+                    "expected": expected_value,
+                    "actual": None if actual_value is MISSING else actual_value,
+                }
+            )
     return diffs
 
 
@@ -716,8 +742,7 @@ def resource_results(contract: Contract, observation: Observation) -> dict:
         }
         if diffs and actual is not None:
             item["mismatches"] = [
-                {"path": diff["path"], "expected": diff["expected"],
-                 "actual": diff["actual"]}
+                {"path": diff["path"], "expected": diff["expected"], "actual": diff["actual"]}
                 for diff in diffs
             ]
         items.append(item)
@@ -736,17 +761,20 @@ def score(contract: Contract, observation: Observation) -> float:
 def field_diffs(contract: Contract, observation: Observation) -> list:
     diffs = []
     for expected in contract.resources:
-        diffs.extend(_resource_diffs(
-            expected, observation.resources.get(expected["id"])))
+        diffs.extend(_resource_diffs(expected, observation.resources.get(expected["id"])))
     return diffs
 
 
 def hpa_settled(state: dict | None) -> bool:
     if not state:
         return False
-    values = (state.get("desired"), state.get("current"),
-              state.get("deployment_spec_replicas"), state.get("min"),
-              state.get("max"))
+    values = (
+        state.get("desired"),
+        state.get("current"),
+        state.get("deployment_spec_replicas"),
+        state.get("min"),
+        state.get("max"),
+    )
     if any(type(value) is not int for value in values):
         return False
     desired, current, replicas, minimum, maximum = values
@@ -758,16 +786,22 @@ def hpa_settled(state: dict | None) -> bool:
         generation_ok = generation == observed
     else:
         generation_ok = False
-    return (state.get("able_to_scale") is True
-            and minimum <= desired <= maximum
-            and desired == current == replicas
-            and generation_ok)
+    return (
+        state.get("able_to_scale") is True
+        and minimum <= desired <= maximum
+        and desired == current == replicas
+        and generation_ok
+    )
 
 
 def hpa_telemetry_valid(state: dict) -> bool:
-    values = (state.get("desired"), state.get("current"),
-              state.get("deployment_spec_replicas"), state.get("min"),
-              state.get("max"))
+    values = (
+        state.get("desired"),
+        state.get("current"),
+        state.get("deployment_spec_replicas"),
+        state.get("min"),
+        state.get("max"),
+    )
     if any(type(value) is not int or value < 0 for value in values):
         return False
     if values[3] <= 0 or values[4] < values[3]:
@@ -795,27 +829,45 @@ def argo_signal(state: dict | None) -> bool:
         return True
     if state.get("operation_phase") in ("Running", "Error", "Failed"):
         return True
-    return any(item.get("type") in ("ComparisonError", "SyncError")
-               and item.get("status") == "True"
-               for item in state.get("conditions") or [])
+    return any(
+        item.get("type") in ("ComparisonError", "SyncError") and item.get("status") == "True"
+        for item in state.get("conditions") or []
+    )
 
 
 _QUANTITY_RE = re.compile(
     r"^(?P<number>[+-]?(?:\d+(?:\.\d*)?|\.\d+))"
-    r"(?P<suffix>Ki|Mi|Gi|Ti|Pi|Ei|[numkKMGTPE]|[eE][+-]?\d+)?$")
+    r"(?P<suffix>Ki|Mi|Gi|Ti|Pi|Ei|[numkKMGTPE]|[eE][+-]?\d+)?$"
+)
 _BINARY_FACTORS = {
-    "Ki": 1024, "Mi": 1024 ** 2, "Gi": 1024 ** 3,
-    "Ti": 1024 ** 4, "Pi": 1024 ** 5, "Ei": 1024 ** 6,
+    "Ki": 1024,
+    "Mi": 1024**2,
+    "Gi": 1024**3,
+    "Ti": 1024**4,
+    "Pi": 1024**5,
+    "Ei": 1024**6,
 }
 _DECIMAL_FACTORS = {
-    None: 1, "n": Decimal("1e-9"), "u": Decimal("1e-6"),
-    "m": Decimal("1e-3"), "k": 1000, "M": 1000 ** 2, "G": 1000 ** 3,
-    "T": 1000 ** 4, "P": 1000 ** 5, "E": 1000 ** 6,
+    None: 1,
+    "n": Decimal("1e-9"),
+    "u": Decimal("1e-6"),
+    "m": Decimal("1e-3"),
+    "k": 1000,
+    "M": 1000**2,
+    "G": 1000**3,
+    "T": 1000**4,
+    "P": 1000**5,
+    "E": 1000**6,
 }
 _DURATION_PART = re.compile(r"(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)")
 _DURATION_FACTORS = {
-    "ns": Decimal("1e-9"), "us": Decimal("1e-6"), "µs": Decimal("1e-6"),
-    "ms": Decimal("1e-3"), "s": 1, "m": 60, "h": 3600,
+    "ns": Decimal("1e-9"),
+    "us": Decimal("1e-6"),
+    "µs": Decimal("1e-6"),
+    "ms": Decimal("1e-3"),
+    "s": 1,
+    "m": 60,
+    "h": 3600,
 }
 
 
@@ -828,8 +880,7 @@ def _quantity(value, field: str) -> Decimal:
     try:
         number = Decimal(match.group("number"))
     except InvalidOperation:
-        raise InstrumentationError(
-            f"{field} is not a valid Kubernetes quantity") from None
+        raise InstrumentationError(f"{field} is not a valid Kubernetes quantity") from None
     suffix = match.group("suffix")
     try:
         if suffix in _BINARY_FACTORS:
@@ -839,12 +890,10 @@ def _quantity(value, field: str) -> Decimal:
         elif suffix and suffix[0] in "eE":
             factor = Decimal(10) ** int(suffix[1:])
         else:
-            raise InstrumentationError(
-                f"{field} is not a valid Kubernetes quantity")
+            raise InstrumentationError(f"{field} is not a valid Kubernetes quantity")
         result = number * factor
     except ArithmeticError:
-        raise InstrumentationError(
-            f"{field} is not a valid Kubernetes quantity") from None
+        raise InstrumentationError(f"{field} is not a valid Kubernetes quantity") from None
     if result == 0 and number != 0:
         raise InstrumentationError(f"{field} underflows")
     if not result.is_finite():
@@ -854,15 +903,14 @@ def _quantity(value, field: str) -> Decimal:
 
 def _quantity_nanocores(value, field: str, positive: bool = False) -> int:
     try:
-        amount = _quantity(value, field) * Decimal(10 ** 9)
+        amount = _quantity(value, field) * Decimal(10**9)
     except ArithmeticError:
         raise InstrumentationError(f"{field} is not a valid CPU quantity") from None
     if amount != amount.to_integral_value():
         raise InstrumentationError(f"{field} is not representable in nanocores")
     result = int(amount)
     if result < 0 or (positive and result == 0):
-        raise InstrumentationError(
-            f"{field} must be {'positive' if positive else 'non-negative'}")
+        raise InstrumentationError(f"{field} must be {'positive' if positive else 'non-negative'}")
     return result
 
 
@@ -872,22 +920,24 @@ def _quantity_bytes(value, field: str, positive: bool = False) -> int:
         raise InstrumentationError(f"{field} is not representable in bytes")
     result = int(amount)
     if result < 0 or (positive and result == 0):
-        raise InstrumentationError(
-            f"{field} must be {'positive' if positive else 'non-negative'}")
+        raise InstrumentationError(f"{field} must be {'positive' if positive else 'non-negative'}")
     return result
 
 
-def load_declaration(path, expected_sha256: str, expected_revision: str,
-                     namespace: str) -> Declaration:
-    return _prepare_declaration(declaration.load(
-        path, expected_sha256, expected_revision, namespace))
+def load_declaration(
+    path, expected_sha256: str, expected_revision: str, namespace: str
+) -> Declaration:
+    return _prepare_declaration(
+        declaration.load(path, expected_sha256, expected_revision, namespace)
+    )
 
 
-def load_declaration_bytes(data: bytes, expected_sha256: str,
-                           expected_revision: str,
-                           namespace: str) -> Declaration:
-    return _prepare_declaration(declaration.loads(
-        data, expected_sha256, expected_revision, namespace))
+def load_declaration_bytes(
+    data: bytes, expected_sha256: str, expected_revision: str, namespace: str
+) -> Declaration:
+    return _prepare_declaration(
+        declaration.loads(data, expected_sha256, expected_revision, namespace)
+    )
 
 
 def _prepare_declaration(frozen: Declaration) -> Declaration:
@@ -932,8 +982,7 @@ def _duration_seconds(value, field: str) -> float:
         for match in _DURATION_PART.finditer(value):
             if match.start() != position:
                 raise InstrumentationError(f"{field} is not a valid duration")
-            total += Decimal(match.group(1)) * Decimal(
-                _DURATION_FACTORS[match.group(2)])
+            total += Decimal(match.group(1)) * Decimal(_DURATION_FACTORS[match.group(2)])
             position = match.end()
         if position != len(value) or total <= 0:
             raise InstrumentationError(f"{field} is not a valid duration")
@@ -1022,8 +1071,7 @@ def _node_name(item, field: str, seen: set) -> str:
     return name
 
 
-def parse_node_metrics(metrics_payload, nodes_payload, metrics_bounds,
-                       allocatable_bounds) -> list:
+def parse_node_metrics(metrics_payload, nodes_payload, metrics_bounds, allocatable_bounds) -> list:
     if not isinstance(metrics_payload, dict):
         raise InstrumentationError("node metrics payload is not an object")
     metrics_items = metrics_payload.get("items")
@@ -1042,78 +1090,75 @@ def parse_node_metrics(metrics_payload, nodes_payload, metrics_bounds,
             raise InstrumentationError(f"node {name} has no status")
         resources = status.get("allocatable")
         if not isinstance(resources, dict):
-            raise InstrumentationError(
-                f"node {name} has no allocatable resources")
+            raise InstrumentationError(f"node {name} has no allocatable resources")
         allocatable[name] = {
             "cpu": resources.get("cpu"),
             "memory": resources.get("memory"),
             "cpu_nanocores": _quantity_nanocores(
-                resources.get("cpu"), f"node {name} allocatable cpu", True),
+                resources.get("cpu"), f"node {name} allocatable cpu", True
+            ),
             "memory_bytes": _quantity_bytes(
-                resources.get("memory"), f"node {name} allocatable memory", True),
+                resources.get("memory"), f"node {name} allocatable memory", True
+            ),
         }
     usage = {}
     seen = set()
     for item in metrics_items:
         name = _node_name(item, "node metrics", seen)
         if name not in allocatable:
-            raise InstrumentationError(
-                f"node metrics returned for unexpected node {name}")
+            raise InstrumentationError(f"node metrics returned for unexpected node {name}")
         resources = item.get("usage")
         if not isinstance(resources, dict):
             raise InstrumentationError(f"node {name} metrics have no usage")
-        timestamp = _timestamp(item.get("timestamp"),
-                               f"node {name} metrics timestamp")
+        timestamp = _timestamp(item.get("timestamp"), f"node {name} metrics timestamp")
         window = item.get("window")
-        window_seconds = _duration_seconds(
-            window, f"node {name} metrics window")
+        window_seconds = _duration_seconds(window, f"node {name} metrics window")
         usage[name] = {
             "cpu": resources.get("cpu"),
             "memory": resources.get("memory"),
-            "cpu_nanocores": _quantity_nanocores(
-                resources.get("cpu"), f"node {name} usage cpu"),
-            "memory_bytes": _quantity_bytes(
-                resources.get("memory"), f"node {name} usage memory"),
+            "cpu_nanocores": _quantity_nanocores(resources.get("cpu"), f"node {name} usage cpu"),
+            "memory_bytes": _quantity_bytes(resources.get("memory"), f"node {name} usage memory"),
             "timestamp": timestamp,
             "window": window,
             "window_seconds": window_seconds,
         }
     missing = sorted(set(allocatable) - set(usage))
     if missing:
-        raise InstrumentationError(
-            "node metrics missing for " + ", ".join(missing))
+        raise InstrumentationError("node metrics missing for " + ", ".join(missing))
     nodes = []
     for name in sorted(usage):
         observed = usage[name]
         capacity = allocatable[name]
         cpu_percent = float(
-            Decimal(observed["cpu_nanocores"]) * 100
-            / Decimal(capacity["cpu_nanocores"]))
+            Decimal(observed["cpu_nanocores"]) * 100 / Decimal(capacity["cpu_nanocores"])
+        )
         memory_percent = float(
-            Decimal(observed["memory_bytes"]) * 100
-            / Decimal(capacity["memory_bytes"]))
+            Decimal(observed["memory_bytes"]) * 100 / Decimal(capacity["memory_bytes"])
+        )
         if not math.isfinite(cpu_percent) or not math.isfinite(memory_percent):
             raise InstrumentationError(f"node {name} percentage is not finite")
-        nodes.append({
-            "name": name,
-            "cpu_usage": observed["cpu"],
-            "memory_usage": observed["memory"],
-            "cpu_allocatable": capacity["cpu"],
-            "memory_allocatable": capacity["memory"],
-            "cpu_usage_nanocores": observed["cpu_nanocores"],
-            "cpu_allocatable_nanocores": capacity["cpu_nanocores"],
-            "memory_usage_bytes": observed["memory_bytes"],
-            "memory_allocatable_bytes": capacity["memory_bytes"],
-            "cpu_percent": cpu_percent,
-            "memory_percent": memory_percent,
-            "metrics_timestamp": observed["timestamp"],
-            "metrics_window": observed["window"],
-            "metrics_window_seconds": observed["window_seconds"],
-            "acquisition": {
-                "metrics": copy.deepcopy(metrics_bounds),
-                "allocatable": copy.deepcopy(allocatable_bounds),
-            },
-        })
+        nodes.append(
+            {
+                "name": name,
+                "cpu_usage": observed["cpu"],
+                "memory_usage": observed["memory"],
+                "cpu_allocatable": capacity["cpu"],
+                "memory_allocatable": capacity["memory"],
+                "cpu_usage_nanocores": observed["cpu_nanocores"],
+                "cpu_allocatable_nanocores": capacity["cpu_nanocores"],
+                "memory_usage_bytes": observed["memory_bytes"],
+                "memory_allocatable_bytes": capacity["memory_bytes"],
+                "cpu_percent": cpu_percent,
+                "memory_percent": memory_percent,
+                "metrics_timestamp": observed["timestamp"],
+                "metrics_window": observed["window"],
+                "metrics_window_seconds": observed["window_seconds"],
+                "acquisition": {
+                    "metrics": copy.deepcopy(metrics_bounds),
+                    "allocatable": copy.deepcopy(allocatable_bounds),
+                },
+            }
+        )
     return nodes
 
 
@@ -1134,16 +1179,24 @@ class Kubectl:
                 timeout=timeout or self.timeout,
                 check=False,
             )
-            code, stdout, stderr = (completed.returncode, completed.stdout or "",
-                                    completed.stderr or "")
+            code, stdout, stderr = (
+                completed.returncode,
+                completed.stdout or "",
+                completed.stderr or "",
+            )
         except subprocess.TimeoutExpired:
             code, stdout, stderr = 124, "", "kubectl timed out"
         except OSError as error:
-            raise InstrumentationError(
-                f"kubectl could not start: {type(error).__name__}") from None
+            raise InstrumentationError(f"kubectl could not start: {type(error).__name__}") from None
         finished = self.clock.now()
-        result = CommandResult(argv=list(argv), returncode=code, stdout=stdout,
-                               stderr=stderr, started=started, finished=finished)
+        result = CommandResult(
+            argv=list(argv),
+            returncode=code,
+            stdout=stdout,
+            stderr=stderr,
+            started=started,
+            finished=finished,
+        )
         if mutating:
             self.recorder.append(result)
         return result
@@ -1162,8 +1215,7 @@ class Kubectl:
             argv.append("--all-namespaces")
         if selector:
             argv.extend(["-l", selector])
-        argv.extend(["-o", "json", "--ignore-not-found",
-                     "--request-timeout=15s"])
+        argv.extend(["-o", "json", "--ignore-not-found", "--request-timeout=15s"])
         attempts = []
 
         def stopped():
@@ -1172,9 +1224,11 @@ class Kubectl:
             reason = guard()
             if not reason:
                 return None
-            bounds = (_read_bounds(kind, name, namespace, attempts,
-                                   present=False, ok=False)
-                      if attempts else None)
+            bounds = (
+                _read_bounds(kind, name, namespace, attempts, present=False, ok=False)
+                if attempts
+                else None
+            )
             return ReadStopped(reason, bounds)
 
         reason = stopped()
@@ -1196,11 +1250,18 @@ class Kubectl:
             if result.returncode == 0:
                 break
             stderr = result.stderr.lower()
-            transient = any(token in stderr for token in (
-                "unexpected error when reading response body",
-                "request canceled", "client.timeout",
-                "connection reset", "tls handshake timeout",
-                "i/o timeout", "temporarily unavailable"))
+            transient = any(
+                token in stderr
+                for token in (
+                    "unexpected error when reading response body",
+                    "request canceled",
+                    "client.timeout",
+                    "connection reset",
+                    "tls handshake timeout",
+                    "i/o timeout",
+                    "temporarily unavailable",
+                )
+            )
             if not transient:
                 break
             reason = stopped()
@@ -1217,27 +1278,28 @@ class Kubectl:
             if reason is not None:
                 raise reason
             error = InstrumentationError(
-                f"kubectl get {kind} failed: {result.stderr.strip()[:300]}")
+                f"kubectl get {kind} failed: {result.stderr.strip()[:300]}"
+            )
             error.read_bounds = _read_bounds(
-                kind, name, namespace, attempts, present=False, ok=False)
+                kind, name, namespace, attempts, present=False, ok=False
+            )
             raise error
         if not result.stdout.strip():
-            return None, _read_bounds(
-                kind, name, namespace, attempts, present=False, ok=True)
+            return None, _read_bounds(kind, name, namespace, attempts, present=False, ok=True)
         try:
             payload = json.loads(result.stdout)
         except ValueError:
-            error = InstrumentationError(
-                f"kubectl get {kind} returned invalid JSON")
+            error = InstrumentationError(f"kubectl get {kind} returned invalid JSON")
             error.read_bounds = _read_bounds(
-                kind, name, namespace, attempts, present=False, ok=False)
+                kind, name, namespace, attempts, present=False, ok=False
+            )
             raise error from None
         if isinstance(payload, dict) and payload.get("kind") == "List":
             items = payload.get("items") or []
             return (items if name is None else None), _read_bounds(
-                kind, name, namespace, attempts, present=True, ok=True)
-        return payload, _read_bounds(
-            kind, name, namespace, attempts, present=True, ok=True)
+                kind, name, namespace, attempts, present=True, ok=True
+            )
+        return payload, _read_bounds(kind, name, namespace, attempts, present=True, ok=True)
 
     def patch(self, kind, name, namespace, patch, patch_type="merge") -> CommandResult:
         argv = ["patch", kind, name]
@@ -1256,11 +1318,9 @@ class Kubectl:
         return self.run(argv, mutating=True)
 
     def apply(self, manifest) -> CommandResult:
-        return self.run(["apply", "-f", "-"], input_text=json.dumps(manifest),
-                        mutating=True)
+        return self.run(["apply", "-f", "-"], input_text=json.dumps(manifest), mutating=True)
 
-    def delete(self, kind, name, namespace=None, wait=False,
-               timeout=90) -> CommandResult:
+    def delete(self, kind, name, namespace=None, wait=False, timeout=90) -> CommandResult:
         argv = ["delete", kind, name]
         if namespace:
             argv.extend(["-n", namespace])
@@ -1269,23 +1329,26 @@ class Kubectl:
         return self.run(argv, mutating=True, timeout=timeout)
 
     def top_nodes(self) -> list:
-        result = self.run(["get", "--raw",
-                           "/apis/metrics.k8s.io/v1beta1/nodes",
-                           "--request-timeout=15s"])
+        result = self.run(
+            ["get", "--raw", "/apis/metrics.k8s.io/v1beta1/nodes", "--request-timeout=15s"]
+        )
         if result.returncode != 0:
             raise InstrumentationError(
-                f"metrics-server node read failed: {result.stderr.strip()[:300]}")
+                f"metrics-server node read failed: {result.stderr.strip()[:300]}"
+            )
         try:
             metrics = json.loads(result.stdout)
         except ValueError:
-            raise InstrumentationError(
-                "metrics-server node read returned invalid JSON") from None
+            raise InstrumentationError("metrics-server node read returned invalid JSON") from None
         allocatable_started = self.clock.now()
         nodes = self.get("Node")
         allocatable_finished = self.clock.now()
         return parse_node_metrics(
-            metrics, nodes, _command_bounds(result),
-            _point_bounds(allocatable_started, allocatable_finished))
+            metrics,
+            nodes,
+            _command_bounds(result),
+            _point_bounds(allocatable_started, allocatable_finished),
+        )
 
     def pods(self, namespace) -> list:
         items = self.get("Pod", namespace=namespace) or []
@@ -1296,18 +1359,26 @@ class Kubectl:
             if phase == "Succeeded":
                 continue
             statuses = (status.get("containerStatuses") or []) + (
-                status.get("initContainerStatuses") or [])
-            ready = bool(statuses) and all(item.get("ready") is True
-                                           for item in statuses)
-            pods.append({"name": (item.get("metadata") or {}).get("name"),
-                         "phase": phase, "ready": ready})
+                status.get("initContainerStatuses") or []
+            )
+            ready = bool(statuses) and all(item.get("ready") is True for item in statuses)
+            pods.append(
+                {"name": (item.get("metadata") or {}).get("name"), "phase": phase, "ready": ready}
+            )
         return pods
 
 
 class Snapshotter:
-    def __init__(self, kubectl, namespace, quarantine, clock,
-                 configmap_name=None, argo_namespace=ARGO_NAMESPACE,
-                 app=DEFAULT_APP):
+    def __init__(
+        self,
+        kubectl,
+        namespace,
+        quarantine,
+        clock,
+        configmap_name=None,
+        argo_namespace=ARGO_NAMESPACE,
+        app=DEFAULT_APP,
+    ):
         self.kubectl = kubectl
         self.namespace = namespace
         self.quarantine = quarantine
@@ -1318,28 +1389,34 @@ class Snapshotter:
 
     def discover_configmap(self, deployment, reads=None, guard=None) -> str | None:
         if deployment:
-            for source in (deployment.get("spec", {}).get("template", {}).get(
-                    "spec", {}).get("containers", [{}])[0].get("envFrom") or []):
+            for source in (
+                deployment.get("spec", {})
+                .get("template", {})
+                .get("spec", {})
+                .get("containers", [{}])[0]
+                .get("envFrom")
+                or []
+            ):
                 name = (source.get("configMapRef") or {}).get("name")
                 if name and name.startswith(CONFIG_PREFIX):
                     return name
         self._guard_stop(reads or {}, guard)
         configmaps = self.kubectl.get("ConfigMap", namespace=self.namespace) or []
-        names = [item.get("metadata", {}).get("name") for item in configmaps
-                 if str(item.get("metadata", {}).get("name", "")).startswith(
-                     CONFIG_PREFIX)]
+        names = [
+            item.get("metadata", {}).get("name")
+            for item in configmaps
+            if str(item.get("metadata", {}).get("name", "")).startswith(CONFIG_PREFIX)
+        ]
         return names[0] if len(names) == 1 else None
 
     def _read(self, reads, key, kind, name=None, namespace=None, guard=None):
         self._guard_stop(reads, guard)
         try:
-            payload, bounds = self.kubectl.read(
-                kind, name, namespace, guard=guard)
+            payload, bounds = self.kubectl.read(kind, name, namespace, guard=guard)
         except ReadStopped as stopped:
             if stopped.read_bounds:
                 reads[key] = copy.deepcopy(stopped.read_bounds)
-            started = (self._capture_started
-                       if getattr(self, "_capture_started", None) else None)
+            started = self._capture_started if getattr(self, "_capture_started", None) else None
             started = started or self.clock.now()
             finished = self.clock.now()
             acquisition = {
@@ -1356,8 +1433,7 @@ class Snapshotter:
             bounds = getattr(error, "read_bounds", None)
             if bounds:
                 reads[key] = copy.deepcopy(bounds)
-            started = (self._capture_started
-                       if getattr(self, "_capture_started", None) else None)
+            started = self._capture_started if getattr(self, "_capture_started", None) else None
             started = started or self.clock.now()
             finished = self.clock.now()
             error.acquisition = {
@@ -1379,8 +1455,7 @@ class Snapshotter:
         reason = guard()
         if not reason:
             return
-        started = (self._capture_started
-                   if getattr(self, "_capture_started", None) else None)
+        started = self._capture_started if getattr(self, "_capture_started", None) else None
         started = started or self.clock.now()
         finished = self.clock.now()
         acquisition = {
@@ -1399,41 +1474,66 @@ class Snapshotter:
         self._capture_started = at
         reads = {}
         deployment = self._read(
-            reads, "Deployment/" + WEB_DEPLOYMENT, "Deployment",
-            WEB_DEPLOYMENT, self.namespace, guard=guard)
+            reads,
+            "Deployment/" + WEB_DEPLOYMENT,
+            "Deployment",
+            WEB_DEPLOYMENT,
+            self.namespace,
+            guard=guard,
+        )
         if deployment and self.configmap_name is None:
-            self.configmap_name = self.discover_configmap(
-                deployment, reads, guard)
-        configmap = (self._read(
-            reads, "ConfigMap/" + self.configmap_name, "ConfigMap",
-            self.configmap_name, self.namespace, guard=guard)
-            if self.configmap_name else None)
+            self.configmap_name = self.discover_configmap(deployment, reads, guard)
+        configmap = (
+            self._read(
+                reads,
+                "ConfigMap/" + self.configmap_name,
+                "ConfigMap",
+                self.configmap_name,
+                self.namespace,
+                guard=guard,
+            )
+            if self.configmap_name
+            else None
+        )
         secret = self._read(
-            reads, "SealedSecret/" + SEALED_SECRET, "SealedSecret",
-            SEALED_SECRET, self.namespace, guard=guard)
+            reads,
+            "SealedSecret/" + SEALED_SECRET,
+            "SealedSecret",
+            SEALED_SECRET,
+            self.namespace,
+            guard=guard,
+        )
         service = self._read(
-            reads, "Service/" + WEB_SERVICE, "Service", WEB_SERVICE,
-            self.namespace, guard=guard)
+            reads, "Service/" + WEB_SERVICE, "Service", WEB_SERVICE, self.namespace, guard=guard
+        )
         hpa_doc = self._read(
-            reads, "HorizontalPodAutoscaler/" + WEB_HPA,
-            "HorizontalPodAutoscaler", WEB_HPA, self.namespace, guard=guard)
+            reads,
+            "HorizontalPodAutoscaler/" + WEB_HPA,
+            "HorizontalPodAutoscaler",
+            WEB_HPA,
+            self.namespace,
+            guard=guard,
+        )
         objects = [item for item in (deployment, configmap, secret, service) if item]
         apps = {}
         for name in (APP_OF_APPS, self.app):
             app = self._read(
-                reads, "Application/" + name, "Application", name,
-                self.argo_namespace, guard=guard)
+                reads, "Application/" + name, "Application", name, self.argo_namespace, guard=guard
+            )
             if app is None:
                 raise InstrumentationError(f"Argo Application {name} is missing")
             apps[name] = application_state(app)
         extras = []
         quarantine_key = "Namespace/" + self.quarantine
-        if self._read(reads, quarantine_key, "Namespace",
-                      self.quarantine, guard=guard) is not None:
+        if self._read(reads, quarantine_key, "Namespace", self.quarantine, guard=guard) is not None:
             quarantine_deployment = self._read(
                 reads,
                 f"{self.quarantine}/Deployment/" + WEB_DEPLOYMENT,
-                "Deployment", WEB_DEPLOYMENT, self.quarantine, guard=guard)
+                "Deployment",
+                WEB_DEPLOYMENT,
+                self.quarantine,
+                guard=guard,
+            )
             if quarantine_deployment:
                 extras.append(f"{self.quarantine}/Deployment/{WEB_DEPLOYMENT}")
         hpa = hpa_state(hpa_doc, deployment) if hpa_doc else None
@@ -1447,46 +1547,43 @@ class Snapshotter:
             "finished_mono": finished.mono,
             "reads": reads,
         }
-        return observation_from_objects(objects, at=at, argo=apps, hpa=hpa,
-                                         extras=extras, acquisition=acquisition)
+        return observation_from_objects(
+            objects, at=at, argo=apps, hpa=hpa, extras=extras, acquisition=acquisition
+        )
 
 
 def _observation_key(observation: Observation) -> str:
     # Node metrics fluctuate between reads; the quiet-window threshold is
     # checked separately, so configuration stability excludes them.
-    return _canonical({
-        "resources": {key: value.get("fields")
-                      for key, value in sorted(observation.resources.items())},
-        "extras": sorted(observation.extra_resources),
-        "argo": observation.argo,
-        "hpa": observation.hpa,
-        "pods": observation.pods,
-    })
+    return _canonical(
+        {
+            "resources": {
+                key: value.get("fields") for key, value in sorted(observation.resources.items())
+            },
+            "extras": sorted(observation.extra_resources),
+            "argo": observation.argo,
+            "hpa": observation.hpa,
+            "pods": observation.pods,
+        }
+    )
 
 
-def _baseline_issues(observation: Observation, arm: str,
-                     app: str = DEFAULT_APP) -> list:
+def _baseline_issues(observation: Observation, arm: str, app: str = DEFAULT_APP) -> list:
     issues = []
 
     def add(code, detail, retryable=False):
-        issues.append({"code": code, "detail": detail,
-                       "retryable": retryable})
+        issues.append({"code": code, "detail": detail, "retryable": retryable})
 
-    if not any(key.startswith("ConfigMap/" + CONFIG_PREFIX)
-               for key in observation.resources):
-        add("missing_configmap",
-            "generated invenio-app-config ConfigMap is missing")
+    if not any(key.startswith("ConfigMap/" + CONFIG_PREFIX) for key in observation.resources):
+        add("missing_configmap", "generated invenio-app-config ConfigMap is missing")
     if "Deployment/" + WEB_DEPLOYMENT not in observation.resources:
         add("missing_deployment", "invenio-web Deployment is missing")
     if "SealedSecret/" + SEALED_SECRET not in observation.resources:
-        add("missing_sealed_secret",
-            "invenio-app-secrets SealedSecret is missing")
+        add("missing_sealed_secret", "invenio-app-secrets SealedSecret is missing")
     else:
         sealed = observation.resources["SealedSecret/" + SEALED_SECRET]
-        if sealed["fields"].get(
-                "/metadata/annotations/" + DRIFT_ANNOTATION) is not None:
-            add("contamination",
-                "drift annotation is already present on SealedSecret")
+        if sealed["fields"].get("/metadata/annotations/" + DRIFT_ANNOTATION) is not None:
+            add("contamination", "drift annotation is already present on SealedSecret")
     if "Service/" + WEB_SERVICE not in observation.resources:
         add("missing_service", "invenio-web Service is missing")
     if not isinstance(observation.hpa, dict):
@@ -1497,74 +1594,70 @@ def _baseline_issues(observation: Observation, arm: str,
         elif not hpa_telemetry_valid(observation.hpa):
             raise InstrumentationError("HPA telemetry is malformed")
         elif not hpa_settled(observation.hpa):
-            add("hpa_settling", "HPA is not settled at baseline",
-                retryable=True)
+            add("hpa_settling", "HPA is not settled at baseline", retryable=True)
     if observation.extra_resources:
-        add("quarantine_preexisting",
-            "quarantine resources exist before the run")
+        add("quarantine_preexisting", "quarantine resources exist before the run")
     if not observation.pods:
         add("pod_readiness", "no pods observed", retryable=True)
     for pod in observation.pods:
         if not isinstance(pod, dict):
             raise InstrumentationError("pod telemetry is malformed")
         if pod.get("phase") != "Running" or pod.get("ready") is not True:
-            add("pod_readiness",
-                f"pod {pod.get('name')} is not Running and Ready",
-                retryable=True)
+            add("pod_readiness", f"pod {pod.get('name')} is not Running and Ready", retryable=True)
     if not observation.nodes:
         add("missing_node_metrics", "no node metrics observed")
     evaluation = None
     if observation.nodes:
-        evaluation = _timestamp_instant(observation.at.utc,
-                                        "observation timestamp")
+        evaluation = _timestamp_instant(observation.at.utc, "observation timestamp")
     for node in observation.nodes:
         if not isinstance(node, dict):
             raise InstrumentationError("node telemetry is malformed")
         name = node.get("name")
         for metric in ("cpu_percent", "memory_percent"):
             value = node.get(metric)
-            finite = (type(value) is int
-                      or (type(value) is float and math.isfinite(value)))
+            finite = type(value) is int or (type(value) is float and math.isfinite(value))
             if not finite or value < 0:
-                raise InstrumentationError(
-                    f"node {name} {metric} is not a finite percentage")
+                raise InstrumentationError(f"node {name} {metric} is not a finite percentage")
             if value >= 70:
-                add("capacity",
-                    f"node {name} {metric} >= 70%", retryable=True)
+                add("capacity", f"node {name} {metric} >= 70%", retryable=True)
         timestamp = _timestamp_instant(
-            node.get("metrics_timestamp"),
-            f"node {name} metrics timestamp")
+            node.get("metrics_timestamp"), f"node {name} metrics timestamp"
+        )
         age = (evaluation - timestamp).total_seconds()
         if age > MAX_SAMPLE_END_AGE_SECONDS:
-            add("stale_metrics",
+            add(
+                "stale_metrics",
                 f"node {name} metrics sample is {age:.3f}s old "
                 f"(limit {MAX_SAMPLE_END_AGE_SECONDS:.1f}s)",
-                retryable=True)
+                retryable=True,
+            )
         elif age < -FUTURE_SAMPLE_TOLERANCE_SECONDS:
-            add("clock_anomaly",
+            add(
+                "clock_anomaly",
                 f"node {name} metrics sample is {-age:.3f}s in the future "
-                f"(tolerance {FUTURE_SAMPLE_TOLERANCE_SECONDS:.1f}s)")
+                f"(tolerance {FUTURE_SAMPLE_TOLERANCE_SECONDS:.1f}s)",
+            )
         window = node.get("metrics_window_seconds")
-        if (type(window) not in (int, float)
-                or not math.isfinite(window) or window <= 0):
+        if type(window) not in (int, float) or not math.isfinite(window) or window <= 0:
             raise InstrumentationError(
-                f"node {name} metrics window is not a positive finite duration")
+                f"node {name} metrics window is not a positive finite duration"
+            )
         if window > MAX_AGGREGATION_WINDOW_SECONDS:
-            add("long_window",
+            add(
+                "long_window",
                 f"node {name} metrics window is {window:.3f}s "
                 f"(limit {MAX_AGGREGATION_WINDOW_SECONDS:.1f}s)",
-                retryable=True)
+                retryable=True,
+            )
     if arm == "gitops":
         for name in (APP_OF_APPS, app):
             state = observation.argo.get(name) or {}
             if state.get("sync") != "Synced" or state.get("health") != "Healthy":
-                add("argo_state",
-                    f"Argo Application {name} is not Synced/Healthy")
+                add("argo_state", f"Argo Application {name} is not Synced/Healthy")
     return issues
 
 
-def baseline_gate(observation: Observation, arm: str,
-                  app: str = DEFAULT_APP) -> None:
+def baseline_gate(observation: Observation, arm: str, app: str = DEFAULT_APP) -> None:
     issues = _baseline_issues(observation, arm, app)
     if issues:
         fatal = [issue for issue in issues if not issue["retryable"]]
@@ -1599,8 +1692,7 @@ def _instrumentation_record(error, started, finished, observation=None) -> dict:
         "acquisition": {"snapshot": _point_bounds(started, finished)},
         "reason": "instrumentation_failure",
         "detail": str(error),
-        "reasons": [{"code": "instrumentation_failure",
-                     "detail": str(error), "retryable": False}],
+        "reasons": [{"code": "instrumentation_failure", "detail": str(error), "retryable": False}],
         "pods": [],
         "nodes": [],
         "hpa": None,
@@ -1608,14 +1700,16 @@ def _instrumentation_record(error, started, finished, observation=None) -> dict:
         "extra_resources": [],
     }
     if observation is not None:
-        record.update({
-            "at": _point_dict(observation.at),
-            "pods": copy.deepcopy(observation.pods),
-            "nodes": copy.deepcopy(observation.nodes),
-            "hpa": copy.deepcopy(observation.hpa),
-            "argo": copy.deepcopy(observation.argo),
-            "extra_resources": copy.deepcopy(observation.extra_resources),
-        })
+        record.update(
+            {
+                "at": _point_dict(observation.at),
+                "pods": copy.deepcopy(observation.pods),
+                "nodes": copy.deepcopy(observation.nodes),
+                "hpa": copy.deepcopy(observation.hpa),
+                "argo": copy.deepcopy(observation.argo),
+                "extra_resources": copy.deepcopy(observation.extra_resources),
+            }
+        )
         acquisition = copy.deepcopy(observation.acquisition)
         if acquisition:
             record["acquisition"] = acquisition
@@ -1626,16 +1720,18 @@ def _instrumentation_record(error, started, finished, observation=None) -> dict:
     return record
 
 
-def stabilize_baseline(snapshotter, kubectl, arm, timeout, interval,
-                       clock, sleep=time.sleep, app=DEFAULT_APP) -> Observation:
+def stabilize_baseline(
+    snapshotter, kubectl, arm, timeout, interval, clock, sleep=time.sleep, app=DEFAULT_APP
+) -> Observation:
     deadline = clock.now().mono + timeout
     previous_key = None
     failures = []
     attempted = False
     while True:
         if attempted and clock.now().mono >= deadline:
-            _raise_readiness(BaselineError(
-                f"baseline did not stabilize within {timeout}s"), failures)
+            _raise_readiness(
+                BaselineError(f"baseline did not stabilize within {timeout}s"), failures
+            )
         attempted = True
         started = clock.now()
         observation = None
@@ -1653,26 +1749,20 @@ def stabilize_baseline(snapshotter, kubectl, arm, timeout, interval,
             pods_started = clock.now()
             observation.pods = kubectl.pods(snapshotter.namespace)
             pods_finished = clock.now()
-            observation.acquisition["pods"] = _point_bounds(
-                pods_started, pods_finished)
+            observation.acquisition["pods"] = _point_bounds(pods_started, pods_finished)
             nodes_started = clock.now()
             observation.nodes = kubectl.top_nodes()
             nodes_finished = clock.now()
-            observation.acquisition["nodes"] = _point_bounds(
-                nodes_started, nodes_finished)
+            observation.acquisition["nodes"] = _point_bounds(nodes_started, nodes_finished)
             issues = _baseline_issues(observation, arm, app)
         except InstrumentationError as error:
             finished = clock.now()
             if observation is not None:
                 if pods_started is not None and "pods" not in observation.acquisition:
-                    observation.acquisition["pods"] = _point_bounds(
-                        pods_started, finished)
-                elif (nodes_started is not None
-                      and "nodes" not in observation.acquisition):
-                    observation.acquisition["nodes"] = _point_bounds(
-                        nodes_started, finished)
-            failures.append(_instrumentation_record(
-                error, started, finished, observation))
+                    observation.acquisition["pods"] = _point_bounds(pods_started, finished)
+                elif nodes_started is not None and "nodes" not in observation.acquisition:
+                    observation.acquisition["nodes"] = _point_bounds(nodes_started, finished)
+            failures.append(_instrumentation_record(error, started, finished, observation))
             _raise_readiness(error, failures)
         now = clock.now().mono
         if issues:
@@ -1682,36 +1772,58 @@ def stabilize_baseline(snapshotter, kubectl, arm, timeout, interval,
             if fatal:
                 _raise_readiness(BaselineError(fatal[0]["detail"]), failures)
             if now >= deadline:
-                _raise_readiness(BaselineError(
-                    f"baseline not ready within {timeout}s: "
-                    + "; ".join(issue["detail"] for issue in issues)), failures)
+                _raise_readiness(
+                    BaselineError(
+                        f"baseline not ready within {timeout}s: "
+                        + "; ".join(issue["detail"] for issue in issues)
+                    ),
+                    failures,
+                )
             sleep(min(interval, deadline - now))
             continue
         key = _observation_key(observation)
         if now >= deadline:
-            failures.append(_readiness_record(observation, [{
-                "code": "deadline",
-                "detail": "baseline read crossed the settling deadline",
-                "retryable": True,
-            }], "deadline"))
-            _raise_readiness(BaselineError(
-                f"baseline did not stabilize within {timeout}s"), failures)
+            failures.append(
+                _readiness_record(
+                    observation,
+                    [
+                        {
+                            "code": "deadline",
+                            "detail": "baseline read crossed the settling deadline",
+                            "retryable": True,
+                        }
+                    ],
+                    "deadline",
+                )
+            )
+            _raise_readiness(
+                BaselineError(f"baseline did not stabilize within {timeout}s"), failures
+            )
         if previous_key == key:
             observation.readiness_failures = failures
             return observation
         if previous_key is not None:
-            failures.append(_readiness_record(observation, [{
-                "code": "unmatched_read",
-                "detail": "baseline read did not match the previous read",
-                "retryable": True,
-            }], "unmatched"))
+            failures.append(
+                _readiness_record(
+                    observation,
+                    [
+                        {
+                            "code": "unmatched_read",
+                            "detail": "baseline read did not match the previous read",
+                            "retryable": True,
+                        }
+                    ],
+                    "unmatched",
+                )
+            )
         previous_key = key
         sleep(min(interval, deadline - now))
 
 
 class ArmController:
-    def __init__(self, kubectl, app=DEFAULT_APP, apps_app=APP_OF_APPS,
-                 argo_namespace=ARGO_NAMESPACE):
+    def __init__(
+        self, kubectl, app=DEFAULT_APP, apps_app=APP_OF_APPS, argo_namespace=ARGO_NAMESPACE
+    ):
         self.kubectl = kubectl
         self.app = app
         self.apps_app = apps_app
@@ -1739,28 +1851,34 @@ class ArmController:
         if arm == "gitops":
             for name, app in apps.items():
                 if not self.enabled(app):
-                    raise ArmStateError(
-                        f"{name} does not have automated sync/selfHeal enabled")
-            return ArmEvidence(arm=arm, original={}, applications={
-                name: sanitize_application(app) for name, app in apps.items()
-            }, paused=False)
+                    raise ArmStateError(f"{name} does not have automated sync/selfHeal enabled")
+            return ArmEvidence(
+                arm=arm,
+                original={},
+                applications={name: sanitize_application(app) for name, app in apps.items()},
+                paused=False,
+            )
         for name, app in apps.items():
             if not self.enabled(app):
-                raise ArmStateError(
-                    f"{name} is not enabled; refusing to stack arm state")
+                raise ArmStateError(f"{name} is not enabled; refusing to stack arm state")
         self.original = {
-            name: {"spec": sanitize_application(app)["spec"],
-                   "automated": copy.deepcopy(self.automated(app))}
+            name: {
+                "spec": sanitize_application(app)["spec"],
+                "automated": copy.deepcopy(self.automated(app)),
+            }
             for name, app in apps.items()
         }
         try:
             for name in (self.apps_app, self.app):
                 result = self.kubectl.patch(
-                    "Application", name, self.argo_namespace,
-                    {"spec": {"syncPolicy": {"automated": None}}}, "merge")
+                    "Application",
+                    name,
+                    self.argo_namespace,
+                    {"spec": {"syncPolicy": {"automated": None}}},
+                    "merge",
+                )
                 if not result.ok:
-                    raise ArmStateError(
-                        f"failed to pause {name}: {result.stderr.strip()[:200]}")
+                    raise ArmStateError(f"failed to pause {name}: {result.stderr.strip()[:200]}")
                 current = self.get_app(name)
                 if self.automated(current) is not None:
                     raise ArmStateError(f"{name} is still auto-syncing")
@@ -1768,26 +1886,27 @@ class ArmController:
             try:
                 self.restore()
             except ArmRestoreError as error:
-                raise ArmRestoreError(
-                    f"pause failed and restore failed: {error}") from None
+                raise ArmRestoreError(f"pause failed and restore failed: {error}") from None
             raise
-        current = {name: self.get_app(name)
-                   for name in (self.apps_app, self.app)}
-        return ArmEvidence(arm=arm, original={
-            name: copy.deepcopy(item["spec"]) for name, item in self.original.items()
-        }, applications={name: sanitize_application(app)
-                         for name, app in current.items()},
-            paused=True)
+        current = {name: self.get_app(name) for name in (self.apps_app, self.app)}
+        return ArmEvidence(
+            arm=arm,
+            original={name: copy.deepcopy(item["spec"]) for name, item in self.original.items()},
+            applications={name: sanitize_application(app) for name, app in current.items()},
+            paused=True,
+        )
 
     def restore(self):
         if not self.original:
             return None
         errors = []
         for name in (self.app, self.apps_app):
-            patch = {"spec": {"syncPolicy": {
-                "automated": copy.deepcopy(self.original[name]["automated"])}}}
-            result = self.kubectl.patch("Application", name, self.argo_namespace,
-                                        patch, "merge")
+            patch = {
+                "spec": {
+                    "syncPolicy": {"automated": copy.deepcopy(self.original[name]["automated"])}
+                }
+            }
+            result = self.kubectl.patch("Application", name, self.argo_namespace, patch, "merge")
             if not result.ok:
                 errors.append(f"{name}: {result.stderr.strip()[:200]}")
                 continue
@@ -1805,8 +1924,7 @@ def _short(run_id: str) -> str:
 
 
 def _field(contract: Contract, resource_id_value: str, path: str):
-    resource = next((item for item in contract.resources
-                     if item["id"] == resource_id_value), None)
+    resource = next((item for item in contract.resources if item["id"] == resource_id_value), None)
     if resource is None:
         raise InjectionError(f"baseline resource {resource_id_value} is missing")
     if path not in resource["fields"]:
@@ -1820,8 +1938,7 @@ def _configmap_name(contract: Contract) -> str:
     return contract.configmap_name
 
 
-def inject(kubectl, contract: Contract, scenario: str, run_id: str,
-           clock: Clock) -> Injection:
+def inject(kubectl, contract: Contract, scenario: str, run_id: str, clock: Clock) -> Injection:
     if scenario not in SCENARIOS:
         raise SafetyError(f"unknown scenario {scenario!r}")
     started = clock.now()
@@ -1834,119 +1951,155 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str,
     effect = "value_changed"
     try:
         if scenario == "A":
-            baseline_replicas = (contract.baseline_hpa or {}).get(
-                "deployment_spec_replicas")
+            baseline_replicas = (contract.baseline_hpa or {}).get("deployment_spec_replicas")
             if type(baseline_replicas) is not int:
-                raise InjectionError(
-                    "baseline HPA did not retain the observed replicas")
+                raise InjectionError("baseline HPA did not retain the observed replicas")
             minimum = (contract.baseline_hpa or {}).get("min") or 2
             target = max(1, int(minimum) - 1) if int(minimum) > 1 else int(minimum) + 1
             if target == baseline_replicas:
                 candidates = (max(1, int(minimum) - 1), int(minimum) + 1)
-                target = next(value for value in candidates
-                              if value != baseline_replicas)
-            commands.append(kubectl.patch(
-                "Deployment", WEB_DEPLOYMENT, contract.namespace,
-                {"spec": {"replicas": target}}, "merge"))
+                target = next(value for value in candidates if value != baseline_replicas)
+            commands.append(
+                kubectl.patch(
+                    "Deployment",
+                    WEB_DEPLOYMENT,
+                    contract.namespace,
+                    {"spec": {"replicas": target}},
+                    "merge",
+                )
+            )
             expected_path = "/spec/replicas"
             expected_value = target
             expected_baseline = baseline_replicas
         elif scenario == "B":
-            image = _field(contract, "Deployment/" + WEB_DEPLOYMENT,
-                           "/spec/template/spec/containers/web/image")
+            image = _field(
+                contract, "Deployment/" + WEB_DEPLOYMENT, "/spec/template/spec/containers/web/image"
+            )
             repository = image.split("@")[0]
             if ":" in repository.rsplit("/", 1)[-1]:
                 repository = repository.rsplit(":", 1)[0]
             target = repository + ":drift-" + short
             if target == image:
-                raise InjectionError(
-                    "drift image is identical to the declared image")
-            commands.append(kubectl.patch(
-                "Deployment", WEB_DEPLOYMENT, contract.namespace,
-                {"spec": {"template": {"spec": {"containers": [
-                    {"name": "web", "image": target}]}}}}, "strategic"))
+                raise InjectionError("drift image is identical to the declared image")
+            commands.append(
+                kubectl.patch(
+                    "Deployment",
+                    WEB_DEPLOYMENT,
+                    contract.namespace,
+                    {
+                        "spec": {
+                            "template": {"spec": {"containers": [{"name": "web", "image": target}]}}
+                        }
+                    },
+                    "strategic",
+                )
+            )
             expected_path = "/spec/template/spec/containers/web/image"
             expected_value = target
             expected_baseline = image
         elif scenario == "C":
             name = _configmap_name(contract)
             key = CONFIG_KEY
-            expected_baseline = _field(contract, "ConfigMap/" + name,
-                                       "/data/" + key)
+            expected_baseline = _field(contract, "ConfigMap/" + name, "/data/" + key)
             target = CONFIG_DRIFT + "-" + short
             if target == expected_baseline:
-                raise InjectionError(
-                    "drift ConfigMap value is identical to the declared value")
-            commands.append(kubectl.patch(
-                "ConfigMap", name, contract.namespace,
-                {"data": {key: target}}, "merge"))
+                raise InjectionError("drift ConfigMap value is identical to the declared value")
+            commands.append(
+                kubectl.patch(
+                    "ConfigMap", name, contract.namespace, {"data": {key: target}}, "merge"
+                )
+            )
             expected_path = "/data/" + key
             expected_value = target
         elif scenario == "D":
-            commands.append(kubectl.delete(
-                "Deployment", WEB_DEPLOYMENT, contract.namespace, wait=True))
+            commands.append(
+                kubectl.delete("Deployment", WEB_DEPLOYMENT, contract.namespace, wait=True)
+            )
             expected_path = "/metadata/name"
             expected_baseline = "present"
             effect = "deleted"
         elif scenario == "E":
-            path = ("/spec/template/spec/containers/web/"
-                    "resources/limits/memory")
+            path = "/spec/template/spec/containers/web/resources/limits/memory"
             baseline = _field(contract, "Deployment/" + WEB_DEPLOYMENT, path)
             target = next(
-                (candidate for candidate in (
-                    MEMORY_LIMIT_DRIFT, MEMORY_LIMIT_DRIFT_FALLBACK)
-                 if not _field_matches(path, baseline, candidate)),
-                None)
+                (
+                    candidate
+                    for candidate in (MEMORY_LIMIT_DRIFT, MEMORY_LIMIT_DRIFT_FALLBACK)
+                    if not _field_matches(path, baseline, candidate)
+                ),
+                None,
+            )
             if target is None:
-                raise InjectionError(
-                    "no distinct memory limit drift quantity is available")
-            commands.append(kubectl.patch(
-                "Deployment", WEB_DEPLOYMENT, contract.namespace,
-                {"spec": {"template": {"spec": {"containers": [
-                    {"name": "web", "resources": {
-                        "limits": {"memory": target}}}]}}}}, "strategic"))
+                raise InjectionError("no distinct memory limit drift quantity is available")
+            commands.append(
+                kubectl.patch(
+                    "Deployment",
+                    WEB_DEPLOYMENT,
+                    contract.namespace,
+                    {
+                        "spec": {
+                            "template": {
+                                "spec": {
+                                    "containers": [
+                                        {"name": "web", "resources": {"limits": {"memory": target}}}
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "strategic",
+                )
+            )
             expected_path = path
             expected_value = target
             expected_baseline = baseline
         elif scenario == "F":
             path = "/spec/ports/0/targetPort"
             port = _field(contract, "Service/" + WEB_SERVICE, "/spec/ports/0/port")
-            expected_baseline = _field(
-                contract, "Service/" + WEB_SERVICE, path)
+            expected_baseline = _field(contract, "Service/" + WEB_SERVICE, path)
             expected_value = (
-                expected_baseline % 65535 + 1
-                if type(expected_baseline) is int else 65535)
+                expected_baseline % 65535 + 1 if type(expected_baseline) is int else 65535
+            )
             if _field_matches(path, expected_baseline, expected_value):
-                raise InjectionError(
-                    "no distinct Service targetPort drift value is available")
-            commands.append(kubectl.patch(
-                "Service", WEB_SERVICE, contract.namespace,
-                {"spec": {"ports": [{"port": port,
-                                     "targetPort": expected_value}]}},
-                "strategic"))
+                raise InjectionError("no distinct Service targetPort drift value is available")
+            commands.append(
+                kubectl.patch(
+                    "Service",
+                    WEB_SERVICE,
+                    contract.namespace,
+                    {"spec": {"ports": [{"port": port, "targetPort": expected_value}]}},
+                    "strategic",
+                )
+            )
             expected_path = path
         elif scenario == "G":
             target = "scenario-g-" + short
-            commands.append(kubectl.annotate(
-                "SealedSecret", SEALED_SECRET, contract.namespace,
-                DRIFT_ANNOTATION, target))
+            commands.append(
+                kubectl.annotate(
+                    "SealedSecret", SEALED_SECRET, contract.namespace, DRIFT_ANNOTATION, target
+                )
+            )
             expected_path = "/metadata/annotations/" + DRIFT_ANNOTATION
             expected_value = target
             expected_baseline = None
     except HarnessError:
         raise
     except Exception as error:
-        raise InjectionError(
-            f"injection command failed: {type(error).__name__}") from None
+        raise InjectionError(f"injection command failed: {type(error).__name__}") from None
 
     acknowledged = clock.now()
     failed = next((command for command in commands if not command.ok), None)
     if failed is not None:
-        error = InjectionError(
-            f"kubectl mutation failed with exit {failed.returncode}")
+        error = InjectionError(f"kubectl mutation failed with exit {failed.returncode}")
         error.injection = Injection(
-            started=started, acknowledged=acknowledged, verified=None,
-            accepted=False, changed=[], commands=commands, error=str(error))
+            started=started,
+            acknowledged=acknowledged,
+            verified=None,
+            accepted=False,
+            changed=[],
+            commands=commands,
+            error=str(error),
+        )
         raise error
 
     try:
@@ -1955,99 +2108,152 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str,
             actual = (observed or {}).get("spec", {}).get("replicas")
             if actual != expected_value:
                 raise InjectionError("/spec/replicas did not change")
-            changed.append({"resource": "Deployment/" + WEB_DEPLOYMENT,
-                            "path": expected_path, "effect": effect,
-                            "matches_desired": False,
-                            "expected": expected_baseline, "actual": actual})
+            changed.append(
+                {
+                    "resource": "Deployment/" + WEB_DEPLOYMENT,
+                    "path": expected_path,
+                    "effect": effect,
+                    "matches_desired": False,
+                    "expected": expected_baseline,
+                    "actual": actual,
+                }
+            )
         elif scenario == "B":
             observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
             container = _container(observed or {})
             actual = container.get("image") if container else None
             if actual != expected_value:
-                raise InjectionError(
-                    "/spec/template/spec/containers/web/image did not change")
-            changed.append({"resource": "Deployment/" + WEB_DEPLOYMENT,
-                            "path": expected_path, "effect": effect,
-                            "matches_desired": False,
-                            "expected": expected_baseline, "actual": actual})
+                raise InjectionError("/spec/template/spec/containers/web/image did not change")
+            changed.append(
+                {
+                    "resource": "Deployment/" + WEB_DEPLOYMENT,
+                    "path": expected_path,
+                    "effect": effect,
+                    "matches_desired": False,
+                    "expected": expected_baseline,
+                    "actual": actual,
+                }
+            )
         elif scenario == "C":
             name = _configmap_name(contract)
             observed = kubectl.get("ConfigMap", name, contract.namespace)
             actual = (observed or {}).get("data", {}).get(CONFIG_KEY)
             if actual != expected_value:
                 raise InjectionError("/data/" + CONFIG_KEY + " did not change")
-            changed.append({"resource": "ConfigMap/" + name,
-                            "path": expected_path, "effect": effect,
-                            "matches_desired": False,
-                            "expected": expected_baseline, "actual": actual})
+            changed.append(
+                {
+                    "resource": "ConfigMap/" + name,
+                    "path": expected_path,
+                    "effect": effect,
+                    "matches_desired": False,
+                    "expected": expected_baseline,
+                    "actual": actual,
+                }
+            )
         elif scenario == "D":
-            if kubectl.get("Deployment", WEB_DEPLOYMENT,
-                           contract.namespace) is not None:
+            if kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace) is not None:
                 raise InjectionError("Deployment/invenio-web was not deleted")
-            changed.append({"resource": "Deployment/" + WEB_DEPLOYMENT,
-                            "path": expected_path, "effect": effect,
-                            "matches_desired": False,
-                            "expected": expected_baseline, "actual": "deleted"})
+            changed.append(
+                {
+                    "resource": "Deployment/" + WEB_DEPLOYMENT,
+                    "path": expected_path,
+                    "effect": effect,
+                    "matches_desired": False,
+                    "expected": expected_baseline,
+                    "actual": "deleted",
+                }
+            )
         elif scenario == "E":
             observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
             container = _container(observed or {})
-            actual = ((container or {}).get("resources", {}).get("limits", {})
-                      .get("memory"))
-            if actual is None or not _field_matches(
-                    expected_path, expected_value, actual):
+            actual = (container or {}).get("resources", {}).get("limits", {}).get("memory")
+            if actual is None or not _field_matches(expected_path, expected_value, actual):
                 raise InjectionError(
-                    "/spec/template/spec/containers/web/resources/limits/memory "
-                    "did not change")
-            changed.append({"resource": "Deployment/" + WEB_DEPLOYMENT,
-                            "path": expected_path, "effect": effect,
-                            "matches_desired": False,
-                            "expected": expected_baseline, "actual": actual})
+                    "/spec/template/spec/containers/web/resources/limits/memory did not change"
+                )
+            changed.append(
+                {
+                    "resource": "Deployment/" + WEB_DEPLOYMENT,
+                    "path": expected_path,
+                    "effect": effect,
+                    "matches_desired": False,
+                    "expected": expected_baseline,
+                    "actual": actual,
+                }
+            )
         elif scenario == "F":
             observed = kubectl.get("Service", WEB_SERVICE, contract.namespace)
             ports = ((observed or {}).get("spec") or {}).get("ports") or []
             actual = ports[0].get("targetPort") if ports else None
             if actual != expected_value:
-                raise InjectionError(
-                    "/spec/ports/0/targetPort did not change")
-            changed.append({"resource": "Service/" + WEB_SERVICE,
-                            "path": expected_path, "effect": effect,
-                            "matches_desired": False,
-                            "expected": expected_baseline, "actual": actual})
+                raise InjectionError("/spec/ports/0/targetPort did not change")
+            changed.append(
+                {
+                    "resource": "Service/" + WEB_SERVICE,
+                    "path": expected_path,
+                    "effect": effect,
+                    "matches_desired": False,
+                    "expected": expected_baseline,
+                    "actual": actual,
+                }
+            )
         elif scenario == "G":
-            observed = kubectl.get("SealedSecret", SEALED_SECRET,
-                                   contract.namespace)
-            actual = ((observed or {}).get("metadata", {}).get("annotations") or {}
-                      ).get(DRIFT_ANNOTATION)
+            observed = kubectl.get("SealedSecret", SEALED_SECRET, contract.namespace)
+            actual = ((observed or {}).get("metadata", {}).get("annotations") or {}).get(
+                DRIFT_ANNOTATION
+            )
             if actual != expected_value:
                 raise InjectionError("metadata annotation did not change")
-            changed.append({"resource": "SealedSecret/" + SEALED_SECRET,
-                            "path": expected_path, "effect": effect,
-                            "matches_desired": False,
-                            "expected": expected_baseline, "actual": actual})
+            changed.append(
+                {
+                    "resource": "SealedSecret/" + SEALED_SECRET,
+                    "path": expected_path,
+                    "effect": effect,
+                    "matches_desired": False,
+                    "expected": expected_baseline,
+                    "actual": actual,
+                }
+            )
     except InjectionError as error:
         error.injection = Injection(
-            started=started, acknowledged=acknowledged, verified=None,
-            accepted=False, changed=changed, commands=commands, error=str(error),
-            verification_started=acknowledged)
+            started=started,
+            acknowledged=acknowledged,
+            verified=None,
+            accepted=False,
+            changed=changed,
+            commands=commands,
+            error=str(error),
+            verification_started=acknowledged,
+        )
         raise error
     except HarnessError as error:
         error.injection = Injection(
-            started=started, acknowledged=acknowledged, verified=None,
-            accepted=False, changed=changed, commands=commands, error=str(error),
-            verification_started=acknowledged)
+            started=started,
+            acknowledged=acknowledged,
+            verified=None,
+            accepted=False,
+            changed=changed,
+            commands=commands,
+            error=str(error),
+            verification_started=acknowledged,
+        )
         raise
     except Exception as error:
-        raise InjectionError(
-            f"injection verification failed: {type(error).__name__}") from None
+        raise InjectionError(f"injection verification failed: {type(error).__name__}") from None
 
-    return Injection(started=started, acknowledged=acknowledged,
-                     verified=clock.now(), accepted=True, changed=changed,
-                     commands=commands, error=None,
-                     verification_started=acknowledged)
+    return Injection(
+        started=started,
+        acknowledged=acknowledged,
+        verified=clock.now(),
+        accepted=True,
+        changed=changed,
+        commands=commands,
+        error=None,
+        verification_started=acknowledged,
+    )
 
 
-def repair(kubectl, contract: Contract, observation: Observation,
-           clock: Clock) -> list:
+def repair(kubectl, contract: Contract, observation: Observation, clock: Clock) -> list:
     commands = []
     for expected in contract.resources:
         actual = observation.resources.get(expected["id"])
@@ -2055,13 +2261,16 @@ def repair(kubectl, contract: Contract, observation: Observation,
             if expected["kind"] == "SealedSecret":
                 continue
             manifest = recovery_manifest(
-                expected["manifest"],
-                hpa_owned=expected["id"] in contract.hpa_targets)
+                expected["manifest"], hpa_owned=expected["id"] in contract.hpa_targets
+            )
             commands.append(kubectl.apply(manifest))
             continue
         values = actual.get("fields") or {}
-        diffs = [diff for diff in field_diffs(contract, observation)
-                 if diff["resource"] == expected["id"] and not diff.get("missing")]
+        diffs = [
+            diff
+            for diff in field_diffs(contract, observation)
+            if diff["resource"] == expected["id"] and not diff.get("missing")
+        ]
         if not diffs:
             continue
         if expected["kind"] == "Deployment":
@@ -2074,42 +2283,58 @@ def repair(kubectl, contract: Contract, observation: Observation,
             for path, value in fields.items():
                 prefix = "/spec/template/spec/containers/web/resources/"
                 if path.startswith(prefix):
-                    parts = path[len(prefix):].split("/")
+                    parts = path[len(prefix) :].split("/")
                     if len(parts) == 2:
                         resources.setdefault(parts[0], {})[parts[1]] = value
             if resources:
                 container_patch["resources"] = resources
             if len(container_patch) > 1:
-                commands.append(kubectl.patch(
-                    "Deployment", expected["name"], contract.namespace,
-                    {"spec": {"template": {"spec": {"containers": [
-                        container_patch]}}}}, "strategic"))
+                commands.append(
+                    kubectl.patch(
+                        "Deployment",
+                        expected["name"],
+                        contract.namespace,
+                        {"spec": {"template": {"spec": {"containers": [container_patch]}}}},
+                        "strategic",
+                    )
+                )
             else:
-                commands.append(kubectl.apply(
-                    recovery_manifest(expected["manifest"],
-                                      hpa_owned=expected["id"] in
-                                      contract.hpa_targets)))
+                commands.append(
+                    kubectl.apply(
+                        recovery_manifest(
+                            expected["manifest"], hpa_owned=expected["id"] in contract.hpa_targets
+                        )
+                    )
+                )
         elif expected["kind"] == "ConfigMap":
             patch = {}
             for diff in diffs:
                 if diff["path"].startswith("/data/"):
-                    patch[diff["path"][len("/data/"):]] = diff["expected"]
+                    patch[diff["path"][len("/data/") :]] = diff["expected"]
             if patch:
-                commands.append(kubectl.patch(
-                    "ConfigMap", expected["name"], contract.namespace,
-                    {"data": patch}, "merge"))
+                commands.append(
+                    kubectl.patch(
+                        "ConfigMap", expected["name"], contract.namespace, {"data": patch}, "merge"
+                    )
+                )
         elif expected["kind"] == "SealedSecret":
             for diff in diffs:
                 if diff["path"].startswith("/metadata/annotations/"):
-                    key = diff["path"][len("/metadata/annotations/"):]
+                    key = diff["path"][len("/metadata/annotations/") :]
                     if values.get(diff["path"]) is not None:
-                        commands.append(kubectl.annotate(
-                            "SealedSecret", expected["name"], contract.namespace,
-                            key, None))
+                        commands.append(
+                            kubectl.annotate(
+                                "SealedSecret", expected["name"], contract.namespace, key, None
+                            )
+                        )
         else:
-            commands.append(kubectl.apply(
-                recovery_manifest(expected["manifest"],
-                                  hpa_owned=expected["id"] in contract.hpa_targets)))
+            commands.append(
+                kubectl.apply(
+                    recovery_manifest(
+                        expected["manifest"], hpa_owned=expected["id"] in contract.hpa_targets
+                    )
+                )
+            )
     return commands
 
 
@@ -2120,21 +2345,21 @@ def cleanup_g_annotation(kubectl, namespace: str) -> CleanupReport:
         annotations = ((sealed or {}).get("metadata") or {}).get("annotations") or {}
         if DRIFT_ANNOTATION not in annotations:
             return CleanupReport(ok=True, results=[], errors=[])
-        result = kubectl.annotate("SealedSecret", SEALED_SECRET, namespace,
-                                  DRIFT_ANNOTATION, None)
+        result = kubectl.annotate("SealedSecret", SEALED_SECRET, namespace, DRIFT_ANNOTATION, None)
         if not result.ok:
             return CleanupReport(
-                ok=False, results=[result],
-                errors=[f"remove {DRIFT_ANNOTATION} failed: "
-                        f"{result.stderr.strip()[:200]}"])
+                ok=False,
+                results=[result],
+                errors=[f"remove {DRIFT_ANNOTATION} failed: {result.stderr.strip()[:200]}"],
+            )
         return CleanupReport(ok=True, results=[result], errors=[])
     except HarnessError as error:
-        return CleanupReport(ok=False, results=[],
-                             errors=[f"annotation cleanup failed: {error}"])
+        return CleanupReport(ok=False, results=[], errors=[f"annotation cleanup failed: {error}"])
 
 
-def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None,
-                       wait_seconds: float = 30.0) -> CleanupReport:
+def cleanup_quarantine(
+    kubectl, quarantine: str, owner: str | None = None, wait_seconds: float = 30.0
+) -> CleanupReport:
     if not quarantine.startswith("exp-"):
         raise SafetyError("quarantine cleanup only accepts exp-* namespaces")
     validate_namespace(quarantine)
@@ -2145,19 +2370,20 @@ def cleanup_quarantine(kubectl, quarantine: str, owner: str | None = None,
         return CleanupReport(ok=True, results=[], errors=[])
     if owner is not None:
         label = ((namespace.get("metadata") or {}).get("labels") or {}).get(
-            "experiment.invenio.ugm/run-id")
+            "experiment.invenio.ugm/run-id"
+        )
         if label != owner:
             return CleanupReport(
-                ok=False, results=[],
-                errors=[f"refusing to delete {quarantine}: owner label mismatch"])
+                ok=False,
+                results=[],
+                errors=[f"refusing to delete {quarantine}: owner label mismatch"],
+            )
     for kind, name in (("Deployment", WEB_DEPLOYMENT), ("Namespace", quarantine)):
         try:
-            result = kubectl.delete(kind, name, quarantine if kind == "Deployment"
-                                    else None)
+            result = kubectl.delete(kind, name, quarantine if kind == "Deployment" else None)
             results.append(result)
             if not result.ok and "not found" not in result.stderr.lower():
-                errors.append(
-                    f"delete {kind}/{name} failed: {result.stderr.strip()[:200]}")
+                errors.append(f"delete {kind}/{name} failed: {result.stderr.strip()[:200]}")
         except HarnessError as error:
             errors.append(f"delete {kind}/{name} failed: {error}")
     deadline = time.monotonic() + wait_seconds
@@ -2176,8 +2402,11 @@ def read_diff_evidence(contract: Contract, observation: Observation) -> list:
     diffs = field_diffs(contract, observation)
     sanitized = []
     for diff in diffs:
-        item = {"resource": diff["resource"], "path": diff.get("path"),
-                "missing": bool(diff.get("missing"))}
+        item = {
+            "resource": diff["resource"],
+            "path": diff.get("path"),
+            "missing": bool(diff.get("missing")),
+        }
         if "expected" in diff:
             item["expected"] = diff["expected"]
             item["actual"] = diff["actual"]
@@ -2218,8 +2447,7 @@ def _validate_acquisition(observation: Observation) -> dict:
         if read_started > read_finished:
             raise InstrumentationError(f"read bounds for {key} are not ordered")
         if read_started < started or read_finished > finished:
-            raise InstrumentationError(
-                f"read bounds for {key} fall outside the capture")
+            raise InstrumentationError(f"read bounds for {key} fall outside the capture")
         if type(record.get("ok")) is not bool:
             raise InstrumentationError(f"read outcome for {key} is not boolean")
     return acquisition
@@ -2231,30 +2459,25 @@ def _read(sample: Observation, key: str) -> dict | None:
     return record if isinstance(record, dict) else None
 
 
-def _read_eligible(sample: Observation, key: str, t0: float,
-                   deadline: float) -> bool:
+def _read_eligible(sample: Observation, key: str, t0: float, deadline: float) -> bool:
     record = _read(sample, key)
     if record is None or record.get("ok") is not True:
         return False
-    return (record["started_mono"] >= t0
-            and record["finished_mono"] <= deadline)
+    return record["started_mono"] >= t0 and record["finished_mono"] <= deadline
 
 
-def _reads_eligible(sample: Observation, keys, t0: float,
-                    deadline: float) -> bool:
+def _reads_eligible(sample: Observation, keys, t0: float, deadline: float) -> bool:
     return all(_read_eligible(sample, key, t0, deadline) for key in keys)
 
 
 def _read_completion(sample: Observation, keys) -> Point:
-    latest = max((_read(sample, key) for key in keys),
-                 key=lambda record: record["finished_mono"])
+    latest = max((_read(sample, key) for key in keys), key=lambda record: record["finished_mono"])
     return Point(latest["finished_mono"], latest["finished_utc"])
 
 
 def _complete_match_completion(sample: Observation, keys) -> Point | None:
     records = [_read(sample, key) for key in keys]
-    if not records or any(record is None or record.get("ok") is not True
-                          for record in records):
+    if not records or any(record is None or record.get("ok") is not True for record in records):
         return None
     latest = max(records, key=lambda record: record["finished_mono"])
     return Point(latest["finished_mono"], latest["finished_utc"])
@@ -2269,20 +2492,17 @@ def _r1_keys(contract: Contract) -> list:
 
 
 def _hpa_keys() -> list:
-    return ["Deployment/" + WEB_DEPLOYMENT,
-            "HorizontalPodAutoscaler/" + WEB_HPA]
+    return ["Deployment/" + WEB_DEPLOYMENT, "HorizontalPodAutoscaler/" + WEB_HPA]
 
 
-def _recovery_keys(contract: Contract, scenario: str,
-                   sample: Observation) -> list:
+def _recovery_keys(contract: Contract, scenario: str, sample: Observation) -> list:
     keys = _r1_keys(contract)
     if scenario == "A":
         keys = list(dict.fromkeys(keys + _hpa_keys()))
     elif scenario == "F":
         keys.append("Namespace/" + contract.quarantine_namespace)
         if sample.extra_resources:
-            keys.append(
-                f"{contract.quarantine_namespace}/Deployment/" + WEB_DEPLOYMENT)
+            keys.append(f"{contract.quarantine_namespace}/Deployment/" + WEB_DEPLOYMENT)
     return keys
 
 
@@ -2291,8 +2511,9 @@ def _post_injection(sample: Observation, t0: float) -> bool:
     return acquisition["finished_mono"] >= t0
 
 
-def _imperative_event_keys(contract: Contract, sample: Observation,
-                           event: Point, t0: float, deadline: float) -> list | None:
+def _imperative_event_keys(
+    contract: Contract, sample: Observation, event: Point, t0: float, deadline: float
+) -> list | None:
     if event is None or not _finite_mono(event.mono):
         return None
     if event.mono < t0 or event.mono > deadline:
@@ -2305,8 +2526,7 @@ def _imperative_event_keys(contract: Contract, sample: Observation,
     return keys
 
 
-def _evaluation_keys(contract: Contract, sample: Observation,
-                     scenario: str) -> list | None:
+def _evaluation_keys(contract: Contract, sample: Observation, scenario: str) -> list | None:
     if sample.evaluated_signal is not True:
         return None
     if scenario == "A":
@@ -2319,8 +2539,9 @@ def _evaluation_keys(contract: Contract, sample: Observation,
     return keys
 
 
-def _evaluation_evidence(post, contract: Contract, scenario: str,
-                         t0: float, deadline: float, evidence_at=None):
+def _evaluation_evidence(
+    post, contract: Contract, scenario: str, t0: float, deadline: float, evidence_at=None
+):
     for sample in post:
         keys = _evaluation_keys(contract, sample, scenario)
         if keys is None:
@@ -2333,21 +2554,19 @@ def _evaluation_evidence(post, contract: Contract, scenario: str,
                 continue
             if event.mono < t0 or event.mono > deadline:
                 continue
-            if any(_read(sample, key)["finished_mono"] > event.mono
-                   for key in keys):
+            if any(_read(sample, key)["finished_mono"] > event.mono for key in keys):
                 continue
         if evidence_at is not None:
             if event is not None and not math.isclose(
-                    event.mono, evidence_at.mono, rel_tol=1e-9, abs_tol=1e-9):
-                raise InstrumentationError(
-                    "evidence evaluation disagrees with the persisted event")
+                event.mono, evidence_at.mono, rel_tol=1e-9, abs_tol=1e-9
+            ):
+                raise InstrumentationError("evidence evaluation disagrees with the persisted event")
             event = evidence_at
         if event is None or not _finite_mono(event.mono):
             continue
         if event.mono < t0 or event.mono > deadline:
             continue
-        if any(_read(sample, key)["finished_mono"] > event.mono
-               for key in keys):
+        if any(_read(sample, key)["finished_mono"] > event.mono for key in keys):
             continue
         return event, keys
     return None, []
@@ -2363,15 +2582,21 @@ def _recovered(contract, observation, scenario):
     return True
 
 
-def analyze_timeline(contract: Contract, samples: list, injection: Injection,
-                     arm: str, scenario: str, timeout: float,
-                     imperative: ImperativeRun | None = None,
-                     evidence_at: Point | None = None,
-                     provided_evidence_ref: str | None = None,
-                     app: str = DEFAULT_APP,
-                     baseline: Observation | None = None,
-                     window_completed: bool | None = None,
-                     window_end: Point | None = None) -> dict:
+def analyze_timeline(
+    contract: Contract,
+    samples: list,
+    injection: Injection,
+    arm: str,
+    scenario: str,
+    timeout: float,
+    imperative: ImperativeRun | None = None,
+    evidence_at: Point | None = None,
+    provided_evidence_ref: str | None = None,
+    app: str = DEFAULT_APP,
+    baseline: Observation | None = None,
+    window_completed: bool | None = None,
+    window_end: Point | None = None,
+) -> dict:
     samples = sorted(samples, key=lambda item: item.at.mono)
     for sample in samples:
         _validate_acquisition(sample)
@@ -2394,18 +2619,27 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         for sample in post:
             if scenario in "BCDEFG":
                 state = sample.argo.get(app)
-                if state and argo_signal(state) and _read_eligible(
-                        sample, "Application/" + app, t0, deadline):
+                if (
+                    state
+                    and argo_signal(state)
+                    and _read_eligible(sample, "Application/" + app, t0, deadline)
+                ):
                     argo_seen = True
-            if detection is None and scenario == "A" and hpa_changed(
-                    contract.baseline_hpa, sample.hpa):
+            if (
+                detection is None
+                and scenario == "A"
+                and hpa_changed(contract.baseline_hpa, sample.hpa)
+            ):
                 keys = _hpa_keys()
                 if _reads_eligible(sample, keys, t0, deadline):
                     detection = _read_completion(sample, keys)
                     detection_reads = keys
-            if (detection is None and arm == "gitops"
-                    and scenario in "BCDEFG"
-                    and argo_signal(sample.argo.get(app))):
+            if (
+                detection is None
+                and arm == "gitops"
+                and scenario in "BCDEFG"
+                and argo_signal(sample.argo.get(app))
+            ):
                 key = "Application/" + app
                 if _read_eligible(sample, key, t0, deadline):
                     detection = _read_completion(sample, [key])
@@ -2413,13 +2647,15 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
 
         if not (imperative and scenario in "BCDEFG"):
             evidence, evidence_reads = _evaluation_evidence(
-                post, contract, scenario, t0, deadline, evidence_at)
+                post, contract, scenario, t0, deadline, evidence_at
+            )
 
         if imperative and scenario in "BCDEFG":
             for sample in post:
                 if imperative.detection_at is not None:
                     keys = _imperative_event_keys(
-                        contract, sample, imperative.detection_at, t0, deadline)
+                        contract, sample, imperative.detection_at, t0, deadline
+                    )
                     if keys:
                         detection = imperative.detection_at
                         detection_reads = keys
@@ -2427,7 +2663,8 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
             for sample in post:
                 if imperative.evidence_at is not None:
                     keys = _imperative_event_keys(
-                        contract, sample, imperative.evidence_at, t0, deadline)
+                        contract, sample, imperative.evidence_at, t0, deadline
+                    )
                     if keys:
                         evidence = imperative.evidence_at
                         evidence_reads = keys
@@ -2463,8 +2700,7 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
             previous_match = completion
         if recovery is None and first_match is not None:
             t_r_first = first_match
-            confirmation = ("late_confirmation" if late_match
-                            else "missing_confirmation")
+            confirmation = "late_confirmation" if late_match else "missing_confirmation"
 
     if scenario == "A":
         detection_ref = "hpa:invenio-web-hpa" if detection else None
@@ -2483,8 +2719,9 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
     stop_reason = "recovery" if recovery is not None else "timeout"
     if not injection.accepted:
         status = "invalid_injection"
-    elif imperative and (imperative.failed or any(
-            not command.ok for command in imperative.commands)):
+    elif imperative and (
+        imperative.failed or any(not command.ok for command in imperative.commands)
+    ):
         status = "recovery_failure"
     elif recovery is not None:
         status = "observed"
@@ -2496,9 +2733,11 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         recovery_controller = "hpa" if recovery is not None else "unattributed"
     elif arm == "imperative":
         detection_controller = "imperative" if detection else "unattributed"
-        recovery_controller = ("imperative" if any(
-            command.ok for command in (imperative.commands if imperative else []))
-            else "unattributed")
+        recovery_controller = (
+            "imperative"
+            if any(command.ok for command in (imperative.commands if imperative else []))
+            else "unattributed"
+        )
     else:
         detection_controller = "argocd" if detection else "unattributed"
         recovery_controller = "argocd" if argo_seen and recovery else "unattributed"
@@ -2507,8 +2746,7 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         return None if at is None else at.mono - t0
 
     r1_keys = _r1_keys(contract)
-    eligible_r1 = [sample for sample in post
-                   if _reads_eligible(sample, r1_keys, t0, deadline)]
+    eligible_r1 = [sample for sample in post if _reads_eligible(sample, r1_keys, t0, deadline)]
     r1_first = eligible_r1[0] if eligible_r1 else None
     r1_last = eligible_r1[-1] if eligible_r1 else None
     if not post:
@@ -2518,13 +2756,11 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
     else:
         r1_reason = None
 
-    gaps = [right.at.mono - left.at.mono
-            for left, right in zip(samples, samples[1:])]
+    gaps = [right.at.mono - left.at.mono for left, right in zip(samples, samples[1:])]
     observation_end = None
     if samples:
         acquisition = samples[-1].acquisition
-        observation_end = Point(acquisition["finished_mono"],
-                                acquisition["finished_utc"])
+        observation_end = Point(acquisition["finished_mono"], acquisition["finished_utc"])
     return {
         "schema_version": 2,
         "timing_convention": TIMING_CONVENTION,
@@ -2552,24 +2788,27 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         "t_r_first_seconds": duration(t_r_first),
         "t_r_confirmed_seconds": duration(t_r_confirmed),
         "recovery_confirmation": confirmation,
-        "r1_baseline": (score(contract, baseline) if baseline is not None
-                        else None),
+        "r1_baseline": (score(contract, baseline) if baseline is not None else None),
         "r1_first": score(contract, r1_first) if r1_first else None,
         "r1_last": score(contract, r1_last) if r1_last else None,
-        "r1_baseline_details": (resource_results(contract, baseline)
-                                if baseline is not None else None),
-        "r1_first_details": (resource_results(contract, r1_first)
-                             if r1_first is not None else None),
-        "r1_last_details": (resource_results(contract, r1_last)
-                            if r1_last is not None else None),
-        "r1_baseline_reason": (None if baseline is not None
-                               else "baseline_not_observed"),
+        "r1_baseline_details": (
+            resource_results(contract, baseline) if baseline is not None else None
+        ),
+        "r1_first_details": (
+            resource_results(contract, r1_first) if r1_first is not None else None
+        ),
+        "r1_last_details": (resource_results(contract, r1_last) if r1_last is not None else None),
+        "r1_baseline_reason": (None if baseline is not None else "baseline_not_observed"),
         "r1_first_reason": r1_reason,
         "r1_last_reason": r1_reason,
         "kubectl_cmds": len(imperative.commands) if imperative else 0,
-        "analysis_group": ("hpa_control" if scenario == "A" else
-                           "visibility_boundary" if scenario == "F" else
-                           "managed_drift"),
+        "analysis_group": (
+            "hpa_control"
+            if scenario == "A"
+            else "visibility_boundary"
+            if scenario == "F"
+            else "managed_drift"
+        ),
         "efficacy_eligible": scenario not in ("A", "F"),
         "t0": injection.started,
         "t_a": injection.acknowledged,
@@ -2578,8 +2817,9 @@ def analyze_timeline(contract: Contract, samples: list, injection: Injection,
         "t_r": recovery,
         "t_r_first": t_r_first,
         "t_r_confirmed": t_r_confirmed,
-        "t_e_store": (imperative.evidence_store_at
-                      if imperative and evidence is not None else None),
+        "t_e_store": (
+            imperative.evidence_store_at if imperative and evidence is not None else None
+        ),
         "recovery_pair": recovery_pair,
         "samples": len(samples),
     }
@@ -2601,9 +2841,13 @@ def dry_run_row(run_id, arm, scenario, rep, namespace, app, args) -> dict:
         "namespace": namespace,
         "app": app,
         "quarantine_namespace": quarantine_namespace(namespace),
-        "analysis_group": ("hpa_control" if scenario == "A" else
-                           "visibility_boundary" if scenario == "F" else
-                           "managed_drift"),
+        "analysis_group": (
+            "hpa_control"
+            if scenario == "A"
+            else "visibility_boundary"
+            if scenario == "F"
+            else "managed_drift"
+        ),
         "efficacy_eligible": scenario not in ("A", "F"),
         "status": "dry_run",
         "stop_reason": None,
@@ -2704,23 +2948,25 @@ def parse_args(argv=None):
     parser.add_argument("--seed-sha256", default=SEED_SHA256)
     args = parser.parse_args(argv)
     args.namespace_explicit = any(
-        token == "--namespace" or token.startswith("--namespace=")
-        for token in tokens)
-    args.app_explicit = any(
-        token == "--app" or token.startswith("--app=") for token in tokens)
+        token == "--namespace" or token.startswith("--namespace=") for token in tokens
+    )
+    args.app_explicit = any(token == "--app" or token.startswith("--app=") for token in tokens)
     args.namespace = args.namespace or DEFAULT_NAMESPACE
     args.app = args.app or DEFAULT_APP
     if args.rep < 1:
         parser.error("--rep must be >= 1")
-    for name in ("timeout", "sample_interval", "imperative_interval",
-                 "baseline_timeout", "reset_timeout"):
+    for name in (
+        "timeout",
+        "sample_interval",
+        "imperative_interval",
+        "baseline_timeout",
+        "reset_timeout",
+    ):
         if getattr(args, name) <= 0:
             parser.error(f"--{name.replace('_', '-')} must be positive")
-    if args.source_revision and not re.fullmatch(r"[0-9a-f]{40}",
-                                                 args.source_revision):
+    if args.source_revision and not re.fullmatch(r"[0-9a-f]{40}", args.source_revision):
         parser.error("--source-revision must be 40 lowercase hex")
-    if args.render_sha256 and not re.fullmatch(r"[0-9a-f]{64}",
-                                               args.render_sha256):
+    if args.render_sha256 and not re.fullmatch(r"[0-9a-f]{64}", args.render_sha256):
         parser.error("--render-sha256 must be 64 lowercase hex")
     if args.run_id and not re.fullmatch(r"[A-Za-z0-9._-]+", args.run_id):
         parser.error("--run-id may only contain letters, digits, dot, dash, underscore")
@@ -2741,31 +2987,28 @@ def validate_live_args(args, environ=None):
     validate_namespace(args.namespace)
     token = load_token(environ)
     if not args.render_sha256:
-        raise SafetyError(
-            "--render-sha256 is required in live mode; freeze the render first")
+        raise SafetyError("--render-sha256 is required in live mode; freeze the render first")
     if not args.source_revision:
-        raise SafetyError(
-            "--source-revision is required in live mode; freeze the revision first")
+        raise SafetyError("--source-revision is required in live mode; freeze the revision first")
     if not args.render_file:
-        raise SafetyError(
-            "--render-file is required in live mode; freeze the render bundle first")
+        raise SafetyError("--render-file is required in live mode; freeze the render bundle first")
     if "://" in args.render_file:
         raise SafetyError("--render-file must be a local file, not a URL")
     try:
         frozen = load_declaration(
-            args.render_file, args.render_sha256, args.source_revision,
-            args.namespace)
+            args.render_file, args.render_sha256, args.source_revision, args.namespace
+        )
     except DeclarationError as error:
         raise SafetyError(f"invalid frozen render: {error}") from None
     http = Http(token, base_url=args.invenio_url)
-    seed = verify_seed(http, args.seed_record, args.seed_file, args.seed_size,
-                       args.seed_md5, args.seed_sha256)
+    seed = verify_seed(
+        http, args.seed_record, args.seed_file, args.seed_size, args.seed_md5, args.seed_sha256
+    )
     return {"http": http, "seed": seed, "declaration": frozen}
 
 
 class Sampler(threading.Thread):
-    def __init__(self, capture, clock, interval, join_timeout=10.0,
-                 guarded=False):
+    def __init__(self, capture, clock, interval, join_timeout=10.0, guarded=False):
         super().__init__(daemon=True)
         self.capture = capture
         self.clock = clock
@@ -2790,8 +3033,7 @@ class Sampler(threading.Thread):
     def _guard(self):
         if self._stop_event.is_set():
             return "stop"
-        if (self.deadline is not None
-                and self.clock.now().mono >= self.deadline):
+        if self.deadline is not None and self.clock.now().mono >= self.deadline:
             self.stopped_at_deadline = True
             return "deadline"
         return None
@@ -2800,8 +3042,7 @@ class Sampler(threading.Thread):
         while True:
             if self._stop_event.is_set():
                 return
-            if (self.deadline is not None
-                    and self.clock.now().mono >= self.deadline):
+            if self.deadline is not None and self.clock.now().mono >= self.deadline:
                 self.stopped_at_deadline = True
                 self._ready_event.set()
                 return
@@ -2831,8 +3072,7 @@ class Sampler(threading.Thread):
                     self._late_result = sample
                     if isinstance(sample, Observation):
                         self._late_result_at = _point_dict(sample.at)
-                        self._late_result_acquisition = copy.deepcopy(
-                            sample.acquisition)
+                        self._late_result_acquisition = copy.deepcopy(sample.acquisition)
                 else:
                     self.samples.append(sample)
                 self._ready_event.set()
@@ -2858,10 +3098,8 @@ class Sampler(threading.Thread):
                 "error": str(self.error) if self.error else None,
                 "late_result": self._late_result is not None,
                 "late_result_at": copy.deepcopy(self._late_result_at),
-                "late_result_acquisition": copy.deepcopy(
-                    self._late_result_acquisition),
-                "late_error": (str(self.late_error)
-                               if self.late_error else None),
+                "late_result_acquisition": copy.deepcopy(self._late_result_acquisition),
+                "late_error": (str(self.late_error) if self.late_error else None),
                 "stopped_at_deadline": self.stopped_at_deadline,
                 "partial_acquisition": copy.deepcopy(self.stopped_capture),
                 "capture_stop_reason": self.capture_stop_reason,
@@ -2870,24 +3108,21 @@ class Sampler(threading.Thread):
 
 def verify_one_stack(kubectl, namespace, app, argo_namespace):
     deployments = kubectl.get(
-        "Deployment",namespace=None,
-        selector="app.kubernetes.io/name=" + WEB_DEPLOYMENT)
+        "Deployment", namespace=None, selector="app.kubernetes.io/name=" + WEB_DEPLOYMENT
+    )
     if not isinstance(deployments, list):
         raise SafetyError("could not inventory invenio-web Deployments")
-    namespaces = {(item.get("metadata") or {}).get("namespace")
-                  for item in deployments}
+    namespaces = {(item.get("metadata") or {}).get("namespace") for item in deployments}
     if namespaces != {namespace}:
         raise SafetyError(
-            "one stack only: expected invenio-web only in "
-            f"{namespace}, found {sorted(namespaces)}")
+            f"one stack only: expected invenio-web only in {namespace}, found {sorted(namespaces)}"
+        )
     application = kubectl.get("Application", app, argo_namespace)
     if application is None:
         raise SafetyError(f"Argo Application {app} is missing")
-    destination = ((application.get("spec") or {}).get("destination") or {}).get(
-        "namespace")
+    destination = ((application.get("spec") or {}).get("destination") or {}).get("namespace")
     if destination != namespace:
-        raise SafetyError(
-            f"Argo Application {app} targets {destination}, not {namespace}")
+        raise SafetyError(f"Argo Application {app} targets {destination}, not {namespace}")
     if kubectl.get("Namespace", quarantine_namespace(namespace)) is not None:
         raise SafetyError("quarantine namespace already exists; clean it first")
 
@@ -2916,15 +3151,13 @@ def write_outputs(row, args, evidence_dir: Path, evidence: dict) -> None:
     if jsonl.exists():
         raise SafetyError(f"refusing to overwrite existing run output {jsonl}")
     evidence_dir.mkdir(parents=True, exist_ok=True)
-    jsonl.write_text(
-        json.dumps(row, sort_keys=True, default=str) + "\n")
+    jsonl.write_text(json.dumps(row, sort_keys=True, default=str) + "\n")
     write_csv([row], out / (run_id + ".csv"))
     for name, payload in evidence.items():
         if name in ("samples", "commands"):
             with (evidence_dir / (name + ".jsonl")).open("w") as handle:
                 for item in payload:
-                    handle.write(json.dumps(item, sort_keys=True,
-                                            default=str) + "\n")
+                    handle.write(json.dumps(item, sort_keys=True, default=str) + "\n")
         else:
             _write_json(evidence_dir / (name + ".json"), payload)
 
@@ -2945,37 +3178,39 @@ class LiveRunner:
     def _declaration(self) -> Declaration:
         frozen = (self.preflight or {}).get("declaration")
         if not isinstance(frozen, Declaration):
-            raise SafetyError(
-                "live runner requires a validated frozen render declaration")
-        if (frozen.source_revision != self.args.source_revision
-                or frozen.render_sha256 != self.args.render_sha256):
-            raise SafetyError(
-                "frozen render identity does not match the live run arguments")
-        if any(resource["namespace"] != self.args.namespace
-               for resource in frozen.resources):
-            raise SafetyError(
-                "frozen render namespace does not match --namespace")
+            raise SafetyError("live runner requires a validated frozen render declaration")
+        if (
+            frozen.source_revision != self.args.source_revision
+            or frozen.render_sha256 != self.args.render_sha256
+        ):
+            raise SafetyError("frozen render identity does not match the live run arguments")
+        if any(resource["namespace"] != self.args.namespace for resource in frozen.resources):
+            raise SafetyError("frozen render namespace does not match --namespace")
         return frozen
 
     @staticmethod
-    def _require_baseline_agreement(contract: Contract,
-                                    baseline: Observation) -> None:
+    def _require_baseline_agreement(contract: Contract, baseline: Observation) -> None:
         diffs = field_diffs(contract, baseline)
         if not diffs:
             return
         first = diffs[0]
         if first.get("missing"):
-            detail = (f"live baseline is missing {first['resource']}; "
-                      "the frozen declaration requires it")
+            detail = (
+                f"live baseline is missing {first['resource']}; the frozen declaration requires it"
+            )
         else:
-            detail = ("live baseline differs from the frozen declaration at "
-                      f"{first['resource']} {first['path']} "
-                      f"({len(diffs)} field(s))")
-        baseline.readiness_failures.append(_readiness_record(
-            baseline,
-            [{"code": "declaration_mismatch", "detail": detail,
-              "retryable": False}],
-            "declaration"))
+            detail = (
+                "live baseline differs from the frozen declaration at "
+                f"{first['resource']} {first['path']} "
+                f"({len(diffs)} field(s))"
+            )
+        baseline.readiness_failures.append(
+            _readiness_record(
+                baseline,
+                [{"code": "declaration_mismatch", "detail": detail, "retryable": False}],
+                "declaration",
+            )
+        )
         error = BaselineError(detail)
         error.readiness_failures = baseline.readiness_failures
         raise error
@@ -2984,12 +3219,15 @@ class LiveRunner:
         args = self.args
         run_id = args.run_id or (
             datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            + f"-{args.arm}-{args.scenario}-r{args.rep}-" + secrets.token_hex(3))
+            + f"-{args.arm}-{args.scenario}-r{args.rep}-"
+            + secrets.token_hex(3)
+        )
         evidence_dir = Path(args.out) / run_id
         ensure_new_run(args, run_id)
         evidence_dir.mkdir(parents=True, exist_ok=True)
-        arm_controller = ArmController(self.kubectl, app=args.app,
-                                       argo_namespace=args.argocd_namespace)
+        arm_controller = ArmController(
+            self.kubectl, app=args.app, argo_namespace=args.argocd_namespace
+        )
         arm_evidence = None
         cleanup = None
         injection = None
@@ -3011,37 +3249,43 @@ class LiveRunner:
         allow_cleanup = False
         try:
             frozen = self._declaration()
-            verify_one_stack(self.kubectl, args.namespace, args.app,
-                             args.argocd_namespace)
+            verify_one_stack(self.kubectl, args.namespace, args.app, args.argocd_namespace)
             allow_cleanup = True
-            snapshotter = Snapshotter(self.kubectl, args.namespace,
-                                      self.quarantine, self.clock,
-                                      configmap_name=frozen.configmap_name,
-                                      argo_namespace=args.argocd_namespace,
-                                      app=args.app)
+            snapshotter = Snapshotter(
+                self.kubectl,
+                args.namespace,
+                self.quarantine,
+                self.clock,
+                configmap_name=frozen.configmap_name,
+                argo_namespace=args.argocd_namespace,
+                app=args.app,
+            )
             arm_evidence = arm_controller.activate(args.arm)
             baseline = stabilize_baseline(
-                snapshotter, self.kubectl, args.arm, args.baseline_timeout,
-                args.sample_interval, self.clock, app=args.app)
+                snapshotter,
+                self.kubectl,
+                args.arm,
+                args.baseline_timeout,
+                args.sample_interval,
+                self.clock,
+                app=args.app,
+            )
             readiness_failures = list(baseline.readiness_failures)
             contract = build_contract(
-                frozen, baseline, args.namespace, self.quarantine,
-                app=args.app)
+                frozen, baseline, args.namespace, self.quarantine, app=args.app
+            )
             self._require_baseline_agreement(contract, baseline)
-            sampler = Sampler(snapshotter.capture, self.clock,
-                              args.sample_interval, guarded=True)
+            sampler = Sampler(snapshotter.capture, self.clock, args.sample_interval, guarded=True)
             self.collector_started = self.clock.now()
             sampler.start()
             if not sampler.wait_ready(timeout=10):
-                raise InstrumentationError(
-                    "collector did not produce an initial sample")
+                raise InstrumentationError("collector did not produce an initial sample")
             if sampler.error:
                 raise InstrumentationError(str(sampler.error))
             if not sampler.snapshot():
                 raise InstrumentationError("collector produced no sample")
             try:
-                injection = inject(self.kubectl, contract, args.scenario,
-                                   run_id, self.clock)
+                injection = inject(self.kubectl, contract, args.scenario, run_id, self.clock)
                 deadline = injection.started.mono + args.timeout
                 sampler.deadline = deadline
                 t0 = injection.started.mono
@@ -3056,38 +3300,37 @@ class LiveRunner:
                     if samples and collector_evidence_at is None:
                         latest = samples[-1]
                         if args.scenario == "A":
-                            changed = hpa_changed(
-                                contract.baseline_hpa, latest.hpa)
+                            changed = hpa_changed(contract.baseline_hpa, latest.hpa)
                             keys = _hpa_keys()
                         else:
                             diffs = field_diffs(contract, latest)
                             changed = bool(diffs)
-                            keys = sorted({diff["resource"]
-                                           for diff in diffs})
+                            keys = sorted({diff["resource"] for diff in diffs})
                         evaluated = self.clock.now()
                         latest.evaluated_at = evaluated
                         latest.evaluated_signal = bool(changed)
                         latest.evaluated_reads = list(keys)
-                        if (changed and _reads_eligible(latest, keys, t0,
-                                                        deadline)):
+                        if changed and _reads_eligible(latest, keys, t0, deadline):
                             collector_evidence_at = evaluated
                             if args.scenario == "A":
                                 collector_evidence_ref = "samples.jsonl"
                             else:
                                 collector_evidence_ref = (
-                                    "diff-" + _short(run_id) + "-collector.json")
+                                    "diff-" + _short(run_id) + "-collector.json"
+                                )
                                 try:
                                     _write_json(
-                                        evidence_dir / collector_evidence_ref, {
+                                        evidence_dir / collector_evidence_ref,
+                                        {
                                             "run_id": run_id,
                                             "at": _point_dict(latest.at),
-                                            "diffs": read_diff_evidence(
-                                                contract, latest),
-                                        })
+                                            "diffs": read_diff_evidence(contract, latest),
+                                        },
+                                    )
                                 except OSError as error:
                                     raise InstrumentationError(
-                                        "collector evidence write failed: "
-                                        f"{type(error).__name__}") from None
+                                        f"collector evidence write failed: {type(error).__name__}"
+                                    ) from None
                                 collector_evidence_store_at = self.clock.now()
                     if args.arm == "imperative" and args.scenario in "BCDEFG":
                         if now >= next_repair and samples:
@@ -3095,8 +3338,7 @@ class LiveRunner:
                             diffs = field_diffs(contract, latest)
                             keys = sorted({diff["resource"] for diff in diffs})
                             evaluated = self.clock.now()
-                            if keys and _reads_eligible(latest, keys, t0,
-                                                        deadline):
+                            if keys and _reads_eligible(latest, keys, t0, deadline):
                                 if imperative is None:
                                     imperative = ImperativeRun()
                                 if imperative.detection_at is None:
@@ -3104,33 +3346,41 @@ class LiveRunner:
                                     imperative.detection_reads = keys
                                     imperative.evidence_at = evaluated
                                     imperative.evidence_reads = keys
-                                    imperative.evidence_ref = (
-                                        "diff-" + _short(run_id) + ".json")
+                                    imperative.evidence_ref = "diff-" + _short(run_id) + ".json"
                                     try:
                                         _write_json(
                                             evidence_dir / imperative.evidence_ref,
-                                            {"run_id": run_id,
-                                             "at": _point_dict(latest.at),
-                                             "diffs": read_diff_evidence(
-                                                 contract, latest)})
+                                            {
+                                                "run_id": run_id,
+                                                "at": _point_dict(latest.at),
+                                                "diffs": read_diff_evidence(contract, latest),
+                                            },
+                                        )
                                     except OSError as error:
                                         raise InstrumentationError(
                                             "imperative evidence write failed: "
-                                            f"{type(error).__name__}") from None
+                                            f"{type(error).__name__}"
+                                        ) from None
                                     imperative.evidence_store_at = self.clock.now()
-                                commands = repair(self.kubectl, contract,
-                                                  latest, self.clock)
+                                commands = repair(self.kubectl, contract, latest, self.clock)
                                 imperative.commands.extend(commands)
                                 if any(not command.ok for command in commands):
                                     imperative.failed = True
                             next_repair = now + args.imperative_interval
                     if len(samples) >= 2:
                         candidate = analyze_timeline(
-                            contract, samples, injection, args.arm,
-                            args.scenario, args.timeout, imperative,
+                            contract,
+                            samples,
+                            injection,
+                            args.arm,
+                            args.scenario,
+                            args.timeout,
+                            imperative,
                             evidence_at=collector_evidence_at,
                             provided_evidence_ref=collector_evidence_ref,
-                            app=args.app, baseline=baseline)
+                            app=args.app,
+                            baseline=baseline,
+                        )
                         if candidate["recovery_seconds"] is not None:
                             break
                     time.sleep(args.sample_interval)
@@ -3141,42 +3391,57 @@ class LiveRunner:
             if injection is not None:
                 window_end = self.clock.now()
                 timeline = analyze_timeline(
-                    contract, samples, injection, args.arm, args.scenario,
-                    args.timeout, imperative,
+                    contract,
+                    samples,
+                    injection,
+                    args.arm,
+                    args.scenario,
+                    args.timeout,
+                    imperative,
                     evidence_at=collector_evidence_at,
                     provided_evidence_ref=collector_evidence_ref,
-                    app=args.app, baseline=baseline,
-                    window_end=window_end)
+                    app=args.app,
+                    baseline=baseline,
+                    window_end=window_end,
+                )
                 if timeline is not None:
                     timeline["window_completed"] = (
                         timeline["recovery_seconds"] is not None
-                        or window_end.mono >= injection.started.mono + args.timeout)
-                    if (timeline["recovery_seconds"] is None
-                            and not timeline["window_completed"]
-                            and failure is None):
+                        or window_end.mono >= injection.started.mono + args.timeout
+                    )
+                    if (
+                        timeline["recovery_seconds"] is None
+                        and not timeline["window_completed"]
+                        and failure is None
+                    ):
                         failure = InstrumentationError(
-                            "observation window did not reach its deadline")
-                if (timeline is not None and collector_evidence_store_at
-                        and timeline.get("t_e") is not None
-                        and not (args.arm == "imperative"
-                                 and args.scenario in "BCDEFG")):
+                            "observation window did not reach its deadline"
+                        )
+                if (
+                    timeline is not None
+                    and collector_evidence_store_at
+                    and timeline.get("t_e") is not None
+                    and not (args.arm == "imperative" and args.scenario in "BCDEFG")
+                ):
                     timeline["t_e_store"] = collector_evidence_store_at
             if sampler is not None and sampler.error is not None:
                 raise InstrumentationError(str(sampler.error))
             if sampler_stop is not None and sampler_stop.get("in_flight"):
-                raise InstrumentationError(
-                    "collector did not join before evidence finalization")
+                raise InstrumentationError("collector did not join before evidence finalization")
         except HarnessError as error:
             failure = error
-            readiness_failures = list(getattr(
-                error, "readiness_failures", readiness_failures))
+            readiness_failures = list(getattr(error, "readiness_failures", readiness_failures))
             injection = getattr(error, "injection", injection)
             if arm_evidence is None and arm_controller.original:
                 arm_evidence = ArmEvidence(
                     arm=args.arm,
-                    original={name: copy.deepcopy(item["spec"])
-                              for name, item in arm_controller.original.items()},
-                    applications={}, paused=True)
+                    original={
+                        name: copy.deepcopy(item["spec"])
+                        for name, item in arm_controller.original.items()
+                    },
+                    applications={},
+                    paused=True,
+                )
         except Exception as error:  # noqa: BLE001 - preserve evidence, then fail
             failure = error
         finally:
@@ -3184,24 +3449,30 @@ class LiveRunner:
                 sampler_stop = sampler.stop()
                 samples = sampler.snapshot()
             g_annotation_owned = bool(
-                args.scenario == "G" and injection is not None
-                and any(command.argv[:2] == ["annotate", "SealedSecret"]
-                        for command in injection.commands))
+                args.scenario == "G"
+                and injection is not None
+                and any(
+                    command.argv[:2] == ["annotate", "SealedSecret"]
+                    for command in injection.commands
+                )
+            )
             try:
-                cleanup = (cleanup_quarantine(self.kubectl, self.quarantine,
-                                              owner=run_id)
-                           if allow_cleanup else CleanupReport(True, [], []))
+                cleanup = (
+                    cleanup_quarantine(self.kubectl, self.quarantine, owner=run_id)
+                    if allow_cleanup
+                    else CleanupReport(True, [], [])
+                )
                 if args.scenario == "G" and allow_cleanup and g_annotation_owned:
-                    annotation_cleanup = cleanup_g_annotation(
-                        self.kubectl, args.namespace)
+                    annotation_cleanup = cleanup_g_annotation(self.kubectl, args.namespace)
                     cleanup = CleanupReport(
                         ok=cleanup.ok and annotation_cleanup.ok,
                         results=cleanup.results + annotation_cleanup.results,
-                        errors=cleanup.errors + annotation_cleanup.errors)
+                        errors=cleanup.errors + annotation_cleanup.errors,
+                    )
             except Exception as error:  # noqa: BLE001 - cleanup must not skip restore
                 cleanup = CleanupReport(
-                    ok=False, results=[],
-                    errors=[f"cleanup failed: {type(error).__name__}"])
+                    ok=False, results=[], errors=[f"cleanup failed: {type(error).__name__}"]
+                )
             try:
                 arm_controller.restore()
             except Exception as error:  # noqa: BLE001 - report, do not skip output
@@ -3209,28 +3480,44 @@ class LiveRunner:
             if contract is not None:
                 for attempt in range(3):
                     try:
-                        snapshotter = Snapshotter(self.kubectl, args.namespace,
-                                                  self.quarantine, self.clock,
-                                                  configmap_name=contract.configmap_name,
-                                                  argo_namespace=args.argocd_namespace,
-                                                  app=args.app)
+                        snapshotter = Snapshotter(
+                            self.kubectl,
+                            args.namespace,
+                            self.quarantine,
+                            self.clock,
+                            configmap_name=contract.configmap_name,
+                            argo_namespace=args.argocd_namespace,
+                            app=args.app,
+                        )
                         postcondition = self._postcondition(
-                            snapshotter, contract, args.scenario, args.arm)
+                            snapshotter, contract, args.scenario, args.arm
+                        )
                         break
                     except Exception as error:  # noqa: BLE001 - retry transient reads
                         if attempt == 2:
                             postcondition = {
                                 "verified": False,
-                                "error": f"{type(error).__name__}: {error}"}
+                                "error": f"{type(error).__name__}: {error}",
+                            }
                         else:
                             time.sleep(1)
-        row = self._row(run_id, args, contract, injection, timeline, failure,
-                        arm_evidence, cleanup, restore_error, postcondition)
+        row = self._row(
+            run_id,
+            args,
+            contract,
+            injection,
+            timeline,
+            failure,
+            arm_evidence,
+            cleanup,
+            restore_error,
+            postcondition,
+        )
         if sampler is not None and sampler_stop is not None:
             sampler_stop["partial_acquisition"] = copy.deepcopy(
-                getattr(sampler, "stopped_capture", None))
-            sampler_stop["capture_stop_reason"] = getattr(
-                sampler, "capture_stop_reason", None)
+                getattr(sampler, "stopped_capture", None)
+            )
+            sampler_stop["capture_stop_reason"] = getattr(sampler, "capture_stop_reason", None)
         evidence = {
             "baseline": baseline if baseline else None,
             "contract": contract.as_dict() if contract else None,
@@ -3243,45 +3530,60 @@ class LiveRunner:
             "row": row,
         }
         evidence["commands"] = (
-            ([command.as_dict() for command in injection.commands]
-             if injection else [])
-            + ([command.as_dict() for command in imperative.commands]
-               if imperative else [])
-            + ([command.as_dict() for command in cleanup.results]
-               if cleanup else [])
+            ([command.as_dict() for command in injection.commands] if injection else [])
+            + ([command.as_dict() for command in imperative.commands] if imperative else [])
+            + ([command.as_dict() for command in cleanup.results] if cleanup else [])
         )
         if baseline:
             evidence["baseline"] = {
                 "at": _point_dict(baseline.at),
                 "acquisition": baseline.acquisition,
                 "readiness_failures": baseline.readiness_failures,
-                "resources": {key: {"fields": value.get("fields"),
-                                    "manifest": value.get("manifest")}
-                              for key, value in baseline.resources.items()},
-                "argo": baseline.argo, "hpa": baseline.hpa,
-                "pods": baseline.pods, "nodes": baseline.nodes,
+                "resources": {
+                    key: {"fields": value.get("fields"), "manifest": value.get("manifest")}
+                    for key, value in baseline.resources.items()
+                },
+                "argo": baseline.argo,
+                "hpa": baseline.hpa,
+                "pods": baseline.pods,
+                "nodes": baseline.nodes,
                 "extra_resources": baseline.extra_resources,
             }
         if readiness_failures:
             evidence["readiness"] = readiness_failures
-        evidence["samples"] = [{
-            "at": _point_dict(sample.at),
-            "acquisition": copy.deepcopy(sample.acquisition),
-            "evaluated_at": _point_dict(sample.evaluated_at),
-            "evaluated_signal": sample.evaluated_signal,
-            "evaluated_reads": list(sample.evaluated_reads),
-            "resources": {key: value.get("fields")
-                          for key, value in sample.resources.items()},
-            "extra_resources": sample.extra_resources,
-            "argo": sample.argo, "hpa": sample.hpa,
-        } for sample in samples]
+        evidence["samples"] = [
+            {
+                "at": _point_dict(sample.at),
+                "acquisition": copy.deepcopy(sample.acquisition),
+                "evaluated_at": _point_dict(sample.evaluated_at),
+                "evaluated_signal": sample.evaluated_signal,
+                "evaluated_reads": list(sample.evaluated_reads),
+                "resources": {key: value.get("fields") for key, value in sample.resources.items()},
+                "extra_resources": sample.extra_resources,
+                "argo": sample.argo,
+                "hpa": sample.hpa,
+            }
+            for sample in samples
+        ]
         write_outputs(row, args, evidence_dir, evidence)
-        print(json.dumps({"run_id": run_id, "status": row["status"],
-                          "jsonl": str(Path(args.out) / (run_id + ".jsonl")),
-                          "csv": str(Path(args.out) / (run_id + ".csv"))},
-                         sort_keys=True))
-        return 0 if row["status"] in ("observed", "right_censored") and not (
-            cleanup and not cleanup.ok) and not restore_error else 1
+        print(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "status": row["status"],
+                    "jsonl": str(Path(args.out) / (run_id + ".jsonl")),
+                    "csv": str(Path(args.out) / (run_id + ".csv")),
+                },
+                sort_keys=True,
+            )
+        )
+        return (
+            0
+            if row["status"] in ("observed", "right_censored")
+            and not (cleanup and not cleanup.ok)
+            and not restore_error
+            else 1
+        )
 
     def _postcondition(self, snapshotter, contract, scenario, arm):
         deadline = self.clock.now().mono + self.args.reset_timeout
@@ -3300,70 +3602,119 @@ class LiveRunner:
             acquisition["finished_utc"] = finished.utc
             acquisition["finished_mono"] = finished.mono
             observation.acquisition = acquisition
-            ok = (score(contract, observation) == 100
-                  and not observation.extra_resources
-                  and bool(observation.pods)
-                  and all(pod.get("phase") == "Running"
-                          and pod.get("ready") is True
-                          for pod in observation.pods))
+            ok = (
+                score(contract, observation) == 100
+                and not observation.extra_resources
+                and bool(observation.pods)
+                and all(
+                    pod.get("phase") == "Running" and pod.get("ready") is True
+                    for pod in observation.pods
+                )
+            )
             if scenario == "A":
                 ok = ok and hpa_settled(observation.hpa)
             if arm == "gitops":
                 for name in (APP_OF_APPS, self.args.app):
                     state = observation.argo.get(name) or {}
-                    ok = ok and state.get("sync") == "Synced" and \
-                        state.get("health") == "Healthy"
+                    ok = ok and state.get("sync") == "Synced" and state.get("health") == "Healthy"
             if finished.mono > deadline:
-                return {"verified": False,
-                        "reason": "deadline",
-                        "deadline_mono": deadline,
-                        "error": "postcondition read completed after the reset deadline",
-                        "acquisition": acquisition}
+                return {
+                    "verified": False,
+                    "reason": "deadline",
+                    "deadline_mono": deadline,
+                    "error": "postcondition read completed after the reset deadline",
+                    "acquisition": acquisition,
+                }
             if ok and previous_ok:
-                return {"verified": True, "at": _point_dict(observation.at),
-                        "acquisition": acquisition}
+                return {
+                    "verified": True,
+                    "at": _point_dict(observation.at),
+                    "acquisition": acquisition,
+                }
             previous_ok = ok
             if self.clock.now().mono >= deadline:
-                return {"verified": False,
-                        "reason": "deadline",
-                        "deadline_mono": deadline,
-                        "error": "two consecutive postcondition reads did not match",
-                        "acquisition": acquisition}
+                return {
+                    "verified": False,
+                    "reason": "deadline",
+                    "deadline_mono": deadline,
+                    "error": "two consecutive postcondition reads did not match",
+                    "acquisition": acquisition,
+                }
             time.sleep(self.args.sample_interval)
 
-    def _row(self, run_id, args, contract, injection, timeline, failure,
-             arm_evidence, cleanup, restore_error, postcondition):
+    def _row(
+        self,
+        run_id,
+        args,
+        contract,
+        injection,
+        timeline,
+        failure,
+        arm_evidence,
+        cleanup,
+        restore_error,
+        postcondition,
+    ):
         base = {
-            "schema_version": 2, "run_id": run_id, "synthetic": False,
+            "schema_version": 2,
+            "run_id": run_id,
+            "synthetic": False,
             "timing_convention": TIMING_CONVENTION,
-            "formal_execution_approved": False, "env": args.arm,
-            "arm": args.arm, "scenario": args.scenario, "rep": args.rep,
-            "namespace": args.namespace, "app": args.app,
+            "formal_execution_approved": False,
+            "env": args.arm,
+            "arm": args.arm,
+            "scenario": args.scenario,
+            "rep": args.rep,
+            "namespace": args.namespace,
+            "app": args.app,
             "quarantine_namespace": self.quarantine,
             "source_revision": getattr(args, "source_revision", None),
             "render_sha256": getattr(args, "render_sha256", None),
-            "detection_seconds": None, "evidence_seconds": None,
+            "detection_seconds": None,
+            "evidence_seconds": None,
             "evidence_store_seconds": None,
-            "recovery_seconds": None, "detection_status": "not_observed",
-            "evidence_status": "not_observed", "recovery_status": "not_observed",
-            "t_r_first_seconds": None, "t_r_confirmed_seconds": None,
+            "recovery_seconds": None,
+            "detection_status": "not_observed",
+            "evidence_status": "not_observed",
+            "recovery_status": "not_observed",
+            "t_r_first_seconds": None,
+            "t_r_confirmed_seconds": None,
             "recovery_confirmation": None,
-            "detection_reads": [], "evidence_reads": [], "recovery_reads": [],
-            "censor_seconds": args.timeout, "detection_controller": None,
-            "recovery_controller": None, "r1_baseline": None, "r1_first": None,
-            "r1_last": None, "r1_baseline_details": None,
-            "r1_first_details": None, "r1_last_details": None,
-            "r1_baseline_reason": None, "r1_first_reason": None,
+            "detection_reads": [],
+            "evidence_reads": [],
+            "recovery_reads": [],
+            "censor_seconds": args.timeout,
+            "detection_controller": None,
+            "recovery_controller": None,
+            "r1_baseline": None,
+            "r1_first": None,
+            "r1_last": None,
+            "r1_baseline_details": None,
+            "r1_first_details": None,
+            "r1_last_details": None,
+            "r1_baseline_reason": None,
+            "r1_first_reason": None,
             "r1_last_reason": None,
-            "kubectl_cmds": 0, "t0_utc": None,
-            "t0_mono": None, "t_a_utc": None, "t_a_mono": None,
-            "t_d_utc": None, "t_d_mono": None, "t_e_utc": None,
-            "t_e_mono": None, "t_e_store_utc": None, "t_e_store_mono": None,
-            "t_r_utc": None, "t_r_mono": None,
-            "t_r_first_utc": None, "t_r_first_mono": None,
-            "t_r_confirmed_utc": None, "t_r_confirmed_mono": None,
+            "kubectl_cmds": 0,
+            "t0_utc": None,
+            "t0_mono": None,
+            "t_a_utc": None,
+            "t_a_mono": None,
+            "t_d_utc": None,
+            "t_d_mono": None,
+            "t_e_utc": None,
+            "t_e_mono": None,
+            "t_e_store_utc": None,
+            "t_e_store_mono": None,
+            "t_r_utc": None,
+            "t_r_mono": None,
+            "t_r_first_utc": None,
+            "t_r_first_mono": None,
+            "t_r_confirmed_utc": None,
+            "t_r_confirmed_mono": None,
             "window_completed": False,
-            "window_end_utc": None, "window_end_mono": None,
+            "window_end_utc": None,
+            "window_end_mono": None,
             "arm_restore_status": "failed" if restore_error else "restored",
             "arm_restore_error": restore_error,
             "cleanup_status": "failed" if cleanup and not cleanup.ok else "ok",
@@ -3372,66 +3723,103 @@ class LiveRunner:
             "max_sample_gap_seconds": None,
             "observation_end_utc": None,
             "observation_end_mono": None,
-            "collector_started_utc": (self.collector_started.utc
-                                      if self.collector_started else None),
-            "collector_started_mono": (self.collector_started.mono
-                                       if self.collector_started else None),
-            "analysis_group": ("hpa_control" if args.scenario == "A" else
-                               "visibility_boundary" if args.scenario == "F" else
-                               "managed_drift"),
+            "collector_started_utc": (
+                self.collector_started.utc if self.collector_started else None
+            ),
+            "collector_started_mono": (
+                self.collector_started.mono if self.collector_started else None
+            ),
+            "analysis_group": (
+                "hpa_control"
+                if args.scenario == "A"
+                else "visibility_boundary"
+                if args.scenario == "F"
+                else "managed_drift"
+            ),
             "efficacy_eligible": args.scenario not in ("A", "F"),
         }
         if contract:
             base["configmap_name"] = contract.configmap_name
             base["baseline_sha256"] = contract.baseline_sha256
         if timeline:
-            for key in ("analysis_group", "efficacy_eligible", "stop_reason",
-                        "injection_seconds", "detection_seconds",
-                        "evidence_seconds", "recovery_seconds",
-                        "detection_status", "evidence_status", "recovery_status",
-                        "detection_controller", "recovery_controller",
-                        "detection_ref", "evidence_ref",
-                        "detection_reads", "evidence_reads", "recovery_reads",
-                        "t_r_first_seconds", "t_r_confirmed_seconds",
-                        "recovery_confirmation", "r1_baseline_reason",
-                        "r1_first_reason", "r1_last_reason",
-                        "window_completed",
-                        "r1_baseline", "r1_first", "r1_last", "kubectl_cmds",
-                        "r1_baseline_details", "r1_first_details",
-                        "r1_last_details",
-                        "max_sample_gap_seconds"):
+            for key in (
+                "analysis_group",
+                "efficacy_eligible",
+                "stop_reason",
+                "injection_seconds",
+                "detection_seconds",
+                "evidence_seconds",
+                "recovery_seconds",
+                "detection_status",
+                "evidence_status",
+                "recovery_status",
+                "detection_controller",
+                "recovery_controller",
+                "detection_ref",
+                "evidence_ref",
+                "detection_reads",
+                "evidence_reads",
+                "recovery_reads",
+                "t_r_first_seconds",
+                "t_r_confirmed_seconds",
+                "recovery_confirmation",
+                "r1_baseline_reason",
+                "r1_first_reason",
+                "r1_last_reason",
+                "window_completed",
+                "r1_baseline",
+                "r1_first",
+                "r1_last",
+                "kubectl_cmds",
+                "r1_baseline_details",
+                "r1_first_details",
+                "r1_last_details",
+                "max_sample_gap_seconds",
+            ):
                 base[key] = timeline[key]
-            for key in ("t_d", "t_e", "t_e_store", "t_r", "t_r_first",
-                        "t_r_confirmed", "window_end"):
+            for key in (
+                "t_d",
+                "t_e",
+                "t_e_store",
+                "t_r",
+                "t_r_first",
+                "t_r_confirmed",
+                "window_end",
+            ):
                 point = timeline[key]
                 base[key + "_utc"] = point.utc if point else None
                 base[key + "_mono"] = point.mono if point else None
             if timeline.get("t_e_store") is not None:
                 base["t_e_store_utc"] = timeline["t_e_store"].utc
                 base["t_e_store_mono"] = timeline["t_e_store"].mono
-                base["evidence_store_seconds"] = (
-                    timeline["t_e_store"].mono - timeline["t0"].mono)
+                base["evidence_store_seconds"] = timeline["t_e_store"].mono - timeline["t0"].mono
             observation_end = timeline.get("observation_end")
-            base["observation_end_utc"] = (
-                observation_end.utc if observation_end else None)
-            base["observation_end_mono"] = (
-                observation_end.mono if observation_end else None)
+            base["observation_end_utc"] = observation_end.utc if observation_end else None
+            base["observation_end_mono"] = observation_end.mono if observation_end else None
         if injection:
-            base.update({
-                "t0_utc": injection.started.utc,
-                "t0_mono": injection.started.mono,
-                "t_a_utc": injection.acknowledged.utc,
-                "t_a_mono": injection.acknowledged.mono,
-                "injection": injection.as_dict(),
-            })
+            base.update(
+                {
+                    "t0_utc": injection.started.utc,
+                    "t0_mono": injection.started.mono,
+                    "t_a_utc": injection.acknowledged.utc,
+                    "t_a_mono": injection.acknowledged.mono,
+                    "injection": injection.as_dict(),
+                }
+            )
         if failure:
             base["status"] = (
-                "arm_state_mismatch" if isinstance(failure, ArmStateError) else
-                "invalid_injection" if isinstance(failure, InjectionError) else
-                "instrumentation_failure" if isinstance(failure, InstrumentationError)
-                else "baseline_failure" if isinstance(failure, BaselineError) else
-                "safety_refusal" if isinstance(failure, SafetyError) else
-                "failure")
+                "arm_state_mismatch"
+                if isinstance(failure, ArmStateError)
+                else "invalid_injection"
+                if isinstance(failure, InjectionError)
+                else "instrumentation_failure"
+                if isinstance(failure, InstrumentationError)
+                else "baseline_failure"
+                if isinstance(failure, BaselineError)
+                else "safety_refusal"
+                if isinstance(failure, SafetyError)
+                else "failure"
+            )
             base["error"] = str(failure)
         elif timeline is None:
             base["status"] = "failure"
@@ -3441,24 +3829,37 @@ class LiveRunner:
             base["status"] = "arm_restore_failure"
         if cleanup and not cleanup.ok:
             base["cleanup_status"] = "failed"
-        if (postcondition and not postcondition.get("verified")
-                and base["status"] in ("observed", "right_censored")):
+        if (
+            postcondition
+            and not postcondition.get("verified")
+            and base["status"] in ("observed", "right_censored")
+        ):
             base["status"] = "reset_failure"
         return base
 
 
 def _run_dry(args):
-    run_id = args.run_id or ("dryrun-" + datetime.now(timezone.utc).strftime(
-        "%Y%m%dT%H%M%SZ") + "-" + secrets.token_hex(3))
+    run_id = args.run_id or (
+        "dryrun-"
+        + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        + "-"
+        + secrets.token_hex(3)
+    )
     ensure_new_run(args, run_id)
-    row = dry_run_row(run_id, args.arm, args.scenario, args.rep,
-                      args.namespace, args.app, args)
+    row = dry_run_row(run_id, args.arm, args.scenario, args.rep, args.namespace, args.app, args)
     evidence_dir = Path(args.out) / run_id
     write_outputs(row, args, evidence_dir, {"row": row})
-    print(json.dumps({"run_id": run_id, "status": "dry_run",
-                      "jsonl": str(Path(args.out) / (run_id + ".jsonl")),
-                      "csv": str(Path(args.out) / (run_id + ".csv"))},
-                     sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "status": "dry_run",
+                "jsonl": str(Path(args.out) / (run_id + ".jsonl")),
+                "csv": str(Path(args.out) / (run_id + ".csv")),
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 

@@ -13,6 +13,7 @@ the same scenario permutation. A cooldown separates terminal runs so the shared
 stack can settle, and only a pre-injection baseline failure may be retried; each
 attempt keeps its own run id. See `README.md`.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,28 +48,50 @@ R2_REPS = range(1, 11)
 R1_REPS = range(11, 16)
 ANALYSIS_STATUSES = frozenset({"observed", "right_censored"})
 PENDING_STATUSES = frozenset({"pending", "running", "retrying"})
-STOP_STATUSES = frozenset({
-    "invalid_injection",
-    "instrumentation_failure",
-    "reset_failure",
-    "recovery_failure",
-    "arm_restore_failure",
-    "safety_refusal",
-    "baseline_failure",
-    "arm_state_mismatch",
-    "failure",
-})
-TERMINAL_STATUSES = (ANALYSIS_STATUSES | STOP_STATUSES
-                     | {"dry_run", "refused"})
-ROW_REQUIRED_STATUSES = (ANALYSIS_STATUSES | STOP_STATUSES
-                         | {"dry_run"}) - {"refused", "failure"}
+STOP_STATUSES = frozenset(
+    {
+        "invalid_injection",
+        "instrumentation_failure",
+        "reset_failure",
+        "recovery_failure",
+        "arm_restore_failure",
+        "safety_refusal",
+        "baseline_failure",
+        "arm_state_mismatch",
+        "failure",
+    }
+)
+TERMINAL_STATUSES = ANALYSIS_STATUSES | STOP_STATUSES | {"dry_run", "refused"}
+ROW_REQUIRED_STATUSES = (ANALYSIS_STATUSES | STOP_STATUSES | {"dry_run"}) - {"refused", "failure"}
 MANIFEST_KEYS = (
-    "schema_version", "batch_id", "state", "mode", "production_like",
-    "formal_execution_approved", "stack_isolated", "r3_status", "created_utc",
-    "updated_utc", "seed", "arms", "scenarios", "reps", "arm_order",
-    "scenario_order", "namespace", "app", "source_revision", "render_sha256",
-    "cooldown_seconds", "baseline_retries", "timing_convention",
-    "runs", "cooldowns", "counts", "stop_reason", "stop_run_id",
+    "schema_version",
+    "batch_id",
+    "state",
+    "mode",
+    "production_like",
+    "formal_execution_approved",
+    "stack_isolated",
+    "r3_status",
+    "created_utc",
+    "updated_utc",
+    "seed",
+    "arms",
+    "scenarios",
+    "reps",
+    "arm_order",
+    "scenario_order",
+    "namespace",
+    "app",
+    "source_revision",
+    "render_sha256",
+    "cooldown_seconds",
+    "baseline_retries",
+    "timing_convention",
+    "runs",
+    "cooldowns",
+    "counts",
+    "stop_reason",
+    "stop_run_id",
 )
 
 
@@ -150,16 +173,17 @@ def build_plan(arms, scenarios, reps, seed):
     for arm in arm_order:
         for scenario in scenario_order:
             for rep in range(1, reps + 1):
-                runs.append({
-                    "index": index,
-                    "arm": arm,
-                    "scenario": scenario,
-                    "rep": rep,
-                    "phase": phase_for(rep),
-                })
+                runs.append(
+                    {
+                        "index": index,
+                        "arm": arm,
+                        "scenario": scenario,
+                        "rep": rep,
+                        "phase": phase_for(rep),
+                    }
+                )
                 index += 1
-    return {"arm_order": arm_order, "scenario_order": scenario_order,
-            "runs": runs}
+    return {"arm_order": arm_order, "scenario_order": scenario_order, "runs": runs}
 
 
 def default_batch_id(args) -> str:
@@ -176,14 +200,12 @@ def default_batch_id(args) -> str:
         "live": bool(args.live),
         "production_like": bool(args.production_like),
     }
-    digest = hashlib.sha256(
-        json.dumps(identity, sort_keys=True).encode()).hexdigest()[:10]
+    digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:10]
     return "fb-" + digest
 
 
 def run_id_for(batch_id, item) -> str:
-    return (f"{batch_id}-{item['arm']}-{item['scenario']}"
-            f"-r{item['rep']:02d}")
+    return f"{batch_id}-{item['arm']}-{item['scenario']}-r{item['rep']:02d}"
 
 
 def run_id_for_retry(run_id: str, retry: int) -> str:
@@ -229,8 +251,7 @@ def _write_text_atomic(path: Path, text: str) -> None:
 
 
 def _write_json_atomic(path: Path, payload) -> None:
-    _write_text_atomic(
-        path, json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
+    _write_text_atomic(path, json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
 
 
 def _write_csv_atomic(rows, path: Path) -> None:
@@ -268,18 +289,13 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     tokens = list(sys.argv[1:] if argv is None else argv)
     parser.add_argument("--arms", nargs="+", default=list(ARMS), metavar="ARM")
-    parser.add_argument("--scenarios", nargs="+", default=["A-G"],
-                        metavar="SCENARIO")
+    parser.add_argument("--scenarios", nargs="+", default=["A-G"], metavar="SCENARIO")
     parser.add_argument("--reps", type=int, default=DEFAULT_REPS)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--baseline-timeout", type=float, default=300.0)
-    parser.add_argument("--cooldown-seconds", type=float,
-                        default=DEFAULT_COOLDOWN_SECONDS)
-    parser.add_argument("--baseline-retries", type=int,
-                        default=DEFAULT_BASELINE_RETRIES)
-    parser.add_argument(
-        "--out", type=Path,
-        default=Path(__file__).resolve().parent / "runs")
+    parser.add_argument("--cooldown-seconds", type=float, default=DEFAULT_COOLDOWN_SECONDS)
+    parser.add_argument("--baseline-retries", type=int, default=DEFAULT_BASELINE_RETRIES)
+    parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "runs")
     parser.add_argument("--namespace", default=harness.DEFAULT_NAMESPACE)
     parser.add_argument("--app", default=harness.DEFAULT_APP)
     parser.add_argument("--source-revision")
@@ -292,10 +308,9 @@ def parse_args(argv=None):
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args(argv)
     args.namespace_explicit = any(
-        token == "--namespace" or token.startswith("--namespace=")
-        for token in tokens)
-    args.app_explicit = any(
-        token == "--app" or token.startswith("--app=") for token in tokens)
+        token == "--namespace" or token.startswith("--namespace=") for token in tokens
+    )
+    args.app_explicit = any(token == "--app" or token.startswith("--app=") for token in tokens)
     try:
         args.arms = parse_arms(args.arms)
         args.scenarios = parse_scenarios(args.scenarios)
@@ -307,15 +322,11 @@ def parse_args(argv=None):
         parser.error("--cooldown-seconds must be a finite value >= 0")
     if args.baseline_retries < 0:
         parser.error("--baseline-retries must be >= 0")
-    if args.batch_id and not re.fullmatch(
-            r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", args.batch_id):
-        parser.error(
-            "--batch-id must be 1-32 characters of letters, digits, dot, dash, underscore")
-    if args.source_revision and not re.fullmatch(
-            r"[0-9a-f]{40}", args.source_revision):
+    if args.batch_id and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", args.batch_id):
+        parser.error("--batch-id must be 1-32 characters of letters, digits, dot, dash, underscore")
+    if args.source_revision and not re.fullmatch(r"[0-9a-f]{40}", args.source_revision):
         parser.error("--source-revision must be 40 lowercase hex")
-    if args.render_sha256 and not re.fullmatch(
-            r"[0-9a-f]{64}", args.render_sha256):
+    if args.render_sha256 and not re.fullmatch(r"[0-9a-f]{64}", args.render_sha256):
         parser.error("--render-sha256 must be 64 lowercase hex")
     if args.production_like and not args.live:
         parser.error("--production-like requires --live; dry runs are never formal")
@@ -333,20 +344,21 @@ def validate_batch_args(args):
     if not args.app_explicit:
         raise BatchSafetyError("--app must be explicit in live mode")
     if not args.render_sha256:
-        raise BatchSafetyError(
-            "--render-sha256 is required in live mode; freeze the render first")
+        raise BatchSafetyError("--render-sha256 is required in live mode; freeze the render first")
     if not args.source_revision:
         raise BatchSafetyError(
-            "--source-revision is required in live mode; freeze the revision first")
+            "--source-revision is required in live mode; freeze the revision first"
+        )
     if not args.render_file:
         raise BatchSafetyError(
-            "--render-file is required in live mode; freeze the render bundle first")
+            "--render-file is required in live mode; freeze the render bundle first"
+        )
     if "://" in args.render_file:
         raise BatchSafetyError("--render-file must be a local file, not a URL")
     try:
         harness.load_declaration(
-            args.render_file, args.render_sha256, args.source_revision,
-            args.namespace)
+            args.render_file, args.render_sha256, args.source_revision, args.namespace
+        )
     except harness.DeclarationError as error:
         raise BatchSafetyError(f"invalid frozen render: {error}") from None
 
@@ -355,17 +367,19 @@ def _new_manifest(args, plan, batch_id):
     runs = []
     for item in plan["runs"]:
         entry = dict(item)
-        entry.update({
-            "run_id": run_id_for(batch_id, item),
-            "status": "pending",
-            "started_utc": None,
-            "finished_utc": None,
-            "exit_code": None,
-            "stop_reason": None,
-            "error": None,
-            "row_path": None,
-            "attempts": [],
-        })
+        entry.update(
+            {
+                "run_id": run_id_for(batch_id, item),
+                "status": "pending",
+                "started_utc": None,
+                "finished_utc": None,
+                "exit_code": None,
+                "stop_reason": None,
+                "error": None,
+                "row_path": None,
+                "attempts": [],
+            }
+        )
         runs.append(entry)
     return {
         "schema_version": BATCH_SCHEMA_VERSION,
@@ -403,26 +417,26 @@ def _ensure_new_batch(args, plan, batch_id, paths):
     for name, path in paths.items():
         if path.exists():
             raise BatchSafetyError(
-                f"batch output already exists ({name}); use --resume or a new --out/--batch-id")
+                f"batch output already exists ({name}); use --resume or a new --out/--batch-id"
+            )
     for item in plan["runs"]:
         run_id = run_id_for(batch_id, item)
         for candidate in run_slots(run_id, args.baseline_retries):
             if len(candidate) > 63:
                 raise BatchSafetyError(
-                    "batch id and retry suffix make a run id longer than 63 characters")
+                    "batch id and retry suffix make a run id longer than 63 characters"
+                )
             jsonl = _row_path(args.out, candidate)
             evidence = _evidence_path(args.out, candidate)
             if jsonl.exists() or (evidence.exists() and any(evidence.iterdir())):
-                raise BatchSafetyError(
-                    f"refusing to overwrite existing run output {candidate}")
+                raise BatchSafetyError(f"refusing to overwrite existing run output {candidate}")
 
 
 def _ensure_run_slot(args, run_id):
     jsonl = _row_path(args.out, run_id)
     evidence = _evidence_path(args.out, run_id)
     if jsonl.exists() or (evidence.exists() and any(evidence.iterdir())):
-        raise BatchSafetyError(
-            f"refusing to overwrite existing run output {run_id}")
+        raise BatchSafetyError(f"refusing to overwrite existing run output {run_id}")
 
 
 def _validate_resume(args, plan, batch_id, paths):
@@ -432,16 +446,15 @@ def _validate_resume(args, plan, batch_id, paths):
         manifest = _read_json(paths["manifest"])
     except (OSError, ValueError, TypeError) as error:
         raise BatchSafetyError(
-            f"invalid batch manifest: {type(error).__name__}: {error}") from error
+            f"invalid batch manifest: {type(error).__name__}: {error}"
+        ) from error
     if not isinstance(manifest, dict):
         raise BatchSafetyError("invalid batch manifest: not an object")
     if "timing_convention" not in manifest:
-        raise BatchSafetyError(
-            "cannot resume a batch that predates completed-observation timing")
+        raise BatchSafetyError("cannot resume a batch that predates completed-observation timing")
     missing = [key for key in MANIFEST_KEYS if key not in manifest]
     if missing:
-        raise BatchSafetyError(
-            f"invalid batch manifest: missing {', '.join(missing)}")
+        raise BatchSafetyError(f"invalid batch manifest: missing {', '.join(missing)}")
     expected = {
         "schema_version": BATCH_SCHEMA_VERSION,
         "batch_id": batch_id,
@@ -466,8 +479,7 @@ def _validate_resume(args, plan, batch_id, paths):
     }
     for key, value in expected.items():
         if manifest.get(key) != value:
-            raise BatchSafetyError(
-                f"manifest {key} does not match this batch invocation")
+            raise BatchSafetyError(f"manifest {key} does not match this batch invocation")
     if manifest.get("state") not in ("running", "stopped", "complete"):
         raise BatchSafetyError("invalid batch manifest state")
     runs = manifest.get("runs")
@@ -479,31 +491,24 @@ def _validate_resume(args, plan, batch_id, paths):
         run_id = run_id_for(batch_id, item)
         for key in ("index", "arm", "scenario", "rep", "phase"):
             if entry.get(key) != item[key]:
-                raise BatchSafetyError(
-                    f"manifest run {run_id} does not match the plan")
+                raise BatchSafetyError(f"manifest run {run_id} does not match the plan")
         if entry.get("run_id") != run_id:
             raise BatchSafetyError("manifest run identity mismatch")
         status = entry.get("status")
         if status not in PENDING_STATUSES | TERMINAL_STATUSES:
-            raise BatchSafetyError(
-                f"manifest run {run_id} has unknown status {status!r}")
+            raise BatchSafetyError(f"manifest run {run_id} has unknown status {status!r}")
         attempts = entry.get("attempts")
         if not isinstance(attempts, list):
-            raise BatchSafetyError(
-                f"manifest run {run_id} has no attempt ledger")
+            raise BatchSafetyError(f"manifest run {run_id} has no attempt ledger")
         for number, attempt in enumerate(attempts):
             if not isinstance(attempt, dict) or attempt.get("attempt") != number:
-                raise BatchSafetyError(
-                    f"manifest run {run_id} has an invalid attempt ledger")
-            attempt_id = (run_id if number == 0
-                          else run_id_for_retry(run_id, number))
+                raise BatchSafetyError(f"manifest run {run_id} has an invalid attempt ledger")
+            attempt_id = run_id if number == 0 else run_id_for_retry(run_id, number)
             if attempt.get("run_id") != attempt_id:
-                raise BatchSafetyError(
-                    f"manifest run {run_id} has an unexpected retry identity")
+                raise BatchSafetyError(f"manifest run {run_id} has an unexpected retry identity")
             expected_retry = None if number == 0 else run_id
             if attempt.get("retry_of") != expected_retry:
-                raise BatchSafetyError(
-                    f"manifest run {run_id} has an invalid retry relationship")
+                raise BatchSafetyError(f"manifest run {run_id} has an invalid retry relationship")
             if attempt_id in identities:
                 raise BatchSafetyError("duplicate run identity in manifest")
             identities.add(attempt_id)
@@ -512,27 +517,26 @@ def _validate_resume(args, plan, batch_id, paths):
             last = attempts[-1]
             if status == "retrying":
                 last_path = _row_path(args.out, last["run_id"])
-                last_row = (_read_last_jsonl(last_path)
-                            if last_path.exists() else None)
-                if (last.get("status") != "baseline_failure"
-                        or len(attempts) > args.baseline_retries
-                        or not _baseline_retryable("baseline_failure", last_row)):
+                last_row = _read_last_jsonl(last_path) if last_path.exists() else None
+                if (
+                    last.get("status") != "baseline_failure"
+                    or len(attempts) > args.baseline_retries
+                    or not _baseline_retryable("baseline_failure", last_row)
+                ):
                     raise BatchSafetyError(
-                        f"manifest run {run_id} is retrying without a "
-                        "retryable baseline failure")
+                        f"manifest run {run_id} is retrying without a retryable baseline failure"
+                    )
             elif status != last.get("status"):
                 raise BatchSafetyError(
-                    f"manifest run {run_id} status does not match its last attempt")
+                    f"manifest run {run_id} status does not match its last attempt"
+                )
         elif status != "pending":
-            raise BatchSafetyError(
-                f"manifest run {run_id} has no attempts but is not pending")
+            raise BatchSafetyError(f"manifest run {run_id} has no attempts but is not pending")
         row_path = _row_path(args.out, final_run_id(entry))
         if entry.get("row_path") and not Path(entry["row_path"]).exists():
-            raise BatchSafetyError(
-                f"manifest run {run_id} points at missing evidence")
+            raise BatchSafetyError(f"manifest run {run_id} points at missing evidence")
         if status in ROW_REQUIRED_STATUSES and not row_path.exists():
-            raise BatchSafetyError(
-                f"manifest run {run_id} is missing its preserved row")
+            raise BatchSafetyError(f"manifest run {run_id} is missing its preserved row")
         if status in PENDING_STATUSES:
             pending_found = True
             if not attempts:
@@ -542,14 +546,13 @@ def _validate_resume(args, plan, batch_id, paths):
             else:
                 next_number = len(attempts) - 1
             for number in range(next_number, args.baseline_retries + 1):
-                slot_id = (run_id if number == 0
-                           else run_id_for_retry(run_id, number))
+                slot_id = run_id if number == 0 else run_id_for_retry(run_id, number)
                 next_row = _row_path(args.out, slot_id)
                 next_evidence = _evidence_path(args.out, slot_id)
-                if next_row.exists() or (next_evidence.exists()
-                                         and any(next_evidence.iterdir())):
+                if next_row.exists() or (next_evidence.exists() and any(next_evidence.iterdir())):
                     raise BatchSafetyError(
-                        f"pending run {slot_id} already has output; refusing overwrite")
+                        f"pending run {slot_id} already has output; refusing overwrite"
+                    )
     if manifest["state"] == "complete" and pending_found:
         raise BatchSafetyError("complete manifest still has pending runs")
     if manifest["state"] == "stopped" and not manifest.get("stop_reason"):
@@ -560,36 +563,34 @@ def _validate_resume(args, plan, batch_id, paths):
 def _validate_attempt(args, item, run_id, attempt):
     status = attempt.get("status")
     if status not in PENDING_STATUSES | TERMINAL_STATUSES:
-        raise BatchSafetyError(
-            f"manifest attempt {run_id} has unknown status {status!r}")
+        raise BatchSafetyError(f"manifest attempt {run_id} has unknown status {status!r}")
     row_path = _row_path(args.out, run_id)
     if attempt.get("row_path") and not Path(attempt["row_path"]).exists():
-        raise BatchSafetyError(
-            f"manifest attempt {run_id} points at missing evidence")
+        raise BatchSafetyError(f"manifest attempt {run_id} points at missing evidence")
     if status in ROW_REQUIRED_STATUSES and not row_path.exists():
-        raise BatchSafetyError(
-            f"manifest attempt {run_id} is missing its preserved row")
+        raise BatchSafetyError(f"manifest attempt {run_id} is missing its preserved row")
     if row_path.exists():
         try:
             row = _read_last_jsonl(row_path)
         except (OSError, ValueError, TypeError) as error:
             raise BatchSafetyError(
-                f"unreadable row for {run_id}: {type(error).__name__}") from error
+                f"unreadable row for {run_id}: {type(error).__name__}"
+            ) from error
         if not isinstance(row, dict):
             raise BatchSafetyError(f"invalid row for {run_id}")
-        if (row.get("run_id") != run_id
-                or row.get("arm") != item["arm"]
-                or row.get("scenario") != item["scenario"]
-                or row.get("rep") != item["rep"]
-                or row.get("status") != status
-                or row.get("timing_convention") != TIMING_CONVENTION):
-            raise BatchSafetyError(
-                f"row identity/status/convention mismatch for {run_id}")
+        if (
+            row.get("run_id") != run_id
+            or row.get("arm") != item["arm"]
+            or row.get("scenario") != item["scenario"]
+            or row.get("rep") != item["rep"]
+            or row.get("status") != status
+            or row.get("timing_convention") != TIMING_CONVENTION
+        ):
+            raise BatchSafetyError(f"row identity/status/convention mismatch for {run_id}")
     if status in PENDING_STATUSES:
         evidence = _evidence_path(args.out, run_id)
         if row_path.exists() or (evidence.exists() and any(evidence.iterdir())):
-            raise BatchSafetyError(
-                f"pending run {run_id} already has output; refusing overwrite")
+            raise BatchSafetyError(f"pending run {run_id} already has output; refusing overwrite")
 
 
 def _rebuild_rows(args, manifest, batch_id):
@@ -601,8 +602,7 @@ def _rebuild_rows(args, manifest, batch_id):
             path = _row_path(args.out, attempt["run_id"])
             if not path.exists():
                 continue
-            rows.append(annotate_row(
-                _read_last_jsonl(path), entry, args, batch_id, attempt))
+            rows.append(annotate_row(_read_last_jsonl(path), entry, args, batch_id, attempt))
     return rows
 
 
@@ -619,16 +619,17 @@ def _resolve_batch_id(args, plan):
             manifests = sorted(out.glob("*.manifest.json"))
             if len(manifests) != 1:
                 raise BatchSafetyError(
-                    "--resume needs --batch-id when --out has zero or multiple manifests")
-            batch_id = manifests[0].name[:-len(".manifest.json")]
+                    "--resume needs --batch-id when --out has zero or multiple manifests"
+                )
+            batch_id = manifests[0].name[: -len(".manifest.json")]
     else:
         batch_id = default_batch_id(args)
     for item in plan["runs"]:
-        for candidate in run_slots(
-                run_id_for(batch_id, item), args.baseline_retries):
+        for candidate in run_slots(run_id_for(batch_id, item), args.baseline_retries):
             if len(candidate) > 63:
                 raise BatchSafetyError(
-                    "batch id and retry suffix make a run id longer than 63 characters")
+                    "batch id and retry suffix make a run id longer than 63 characters"
+                )
     return batch_id
 
 
@@ -637,48 +638,60 @@ def annotate_row(row, entry, args, batch_id, attempt=None):
     marker = annotated.get("timing_convention")
     if marker != TIMING_CONVENTION:
         raise BatchSafetyError(
-            f"row {annotated.get('run_id')} is missing or uses an unsupported "
-            "timing convention")
-    annotated.update({
-        "batch_id": batch_id,
-        "batch_index": entry["index"],
-        "batch_phase": entry["phase"],
-        "batch_attempt": (attempt or {}).get("attempt", 0),
-        "batch_retry_of": (attempt or {}).get("retry_of"),
-        "batch_mode": "live" if args.live else "dry_run",
-        "batch_stop_reason": entry.get("stop_reason"),
-        "stack_isolated": False,
-        "r3_status": "not_measured",
-        "production_like": bool(args.production_like),
-        "formal_execution_approved": bool(args.live and args.production_like),
-    })
+            f"row {annotated.get('run_id')} is missing or uses an unsupported timing convention"
+        )
+    annotated.update(
+        {
+            "batch_id": batch_id,
+            "batch_index": entry["index"],
+            "batch_phase": entry["phase"],
+            "batch_attempt": (attempt or {}).get("attempt", 0),
+            "batch_retry_of": (attempt or {}).get("retry_of"),
+            "batch_mode": "live" if args.live else "dry_run",
+            "batch_stop_reason": entry.get("stop_reason"),
+            "stack_isolated": False,
+            "r3_status": "not_measured",
+            "production_like": bool(args.production_like),
+            "formal_execution_approved": bool(args.live and args.production_like),
+        }
+    )
     return annotated
 
 
 def _timing_problem(row):
     required = (
-        "t0_mono", "t_a_mono", "t_d_mono", "t_e_mono", "t_r_mono",
-        "t_r_first_mono", "t_r_confirmed_mono", "window_end_mono",
+        "t0_mono",
+        "t_a_mono",
+        "t_d_mono",
+        "t_e_mono",
+        "t_r_mono",
+        "t_r_first_mono",
+        "t_r_confirmed_mono",
+        "window_end_mono",
     )
     if any(field not in row for field in required):
         return "incomplete_timing_bounds"
     limit = row.get("censor_seconds")
-    if (type(limit) not in (int, float) or not math.isfinite(limit)
-            or limit <= 0):
+    if type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0:
         return "invalid_censor_seconds"
     t0 = row.get("t0_mono")
     t_a = row.get("t_a_mono")
     window_end = row.get("window_end_mono")
-    if (any(type(value) not in (int, float) or not math.isfinite(value)
-            for value in (t0, t_a, window_end))
-            or t_a < t0 or window_end < t0):
+    if (
+        any(
+            type(value) not in (int, float) or not math.isfinite(value)
+            for value in (t0, t_a, window_end)
+        )
+        or t_a < t0
+        or window_end < t0
+    ):
         return "invalid_timing_bounds"
     if row.get("injection_seconds") is not None and not math.isclose(
-            row["injection_seconds"], t_a - t0, rel_tol=1e-9, abs_tol=1e-9):
+        row["injection_seconds"], t_a - t0, rel_tol=1e-9, abs_tol=1e-9
+    ):
         return "invalid_timing_bounds"
     if row.get("status") == "observed":
-        if (row.get("stop_reason") != "recovery"
-                or row.get("recovery_status") != "observed"):
+        if row.get("stop_reason") != "recovery" or row.get("recovery_status") != "observed":
             return "incomplete_timing_bounds"
     else:
         if row.get("recovery_status") != "right_censored":
@@ -687,8 +700,7 @@ def _timing_problem(row):
             return "window_not_completed"
         if window_end < t0 + limit:
             return "window_not_completed"
-    for metric, key in (("detection", "t_d"), ("evidence", "t_e"),
-                        ("recovery", "t_r")):
+    for metric, key in (("detection", "t_d"), ("evidence", "t_e"), ("recovery", "t_r")):
         point = row.get(key + "_mono")
         value = row.get(metric + "_seconds")
         status = row.get(metric + "_status")
@@ -696,56 +708,80 @@ def _timing_problem(row):
             if value is not None or status == "observed":
                 return f"invalid_{metric}_observation"
             continue
-        if (type(point) not in (int, float) or not math.isfinite(point)
-                or point < t0 or point > t0 + limit or point > window_end):
+        if (
+            type(point) not in (int, float)
+            or not math.isfinite(point)
+            or point < t0
+            or point > t0 + limit
+            or point > window_end
+        ):
             return f"invalid_{metric}_observation"
-        if (status != "observed" or type(value) not in (int, float)
-                or not math.isfinite(value)
-                or not math.isclose(value, point - t0, rel_tol=1e-9,
-                                    abs_tol=1e-9)):
+        if (
+            status != "observed"
+            or type(value) not in (int, float)
+            or not math.isfinite(value)
+            or not math.isclose(value, point - t0, rel_tol=1e-9, abs_tol=1e-9)
+        ):
             return f"invalid_{metric}_observation"
     first = row.get("t_r_first_mono")
     confirmed = row.get("t_r_confirmed_mono")
     if first is not None:
-        if (type(first) not in (int, float) or not math.isfinite(first)
-                or first < t0 or first > t0 + limit or first > window_end):
+        if (
+            type(first) not in (int, float)
+            or not math.isfinite(first)
+            or first < t0
+            or first > t0 + limit
+            or first > window_end
+        ):
             return "invalid_recovery_observation"
         if row.get("t_r_first_seconds") is not None and not math.isclose(
-                row["t_r_first_seconds"], first - t0, rel_tol=1e-9,
-                abs_tol=1e-9):
+            row["t_r_first_seconds"], first - t0, rel_tol=1e-9, abs_tol=1e-9
+        ):
             return "invalid_recovery_observation"
     if confirmed is not None:
-        if (type(confirmed) not in (int, float)
-                or not math.isfinite(confirmed)
-                or confirmed < t0 or confirmed > t0 + limit
-                or confirmed > window_end or first is None
-                or confirmed < first):
+        if (
+            type(confirmed) not in (int, float)
+            or not math.isfinite(confirmed)
+            or confirmed < t0
+            or confirmed > t0 + limit
+            or confirmed > window_end
+            or first is None
+            or confirmed < first
+        ):
             return "invalid_recovery_observation"
         if row.get("t_r_confirmed_seconds") is not None and not math.isclose(
-                row["t_r_confirmed_seconds"], confirmed - t0, rel_tol=1e-9,
-                abs_tol=1e-9):
+            row["t_r_confirmed_seconds"], confirmed - t0, rel_tol=1e-9, abs_tol=1e-9
+        ):
             return "invalid_recovery_observation"
     if row.get("recovery_status") == "observed":
-        if (row.get("t_r_mono") is None or first is None
-                or confirmed is None
-                or not math.isclose(row["t_r_mono"], first, rel_tol=1e-9,
-                                    abs_tol=1e-9)
-                or window_end < confirmed
-                or row.get("recovery_confirmation") != "confirmed"):
+        if (
+            row.get("t_r_mono") is None
+            or first is None
+            or confirmed is None
+            or not math.isclose(row["t_r_mono"], first, rel_tol=1e-9, abs_tol=1e-9)
+            or window_end < confirmed
+            or row.get("recovery_confirmation") != "confirmed"
+        ):
             return "incomplete_timing_bounds"
     else:
-        if (row.get("t_r_mono") is not None or confirmed is not None
-                or row.get("recovery_confirmation") == "confirmed"):
+        if (
+            row.get("t_r_mono") is not None
+            or confirmed is not None
+            or row.get("recovery_confirmation") == "confirmed"
+        ):
             return "invalid_recovery_observation"
     store = row.get("t_e_store_mono")
     if store is not None:
-        if (type(store) not in (int, float) or not math.isfinite(store)
-                or row.get("t_e_mono") is None
-                or store < row["t_e_mono"]):
+        if (
+            type(store) not in (int, float)
+            or not math.isfinite(store)
+            or row.get("t_e_mono") is None
+            or store < row["t_e_mono"]
+        ):
             return "invalid_evidence_store"
         if row.get("evidence_store_seconds") is not None and not math.isclose(
-                row["evidence_store_seconds"], store - t0, rel_tol=1e-9,
-                abs_tol=1e-9):
+            row["evidence_store_seconds"], store - t0, rel_tol=1e-9, abs_tol=1e-9
+        ):
             return "invalid_evidence_store"
     return None
 
@@ -779,33 +815,41 @@ def _analysis_problem(row):
     scenario = row.get("scenario")
     if scenario not in SCENARIOS:
         return "invalid_scenario"
-    group = ("hpa_control" if scenario == "A" else
-             "visibility_boundary" if scenario == "F" else "managed_drift")
+    group = (
+        "hpa_control"
+        if scenario == "A"
+        else "visibility_boundary"
+        if scenario == "F"
+        else "managed_drift"
+    )
     if row.get("analysis_group") != group:
         return "invalid_analysis_group"
-    if not re.fullmatch(r"[0-9a-f]{40}",
-                        str(row.get("source_revision") or "")):
+    if not re.fullmatch(r"[0-9a-f]{40}", str(row.get("source_revision") or "")):
         return "invalid_source_revision"
-    if not re.fullmatch(r"[0-9a-f]{64}",
-                        str(row.get("render_sha256") or "")):
+    if not re.fullmatch(r"[0-9a-f]{64}", str(row.get("render_sha256") or "")):
         return "invalid_render_sha256"
     limit = row.get("censor_seconds")
-    if (type(limit) not in (int, float) or not math.isfinite(limit)
-            or limit <= 0):
+    if type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0:
         return "invalid_censor_seconds"
     for metric in ("detection", "evidence", "recovery"):
         value = row.get(metric + "_seconds")
         metric_status = row.get(metric + "_status")
         if metric_status == "right_censored" and value is None:
             continue
-        if (metric_status == "unobserved_before_stop" and value is None
-                and row.get("status") == "observed"
-                and row.get("stop_reason") == "recovery"
-                and row.get("recovery_status") == "observed"):
+        if (
+            metric_status == "unobserved_before_stop"
+            and value is None
+            and row.get("status") == "observed"
+            and row.get("stop_reason") == "recovery"
+            and row.get("recovery_status") == "observed"
+        ):
             continue
-        if (metric_status == "observed"
-                and type(value) in (int, float)
-                and math.isfinite(value) and 0 <= value <= limit):
+        if (
+            metric_status == "observed"
+            and type(value) in (int, float)
+            and math.isfinite(value)
+            and 0 <= value <= limit
+        ):
             continue
         return f"invalid_{metric}_observation"
     return None
@@ -852,10 +896,8 @@ def _analysis_view(manifest, rows):
 
 def _phase_summary(manifest, analysis_rows):
     phases = {
-        "R2": {"planned": 0, "recorded": 0, "observed": 0,
-               "right_censored": 0, "excluded": 0},
-        "R1": {"planned": 0, "recorded": 0, "observed": 0,
-               "right_censored": 0, "excluded": 0},
+        "R2": {"planned": 0, "recorded": 0, "observed": 0, "right_censored": 0, "excluded": 0},
+        "R1": {"planned": 0, "recorded": 0, "observed": 0, "right_censored": 0, "excluded": 0},
     }
     for entry in manifest["runs"]:
         phase = phases[entry["phase"]]
@@ -876,12 +918,10 @@ def _phase_summary(manifest, analysis_rows):
 def _censoring(analysis_rows):
     result = {}
     for phase in ("R2", "R1"):
-        phase_rows = [row for row in analysis_rows
-                      if row.get("batch_phase") == phase]
+        phase_rows = [row for row in analysis_rows if row.get("batch_phase") == phase]
         result[phase] = {}
         for metric in ("detection", "evidence", "recovery"):
-            counts = {"observed": 0, "right_censored": 0,
-                      "unobserved_before_stop": 0}
+            counts = {"observed": 0, "right_censored": 0, "unobserved_before_stop": 0}
             for row in phase_rows:
                 status = row.get(metric + "_status")
                 if status in counts:
@@ -912,15 +952,17 @@ def _summary(manifest, analysis_rows, exclusions):
         "analysis_rows": len(analysis_rows),
         "exclusions": exclusions,
         "efficacy_ineligible": [
-            row["run_id"] for row in analysis_rows
-            if row.get("scenario") in ("A", "F")],
+            row["run_id"] for row in analysis_rows if row.get("scenario") in ("A", "F")
+        ],
         "status_counts": manifest["counts"]["by_status"],
-        "note": ("R2 = repetitions 1..10; R1 = repetitions 11..15. "
-                 "Observed medians require a separate censoring-aware analysis. "
-                 "unobserved_before_stop endpoints are missing before an early "
-                 "stop, not censored observations. "
-                 "Dry runs and failed runs are never observations. "
-                 "A retried baseline failure stays one planned cell, not an extra sample."),
+        "note": (
+            "R2 = repetitions 1..10; R1 = repetitions 11..15. "
+            "Observed medians require a separate censoring-aware analysis. "
+            "unobserved_before_stop endpoints are missing before an early "
+            "stop, not censored observations. "
+            "Dry runs and failed runs are never observations. "
+            "A retried baseline failure stays one planned cell, not an extra sample."
+        ),
     }
 
 
@@ -937,12 +979,12 @@ def _write_batch_outputs(args, batch_id, paths, manifest, rows):
     _write_json_atomic(paths["manifest"], manifest)
     _write_text_atomic(
         paths["rows"],
-        "".join(json.dumps(row, sort_keys=True, default=str) + "\n"
-                for row in ordered))
+        "".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in ordered),
+    )
     _write_text_atomic(
         paths["analysis"],
-        "".join(json.dumps(row, sort_keys=True, default=str) + "\n"
-                for row in analysis_rows))
+        "".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in analysis_rows),
+    )
     _write_csv_atomic(ordered, paths["csv"])
     _write_json_atomic(paths["summary"], summary)
     return summary
@@ -951,13 +993,20 @@ def _write_batch_outputs(args, batch_id, paths, manifest, rows):
 def _run_one(args, item, run_id):
     """Delegate one run to the existing harness entrypoint path."""
     argv = [
-        "--arm", item["arm"],
-        "--scenario", item["scenario"],
-        "--rep", str(item["rep"]),
-        "--namespace", args.namespace,
-        "--app", args.app,
-        "--out", str(args.out),
-        "--run-id", run_id,
+        "--arm",
+        item["arm"],
+        "--scenario",
+        item["scenario"],
+        "--rep",
+        str(item["rep"]),
+        "--namespace",
+        args.namespace,
+        "--app",
+        args.app,
+        "--out",
+        str(args.out),
+        "--run-id",
+        run_id,
     ]
     if args.source_revision:
         argv.extend(["--source-revision", args.source_revision])
@@ -1026,8 +1075,7 @@ def _next_pending_run_id(manifest, current):
     return None
 
 
-def _cooldown(args, batch_id, paths, manifest, rows, after_run_id,
-              next_run_id, sleep):
+def _cooldown(args, batch_id, paths, manifest, rows, after_run_id, next_run_id, sleep):
     record = {
         "after_run_id": after_run_id,
         "next_run_id": next_run_id,
@@ -1053,16 +1101,21 @@ def _cooldown(args, batch_id, paths, manifest, rows, after_run_id,
 
 
 def _print_result(paths, manifest, summary):
-    print(json.dumps({
-        "batch_id": manifest["batch_id"],
-        "state": manifest["state"],
-        "planned": summary["planned"],
-        "recorded": summary["recorded"],
-        "analysis_rows": summary["analysis_rows"],
-        "formal_execution_approved": manifest["formal_execution_approved"],
-        "manifest": str(paths["manifest"]),
-        "summary": str(paths["summary"]),
-    }, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "batch_id": manifest["batch_id"],
+                "state": manifest["state"],
+                "planned": summary["planned"],
+                "recorded": summary["recorded"],
+                "analysis_rows": summary["analysis_rows"],
+                "formal_execution_approved": manifest["formal_execution_approved"],
+                "manifest": str(paths["manifest"]),
+                "summary": str(paths["summary"]),
+            },
+            sort_keys=True,
+        )
+    )
 
 
 def run_batch(args, run_one=None, sleep=None):
@@ -1090,20 +1143,21 @@ def run_batch(args, run_one=None, sleep=None):
         attempts = entry.setdefault("attempts", [])
         while attempts and attempts[-1].get("status") in PENDING_STATUSES:
             attempts.pop()
-        item = {key: entry[key]
-                for key in ("index", "arm", "scenario", "rep", "phase")}
+        item = {key: entry[key] for key in ("index", "arm", "scenario", "rep", "phase")}
         while True:
             number = len(attempts)
-            run_id = (entry["run_id"] if number == 0
-                      else run_id_for_retry(entry["run_id"], number))
+            run_id = entry["run_id"] if number == 0 else run_id_for_retry(entry["run_id"], number)
             try:
                 _ensure_run_slot(args, run_id)
             except BatchSafetyError as error:
-                manifest.update(state="stopped", stop_reason="output_conflict",
-                                stop_run_id=run_id, updated_utc=_utc_now())
+                manifest.update(
+                    state="stopped",
+                    stop_reason="output_conflict",
+                    stop_run_id=run_id,
+                    updated_utc=_utc_now(),
+                )
                 manifest["counts"] = _counts(manifest["runs"])
-                summary = _write_batch_outputs(
-                    args, batch_id, paths, manifest, rows)
+                summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
                 _print_result(paths, manifest, summary)
                 raise error
             started = _utc_now()
@@ -1120,9 +1174,15 @@ def run_batch(args, run_one=None, sleep=None):
                 "row_path": None,
             }
             attempts.append(attempt)
-            entry.update(status="running", started_utc=started,
-                         finished_utc=None, exit_code=None, stop_reason=None,
-                         error=None, row_path=None)
+            entry.update(
+                status="running",
+                started_utc=started,
+                finished_utc=None,
+                exit_code=None,
+                stop_reason=None,
+                error=None,
+                row_path=None,
+            )
             manifest["state"] = "running"
             manifest["updated_utc"] = _utc_now()
             manifest["counts"] = _counts(manifest["runs"])
@@ -1146,8 +1206,7 @@ def run_batch(args, run_one=None, sleep=None):
                 "exit_code": code,
                 "stop_reason": stop_reason,
                 "error": error,
-                "row_path": (str(row_path)
-                             if row is not None and row_path.exists() else None),
+                "row_path": (str(row_path) if row is not None and row_path.exists() else None),
             }
             attempt.update(outcome)
             entry.update(outcome)
@@ -1155,39 +1214,50 @@ def run_batch(args, run_one=None, sleep=None):
                 rows.append(annotate_row(row, entry, args, batch_id, attempt))
             manifest["updated_utc"] = _utc_now()
             manifest["counts"] = _counts(manifest["runs"])
-            retry = (stop_reason == "baseline_failure"
-                     and number < args.baseline_retries
-                     and _baseline_retryable(status, row))
+            retry = (
+                stop_reason == "baseline_failure"
+                and number < args.baseline_retries
+                and _baseline_retryable(status, row)
+            )
             if stop_reason and not retry:
-                manifest.update(state="stopped", stop_reason=stop_reason,
-                                stop_run_id=run_id)
-                summary = _write_batch_outputs(
-                    args, batch_id, paths, manifest, rows)
+                manifest.update(state="stopped", stop_reason=stop_reason, stop_run_id=run_id)
+                summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
                 _print_result(paths, manifest, summary)
                 return 1
             if retry:
-                entry.update(status="retrying", finished_utc=None, exit_code=None,
-                             stop_reason=None, error=None, row_path=None)
+                entry.update(
+                    status="retrying",
+                    finished_utc=None,
+                    exit_code=None,
+                    stop_reason=None,
+                    error=None,
+                    row_path=None,
+                )
                 manifest["state"] = "running"
             summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
-            next_run_id = (run_id_for_retry(entry["run_id"], number + 1)
-                           if retry
-                           else _next_pending_run_id(manifest, entry))
+            next_run_id = (
+                run_id_for_retry(entry["run_id"], number + 1)
+                if retry
+                else _next_pending_run_id(manifest, entry)
+            )
             if next_run_id is not None:
-                _cooldown(args, batch_id, paths, manifest, rows, run_id,
-                          next_run_id, sleep)
+                _cooldown(args, batch_id, paths, manifest, rows, run_id, next_run_id, sleep)
             if not retry:
                 break
 
-    failures = [entry for entry in manifest["runs"]
-                if entry.get("stop_reason")]
+    failures = [entry for entry in manifest["runs"] if entry.get("stop_reason")]
     if failures:
         first = failures[0]
-        manifest.update(state="stopped", stop_reason=first["stop_reason"],
-                        stop_run_id=final_run_id(first), updated_utc=_utc_now())
+        manifest.update(
+            state="stopped",
+            stop_reason=first["stop_reason"],
+            stop_run_id=final_run_id(first),
+            updated_utc=_utc_now(),
+        )
     else:
-        manifest.update(state="complete", stop_reason=None, stop_run_id=None,
-                        updated_utc=_utc_now())
+        manifest.update(
+            state="complete", stop_reason=None, stop_run_id=None, updated_utc=_utc_now()
+        )
     manifest["counts"] = _counts(manifest["runs"])
     summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
     _print_result(paths, manifest, summary)

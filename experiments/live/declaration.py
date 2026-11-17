@@ -4,6 +4,7 @@ The bundle is a JSON export of the GitOps render at a frozen revision. Only the
 four scoped resources are selected; every other rendered object is ignored.
 Secret values and SealedSecret ciphertext are never selected or emitted.
 """
+
 from __future__ import annotations
 
 import copy
@@ -52,8 +53,10 @@ class Declaration:
             "render_sha256": self.render_sha256,
             "configmap_name": self.configmap_name,
             "resources": [
-                {key: copy.deepcopy(resource[key])
-                 for key in ("id", "kind", "name", "namespace", "fields")}
+                {
+                    key: copy.deepcopy(resource[key])
+                    for key in ("id", "kind", "name", "namespace", "fields")
+                }
                 for resource in self.resources
             ],
         }
@@ -79,8 +82,7 @@ def _finite_float(text):
     return value
 
 
-def load(path, expected_sha256: str, expected_revision: str,
-         namespace: str) -> Declaration:
+def load(path, expected_sha256: str, expected_revision: str, namespace: str) -> Declaration:
     try:
         data = Path(path).read_bytes()
     except OSError as error:
@@ -90,16 +92,13 @@ def load(path, expected_sha256: str, expected_revision: str,
     return loads(data, expected_sha256, expected_revision, namespace)
 
 
-def loads(data: bytes, expected_sha256: str, expected_revision: str,
-          namespace: str) -> Declaration:
-    if (not isinstance(expected_sha256, str)
-            or not SHA256.fullmatch(expected_sha256)):
+def loads(data: bytes, expected_sha256: str, expected_revision: str, namespace: str) -> Declaration:
+    if not isinstance(expected_sha256, str) or not SHA256.fullmatch(expected_sha256):
         raise DeclarationError("render SHA-256 must be 64 lowercase hex")
     digest = hashlib.sha256(data).hexdigest()
     if digest != expected_sha256:
         raise DeclarationError("render bundle SHA-256 does not match --render-sha256")
-    if (not isinstance(expected_revision, str)
-            or not REVISION.fullmatch(expected_revision)):
+    if not isinstance(expected_revision, str) or not REVISION.fullmatch(expected_revision):
         raise DeclarationError("frozen source revision must be 40 lowercase hex")
     try:
         bundle = json.loads(
@@ -120,8 +119,7 @@ def loads(data: bytes, expected_sha256: str, expected_revision: str,
     if not isinstance(revision, str) or not REVISION.fullmatch(revision):
         raise DeclarationError("render bundle source_revision must be 40 lowercase hex")
     if revision != expected_revision:
-        raise DeclarationError(
-            "render bundle revision does not match --source-revision")
+        raise DeclarationError("render bundle revision does not match --source-revision")
     objects = bundle.get("objects")
     if not isinstance(objects, list):
         raise DeclarationError("render bundle objects must be an array")
@@ -161,14 +159,10 @@ def selected_fields(doc: dict) -> dict:
         limits = _mapping(resources.get("limits"))
         return {
             "/spec/template/spec/containers/web/image": container.get("image"),
-            "/spec/template/spec/containers/web/resources/requests/cpu":
-                requests.get("cpu"),
-            "/spec/template/spec/containers/web/resources/requests/memory":
-                requests.get("memory"),
-            "/spec/template/spec/containers/web/resources/limits/cpu":
-                limits.get("cpu"),
-            "/spec/template/spec/containers/web/resources/limits/memory":
-                limits.get("memory"),
+            "/spec/template/spec/containers/web/resources/requests/cpu": requests.get("cpu"),
+            "/spec/template/spec/containers/web/resources/requests/memory": requests.get("memory"),
+            "/spec/template/spec/containers/web/resources/limits/cpu": limits.get("cpu"),
+            "/spec/template/spec/containers/web/resources/limits/memory": limits.get("memory"),
         }
     if kind == "ConfigMap":
         data = doc.get("data")
@@ -178,18 +172,15 @@ def selected_fields(doc: dict) -> dict:
     if kind == "SealedSecret":
         metadata = _mapping(doc.get("metadata"))
         annotations = _mapping(metadata.get("annotations"))
-        return {"/metadata/annotations/" + DRIFT_ANNOTATION:
-                annotations.get(DRIFT_ANNOTATION)}
+        return {"/metadata/annotations/" + DRIFT_ANNOTATION: annotations.get(DRIFT_ANNOTATION)}
     if kind == "Service":
         spec = _mapping(doc.get("spec"))
         ports = spec.get("ports")
-        first = (ports[0] if isinstance(ports, list) and ports
-                 and isinstance(ports[0], dict) else {})
+        first = ports[0] if isinstance(ports, list) and ports and isinstance(ports[0], dict) else {}
         selector = _mapping(spec.get("selector"))
         return {
             "/spec/type": spec.get("type"),
-            "/spec/selector/app.kubernetes.io/name":
-                selector.get("app.kubernetes.io/name"),
+            "/spec/selector/app.kubernetes.io/name": selector.get("app.kubernetes.io/name"),
             "/spec/ports/0/port": first.get("port"),
             "/spec/ports/0/targetPort": first.get("targetPort"),
         }
@@ -207,9 +198,14 @@ def _container(doc: dict):
     containers = pod_spec.get("containers", [])
     if not isinstance(containers, list):
         return None
-    return next((item for item in containers
-                 if isinstance(item, dict)
-                 and item.get("name") == DEPLOYMENT_CONTAINER), None)
+    return next(
+        (
+            item
+            for item in containers
+            if isinstance(item, dict) and item.get("name") == DEPLOYMENT_CONTAINER
+        ),
+        None,
+    )
 
 
 def _web_container(deployment: dict) -> dict:
@@ -219,12 +215,13 @@ def _web_container(deployment: dict) -> dict:
     containers = pod_spec.get("containers")
     if not isinstance(containers, list):
         raise DeclarationError("declared Deployment has no containers")
-    matches = [item for item in containers
-               if isinstance(item, dict)
-               and item.get("name") == DEPLOYMENT_CONTAINER]
+    matches = [
+        item
+        for item in containers
+        if isinstance(item, dict) and item.get("name") == DEPLOYMENT_CONTAINER
+    ]
     if len(matches) != 1:
-        raise DeclarationError(
-            "declared Deployment must have exactly one web container")
+        raise DeclarationError("declared Deployment must have exactly one web container")
     return matches[0]
 
 
@@ -244,35 +241,30 @@ def _configmap_reference(container: dict) -> str:
             names.append(name)
     if len(names) != 1:
         raise DeclarationError(
-            "declared web envFrom must reference exactly one generated ConfigMap")
+            "declared web envFrom must reference exactly one generated ConfigMap"
+        )
     return names[0]
 
 
 def _validate_objects(objects) -> None:
     for item in objects:
         if not isinstance(item, dict):
-            raise DeclarationError(
-                "render bundle objects must be object dictionaries")
+            raise DeclarationError("render bundle objects must be object dictionaries")
         if not isinstance(item.get("apiVersion"), str) or not item["apiVersion"]:
-            raise DeclarationError(
-                "render bundle contains an object without apiVersion")
+            raise DeclarationError("render bundle contains an object without apiVersion")
         if not isinstance(item.get("kind"), str) or not item["kind"]:
-            raise DeclarationError(
-                "render bundle contains an object without kind")
+            raise DeclarationError("render bundle contains an object without kind")
         metadata = item.get("metadata")
         if not isinstance(metadata, dict):
-            raise DeclarationError(
-                "render bundle contains an object without metadata")
+            raise DeclarationError("render bundle contains an object without metadata")
         if not isinstance(metadata.get("name"), str) or not metadata["name"]:
-            raise DeclarationError(
-                "render bundle contains an object without a name")
+            raise DeclarationError("render bundle contains an object without a name")
 
 
 def _index_objects(objects):
     index = {}
     for item in objects:
-        index.setdefault(
-            (item["kind"], item["metadata"]["name"]), []).append(item)
+        index.setdefault((item["kind"], item["metadata"]["name"]), []).append(item)
     return index
 
 
@@ -285,8 +277,7 @@ def _target(index, kind: str, name: str, namespace: str) -> dict:
     item = matches[0]
     observed = (item.get("metadata") or {}).get("namespace")
     if observed != namespace:
-        raise DeclarationError(
-            f"{kind}/{name} is not in namespace {namespace!r}")
+        raise DeclarationError(f"{kind}/{name} is not in namespace {namespace!r}")
     return item
 
 
@@ -309,25 +300,22 @@ def _validate_fields(resources) -> None:
         metadata = _mapping(resource["manifest"].get("metadata"))
         annotations = metadata.get("annotations")
         if annotations is not None and not isinstance(annotations, dict):
-            raise DeclarationError(
-                f"{resource['id']} metadata.annotations must be an object")
+            raise DeclarationError(f"{resource['id']} metadata.annotations must be an object")
         if kind == "Deployment":
             _require_fields(fields, DEPLOYMENT_FIELDS, resource["id"])
             for path in DEPLOYMENT_FIELDS:
                 if not isinstance(fields[path], str) or not fields[path].strip():
                     raise DeclarationError(
-                        f"{resource['id']} field {path} must be a non-empty string")
+                        f"{resource['id']} field {path} must be a non-empty string"
+                    )
         elif kind == "ConfigMap":
             if not fields:
-                raise DeclarationError(
-                    f"{resource['id']} has no data fields")
+                raise DeclarationError(f"{resource['id']} has no data fields")
             if "/data/" + CONFIG_KEY not in fields:
-                raise DeclarationError(
-                    f"{resource['id']} is missing /data/{CONFIG_KEY}")
+                raise DeclarationError(f"{resource['id']} is missing /data/{CONFIG_KEY}")
             for path, value in fields.items():
                 if not isinstance(value, str):
-                    raise DeclarationError(
-                        f"{resource['id']} field {path} must be a string")
+                    raise DeclarationError(f"{resource['id']} field {path} must be a string")
         elif kind == "Service":
             paths = (
                 "/spec/selector/app.kubernetes.io/name",
@@ -336,33 +324,25 @@ def _validate_fields(resources) -> None:
             )
             _require_fields(fields, paths, resource["id"])
             kind_value = fields.get("/spec/type")
-            if kind_value is not None and (
-                    not isinstance(kind_value, str) or not kind_value):
-                raise DeclarationError(
-                    f"{resource['id']} field /spec/type must be a string")
+            if kind_value is not None and (not isinstance(kind_value, str) or not kind_value):
+                raise DeclarationError(f"{resource['id']} field /spec/type must be a string")
             selector = fields["/spec/selector/app.kubernetes.io/name"]
             if not isinstance(selector, str) or not selector:
-                raise DeclarationError(
-                    f"{resource['id']} has no app.kubernetes.io/name selector")
+                raise DeclarationError(f"{resource['id']} has no app.kubernetes.io/name selector")
             port = fields["/spec/ports/0/port"]
             if type(port) is not int or not 1 <= port <= 65535:
-                raise DeclarationError(
-                    f"{resource['id']} port must be an integer in 1..65535")
+                raise DeclarationError(f"{resource['id']} port must be an integer in 1..65535")
             target = fields["/spec/ports/0/targetPort"]
             if type(target) is int:
                 if not 1 <= target <= 65535:
-                    raise DeclarationError(
-                        f"{resource['id']} targetPort is outside 1..65535")
+                    raise DeclarationError(f"{resource['id']} targetPort is outside 1..65535")
             elif not isinstance(target, str) or not target:
-                raise DeclarationError(
-                    f"{resource['id']} targetPort must be an integer or name")
+                raise DeclarationError(f"{resource['id']} targetPort must be an integer or name")
         elif kind == "SealedSecret":
             if not fields:
-                raise DeclarationError(
-                    f"{resource['id']} has no selected annotation field")
+                raise DeclarationError(f"{resource['id']} has no selected annotation field")
             if fields.get("/metadata/annotations/" + DRIFT_ANNOTATION) is not None:
-                raise DeclarationError(
-                    f"{resource['id']} already carries the drift annotation")
+                raise DeclarationError(f"{resource['id']} already carries the drift annotation")
 
 
 def _require_fields(fields: dict, paths, identity: str) -> None:

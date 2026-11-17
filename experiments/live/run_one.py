@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """CLI entrypoint for one dry-run or live InvenioRDM drift run."""
+
 import sys
 
 try:

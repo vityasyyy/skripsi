@@ -1,4 +1,5 @@
 """Offline instrument regressions; all timestamps and workload values are synthetic."""
+
 import copy
 import json
 import os
@@ -23,9 +24,18 @@ def hpa_fixture():
         event.update(controller="hpa", fields=["/spec/replicas"])
     for sample in evidence["samples"]:
         sample["resources"] = copy.deepcopy(evidence["contract"]["resources"])
-        sample["hpa_states"] = [{"target": "app/Deployment/web", "desired": 3,
-                                 "replicas": 3, "ready": 3, "generation": 1,
-                                 "observed_generation": 1, "active": True, "able_to_scale": True}]
+        sample["hpa_states"] = [
+            {
+                "target": "app/Deployment/web",
+                "desired": 3,
+                "replicas": 3,
+                "ready": 3,
+                "generation": 1,
+                "observed_generation": 1,
+                "active": True,
+                "able_to_scale": True,
+            }
+        ]
     evidence["samples"][0]["hpa_states"][0]["replicas"] = 5
     return evidence
 
@@ -37,7 +47,9 @@ class InstrumentsTest(unittest.TestCase):
             path.write_text(json.dumps(evidence))
             result = subprocess.run(
                 ["bash", str(ROOT / "scripts" / tool), "--evidence", str(path)],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             return result
 
@@ -165,14 +177,18 @@ class InstrumentsTest(unittest.TestCase):
         for mutate in mutations:
             evidence = fixture()
             mutate(evidence)
-            tool = "recovery-runbook.sh" if evidence["reset"].get("at") == 99 else "metrics-collect.sh"
+            tool = (
+                "recovery-runbook.sh" if evidence["reset"].get("at") == 99 else "metrics-collect.sh"
+            )
             result = self.run_tool(tool, evidence)
             self.assertNotEqual(result.returncode, 0, result.stdout)
 
     def test_secret_values_are_refused_without_leaking_input(self):
         evidence = fixture()
         evidence["contract"]["resources"][0] = {
-            "id": "app/Secret/synthetic", "fields": {"/data/password": "DO-NOT-LEAK"}}
+            "id": "app/Secret/synthetic",
+            "fields": {"/data/password": "DO-NOT-LEAK"},
+        }
         result = self.run_tool("baseline-check.sh", evidence)
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("DO-NOT-LEAK", result.stderr + result.stdout)
@@ -261,7 +277,9 @@ class InstrumentsTest(unittest.TestCase):
             lambda e: e["reset"].update(extra_resources=["quarantine/Deployment/extra"]),
             lambda e: e["reset"]["resources"][0]["fields"].update({"/image": "wrong"}),
             lambda e: e["reset"]["pods"][0].update(ready=False),
-            lambda e: e["reset"]["resources"].append({"id": "app/Deployment/untracked", "fields": {"/image": "extra"}}),
+            lambda e: e["reset"]["resources"].append(
+                {"id": "app/Deployment/untracked", "fields": {"/image": "extra"}}
+            ),
         ]
         for mutate in mutations:
             evidence = fixture()
@@ -279,15 +297,24 @@ class InstrumentsTest(unittest.TestCase):
         evidence["scenario"] = "F"
         evidence["contract"]["quarantine_namespace"] = "exp-fixture-wrong"
         evidence["contract"]["quarantine_resources"] = ["exp-fixture-wrong/Deployment/web"]
-        evidence["injection"]["changed_fields"] = [{
-            "resource": "exp-fixture-wrong/Deployment/web", "path": "/metadata/namespace",
-            "effect": "created", "matches_desired": False}]
-        evidence["injection"]["request_metadata"] = {"name": "web", "namespace": "exp-fixture-wrong"}
+        evidence["injection"]["changed_fields"] = [
+            {
+                "resource": "exp-fixture-wrong/Deployment/web",
+                "path": "/metadata/namespace",
+                "effect": "created",
+                "matches_desired": False,
+            }
+        ]
+        evidence["injection"]["request_metadata"] = {
+            "name": "web",
+            "namespace": "exp-fixture-wrong",
+        }
         evidence["events"] = []
         evidence["stop_reason"] = "recovery"
         for position, sample in enumerate(evidence["samples"]):
-            sample["extra_resources"] = (["exp-fixture-wrong/Deployment/web"]
-                                         if position == 0 else [])
+            sample["extra_resources"] = (
+                ["exp-fixture-wrong/Deployment/web"] if position == 0 else []
+            )
         result = self.run_tool("metrics-collect.sh", evidence)
         self.assertEqual(result.returncode, 0, result.stderr)
         row = json.loads(result.stdout)
@@ -301,17 +328,24 @@ class InstrumentsTest(unittest.TestCase):
     def test_deletion_uses_existence_evidence_not_a_fake_field_value(self):
         evidence = fixture()
         evidence["scenario"] = "D"
-        evidence["injection"]["changed_fields"] = [{
-            "resource": "app/Deployment/web", "path": "/metadata/name",
-            "effect": "deleted", "matches_desired": False}]
-        evidence["samples"][0]["resources"] = [
-            {"id": "app/Service/web", "fields": {"/port": 80}}]
+        evidence["injection"]["changed_fields"] = [
+            {
+                "resource": "app/Deployment/web",
+                "path": "/metadata/name",
+                "effect": "deleted",
+                "matches_desired": False,
+            }
+        ]
+        evidence["samples"][0]["resources"] = [{"id": "app/Service/web", "fields": {"/port": 80}}]
         evidence["stop_reason"] = "recovery"
         for sample in evidence["samples"][1:]:
             sample["resources"] = [
-                {"id": "app/Deployment/web", "fields": {"/image": "fixture@sha256:abc",
-                                                         "/limits/memory": "1Gi"}},
-                {"id": "app/Service/web", "fields": {"/port": 80}}]
+                {
+                    "id": "app/Deployment/web",
+                    "fields": {"/image": "fixture@sha256:abc", "/limits/memory": "1Gi"},
+                },
+                {"id": "app/Service/web", "fields": {"/port": 80}},
+            ]
         result = self.run_tool("metrics-collect.sh", evidence)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["r1_first"], 50)
@@ -363,10 +397,20 @@ class InstrumentsTest(unittest.TestCase):
                 fake.write_text(f'#!/bin/sh\ntouch "{marker}"\nexit 99\n')
                 fake.chmod(0o755)
             env = {**os.environ, "PATH": directory + os.pathsep + os.environ["PATH"]}
-            for tool in ("baseline-check.sh", "metrics-collect.sh", "recovery-runbook.sh", "drift-inject.sh"):
+            for tool in (
+                "baseline-check.sh",
+                "metrics-collect.sh",
+                "recovery-runbook.sh",
+                "drift-inject.sh",
+            ):
                 with self.subTest(tool=tool):
-                    result = subprocess.run(["bash", str(ROOT / "scripts" / tool), "--live"],
-                                            capture_output=True, text=True, timeout=5, env=env)
+                    result = subprocess.run(
+                        ["bash", str(ROOT / "scripts" / tool), "--live"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        env=env,
+                    )
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("disabled", result.stderr)
             self.assertFalse(marker.exists())

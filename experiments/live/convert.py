@@ -5,6 +5,7 @@ The historical analyzer is mock-only and rejects these rows; this converter is
 an archival bridge, not formal inference. `trci` is a legacy column name and
 here means evidence latency (`t_e - t0`), never human root-cause time.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -13,8 +14,21 @@ import json
 from pathlib import Path
 import sys
 
-COLUMNS = ["subject", "env", "skenario", "rep", "t0", "td", "trci", "t2",
-           "r1_t0", "r1_t1", "r1_t2", "kubectl_cmds", "notes"]
+COLUMNS = [
+    "subject",
+    "env",
+    "skenario",
+    "rep",
+    "t0",
+    "td",
+    "trci",
+    "t2",
+    "r1_t0",
+    "r1_t1",
+    "r1_t2",
+    "kubectl_cmds",
+    "notes",
+]
 
 
 def _number(value):
@@ -85,14 +99,12 @@ def main(argv=None):
     parser.add_argument("--out", dest="target", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        rows = [json.loads(line) for line in
-                args.source.read_text().splitlines() if line.strip()]
+        rows = [json.loads(line) for line in args.source.read_text().splitlines() if line.strip()]
         if not rows:
             raise ValueError("empty JSONL")
         write_csv(rows, args.target)
     except (OSError, ValueError, KeyError) as error:
-        print(f"invalid JSONL input: {type(error).__name__}: {error}",
-              file=sys.stderr)
+        print(f"invalid JSONL input: {type(error).__name__}: {error}", file=sys.stderr)
         return 1
     return 0
 
