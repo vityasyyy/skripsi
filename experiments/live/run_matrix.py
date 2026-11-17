@@ -546,7 +546,9 @@ def _validate_resume(args: argparse.Namespace, plan: dict, batch_id: str, paths:
         row_path = _row_path(args.out, final_run_id(entry))
         if entry.get("row_path") and not Path(entry["row_path"]).exists():
             raise BatchSafetyError(f"manifest run {run_id} points at missing evidence")
-        if status in ROW_REQUIRED_STATUSES and not row_path.exists():
+        if (
+            status in ROW_REQUIRED_STATUSES and not row_path.exists()
+        ):  # pragma: no cover - attempt check enforces it first
             raise BatchSafetyError(f"manifest run {run_id} is missing its preserved row")
         if status in PENDING_STATUSES:
             pending_found = True
@@ -845,7 +847,9 @@ def _analysis_problem(row: dict) -> str | None:
     if not re.fullmatch(r"[0-9a-f]{64}", str(row.get("render_sha256") or "")):
         return "invalid_render_sha256"
     limit = cast(float, row.get("censor_seconds"))
-    if type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0:
+    if (
+        type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0
+    ):  # pragma: no cover - _timing_problem rejects this first
         return "invalid_censor_seconds"
     for metric in ("detection", "evidence", "recovery"):
         value = row.get(metric + "_seconds")

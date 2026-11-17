@@ -5,6 +5,8 @@ No test reaches a cluster. Dry-run tests use the real harness with
 call `harness.main`.
 """
 
+import argparse
+import copy
 import hashlib
 import io
 import json
@@ -13,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -1093,6 +1095,552 @@ class TokenSafetyTests(unittest.TestCase):
             texts.extend(path.read_text() for path in Path(directory).iterdir() if path.is_file())
             for text in texts:
                 self.assertNotIn(token, text)
+
+
+class RunMatrixEdgeTests(unittest.TestCase):
+    def _item(self):
+        return {"index": 0, "arm": "gitops", "scenario": "A", "rep": 1, "phase": "R2"}
+
+    def test_argument_parsers_cover_ranges_and_rejections(self):
+        self.assertEqual(run_matrix._as_list("gitops", "arms"), ["gitops"])
+        with self.assertRaises(ValueError):
+            run_matrix._as_list([" "], "arms")
+        with self.assertRaises(ValueError):
+            run_matrix.parse_arms("bogus")
+        self.assertEqual(run_matrix.parse_scenarios("b-d"), ["B", "C", "D"])
+        with self.assertRaises(ValueError):
+            run_matrix.parse_scenarios("D-B")
+        with self.assertRaises(ValueError):
+            run_matrix.parse_scenarios("Q")
+        with self.assertRaises(ValueError):
+            run_matrix.build_plan(["gitops"], ["A"], 0, 1)
+
+    def test_read_last_jsonl_returns_none_for_blank_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "blank.jsonl"
+            path.write_text("\n")
+            self.assertIsNone(run_matrix._read_last_jsonl(path))
+
+    def test_parse_args_rejects_every_invalid_bound(self):
+        cases = (
+            ["--reps", "0"],
+            ["--cooldown-seconds", "-1"],
+            ["--cooldown-seconds", "nan"],
+            ["--baseline-retries", "-1"],
+            ["--batch-id", "bad id"],
+            ["--source-revision", "short"],
+            ["--render-sha256", "short"],
+            ["--production-like"],
+            ["--arms", "bogus"],
+            ["--scenarios", "Q"],
+        )
+        for case in cases:
+            with (
+                self.subTest(case=case),
+                redirect_stderr(io.StringIO()),
+                self.assertRaises(SystemExit),
+            ):
+                run_matrix.parse_args(case)
+
+    def test_validate_batch_args_rejects_missing_live_requirements(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(live_args(directory, "safety", "gitops", "A", "1"))
+            mutations = (
+                ("confirm_single_stack", False, "--live requires"),
+                ("namespace_explicit", False, "--namespace must be explicit"),
+                ("app_explicit", False, "--app must be explicit"),
+                ("render_sha256", None, "--render-sha256 is required"),
+                ("source_revision", None, "--source-revision is required"),
+                ("render_file", None, "--render-file is required"),
+                ("render_file", "https://example/render.json", "local file"),
+            )
+            for attribute, value, message in mutations:
+                current = copy.deepcopy(args)
+                setattr(current, attribute, value)
+                with (
+                    self.subTest(attribute=attribute),
+                    self.assertRaisesRegex(run_matrix.BatchSafetyError, message),
+                ):
+                    run_matrix.validate_batch_args(current)
+
+    def test_new_batch_rejects_long_ids_and_existing_outputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            long_args = argparse.Namespace(out=directory, baseline_retries=15)
+            plan = run_matrix.build_plan(["gitops"], ["A"], 1, 1)
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "longer than 63"):
+                run_matrix._ensure_new_batch(
+                    long_args, plan, "x" * 60, {"manifest": Path(directory) / "m"}
+                )
+            args = run_matrix.parse_args(full_args(directory, "exists", "gitops", "A", "1"))
+            plan = run_matrix.build_plan(args.arms, args.scenarios, args.reps, args.seed)
+            run_id = run_matrix.run_id_for("exists", plan["runs"][0])
+            write_row(directory, run_id, make_row(plan["runs"][0]))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "refusing to overwrite"):
+                run_matrix._ensure_new_batch(
+                    args, plan, "exists", {"manifest": Path(directory) / "m"}
+                )
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "refusing to overwrite"):
+                run_matrix._ensure_run_slot(args, run_id)
+
+    def _tiny_batch(self, directory, batch_id="tiny", scenarios="A"):
+        args = run_matrix.parse_args(live_args(directory, batch_id, "gitops", scenarios, "1"))
+        self.assertEqual(run_quiet(args, run_one=fake_runner()[0]), 0)
+        paths = run_matrix._batch_paths(args.out, batch_id)
+        manifest = json.loads(paths["manifest"].read_text())
+        plan = run_matrix.build_plan(args.arms, args.scenarios, args.reps, args.seed)
+        return args, plan, batch_id, paths, manifest
+
+    def test_resume_rejects_malformed_manifests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, plan, batch_id, paths, manifest = self._tiny_batch(directory)
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "existing manifest"):
+                run_matrix._validate_resume(
+                    args, plan, batch_id, {"manifest": Path(directory) / "missing.json"}
+                )
+            paths["manifest"].write_text("{bad")
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "invalid batch manifest"):
+                run_matrix._validate_resume(args, plan, batch_id, paths)
+            paths["manifest"].write_text("[]")
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "not an object"):
+                run_matrix._validate_resume(args, plan, batch_id, paths)
+            cases = (
+                (lambda value: value.pop("timing_convention"), "predates"),
+                (lambda value: value.pop("counts"), "missing counts"),
+                (lambda value: value.update(seed=999), "seed does not match"),
+                (lambda value: value.update(state="weird"), "invalid batch manifest state"),
+                (lambda value: value["runs"].pop(), "does not match the plan"),
+            )
+            for mutate, message in cases:
+                bad = copy.deepcopy(manifest)
+                mutate(bad)
+                paths["manifest"].write_text(json.dumps(bad))
+                with (
+                    self.subTest(message=message),
+                    self.assertRaisesRegex(run_matrix.BatchSafetyError, message),
+                ):
+                    run_matrix._validate_resume(args, plan, batch_id, paths)
+
+    def test_resume_rejects_each_manifest_identity_violation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, plan, batch_id, paths, manifest = self._tiny_batch(directory)
+
+            def check(mutate, message):
+                bad = copy.deepcopy(manifest)
+                mutate(bad)
+                paths["manifest"].write_text(json.dumps(bad))
+                with self.assertRaisesRegex(run_matrix.BatchSafetyError, message):
+                    run_matrix._validate_resume(args, plan, batch_id, paths)
+
+            def entry(value):
+                return value["runs"][0]
+
+            check(lambda value: entry(value).update(index=9), "does not match the plan")
+            check(lambda value: entry(value).update(run_id="other"), "identity mismatch")
+            check(lambda value: entry(value).update(status="weird"), "unknown status")
+            check(lambda value: entry(value).update(attempts="bad"), "no attempt ledger")
+            check(
+                lambda value: entry(value)["attempts"][0].update(attempt=3),
+                "invalid attempt ledger",
+            )
+            check(
+                lambda value: entry(value)["attempts"][0].update(run_id="other"),
+                "unexpected retry identity",
+            )
+            check(
+                lambda value: entry(value)["attempts"][0].update(retry_of="other"),
+                "invalid retry relationship",
+            )
+            check(lambda value: entry(value).update(row_path="missing"), "missing evidence")
+            check(
+                lambda value: entry(value).update(status="observed", attempts=[]),
+                "no attempts but is not pending",
+            )
+            check(
+                lambda value: entry(value).update(status="failure"),
+                "does not match its last attempt",
+            )
+            check(
+                lambda value: (
+                    entry(value).update(status="retrying"),
+                    entry(value)["attempts"][0].update(status="observed"),
+                ),
+                "retrying without a retryable baseline failure",
+            )
+
+    def test_resume_rejects_duplicate_identity_across_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(live_args(directory, "dupe", "gitops", "A", "1"))
+            item = {"index": 0, "arm": "gitops", "scenario": "A", "rep": 1, "phase": "R2"}
+            plan = {
+                "arm_order": ["gitops"],
+                "scenario_order": ["A"],
+                "runs": [dict(item), dict(item, index=1)],
+            }
+            manifest = run_matrix._new_manifest(args, plan, "dupe")
+            run_id = run_matrix.run_id_for("dupe", item)
+            for entry in manifest["runs"]:
+                entry["attempts"] = [
+                    {"attempt": 0, "run_id": run_id, "retry_of": None, "status": "pending"}
+                ]
+            manifest["state"] = "running"
+            paths = run_matrix._batch_paths(args.out, "dupe")
+            paths["manifest"].write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "duplicate run identity"):
+                run_matrix._validate_resume(args, plan, "dupe", paths)
+
+    def test_resume_rejects_missing_rows_and_pending_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, plan, batch_id, paths, manifest = self._tiny_batch(directory, "rows")
+            row_path = run_matrix._row_path(args.out, run_matrix.final_run_id(manifest["runs"][0]))
+            manifest["runs"][0]["row_path"] = None
+            manifest["runs"][0]["attempts"][0]["row_path"] = None
+            row_path.unlink()
+            paths["manifest"].write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "missing its preserved row"):
+                run_matrix._validate_resume(args, plan, batch_id, paths)
+            manifest["runs"][0].update(status="pending", attempts=[])
+            paths["manifest"].write_text(json.dumps(manifest))
+            write_row(args.out, manifest["runs"][0]["run_id"], make_row(plan["runs"][0]))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "already has output"):
+                run_matrix._validate_resume(args, plan, batch_id, paths)
+
+    def test_resume_rejects_complete_with_pending_and_stopped_without_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, plan, batch_id, paths, manifest = self._tiny_batch(directory, "state")
+            row_path = run_matrix._row_path(args.out, run_matrix.final_run_id(manifest["runs"][0]))
+            manifest["runs"][0].update(status="pending", attempts=[], row_path=None)
+            row_path.unlink()
+            manifest["state"] = "complete"
+            paths["manifest"].write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "still has pending"):
+                run_matrix._validate_resume(args, plan, batch_id, paths)
+            manifest["state"] = "stopped"
+            manifest["stop_reason"] = None
+            paths["manifest"].write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "no stop reason"):
+                run_matrix._validate_resume(args, plan, batch_id, paths)
+
+    def test_validate_attempt_rejects_invalid_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(full_args(directory, "attempt", "gitops", "A", "1"))
+            item = {"arm": "gitops", "scenario": "A", "rep": 1}
+            run_id = "attempt-gitops-A-r01"
+            base = make_row(item)
+            base["run_id"] = run_id
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "unknown status"):
+                run_matrix._validate_attempt(args, item, run_id, {"status": "weird"})
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "missing evidence"):
+                run_matrix._validate_attempt(
+                    args, item, run_id, {"status": "observed", "row_path": "missing"}
+                )
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "preserved row"):
+                run_matrix._validate_attempt(args, item, run_id, {"status": "observed"})
+            write_row(directory, run_id, dict(base))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "identity/status"):
+                run_matrix._validate_attempt(args, item, run_id, {"status": "failure"})
+            Path(directory, run_id + ".jsonl").write_text("{bad")
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "unreadable row"):
+                run_matrix._validate_attempt(args, item, run_id, {"status": "observed"})
+            Path(directory, run_id + ".jsonl").write_text("[1]\n")
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "invalid row"):
+                run_matrix._validate_attempt(args, item, run_id, {"status": "observed"})
+            write_row(directory, run_id, make_row(item, status="pending"))
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "already has output"):
+                run_matrix._validate_attempt(args, item, run_id, {"status": "pending"})
+
+    def test_rebuild_rows_skips_pending_and_missing_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(full_args(directory, "rebuild", "gitops", "A", "1"))
+            manifest = {
+                "runs": [
+                    {
+                        "index": 0,
+                        "arm": "gitops",
+                        "scenario": "A",
+                        "rep": 1,
+                        "phase": "R2",
+                        "run_id": "rebuild-gitops-A-r01",
+                        "attempts": [
+                            {"attempt": 0, "run_id": "rebuild-gitops-A-r01", "status": "pending"},
+                            {"attempt": 1, "run_id": "missing-row", "status": "observed"},
+                        ],
+                    }
+                ]
+            }
+            self.assertEqual(run_matrix._rebuild_rows(args, manifest, "rebuild"), [])
+            write_row(directory, "rebuild-gitops-A-r01", make_row(manifest["runs"][0]))
+            manifest["runs"][0]["attempts"][0]["status"] = "observed"
+            rows = run_matrix._rebuild_rows(args, manifest, "rebuild")
+            self.assertEqual(len(rows), 1)
+
+    def test_resolve_batch_id_handles_resume_discovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            args = run_matrix.parse_args(full_args(directory, "named", "gitops", "A", "1"))
+            plan = run_matrix.build_plan(args.arms, args.scenarios, args.reps, args.seed)
+            self.assertEqual(run_matrix._resolve_batch_id(args, plan), "named")
+            unnamed = run_matrix.parse_args(full_args(directory, "named", "gitops", "A", "1"))
+            unnamed.batch_id = None
+            self.assertEqual(
+                run_matrix._resolve_batch_id(unnamed, plan), run_matrix.default_batch_id(unnamed)
+            )
+            args.resume = True
+            args.batch_id = None
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "zero or multiple manifests"):
+                run_matrix._resolve_batch_id(args, plan)
+            default = run_matrix.default_batch_id(args)
+            (out / (default + ".manifest.json")).write_text("{}")
+            self.assertEqual(run_matrix._resolve_batch_id(args, plan), default)
+            (out / "other.manifest.json").write_text("{}")
+            (out / (default + ".manifest.json")).unlink()
+            self.assertEqual(run_matrix._resolve_batch_id(args, plan), "other")
+            long_args = argparse.Namespace(
+                out=directory, batch_id="x" * 60, resume=False, baseline_retries=0
+            )
+            with self.assertRaisesRegex(run_matrix.BatchSafetyError, "longer than 63"):
+                run_matrix._resolve_batch_id(long_args, plan)
+
+    def test_timing_problem_reports_each_invalid_shape(self):
+        def row(**overrides):
+            value = make_row(self._item())
+            value.update(overrides)
+            return value
+
+        cases = (
+            (lambda value: value.pop("t0_mono"), "incomplete_timing_bounds"),
+            (lambda value: value.update(censor_seconds=0), "invalid_censor_seconds"),
+            (lambda value: value.update(t_a_mono=99.0), "invalid_timing_bounds"),
+            (lambda value: value.update(injection_seconds=9.0), "invalid_timing_bounds"),
+            (lambda value: value.update(stop_reason="timeout"), "incomplete_timing_bounds"),
+            (
+                lambda value: value.update(status="right_censored", recovery_status="observed"),
+                "incomplete_timing_bounds",
+            ),
+            (
+                lambda value: value.update(
+                    status="right_censored",
+                    recovery_status="right_censored",
+                    stop_reason="recovery",
+                ),
+                "window_not_completed",
+            ),
+            (
+                lambda value: value.update(
+                    status="right_censored",
+                    recovery_status="right_censored",
+                    stop_reason="timeout",
+                    window_end_mono=120.0,
+                ),
+                "window_not_completed",
+            ),
+            (lambda value: value.update(t_d_mono=None), "invalid_detection_observation"),
+            (
+                lambda value: value.update(detection_status="right_censored"),
+                "invalid_detection_observation",
+            ),
+            (lambda value: value.update(t_r_first_mono=200.0), "invalid_recovery_observation"),
+            (lambda value: value.update(t_r_first_seconds=9.0), "invalid_recovery_observation"),
+            (lambda value: value.update(t_r_confirmed_mono=200.0), "invalid_recovery_observation"),
+            (
+                lambda value: value.update(t_r_confirmed_seconds=9.0),
+                "invalid_recovery_observation",
+            ),
+            (
+                lambda value: value.update(t_r_mono=104.0, recovery_seconds=4.0),
+                "incomplete_timing_bounds",
+            ),
+            (
+                lambda value: value.update(
+                    status="right_censored",
+                    recovery_status="right_censored",
+                    stop_reason="timeout",
+                    t_r_mono=102.0,
+                    t_r_confirmed_mono=None,
+                    recovery_confirmation="none",
+                ),
+                "invalid_recovery_observation",
+            ),
+            (
+                lambda value: value.update(
+                    status="right_censored",
+                    recovery_status="right_censored",
+                    stop_reason="timeout",
+                    t_r_mono=None,
+                    recovery_seconds=None,
+                ),
+                "invalid_recovery_observation",
+            ),
+            (
+                lambda value: value.update(t_e_store_mono=101.6),
+                None,
+            ),
+            (lambda value: value.update(t_e_store_mono="bad"), "invalid_evidence_store"),
+            (
+                lambda value: value.update(t_e_store_mono=101.6, evidence_store_seconds=9.0),
+                "invalid_evidence_store",
+            ),
+        )
+        for index, (mutate, expected) in enumerate(cases):
+            value = row()
+            mutate(value)
+            with self.subTest(index=index, expected=expected):
+                self.assertEqual(run_matrix._timing_problem(value), expected)
+        self.assertIsNone(run_matrix._timing_problem(row()))
+
+    def test_analysis_problem_reports_each_invalid_shape(self):
+        def row(**overrides):
+            value = make_row(self._item())
+            value.update(overrides)
+            return value
+
+        cases = (
+            (lambda value: value.update(status="dry_run"), "status:dry_run"),
+            (lambda value: value.update(cleanup_status="failed"), "cleanup_failure"),
+            (lambda value: value.update(arm_restore_status="failed"), "arm_restore_failure"),
+            (lambda value: value.update(batch_stop_reason="halt"), "batch_stop:halt"),
+            (lambda value: value.update(error="boom"), "row_error"),
+            (lambda value: value.update(postcondition=None), "postcondition_not_verified"),
+            (lambda value: value.update(synthetic=True), "synthetic"),
+            (lambda value: value.pop("timing_convention"), "missing_timing_convention"),
+            (
+                lambda value: value.update(timing_convention="other"),
+                "unsupported_timing_convention",
+            ),
+            (lambda value: value.update(window_completed=False), "window_not_completed"),
+            (lambda value: value.update(t_a_mono=99.0), "invalid_timing_bounds"),
+            (lambda value: value.update(scenario="Z"), "invalid_scenario"),
+            (
+                lambda value: value.update(analysis_group="visibility_boundary"),
+                "invalid_analysis_group",
+            ),
+            (lambda value: value.update(source_revision="short"), "invalid_source_revision"),
+            (lambda value: value.update(render_sha256="short"), "invalid_render_sha256"),
+            (
+                lambda value: value.update(
+                    status="right_censored",
+                    recovery_status="right_censored",
+                    stop_reason="timeout",
+                    detection_seconds=None,
+                    detection_status="unobserved_before_stop",
+                    t_d_mono=None,
+                    recovery_seconds=None,
+                    t_r_mono=None,
+                    t_r_first_mono=None,
+                    t_r_confirmed_mono=None,
+                    recovery_confirmation="none",
+                ),
+                "invalid_detection_observation",
+            ),
+        )
+        for mutate, expected in cases:
+            value = row()
+            mutate(value)
+            with self.subTest(expected=expected):
+                self.assertEqual(run_matrix._analysis_problem(value), expected)
+        self.assertIsNone(run_matrix._analysis_problem(row()))
+
+    def test_run_one_forwards_optional_identity_arguments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(live_args(directory, "one", "gitops", "A", "1"))
+            self.assertFalse(hasattr(args, "for_test_only"))
+            item = self._item()
+            run_id = "one-gitops-A-r01"
+            write_row(directory, run_id, make_row(item))
+            with mock.patch.object(run_matrix.harness, "main", return_value=0) as main:
+                code, row, error = run_matrix._run_one(args, item, run_id)
+            self.assertEqual((code, error), (0, None))
+            self.assertEqual(row["run_id"], run_id)
+            forwarded = main.call_args[0][0]
+            for flag in ("--source-revision", "--render-sha256", "--render-file", "--live"):
+                self.assertIn(flag, forwarded)
+
+    def test_classify_covers_each_terminal_shape(self):
+        live = argparse.Namespace(live=True)
+        dry = argparse.Namespace(live=False)
+        cases = (
+            (live, 0, None, "boom", ("failure", "runner_exception")),
+            (live, 0, None, None, ("refused", "missing_row")),
+            (live, 0, {"status": "weird"}, None, ("failure", "unknown_status")),
+            (live, 0, {"status": "dry_run"}, None, ("dry_run", "unexpected_dry_run")),
+            (dry, 0, {"status": "observed"}, None, ("observed", "unexpected_live_row")),
+            (
+                live,
+                0,
+                {"status": "observed", "cleanup_status": "failed"},
+                None,
+                ("observed", "cleanup_failure"),
+            ),
+            (
+                live,
+                0,
+                {"status": "observed", "arm_restore_status": "failed"},
+                None,
+                ("observed", "arm_restore_failure"),
+            ),
+            (
+                live,
+                0,
+                {"status": "baseline_failure"},
+                None,
+                ("baseline_failure", "baseline_failure"),
+            ),
+            (live, 1, {"status": "observed"}, None, ("observed", "nonzero_exit")),
+        )
+        for args, code, row, error, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(run_matrix._classify(args, code, row, error), expected)
+        self.assertFalse(run_matrix._baseline_retryable("baseline_failure", None))
+        censored = run_matrix._censoring([{"batch_phase": "R2", "detection_status": "weird"}])
+        self.assertEqual(censored["R2"]["detection"]["observed"], 0)
+
+    def test_run_batch_stops_on_output_conflict(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(full_args(directory, "conflict", "gitops", "A", "1"))
+            with (
+                mock.patch.object(
+                    run_matrix,
+                    "_ensure_run_slot",
+                    side_effect=run_matrix.BatchSafetyError("conflict"),
+                ),
+                self.assertRaises(run_matrix.BatchSafetyError),
+            ):
+                run_quiet(args, run_one=fake_runner()[0])
+
+    def test_run_batch_records_non_object_and_missing_row_outputs(self):
+        for runner, expected in (
+            (lambda args, item, run_id: (0, "not-a-row", None), "non-object row"),
+            (lambda args, item, run_id: (0, make_row(item), None), "row file missing"),
+        ):
+            with tempfile.TemporaryDirectory() as directory:
+                args = run_matrix.parse_args(live_args(directory, "shape", "gitops", "A", "1"))
+                self.assertEqual(run_quiet(args, run_one=runner), 1)
+                manifest = json.loads((Path(directory) / "shape.manifest.json").read_text())
+                self.assertIn(expected, manifest["runs"][0]["error"])
+
+    def test_run_batch_pops_a_pending_attempt_on_resume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args, _plan, _batch_id, paths, manifest = self._tiny_batch(directory, "pop")
+            entry = manifest["runs"][0]
+            manifest["state"] = "running"
+            entry["status"] = "running"
+            entry["row_path"] = None
+            entry["attempts"][0]["row_path"] = None
+            entry["attempts"][0]["status"] = "running"
+            run_matrix._row_path(args.out, run_matrix.final_run_id(entry)).unlink()
+            paths["manifest"].write_text(json.dumps(manifest))
+            resume = run_matrix.parse_args(
+                live_args(directory, "pop", "gitops", "A", "1", "--resume")
+            )
+            self.assertEqual(run_quiet(resume, run_one=fake_runner()[0]), 0)
+
+    def test_main_reports_batch_errors(self):
+        with redirect_stderr(io.StringIO()):
+            with mock.patch.object(run_matrix, "run_batch", side_effect=run_matrix.BatchError("x")):
+                self.assertEqual(run_matrix.main([]), 1)
+            with mock.patch.object(
+                run_matrix, "run_batch", side_effect=run_matrix.BatchSafetyError("x")
+            ):
+                self.assertEqual(run_matrix.main([]), 2)
 
 
 if __name__ == "__main__":

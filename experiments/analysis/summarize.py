@@ -102,8 +102,8 @@ def summarize(rows: list) -> dict:
             }
             summary["complete_time_observations"] &= censored == 0 and missing == 0
         result.append(summary)
-    if not result:
-        raise ValueError("empty dataset")
+    if not result:  # pragma: no cover - every non-empty row adds one group
+        raise ValueError("empty dataset")  # pragma: no cover
     return {
         "schema_version": 2,
         "formal_execution_approved": False,

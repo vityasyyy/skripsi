@@ -344,8 +344,8 @@ def _validate_fields(resources: tuple) -> None:
                     raise DeclarationError(f"{resource['id']} targetPort is outside 1..65535")
             elif not isinstance(target, str) or not target:
                 raise DeclarationError(f"{resource['id']} targetPort must be an integer or name")
-        elif kind == "SealedSecret":
-            if not fields:
+        elif kind == "SealedSecret":  # pragma: no branch - contract selects only four kinds
+            if not fields:  # pragma: no cover - selected_fields always emits the annotation key
                 raise DeclarationError(f"{resource['id']} has no selected annotation field")
             if fields.get("/metadata/annotations/" + DRIFT_ANNOTATION) is not None:
                 raise DeclarationError(f"{resource['id']} already carries the drift annotation")

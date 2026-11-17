@@ -1,9 +1,11 @@
+import io
 import json
 import math
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1136,6 +1138,357 @@ class RawAnalysisConsistencyTest(unittest.TestCase):
                 raw_rows[0]["env"] = value
                 with self.assertRaises(analyze_live.LiveAnalysisError):
                     analyze_live.analyze(analysis_rows, raw_rows=raw_rows, bootstrap=100, seed=1)
+
+
+class LiveAnalysisEdgeTests(unittest.TestCase):
+    def test_load_jsonl_reports_read_and_shape_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            missing = root / "missing.jsonl"
+            self.assertRaises(analyze_live.LiveAnalysisError, analyze_live._load_jsonl, missing)
+            invalid = root / "invalid.jsonl"
+            invalid.write_text("{not-json}\n")
+            self.assertRaises(analyze_live.LiveAnalysisError, analyze_live._load_jsonl, invalid)
+            scalar = root / "scalar.jsonl"
+            scalar.write_text("[1, 2]\n")
+            self.assertRaises(analyze_live.LiveAnalysisError, analyze_live._load_jsonl, scalar)
+            for text in ("", "\n\n"):
+                empty = root / "empty.jsonl"
+                empty.write_text(text)
+                with self.assertRaisesRegex(analyze_live.LiveAnalysisError, "empty JSONL"):
+                    analyze_live._load_jsonl(empty)
+
+    def test_timing_seconds_fields_must_agree_with_bounds(self):
+        cases = (
+            ("t_r_first_seconds", 99.0, "t_r_first_seconds disagrees"),
+            ("t_r_confirmed_seconds", 99.0, "t_r_confirmed_seconds disagrees"),
+            ("evidence_store_seconds", 99.0, "evidence_store_seconds disagrees"),
+        )
+        for field, value, message in cases:
+            with self.subTest(field=field):
+                row = completed_row("C", "gitops", 4)
+                row[field] = value
+                with self.assertRaisesRegex(analyze_live.LiveAnalysisError, message):
+                    analyze_live.validate_rows([row])
+
+    def test_mann_whitney_not_estimable_and_all_tied(self):
+        self.assertEqual(analyze_live.mann_whitney_u([1, 2], [3, 4, 5])["statistic"], None)
+        tied = analyze_live.mann_whitney_u([1, 1, 1], [1, 1, 1])
+        self.assertEqual(tied["p_value"], 1.0)
+        self.assertEqual(tied["note"], "all observations tied")
+
+    def test_wilcoxon_normal_approximation_for_larger_samples(self):
+        result = analyze_live.wilcoxon_signed_rank([float(value) for value in range(1, 18)])
+        self.assertEqual(result["method"], "normal_approximation_tie_corrected")
+        self.assertEqual(result["n_nonzero"], 17)
+        self.assertGreaterEqual(result["p_value"], 0.0)
+        self.assertLessEqual(result["p_value"], 1.0)
+
+    def test_percentile_and_bootstrap_empty_inputs(self):
+        self.assertIsNone(analyze_live._percentile([], 0.5))
+        self.assertEqual(analyze_live._percentile([3], 0.5), 3)
+        self.assertIsNone(analyze_live._bootstrap_median([], 100, 1))
+        self.assertIsNone(analyze_live._bootstrap_cliff([], [1], 100, 1))
+
+    def test_survival_notes_cover_administered_and_missing_endpoints(self):
+        def survival_rows(metric, values):
+            rows = []
+            for index, (value, status, limit) in enumerate(values):
+                row = {"scenario": "C", "env": "gitops", "censor_seconds": limit}
+                for name in analyze_live.METRICS:
+                    row[name + "_seconds"] = None
+                    row[name + "_status"] = "right_censored"
+                row[metric + "_seconds"] = value
+                row[metric + "_status"] = status
+                row["run_id"] = f"r{index}"
+                rows.append(row)
+            return rows
+
+        administrative = analyze_live._survival_entries(
+            survival_rows("detection", [(7.0, "observed", 5.0), (4.0, "right_censored", 5.0)])
+        )
+        self.assertIn("administratively censored", administrative[0]["note"])
+        censored = analyze_live._survival_entries(
+            survival_rows("detection", [(None, "right_censored", 10.0)])
+        )
+        self.assertEqual(censored[0]["note"], "all observations censored")
+        missing = analyze_live._survival_entries(
+            survival_rows(
+                "detection",
+                [
+                    (1.0, "observed", 10.0),
+                    (None, "unobserved_before_stop", 10.0),
+                    (None, "unobserved_before_stop", 10.0),
+                ],
+            )
+        )
+        self.assertIn("missing endpoints excluded", missing[0]["note"])
+        not_reached = analyze_live._survival_entries(
+            survival_rows(
+                "detection",
+                [(1.0, "observed", 10.0)] + [(None, "right_censored", 10.0) for _ in range(4)],
+            )
+        )
+        self.assertEqual(not_reached[0]["note"], "median not reached within horizon")
+
+    def test_classify_raw_reports_every_conservative_exclusion(self):
+        base = {
+            "batch_mode": "live",
+            "status": "observed",
+            "cleanup_status": "ok",
+            "arm_restore_status": "restored",
+            "postcondition": {"verified": True},
+            "synthetic": False,
+            "scenario": "C",
+            "analysis_group": "managed_drift",
+            "source_revision": REVISION,
+            "render_sha256": RENDER,
+            "censor_seconds": 10,
+            "detection_seconds": 2,
+            "detection_status": "observed",
+            "evidence_seconds": 3,
+            "evidence_status": "observed",
+            "recovery_seconds": 4,
+            "recovery_status": "observed",
+        }
+        self.assertIsNone(analyze_live._classify_raw(base))
+        censored = dict(base)
+        censored["detection_seconds"] = None
+        censored["detection_status"] = "right_censored"
+        self.assertIsNone(analyze_live._classify_raw(censored))
+        missing = dict(base)
+        missing["detection_seconds"] = None
+        missing["detection_status"] = "unobserved_before_stop"
+        missing["stop_reason"] = "recovery"
+        self.assertIsNone(analyze_live._classify_raw(missing))
+        cases = (
+            ({"batch_mode": "dry_run"}, "dry_run"),
+            ({"status": "dry_run"}, "dry_run"),
+            ({"status": "weird"}, "status_not_analyzable"),
+            ({"cleanup_status": "failed"}, "cleanup_failure"),
+            ({"arm_restore_status": "failed"}, "arm_restore_failure"),
+            ({"batch_stop_reason": "stop"}, "batch_stop"),
+            ({"error": "boom"}, "row_error"),
+            ({"postcondition": None}, "postcondition_not_verified"),
+            ({"synthetic": True}, "synthetic"),
+            ({"scenario": "Z"}, "invalid_scenario"),
+            ({"analysis_group": "hpa_control"}, "invalid_analysis_group"),
+            ({"source_revision": "short"}, "invalid_provenance"),
+            ({"censor_seconds": 0}, "invalid_censor_seconds"),
+            ({"detection_status": "weird"}, "invalid_metric_observation"),
+        )
+        for change, reason in cases:
+            with self.subTest(reason=reason):
+                row = dict(base)
+                row.update(change)
+                self.assertEqual(analyze_live._classify_raw(row), reason)
+
+    def test_raw_retry_violation_covers_each_precondition(self):
+        cases = (
+            ({"status": "failure"}, "predecessor_not_baseline_failure"),
+            ({"status": "baseline_failure", "t0_utc": "now"}, "predecessor_started_injection"),
+            (
+                {"status": "baseline_failure", "injection": {"accepted": True}},
+                "predecessor_injection_not_rejected",
+            ),
+            (
+                {"status": "baseline_failure", "cleanup_status": "failed"},
+                "predecessor_cleanup_not_ok",
+            ),
+            (
+                {"status": "baseline_failure", "arm_restore_status": "failed"},
+                "predecessor_arm_not_restored",
+            ),
+            ({"status": "baseline_failure", "mutations_executed": 1}, "predecessor_mutated"),
+        )
+        for predecessor, reason in cases:
+            with self.subTest(reason=reason):
+                self.assertEqual(analyze_live._raw_retry_violation(predecessor), reason)
+        self.assertIsNone(
+            analyze_live._raw_retry_violation(
+                {"status": "baseline_failure", "injection": {"accepted": False}}
+            )
+        )
+
+    def test_validate_analyzed_raw_accepts_rows_without_env(self):
+        row = completed_row("C", "gitops", 4)
+        analysis = dict(row)
+        raw = dict(row)
+        raw.pop("env")
+        analyze_live._validate_analyzed_raw(raw, analysis, 1)
+
+    def test_tex_helpers_escape_and_format_optional_values(self):
+        self.assertEqual(analyze_live._tex_escape("a&b_c%"), r"a\&b\_c\%")
+        self.assertEqual(analyze_live._p(0.0001), "$<0{,}001$")
+        self.assertEqual(analyze_live._interval(1.5, None), "1,500")
+        self.assertEqual(analyze_live._r1_cell({"present": 0, "median": None}), "-- (0)")
+
+    def test_tex_tables_cover_missing_exclusions_and_survival_medians(self):
+        result = {
+            "overview": [],
+            "batch": {
+                "batch_id": "batch",
+                "formal_execution_approved": False,
+                "stack_isolated": False,
+                "r1_rows": 0,
+            },
+            "exclusions": {"count": None, "raw_rows": None, "by_reason": {}, "rows": []},
+            "r1": [],
+            "survival": [
+                {
+                    "scenario": "C",
+                    "arm": "gitops",
+                    "metric": "detection",
+                    "n": 1,
+                    "events": 0,
+                    "censored": 1,
+                    "missing": 0,
+                    "excluded_runs": None,
+                    "horizon_seconds": 10.0,
+                    "median_seconds": None,
+                    "rmst_seconds": None,
+                    "estimable": True,
+                    "median_reached": False,
+                },
+                {
+                    "scenario": "C",
+                    "arm": "manual",
+                    "metric": "detection",
+                    "n": 0,
+                    "events": 0,
+                    "censored": 0,
+                    "missing": 0,
+                    "excluded_runs": None,
+                    "horizon_seconds": 10.0,
+                    "median_seconds": None,
+                    "rmst_seconds": None,
+                    "estimable": False,
+                    "median_reached": False,
+                },
+            ],
+            "efficacy": [
+                {
+                    "scenario": "B",
+                    "metric": "detection",
+                    "test": {
+                        "name": "wilcoxon_signed_rank",
+                        "n_pairs": 3,
+                        "statistic": 1.0,
+                        "p_value": 0.5,
+                    },
+                    "holm_adjusted_p": 0.9,
+                    "reject_holm": False,
+                    "effect": {
+                        "cliffs_delta": None,
+                        "cliffs_delta_ci": None,
+                        "median_paired_difference": None,
+                        "median_paired_difference_ci": None,
+                        "rank_biserial": None,
+                    },
+                },
+                {
+                    "scenario": "C",
+                    "metric": "evidence",
+                    "test": {
+                        "name": "mann_whitney_u",
+                        "n_manual": 3,
+                        "n_gitops": 3,
+                        "statistic": 2.0,
+                        "p_value": 0.2,
+                    },
+                    "holm_adjusted_p": 0.4,
+                    "reject_holm": True,
+                    "effect": {
+                        "cliffs_delta": 0.5,
+                        "cliffs_delta_ci": [0.1, 0.9],
+                        "median_paired_difference": None,
+                        "median_paired_difference_ci": None,
+                        "rank_biserial": 0.5,
+                    },
+                },
+                {
+                    "scenario": "D",
+                    "metric": "recovery",
+                    "test": {"name": "not_estimable", "statistic": None, "p_value": None},
+                    "holm_adjusted_p": None,
+                    "reject_holm": None,
+                    "effect": {
+                        "cliffs_delta": None,
+                        "cliffs_delta_ci": None,
+                        "median_paired_difference": None,
+                        "median_paired_difference_ci": None,
+                        "rank_biserial": None,
+                    },
+                },
+            ],
+        }
+        self.assertIn("Tidak dihitung", analyze_live._exclusions_tex(result))
+        self.assertIn("$^{*}$", analyze_live._survival_tex(result))
+        tests = analyze_live._tests_tex(result)
+        self.assertIn("Wilcoxon", tests)
+        self.assertIn("Mann--Whitney", tests)
+        self.assertIn("Tidak terestimasi", tests)
+        self.assertIn("tolak", tests)
+        self.assertIn("gagal", tests)
+        self.assertIn("--", analyze_live._effects_tex(result))
+
+    def test_write_outputs_refuses_existing_files_and_force_replaces(self):
+        result = {
+            "overview": [],
+            "batch": {
+                "batch_id": "batch",
+                "formal_execution_approved": False,
+                "stack_isolated": False,
+                "r1_rows": 0,
+            },
+            "exclusions": {"count": 0, "raw_rows": 1, "by_reason": {}, "rows": []},
+            "r1": [],
+            "survival": [],
+            "efficacy": [],
+            "families": [{"tested": 0}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            analyze_live.write_outputs(result, directory)
+            with self.assertRaisesRegex(analyze_live.LiveAnalysisError, "already exists"):
+                analyze_live.write_outputs(result, directory)
+            paths = analyze_live.write_outputs(result, directory, force=True)
+            self.assertTrue(Path(paths["json"]).exists())
+            self.assertIn("Tidak ada baris", (Path(directory) / "live_exclusions.tex").read_text())
+
+    def test_main_reports_success_and_invalid_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "batch.analysis.jsonl"
+            source.write_text("\n".join(json.dumps(row) for row in paired_batch()) + "\n")
+            output = root / "out"
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = analyze_live.main(
+                    [
+                        "--in",
+                        str(source),
+                        "--out",
+                        str(output),
+                        "--bootstrap",
+                        "100",
+                    ]
+                )
+            self.assertEqual(code, 0)
+            self.assertIn("OK:", stdout.getvalue())
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    analyze_live.main(
+                        [
+                            "--in",
+                            str(root / "missing.jsonl"),
+                            "--out",
+                            str(root / "other"),
+                            "--bootstrap",
+                            "100",
+                        ]
+                    ),
+                    1,
+                )
 
 
 if __name__ == "__main__":
