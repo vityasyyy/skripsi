@@ -32,7 +32,7 @@
     15 \textit{run}
 };
 \node[box=manualgray, right=of gitops] (reset) {
-    \textbf{Reset baseline}\\
+    \textbf{Reset \textit{baseline}}\\
     verifikasi inventaris\\
     penangguhan 60 detik
 };
@@ -40,7 +40,7 @@
     \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
     \textbf{Mode imperatif}\\
     ArgoCD ditangguhkan\\
-    checker + \textit{runbook}
+    pemeriksa +\\\textit{runbook}
 };
 \node[box=metricyellow!85!black, right=of imperative, text width=2.5cm] (eval) {
     \textbf{Evaluator}\\
@@ -55,7 +55,7 @@
 \draw[arrow] (imperative) -- (eval);
 
 \node[note, below=0.42cm of stack.south west, anchor=north west] (n1)
-    {\textbf{Bukan dua deployment.}\\Satu stack dipakai bergantian.};
+    {\textbf{Bukan dua \textit{deployment}.}\\Satu stack dipakai bergantian.};
 \node[note, below=0.42cm of reset.south, anchor=north] (n2)
     {\textbf{HPA aktif pada kedua mode.}\\Skenario A adalah kontrol HPA.};
 \node[note, below=0.42cm of eval.south east, anchor=north east] (n3)
