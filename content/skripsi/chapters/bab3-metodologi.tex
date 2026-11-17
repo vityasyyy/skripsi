@@ -16,7 +16,7 @@ Pengendalian kondisi awal, pengulangan, pencatatan penyimpangan protokol, dan pe
 
 Unit analisis adalah satu injeksi penyimpangan yang diterima pada satu mode dalam satu pengulangan. Kedua mode memakai beban uji, nilai acuan, definisi \textit{field} yang diperiksa, serta prosedur injeksi dan pengukuran yang setara, dan injeksi dilakukan satu per satu, bukan serentak. Pengendali koreksi hanya menerima \textit{actual state} dan deklarasi yang diperlukan untuk membandingkannya, dan identitas skenario tidak diteruskan sebagai label, termasuk pada skenario SealedSecret.
 
-Urutan mode adalah GitOps lebih dahulu, lalu imperatif, ditetapkan sebelum pengumpulan dan tidak diacak ulang per blok. Karena satu \textit{stack} dipakai bergantian, perlakuan tidak terisolasi dari beban latar, dependensi bersama, atau kondisi klaster yang berubah. Efek periode tidak dapat dipisahkan sepenuhnya dari efek mode. Keduanya merupakan keterbatasan desain yang dibahas pada Bab V.
+Urutan mode adalah GitOps lebih dahulu, lalu imperatif, ditetapkan sebelum pengumpulan dan tidak diacak ulang per blok. Karena satu \textit{stack} dipakai bergantian, perlakuan tidak terisolasi dari beban latar, dependensi bersama, atau \textit{state} klaster yang berubah. Efek periode tidak dapat dipisahkan sepenuhnya dari efek mode. Keduanya merupakan keterbatasan desain yang dibahas pada Bab V.
 
 \subsection{Unit Sel dan Cakupan 210 Sel}
 \label{sec:unit-sel}
@@ -167,7 +167,7 @@ Skenario A dibatasi oleh plafon HPA 4 replika dan tidak menguji perilaku di atas
 
 \subsection{Validitas Internal}
 
-Validitas internal dapat terancam oleh perbedaan beban klaster dari waktu ke waktu, perubahan konfigurasi selain intervensi, ketidaksetaraan inventaris, dan perbedaan jadwal rekonsiliasi. Kedua mode berurutan pada satu \textit{stack} tanpa isolasi penuh. Beban latar dan kondisi klaster dapat berubah antarblok, dan urutan mode tidak diacak ulang sehingga efek periode dan efek urutan tidak dapat dipisahkan dari efek mode.
+Validitas internal dapat terancam oleh perbedaan beban klaster dari waktu ke waktu, perubahan konfigurasi selain intervensi, ketidaksetaraan inventaris, dan perbedaan jadwal rekonsiliasi. Kedua mode berurutan pada satu \textit{stack} tanpa isolasi penuh. Beban latar dan \textit{state} klaster dapat berubah antarblok, dan urutan mode tidak diacak ulang sehingga efek periode dan efek urutan tidak dapat dipisahkan dari efek mode.
 
 Nilai acuan yang dibekukan, pemeriksaan kesiapan, penangguhan sementara dan pemulihan ArgoCD, serta jeda 60 detik mengurangi ancaman tersebut, tetapi tidak menjamin bahwa satu-satunya perbedaan adalah paradigma abstrak. Pemasangan berdasarkan nomor pengulangan juga tidak menghapus korelasi antarwaktu, dan perbandingan tetap mengikutsertakan perbedaan implementasi yang melekat pada pemeriksa dan korektor \texttt{kubectl} serta ArgoCD.
 

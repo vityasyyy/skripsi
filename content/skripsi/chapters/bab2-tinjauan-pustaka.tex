@@ -1,6 +1,6 @@
 \chapter{TINJAUAN PUSTAKA}
 
-\section{\textit{Configuration Drift}}
+\section{Penyimpangan Konfigurasi (\textit{Configuration Drift})}
 
 \textit{Configuration drift} adalah ketidakcocokan antara \textit{actual state} sistem dan \textit{desired state} yang ditetapkan sebagai acuan deklaratif \citep{pohjola2025mitigating}. Drift berbeda dari cacat statis. Konfigurasi yang tidak aman dapat tetap cocok dengan acuannya, sedangkan perubahan aktual yang tidak cocok dengan acuan merupakan drift meskipun nilai aktual belum dinilai dampaknya. Penelitian ini mengukur kesetaraan terhadap deklarasi, bukan kebenaran semantik atau keamanan seluruh manifest.
 
@@ -11,7 +11,7 @@ Bukti empiris menunjukkan bahwa masalah ini nyata. \citet{zhang2026configuration
 Literatur juga mencatat beberapa faktor yang memperburuk drift pada Kubernetes:
 \begin{enumerate}
   \item perubahan langsung pada klaster melalui \texttt{kubectl\allowbreak{} edit}, \texttt{kubectl\allowbreak{} patch}, atau \texttt{kubectl\allowbreak{} scale} tanpa memperbarui repositori \textit{source of truth} \citep{zhang2026configuration};
-  \item prosedur \textit{deployment} yang tidak terdokumentasi, sehingga urutan perintah berbeda antarpelaksana dan kondisi klaster menjadi tidak deterministik \citep{pohjola2025mitigating};
+  \item prosedur \textit{deployment} yang tidak terdokumentasi, sehingga urutan perintah berbeda antarpelaksana dan \textit{state} klaster menjadi tidak deterministik \citep{pohjola2025mitigating};
   \item kurangnya mekanisme \textit{rollback} terintegrasi, karena kemampuan mengembalikan perubahan bergantung pada pencatatan versi dan ketersediaan nilai acuan \citep{rahman2023security}; dan
   \item ketiadaan pemeriksaan berkala antara \textit{actual state} dan \textit{desired state}, sehingga drift dapat terakumulasi tanpa terdeteksi \citep{zhang2026configuration}.
 \end{enumerate}
@@ -32,7 +32,7 @@ Git adalah sistem \textit{version control} terdistribusi yang merekam perubahan 
 
 \section{Paradigma Deklaratif dan Imperatif}
 
-Dalam paradigma imperatif, tindakan manajemen dinyatakan sebagai perintah atau urutan tindakan yang mengubah \textit{actual state} sistem; dalam paradigma deklaratif, \textit{desired state} dinyatakan dan pengendali berupaya mendekatinya \citep{scott2015plp}. Keduanya dapat diotomasi. Perbedaannya terletak pada cara \textit{final state} ditentukan dan dipulihkan, bukan pada ada atau tidaknya otomasi.
+Dalam paradigma imperatif, tindakan manajemen dinyatakan sebagai perintah atau urutan tindakan yang mengubah \textit{actual state} sistem; dalam paradigma deklaratif, \textit{desired state} dinyatakan dan pengendali berupaya mendekatinya \citep{scott2015plp}. Keduanya dapat diotomasi. Perbedaannya terletak pada cara kondisi akhir ditentukan dan dipulihkan, bukan pada ada atau tidaknya otomasi.
 
 Penelitian ini membandingkan dua implementasi yang telah ditetapkan: prosedur imperatif yang memakai pemeriksa dan \textit{runbook} \texttt{kubectl} dengan koreksi tetap, serta prosedur GitOps yang memakai rekonsiliasi ArgoCD terhadap deklarasi di Git. Perbandingan tidak menguji seluruh kemungkinan desain imperatif atau GitOps, sehingga hanya berlaku untuk implementasi dan konfigurasi yang dijalankan.
 

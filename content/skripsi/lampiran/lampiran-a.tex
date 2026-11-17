@@ -133,7 +133,7 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \hline
   Kedua mode berurutan pada \textit{stack} yang sama & Urutan berbasis \textit{seed}, pemeriksaan kesiapan \textit{baseline}, prosedur reset, dan jeda 60 detik; urutan dilaporkan & Efek urutan dan beban latar tidak dihilangkan, hanya dimitigasi \\
   \hline
-  Tidak ada \textit{stack} kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari kondisi klaster bersama \\
+  Tidak ada \textit{stack} kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari \textit{state} klaster bersama \\
   \hline
   Satu domain kegagalan penyimpanan & Dinyatakan bahwa penyimpanan primer dan cadangan berbagi server NFS yang sama; pemulihan byte berkas dari artefak cadangan diverifikasi terpisah (Tabel~\ref{tab:lampiran-recovery}) & Pemulihan lintas kehilangan penyimpanan primer tetap tidak diuji \\
   \hline
@@ -226,4 +226,4 @@ Seluruh artefak yang dirujuk pada lampiran ini telah dihasilkan oleh eksperimen 
 \subsection{Ketersediaan Artefak dan \textit{Provenance}}
 \label{subsec:provenance}
 
-Revisi instrumen pengumpulan yang dibekukan adalah \texttt{\seqsplit{3572f3c1c11d3abc8b63882c4348b1b803d4256f}}. Revisi kode analisis yang dipakai pada analisis formal adalah \texttt{a1d43ea}; revisi tersebut bukan revisi pengumpulan dan tidak menggantikan identitas instrumen. Dataset mentah, berkas bukti per \textit{run}, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum SHA-256 masing-masing. Dengan demikian, integritas berkas dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen, dan revisi instrumentasi dapat dibedakan dari kode yang dipakai setelah pengumpulan.
+Revisi instrumen pengumpulan yang dibekukan adalah \texttt{\seqsplit{3572f3c1c11d3abc8b63882c4348b1b803d4256f}}. Analisis primer memakai kode analisis revisi \texttt{a1d43ea}; analisis sensitivitas memakai berkas \path{experiments/sensitivity/} yang ditambahkan pada revisi \texttt{6cfc99e}. Keduanya bukan revisi pengumpulan dan tidak menggantikan identitas instrumen. Dataset mentah, berkas bukti per \textit{run}, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum SHA-256 masing-masing. Dengan demikian, integritas berkas dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen, dan revisi instrumentasi dapat dibedakan dari kode yang dipakai setelah pengumpulan.

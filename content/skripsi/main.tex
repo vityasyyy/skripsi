@@ -108,7 +108,7 @@
 %------------------------------------------------------------
 \nomenclature[001]{ArgoCD}{Alat GitOps \textit{pull-based} yang membandingkan kondisi klaster dengan deklarasi di Git lalu melakukan rekonsiliasi otomatis}
 \nomenclature[002]{\textit{Arm}}{Kelompok perlakuan dalam desain eksperimen; pada penelitian ini satu \textit{arm} adalah satu mode manajemen}
-\nomenclature[003]{\textit{Baseline}}{Prosedur atau kondisi acuan pembanding; nilai acuannya disebut nilai acuan}
+\nomenclature[003]{\textit{Baseline}}{Prosedur atau kondisi acuan yang dipakai sebagai pembanding}
 \nomenclature[004]{\textit{Batch}}{Kumpulan \textit{run} yang dijalankan dalam satu protokol pengumpulan}
 \nomenclature[005]{Cliff's $\delta$}{Ukuran efek nonparametrik berkisar $-1$ sampai $1$; nilai $1$ berarti seluruh pengamatan satu kelompok lebih besar daripada kelompok lain}
 \nomenclature[006]{ConfigMap}{Objek Kubernetes yang menyimpan konfigurasi non-rahasia sebagai pasangan kunci--nilai}
@@ -165,7 +165,7 @@ Perbandingan ini memakai \textit{runbook} imperatif \texttt{kubectl} yang dijala
 
 Desain memakai tujuh skenario \textit{drift} dan lima belas pengulangan per skenario per mode (210 sel). Tujuh skenario mencakup replika di bawah minimum \textit{Horizontal Pod Autoscaler} (HPA), perubahan \textit{tag} \textit{image}, perubahan \textit{tagline} ConfigMap, penghapusan \textit{Deployment}, batas memori, \texttt{targetPort} Service, dan anotasi SealedSecret.
 
-Dari 210 sel, 207 baris dianalisis. Tiga sel tidak menghasilkan baris analisis; baris mentah keempat adalah percobaan \textit{baseline} yang gagal lalu diulang. Empat baris mentah dikecualikan. Analisis sensitivitas tidak mengubah arah kesimpulan, tetapi menurunkan ukuran efek pemulihan pada skenario \textit{tagline} ConfigMap dari 0,75 menjadi 0,64. Pada R1, skor B--G turun dari 100 ke 75. Untuk B--F, skor kembali ke 100 pada kedua mode; untuk G, hanya mode imperatif yang kembali ke 100. Kontrol HPA (A) tetap 100; anotasi SealedSecret menjadi satu-satunya asimetri, dilaporkan sebagai kasus batas deskriptif.
+Dari 210 sel, 207 baris dianalisis. Tiga sel tidak menghasilkan baris analisis; baris mentah keempat yang dikecualikan adalah percobaan \textit{baseline} yang gagal lalu diulang. Empat baris mentah dikecualikan. Analisis sensitivitas tidak mengubah arah kesimpulan, tetapi menurunkan ukuran efek pemulihan pada skenario \textit{tagline} ConfigMap dari 0,75 menjadi 0,64. Pada R1, skor skenario \textit{drift} B--G turun dari 100 ke 75. Untuk B--F, skor kembali ke 100 pada kedua mode; untuk G, hanya mode imperatif yang kembali ke 100. Kontrol HPA (A) tetap 100; anotasi SealedSecret menjadi satu-satunya asimetri, dilaporkan sebagai kasus batas deskriptif.
 
 Pada R2, GitOps lebih cepat pada seluruh dua belas perbandingan waktu di empat skenario efikasi setelah koreksi Holm, dengan $p$ terkoreksi 0,0054 sampai 0,0195 pada analisis primer. Selisih median deteksi dan bukti pada dua skenario dengan pasangan lengkap, yaitu perubahan \textit{tag} \textit{image} dan batas memori, berkisar 4,0--4,3 detik. Ukuran efek pemulihan tidak seragam: 0,48 dan 0,75 pada dua skenario, 1,00 dan 0,86 pada dua lainnya. Keunggulan waktu tidak menyusut seragam di akhir siklus.
 
@@ -183,7 +183,7 @@ Of 210 cells, 207 have analysis rows. Three cells produced no analysis row; the 
 
 For R2, GitOps was faster in all twelve timing comparisons across the four efficacy scenarios after Holm correction, with Holm-adjusted $p$ from 0.0054 to 0.0195 in the primary analysis. The median detection and evidence gaps for the two fully paired scenarios, the \textit{image} \textit{tag} and memory \textit{limit} changes, ranged from 4.0 to 4.3 s. Recovery effect sizes were not uniform: 0.48 and 0.75 in two scenarios, 1.00 and 0.86 in two others. The timing advantage did not shrink uniformly.
 
-This exploratory single-case study has sequential arms and a fixed arm order; observations are not independent and $p$ values are not population estimates. The results do not establish general superiority, adoption suitability, or semantic correctness of the configuration.
+This exploratory single-case study has sequential modes and a fixed mode order; observations are not independent and $p$ values are not population estimates. The results do not establish general superiority, adoption suitability, or semantic correctness of the configuration.
 \par\vspace{0.1cm}
 \noindent\textbf{Keywords:} configuration drift, Kubernetes, GitOps, manual-procedure baseline, automated imperative procedure, controlled single-case comparative study
 \endabstracteng
