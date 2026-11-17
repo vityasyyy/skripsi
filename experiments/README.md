@@ -44,6 +44,9 @@ make coverage-experiments   # 100% baris dan cabang
 make check-experiments      # agregat
 ```
 
+Target `lint-experiments` dan `coverage-experiments` memerlukan `uv` dan
+`shellcheck` terpasang lokal; CI memakai `pip` dan runner Ubuntu.
+
 Versi alat pengembangan ada di [`requirements-dev.txt`](requirements-dev.txt);
 CI menjalankan gerbang yang sama pada Python 3.9 dan 3.12. Gerbang cakupan
 menggabungkan suite inti dan suite sensitivity, lalu mengukur seluruh modul
@@ -51,7 +54,8 @@ runtime yang diimpor: `analyze_live`, `summarize`, `convert`, `declaration`,
 `harness`, `run_matrix`, `run_one`, `acquire-readonly`, `instruments`, dan
 `c_r02_sensitivity`. Hanya `analysis/analyze.py` dan `analysis/mockgen.py`
 (analisis historis dengan dependensi pandas/scipy) yang dikecualikan sebagai
-artefak historis.
+artefak historis; keduanya dipertahankan untuk reproduksi dan boleh diformat
+atau dianotasi ulang tanpa mengubah perilaku.
 
 ## Dua mode berurutan pada satu stack
 

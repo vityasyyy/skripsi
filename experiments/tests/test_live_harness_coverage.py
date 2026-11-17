@@ -1337,6 +1337,10 @@ class NumericCoverageTests(unittest.TestCase):
         with self.assertRaisesRegex(harness.InstrumentationError, "not finite"):
             harness.parse_node_metrics(metrics, nodes, {}, {})
 
+    def test_nanocores_overflow_is_an_instrumentation_error(self):
+        with self.assertRaisesRegex(harness.InstrumentationError, "not a valid CPU quantity"):
+            harness._quantity_nanocores("1E+999999", "cpu")
+
     def test_hpa_telemetry_rejects_zero_minimum(self):
         self.assertFalse(
             harness.hpa_telemetry_valid(

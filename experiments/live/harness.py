@@ -5,17 +5,6 @@ The harness never mutates a cluster unless `--live` is explicit. It targets the
 single real InvenioRDM stack (`invenio-web`, `invenio-web-hpa`,
 `invenio-app-config-<hash>`, `invenio-app-secrets`) and never the legacy NGINX
 surrogate subjects.
-
-Architecture, top to bottom:
-
-* arm control -- `ArmController` pauses and restores Argo automation.
-* snapshot -- `Snapshotter` reads the scoped objects with bounded attempts.
-* contract -- `build_contract` freezes the baseline compared on every read.
-* baseline -- `stabilize_baseline` gates a clean, settled starting state.
-* injection/repair -- `inject` drifts one scenario; `repair` reverses it.
-* sampler -- `Sampler` captures guarded snapshots on a background thread.
-* timeline -- `analyze_timeline` derives detection/evidence/recovery bounds.
-* row/evidence -- `LiveRunner` writes the analysis row and evidence artifacts.
 """
 
 from __future__ import annotations
@@ -52,6 +41,15 @@ except ImportError:
 # Constants
 # --------------------------------------------------------------------------
 
+# Architecture, top to bottom:
+# * arm control -- ArmController pauses and restores Argo automation.
+# * snapshot -- Snapshotter reads the scoped objects with bounded attempts.
+# * contract -- build_contract freezes the baseline compared on every read.
+# * baseline -- stabilize_baseline gates a clean, settled starting state.
+# * injection/repair -- inject drifts one scenario; repair reverses it.
+# * sampler -- Sampler captures guarded snapshots on a background thread.
+# * timeline -- analyze_timeline derives detection/evidence/recovery bounds.
+# * row/evidence -- LiveRunner writes the analysis row and evidence artifacts.
 ARMS = ("gitops", "imperative")
 SCENARIOS = tuple("ABCDEFG")
 DEFAULT_NAMESPACE = "invenio"
@@ -1023,10 +1021,8 @@ def _quantity(value: Any, field: str) -> Decimal:
 def _quantity_nanocores(value: Any, field: str, positive: bool = False) -> int:
     try:
         amount = _quantity(value, field) * Decimal(10**9)
-    except ArithmeticError:  # pragma: no cover - _quantity catches its own arithmetic errors
-        raise InstrumentationError(
-            f"{field} is not a valid CPU quantity"
-        ) from None  # pragma: no cover
+    except ArithmeticError:
+        raise InstrumentationError(f"{field} is not a valid CPU quantity") from None
     if amount != amount.to_integral_value():
         raise InstrumentationError(f"{field} is not representable in nanocores")
     result = int(amount)

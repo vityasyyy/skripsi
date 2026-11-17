@@ -45,3 +45,10 @@ secrets/
 # Python offline instrument checks
 __pycache__/
 *.pyc
+
+# Python tooling caches and coverage data
+.coverage
+.coverage.*
+.mypy_cache/
+.ruff_cache/
+htmlcov/

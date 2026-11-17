@@ -1,6 +1,7 @@
 """Import-level coverage for the offline entrypoints and sensitivity script."""
 
 import importlib.util
+import io
 import json
 import subprocess
 import sys
@@ -94,6 +95,19 @@ def bundle():
             ]
         },
     }
+
+
+class RunOneHelpTests(unittest.TestCase):
+    def test_help_keeps_the_module_description_concise(self):
+        with (
+            mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
+            self.assertRaises(SystemExit) as caught,
+        ):
+            run_one.main(["--help"])
+        self.assertEqual(caught.exception.code, 0)
+        text = stdout.getvalue()
+        self.assertIn("Dry-run by default", text)
+        self.assertNotIn("Architecture", text)
 
 
 class AcquireReadonlyTests(unittest.TestCase):
