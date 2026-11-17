@@ -78,13 +78,13 @@ Transisi: ``Sebelum kita masuk ke pertanyaan penelitian, mari kita pahami kontek
             \scriptsize
             \textbf{Deployment} adalah proses membawa aplikasi dari kode menjadi layanan yang berjalan.
             \vspace{0.04cm}
-            \textbf{Aplikasi multi-service} memiliki banyak komponen yang saling bergantung. InvenioRDM, misalnya, terdiri dari 16+ komponen: web, worker, database, search, cache, object storage, ingress, secrets, dan monitoring.
+            \textbf{Aplikasi multi-service} memiliki banyak komponen yang saling bergantung. InvenioRDM, misalnya, terdiri dari 16+ komponen: web, worker, database, search, cache, \textit{object storage}, ingress, secrets, dan monitoring.
             \vspace{0.04cm}
             \linebreak{}
             \textbf{Dua paradigma deployment:}
             \begin{itemize}\setlength{\itemsep}{0pt}
                 \item \textbf{Manual:} operator menjalankan \texttt{kubectl} langsung ke klaster.
-                \item \textbf{GitOps:} Git menyimpan desired state; agen software melakukan reconciliation secara berkala.
+                \item \textbf{GitOps:} Git menyimpan \textit{desired state}; agen \textit{software} melakukan reconciliation secara berkala.
             \end{itemize}
         \end{column}
         \begin{column}{0.52\textwidth}
@@ -95,7 +95,7 @@ Transisi: ``Sebelum kita masuk ke pertanyaan penelitian, mari kita pahami kontek
 \note{
 Sapaan: ``Deployment adalah proses membawa aplikasi dari kode menjadi layanan yang berjalan di klaster. Untuk aplikasi multi-service seperti InvenioRDM, ini berarti mengelola 16+ komponen yang saling bergantung.''
 
-Paradigma: ``Ada dua cara utama: manual, di mana operator menjalankan perintah langsung ke klaster, dan GitOps, di mana Git menjadi single source of truth dan agen software menyelaraskan state klaster secara otomatis.''
+Paradigma: ``Ada dua cara utama: manual, di mana operator menjalankan perintah langsung ke klaster, dan GitOps, di mana Git menjadi \textit{single source of truth} dan agen \textit{software} menyelaraskan \textit{state} klaster secara otomatis.''
 
 Transisi: ``Masalah muncul ketika apa yang berjalan di klaster tidak lagi sesuai dengan apa yang tertulis. Itulah configuration drift.''
 }
@@ -127,11 +127,11 @@ Transisi: ``Masalah muncul ketika apa yang berjalan di klaster tidak lagi sesuai
         \end{column}
     \end{columns}
     \vspace{0.04cm}
-    \slidelead{Drift = klaster menyimpang dari apa yang tertulis. Tim kehilangan kepastian tentang state sistem.}
+    \slidelead{Drift = klaster menyimpang dari apa yang tertulis. Tim kehilangan kepastian tentang kondisi sistem.}
 \note{
 Sapaan: ``Bayangkan seorang operator yang harus menangani spike traffic pada pukul 2 pagi. Dia menjalankan kubectl scale langsung di klaster. Masalah terselesaikan, tapi Git tidak tahu. Besok pagi, tidak ada yang bisa menjelaskan mengapa jumlah replika berubah. Itulah configuration drift.''
 
-Definisi: ``Drift adalah celah antara desired state dan actual state. Dan bukti menunjukkan ini bukan kasus langka.''
+Definisi: ``Drift adalah celah antara \textit{desired state} dan \textit{actual state}. Dan bukti menunjukkan ini bukan kasus langka.''
 
 Transisi: ``Seberapa sering drift ini terjadi? Mari kita lihat buktinya.''
 }
@@ -153,8 +153,8 @@ Transisi: ``Seberapa sering drift ini terjadi? Mari kita lihat buktinya.''
             \begin{enumerate}\setlength{\itemsep}{1pt}
                 \item Sistem didefinisikan secara deklaratif.
                 \item \textit{Desired state} tersimpan dan \textit{versioned} di Git.
-                \item Perubahan ditarik secara otomatis oleh agen software.
-                \item Agen software secara kontinu mendeteksi dan mengoreksi deviasi.
+                \item Perubahan ditarik secara otomatis oleh agen \textit{software}.
+                \item Agen \textit{software} secara kontinu mendeteksi dan mengoreksi deviasi.
             \end{enumerate}
             \vspace{0.04cm}
             \textbf{Konsekuensi:} drift menjadi \textit{observable} dan dapat dipulihkan otomatis (\textit{self-heal}); audit trail terjamin lewat Git history.
@@ -230,7 +230,7 @@ Transisi: ``Dari celah ini, rumuskan pertanyaan inti penelitian.''
         \begin{column}{0.48\textwidth}
             \small\textbf{Tiga dimensi pengukuran}
             \begin{enumerate}\setlength{\itemsep}{2pt}
-                \item \textbf{R1:} Konsistensi: apakah state klaster kembali ke yang diharapkan setelah drift?
+                \item \textbf{R1:} Konsistensi: apakah klaster kembali ke \textit{desired state} setelah drift?
                 \item \textbf{R2:} Waktu: berapa lama drift terdeteksi dan dipulihkan?
                 \item \textbf{R3:} Identifikasi: berapa lama sumber drift dapat diidentifikasi?
             \end{enumerate}
@@ -449,7 +449,7 @@ Sapaan: ``Tiga metrik didefinisikan sebelum eksperimen, bukan setelah melihat ha
 
 R3: ``R3 menggunakan MTTI --- Mean Time To Identify --- yaitu waktu dari deteksi hingga operator atau sistem berhasil mengidentifikasi sumber drift. Metrik ini mengukur usaha diagnostik operasional secara objektif melalui \textit{timestamp}.''
 
-Transisi: ``Bagaimana satu run eksperimen berjalan dari awal sampai akhir?''
+Transisi: ``Bagaimana satu \textit{run} eksperimen berjalan dari awal sampai akhir?''
 }
 \end{frame}
 }
@@ -465,9 +465,9 @@ Transisi: ``Bagaimana satu run eksperimen berjalan dari awal sampai akhir?''
     \centering
     \includegraphics[width=0.96\textwidth,height=0.68\textheight,keepaspectratio]{experiment-procedure}
 \note{
-Sapaan: ``Inilah yang terjadi dalam satu run eksperimen, dari drift injection sampai pemulihan, pada kedua lingkungan secara paralel.''
+Sapaan: ``Inilah yang terjadi dalam satu \textit{run} eksperimen, dari drift injection sampai pemulihan, pada kedua lingkungan secara paralel.''
 
-Detail: ``Di Lingkungan A, operator mendeteksi drift secara manual dengan kubectl get/describe, mengidentifikasi akar masalah lewat log, dan memulihkan via recovery runbook. Di Lingkungan B, ArgoCD mendeteksi drift lewat polling setiap 60 detik, menampilkan diff untuk identifikasi akar masalah, dan memulihkan lewat self-heal.''
+Detail: ``Di Lingkungan A, operator mendeteksi drift secara manual dengan kubectl get/describe, mengidentifikasi akar masalah lewat log, dan memulihkan via \textit{recovery runbook}. Di Lingkungan B, ArgoCD mendeteksi drift lewat polling setiap 60 detik, menampilkan \textit{diff} untuk identifikasi akar masalah, dan memulihkan lewat \textit{self-heal}.''
 
 Inti: ``Injeksi identik, tapi mekanisme deteksi dan pemulihan berbeda secara inheren. Itulah yang kita ukur.''
 
@@ -528,7 +528,7 @@ Transisi: ``Setelah analisis, kita perlu mengakui ancaman terhadap validitas dan
         \toprule
         \textbf{Ancaman} & \textbf{Mitigasi dalam rancangan} \\
         \midrule
-        Operator tunggal & Recovery runbook dan timestamp otomatis \\
+        Operator tunggal & \textit{Recovery runbook} dan timestamp otomatis \\
         Efek pembelajaran & Urutan \textit{eksekusi} skenario diacak (A--F--C--B--G--A--D--\ldots), bukan jenis drift, paradigma, atau prosedur recovery \\
         Instrumentasi berubah & Versi Kubernetes, ArgoCD, dan workload dikunci \\
         Satu workload & InvenioRDM mewakili kelas workload multi-service \\
@@ -539,7 +539,7 @@ Transisi: ``Setelah analisis, kita perlu mengakui ancaman terhadap validitas dan
     \vspace{0.08cm}
     \slidelead{Klaim dibatasi pada konteks yang didefinisikan.}
 \note{
-Sapaan: ``Kita mengakui ancaman secara langsung. Operator tunggal, kita mitigasi dengan recovery runbook dan timestamp otomatis. Efek pembelajaran, kita acak urutan skenario. Instrumentasi berubah, versi software dikunci sepanjang eksperimen.''
+Sapaan: ``Kita mengakui ancaman secara langsung. Operator tunggal, kita mitigasi dengan \textit{recovery runbook} dan timestamp otomatis. Efek pembelajaran, kita acak urutan skenario. Instrumentasi berubah, versi \textit{software} dikunci sepanjang eksperimen.''
 
 Inti: ``Ini bukan studi tentang semua klaster Kubernetes. Ini tentang satu pertanyaan di satu konteks terkontrol. Klaim kita dibatasi pada konteks itu.''
 
@@ -743,7 +743,7 @@ Penutup: ``Terima kasih. Silakan bertanya.''
         \item Operator tunggal justru \textbf{mengurangi} varians antar-\textit{run}, sehingga memperkuat validitas internal perbandingan antar paradigma.
     \end{enumerate}
     \vspace{0.08cm}
-    \smallnote{Keterampilan operator memengaruhi kedua paradigma secara sama: operator, runbook, klaster, dan skenario yang sama. Oleh karena itu, perbandingan tetap bermakna.}
+    \smallnote{Keterampilan operator memengaruhi kedua paradigma secara sama: operator, \textit{runbook}, klaster, dan skenario yang sama. Oleh karena itu, perbandingan tetap bermakna.}
 \end{frame}
 }
 

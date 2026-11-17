@@ -1,9 +1,9 @@
 flowchart TB
-  A["210 sel: 7 skenario × 2 mode × 15 pengulangan"] --> B["211 baris mentah: 210 sel dan 1 upaya ulang baseline"]
+  A["210 sel: 7 skenario × 2 mode × 15 pengulangan"] --> B["211 baris mentah: 210 sel dan 1 percobaan baseline yang gagal"]
   B --> C["4 baris dikecualikan: 2 instrumentation, 1 batch_stop, 1 baseline"]
   C --> D["207 baris analisis: 192 observed, 15 right_censored"]
   D --> R1["R1: 70 sel, 70 baris<br/>5 pengulangan × 7 skenario × 2 mode"]
-  D --> R2["R2: 140 sel, 137 baris per luaran<br/>10 pengulangan × 7 skenario × 2 mode"]
+  D --> R2["R2: 140 sel, 137 baris per metrik<br/>10 pengulangan × 7 skenario × 2 mode"]
   R1 --> E["Tiga titik baca dan empat objek kontrak"]
   R2 --> F["Tiga sel tanpa baris"]
   classDef count fill:#eef2f7,stroke:#64748b,color:#14212b;

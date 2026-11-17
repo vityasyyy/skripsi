@@ -1,7 +1,7 @@
 # Skripsi Makefile
 # Supports local compilation (requires texlive) and Docker compilation
 
-.PHONY: help proposal skripsi skripsi-diagrams presentation presentation-diagrams presentation-skripsi presentation-skripsi-diagrams clean clean-proposal clean-skripsi clean-presentation clean-presentation-skripsi proposal-docker skripsi-docker presentation-docker presentation-diagrams-docker presentation-skripsi-docker presentation-skripsi-diagrams-docker shell
+.PHONY: help proposal skripsi skripsi-diagrams presentation presentation-diagrams presentation-skripsi presentation-skripsi-diagrams clean clean-proposal clean-skripsi clean-presentation clean-presentation-skripsi proposal-docker skripsi-docker presentation-docker presentation-diagrams-docker presentation-skripsi-docker presentation-skripsi-diagrams-docker shell test-experiments lint-experiments coverage-experiments check-experiments
 
 help:
 	@echo "Skripsi - Build Options"
@@ -110,3 +110,22 @@ shell: build-docker
 all: proposal skripsi presentation presentation-skripsi
 
 all-docker: proposal-docker skripsi-docker presentation-docker presentation-skripsi-docker
+
+# Experiment apparatus verification (dry-run/offline only; no cluster access)
+test-experiments:
+	python3 -m unittest discover -s experiments/tests -v
+	python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -v
+
+lint-experiments:
+	uv run --with-requirements experiments/requirements-dev.txt ruff check experiments
+	uv run --with-requirements experiments/requirements-dev.txt ruff format --check experiments
+	cd experiments && uv run --with-requirements requirements-dev.txt mypy
+	shellcheck experiments/scripts/*.sh
+	bash -n experiments/scripts/*.sh
+
+coverage-experiments:
+	uv run --with-requirements experiments/requirements-dev.txt coverage run --rcfile=experiments/.coveragerc -m unittest discover -s experiments/tests
+	uv run --with-requirements experiments/requirements-dev.txt coverage run -a --rcfile=experiments/.coveragerc -m unittest discover -s experiments/sensitivity -p 'test_*.py'
+	uv run --with-requirements experiments/requirements-dev.txt coverage report --rcfile=experiments/.coveragerc --fail-under=100
+
+check-experiments: test-experiments lint-experiments coverage-experiments

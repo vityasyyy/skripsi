@@ -5,19 +5,33 @@ The historical analyzer is mock-only and rejects these rows; this converter is
 an archival bridge, not formal inference. `trci` is a legacy column name and
 here means evidence latency (`t_e - t0`), never human root-cause time.
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
-COLUMNS = ["subject", "env", "skenario", "rep", "t0", "td", "trci", "t2",
-           "r1_t0", "r1_t1", "r1_t2", "kubectl_cmds", "notes"]
+COLUMNS = [
+    "subject",
+    "env",
+    "skenario",
+    "rep",
+    "t0",
+    "td",
+    "trci",
+    "t2",
+    "r1_t0",
+    "r1_t1",
+    "r1_t2",
+    "kubectl_cmds",
+    "notes",
+]
 
 
-def _number(value):
+def _number(value: object) -> str:
     if value is None:
         return ""
     if type(value) is int:
@@ -27,7 +41,7 @@ def _number(value):
     return str(value)
 
 
-def _notes(row):
+def _notes(row: dict) -> str:
     parts = [
         "status=" + str(row.get("status", "")),
         "detection_controller=" + str(row.get("detection_controller")),
@@ -46,7 +60,7 @@ def _notes(row):
     return "; ".join(parts)
 
 
-def row_to_csv(row):
+def row_to_csv(row: dict) -> dict:
     env = row.get("env") or row.get("arm")
     if env == "imperative":
         env = "manual"
@@ -69,7 +83,7 @@ def row_to_csv(row):
     }
 
 
-def write_csv(rows, path):
+def write_csv(rows: list, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
@@ -79,23 +93,21 @@ def write_csv(rows, path):
             writer.writerow(row_to_csv(row))
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--in", dest="source", type=Path, required=True)
     parser.add_argument("--out", dest="target", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        rows = [json.loads(line) for line in
-                args.source.read_text().splitlines() if line.strip()]
+        rows = [json.loads(line) for line in args.source.read_text().splitlines() if line.strip()]
         if not rows:
             raise ValueError("empty JSONL")
         write_csv(rows, args.target)
     except (OSError, ValueError, KeyError) as error:
-        print(f"invalid JSONL input: {type(error).__name__}: {error}",
-              file=sys.stderr)
+        print(f"invalid JSONL input: {type(error).__name__}: {error}", file=sys.stderr)
         return 1
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - executable guard
     sys.exit(main())

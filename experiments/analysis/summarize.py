@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Descriptive v2 evidence summaries; never pool controls or discard censoring."""
+
+from __future__ import annotations
+
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 from statistics import median
-import sys
 
 
-def summarize(rows):
-    groups = {}
-    identities = set()
-    conventions = set()
+def summarize(rows: list) -> dict:
+    groups: dict[tuple, list[dict]] = {}
+    identities: set[str] = set()
+    conventions: set[str | None] = set()
     for row in rows:
         if row["schema_version"] != 2 or row["run_id"] in identities:
             raise ValueError("wrong schema or duplicate run identity")
@@ -21,13 +24,30 @@ def summarize(rows):
             raise ValueError("unknown timing convention")
         conventions.add(marker)
         scenario = row["scenario"]
-        if scenario not in "ABCDEFG" or len(scenario) != 1 or row["env"] not in ("manual", "gitops"):
+        if (
+            scenario not in "ABCDEFG"
+            or len(scenario) != 1
+            or row["env"] not in ("manual", "gitops")
+        ):
             raise ValueError("unknown scenario/arm")
-        group = "hpa_control" if scenario == "A" else "visibility_boundary" if scenario == "F" else "managed_drift"
+        group = (
+            "hpa_control"
+            if scenario == "A"
+            else "visibility_boundary"
+            if scenario == "F"
+            else "managed_drift"
+        )
         if row["analysis_group"] != group or type(row["synthetic"]) is not bool:
             raise ValueError("invalid analysis classification")
-        key = (scenario, row["env"], group, row["synthetic"],
-               row["source_revision"], row["render_sha256"], marker)
+        key = (
+            scenario,
+            row["env"],
+            group,
+            row["synthetic"],
+            row["source_revision"],
+            row["render_sha256"],
+            marker,
+        )
         groups.setdefault(key, []).append(row)
     if len(conventions) != 1:
         raise ValueError("mixed timing conventions")
@@ -35,12 +55,17 @@ def summarize(rows):
     result = []
     for key, runs in sorted(groups.items()):
         scenario, env, group, synthetic, revision, digest, marker = key
-        summary = {"scenario": scenario, "env": env, "analysis_group": group,
-                   "synthetic": synthetic, "source_revision": revision,
-                   "render_sha256": digest,
-                   "timing_convention": marker,
-                   "runs": len(runs),
-                   "complete_time_observations": True}
+        summary = {
+            "scenario": scenario,
+            "env": env,
+            "analysis_group": group,
+            "synthetic": synthetic,
+            "source_revision": revision,
+            "render_sha256": digest,
+            "timing_convention": marker,
+            "runs": len(runs),
+            "complete_time_observations": True,
+        }
         for metric in ("detection", "evidence", "recovery"):
             observed, censored, missing = [], 0, 0
             for row in runs:
@@ -52,31 +77,45 @@ def summarize(rows):
                 if status == "right_censored" and value is None:
                     censored += 1
                 elif status == "unobserved_before_stop":
-                    if (value is not None
-                            or row.get("status") != "observed"
-                            or row.get("stop_reason") != "recovery"
-                            or row.get("recovery_status") != "observed"):
-                        raise ValueError(
-                            "missing endpoint without early-stop provenance")
+                    if (
+                        value is not None
+                        or row.get("status") != "observed"
+                        or row.get("stop_reason") != "recovery"
+                        or row.get("recovery_status") != "observed"
+                    ):
+                        raise ValueError("missing endpoint without early-stop provenance")
                     missing += 1
-                elif status == "observed" and type(value) in (int, float) and math.isfinite(value) and 0 <= value <= limit:
+                elif (
+                    status == "observed"
+                    and type(value) in (int, float)
+                    and math.isfinite(value)
+                    and 0 <= value <= limit
+                ):
                     observed.append(value)
                 else:
                     raise ValueError("invalid event time/status; no imputation allowed")
-            summary[metric] = {"observed": len(observed), "right_censored": censored,
-                               "missing": missing,
-                               "observed_median_seconds": median(observed) if observed else None}
+            summary[metric] = {
+                "observed": len(observed),
+                "right_censored": censored,
+                "missing": missing,
+                "observed_median_seconds": median(observed) if observed else None,
+            }
             summary["complete_time_observations"] &= censored == 0 and missing == 0
         result.append(summary)
-    if not result:
-        raise ValueError("empty dataset")
-    return {"schema_version": 2, "formal_execution_approved": False,
-            "timing_convention": convention,
-            "note": "Observed-only medians are not censoring-adjusted comparisons; no efficacy inference.",
-            "groups": result}
+    if not result:  # pragma: no cover - every non-empty row adds one group
+        raise ValueError("empty dataset")  # pragma: no cover
+    return {
+        "schema_version": 2,
+        "formal_execution_approved": False,
+        "timing_convention": convention,
+        "note": (
+            "Observed-only medians are not censoring-adjusted comparisons; no efficacy inference."
+        ),
+        "groups": result,
+    }
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--in", dest="source", type=Path, required=True)
     args = parser.parse_args()
@@ -84,10 +123,13 @@ def main():
         rows = [json.loads(line) for line in args.source.read_text().splitlines() if line.strip()]
         print(json.dumps(summarize(rows), allow_nan=False, sort_keys=True))
     except (KeyError, TypeError, ValueError, OSError):
-        print("Invalid v2 dataset; preserve failed-run evidence separately, never invent times.", file=sys.stderr)
+        print(
+            "Invalid v2 dataset; preserve failed-run evidence separately, never invent times.",
+            file=sys.stderr,
+        )
         return 1
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - executable guard
     sys.exit(main())

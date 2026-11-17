@@ -1,0 +1,18 @@
+[run]
+branch = True
+source = experiments
+# The offline suite imports the measured modules directly. Only the excluded
+# historical pandas analyzer and its mock generator remain outside the line
+# gate: their third-party dependencies are not part of the experiment runtime.
+omit =
+    experiments/tests/*
+    experiments/sensitivity/test_*.py
+    experiments/analysis/analyze.py
+    experiments/analysis/mockgen.py
+
+[report]
+fail_under = 100
+exclude_lines =
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    pragma: no cover

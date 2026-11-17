@@ -18,19 +18,19 @@
 ]
 
 \node[box=gitopsblue] (freeze) {
-    \textbf{Bekukan}\\\textbf{apparatus}\\27 objek render
+    \textbf{Bekukan}\\\textit{apparatus}\\27 objek render
 };
 \node[box=manualgray, right=of freeze] (gate) {
-    \textbf{Gerbang}\\\textbf{kesiapan}\\CPU dan memori $<70\%$
+    \textbf{Pemeriksaan}\\\textbf{kesiapan}\\CPU dan memori $<70\%$
 };
 \node[box=gitopsblue, right=of gate] (gitops) {
-    \textbf{Blok GitOps}\\ArgoCD aktif\\15 run
+    \textbf{Blok GitOps}\\ArgoCD aktif\\15 \textit{run}
 };
 \node[box=manualgray, right=of gitops] (reset) {
-    \textbf{Reset baseline}\\verifikasi\\jeda 60 detik
+    \textbf{Reset \textit{baseline}}\\verifikasi\\tunggu 60 detik
 };
 \node[box=manualgray, right=of reset] (imp) {
-    \textbf{Blok imperatif}\\ArgoCD dijeda\\15 run
+    \textbf{Imperatif}\\ArgoCD ditangguhkan\\15 \textit{run}
 };
 \node[box=metricyellow!85!black, right=of imp] (analysis) {
     \textbf{Pemulihan dan}\\\textbf{analisis}\\207 baris

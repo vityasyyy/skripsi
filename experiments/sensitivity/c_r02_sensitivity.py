@@ -7,13 +7,15 @@ complete and observed. This script reads the frozen raw rows, adds that one
 row only to the C-scenario comparisons, and reports the resulting tests and
 effect sizes. It never writes to the frozen evidence directories.
 """
+
 from __future__ import annotations
 
 import argparse
 import importlib.util
 import json
-from pathlib import Path
 import sys
+import types
+from pathlib import Path
 
 
 def _load_jsonl(path: Path) -> list[dict]:
@@ -31,7 +33,7 @@ def _load_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def _load_analyzer(path: Path):
+def _load_analyzer(path: Path) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location("analyze_live_sensitivity", path)
     if spec is None or spec.loader is None:
         raise SystemExit(f"cannot load analyzer: {path}")
@@ -48,7 +50,7 @@ def _is_within(path: Path, root: Path) -> bool:
     return True
 
 
-def _reject_frozen_output(out: Path | None, batch_dir: Path, analysis_json: Path):
+def _reject_frozen_output(out: Path | None, batch_dir: Path, analysis_json: Path) -> None:
     if out is None:
         return
     for label, root in (
@@ -56,9 +58,7 @@ def _reject_frozen_output(out: Path | None, batch_dir: Path, analysis_json: Path
         ("analysis", analysis_json.parent),
     ):
         if _is_within(out, root):
-            raise SystemExit(
-                f"refusing --out inside frozen {label} directory: {root}"
-            )
+            raise SystemExit(f"refusing --out inside frozen {label} directory: {root}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -73,8 +73,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--analysis-json",
         type=Path,
-        default=home / "skripsi" / "experiments"
-        / "analysis-formal-20261029" / "live_analysis.json",
+        default=home
+        / "skripsi"
+        / "experiments"
+        / "analysis-formal-20261029"
+        / "live_analysis.json",
         help="frozen primary live_analysis.json (default: %(default)s)",
     )
     parser.add_argument(
@@ -96,9 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     primary = json.loads(args.analysis_json.read_text())
 
     if len(rows) != 207 or len(raw) != 211:
-        raise SystemExit(
-            f"unexpected frozen row counts: analysis={len(rows)}, raw={len(raw)}"
-        )
+        raise SystemExit(f"unexpected frozen row counts: analysis={len(rows)}, raw={len(raw)}")
     matches = [row for row in raw if row.get("run_id") == "formal-20261029-gitops-C-r02"]
     if len(matches) != 1:
         raise SystemExit("expected exactly one gitops-C-r02 raw row")
@@ -107,14 +108,13 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("gitops-C-r02 is not a complete observed run")
 
     c_rows = [
-        row for row in rows + [c_r02]
+        row
+        for row in [*rows, c_r02]
         if row.get("scenario") == "C" and row.get("batch_phase") == "R2"
     ]
     sensitivity = {}
     for metric in analysis_module.METRICS:
-        result = analysis_module._comparison(
-            c_rows, "C", metric, args.bootstrap, args.seed
-        )
+        result = analysis_module._comparison(c_rows, "C", metric, args.bootstrap, args.seed)
         sensitivity[metric] = {
             "n_manual": result["test"].get("n_manual"),
             "n_gitops": result["test"].get("n_gitops"),
@@ -135,7 +135,8 @@ def main(argv: list[str] | None = None) -> int:
                 p_value = sensitivity[metric]["p_value"]
             else:
                 match = next(
-                    item for item in primary["efficacy"]
+                    item
+                    for item in primary["efficacy"]
                     if item["scenario"] == scenario and item["metric"] == metric
                 )
                 p_value = match["test"]["p_value"]

@@ -1,0 +1,79 @@
+name: Experiments CI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'experiments/**'
+      - 'Makefile'
+      - '.github/workflows/experiments-ci.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'experiments/**'
+      - 'Makefile'
+      - '.github/workflows/experiments-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  experiments:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # setup-python has no Python 3.9 build for the current
+          # ubuntu-latest (26.04); pin the oldest supported runner.
+          - os: ubuntu-22.04
+            python-version: '3.9'
+          - os: ubuntu-24.04
+            python-version: '3.12'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install verification tools
+        run: pip install -r experiments/requirements-dev.txt
+
+      - name: Run experiment tests
+        run: python -m unittest discover -s experiments/tests -v
+
+      - name: Run tests with warnings as errors
+        env:
+          PYTHONWARNINGS: error
+        run: python -m unittest discover -s experiments/tests
+
+      - name: Run sensitivity tests
+        run: python -m unittest discover -s experiments/sensitivity -p 'test_*.py' -v
+
+      - name: Enforce branch coverage
+        run: |
+          coverage run --rcfile=experiments/.coveragerc -m unittest discover -s experiments/tests
+          coverage run -a --rcfile=experiments/.coveragerc -m unittest discover -s experiments/sensitivity -p 'test_*.py'
+          coverage report --rcfile=experiments/.coveragerc --fail-under=100
+
+      - name: Ruff lint
+        run: ruff check experiments
+
+      - name: Ruff format check
+        run: ruff format --check experiments
+
+      - name: Mypy
+        working-directory: experiments
+        run: mypy
+
+      - name: Shell syntax
+        run: bash -n experiments/scripts/*.sh
+
+      - name: ShellCheck
+        run: shellcheck experiments/scripts/*.sh
