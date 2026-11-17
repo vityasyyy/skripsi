@@ -45,7 +45,7 @@ Identitas yang mengikat seluruh data pada Bab IV dirangkum pada Tabel~\ref{tab:l
 
 \section{Perintah Eksekusi}
 
-Pengumpulan dijalankan melalui satu perintah batch yang memakai ulang jalur harian pemeriksa, sehingga gerbang keamanan tetap berada di satu tempat. Kredensial dibaca dari berkas privat bermode 0600 di luar repositori dan disuntikkan ke lingkungan proses anak; nilainya tidak pernah dicetak, tidak ditulis ke berkas bukti, dan tidak muncul pada argumen perintah.
+Pengumpulan dijalankan melalui satu perintah \textit{batch} yang memakai ulang jalur harian pemeriksa, sehingga pemeriksaan keamanan tetap berada di satu tempat. Kredensial dibaca dari berkas privat bermode 0600 di luar repositori dan disuntikkan ke lingkungan proses anak; nilainya tidak pernah dicetak, tidak ditulis ke berkas bukti, dan tidak muncul pada argumen perintah.
 
 \begin{lstlisting}[breaklines=true,basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,numbers=none]
 python3 -B experiments/live/run_matrix.py \
@@ -77,39 +77,39 @@ Analisis sensitivitas untuk \texttt{gitops-C-r02} dijalankan terpisah dengan skr
 
 \section{Skema Data per Run}
 
-Setiap run menulis satu berkas baris JSON dengan bidang berikut, dirangkum pada Tabel~\ref{tab:lampiran-skema}. Bidang waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
+Setiap \textit{run} menulis satu berkas baris JSON dengan \textit{field} berikut, dirangkum pada Tabel~\ref{tab:lampiran-skema}. \textit{Field} waktu disimpan ganda: cap waktu UTC untuk keterbacaan dan waktu monotonik untuk perhitungan selang, sehingga perubahan jam dinding tidak memengaruhi durasi.
 
 \begin{table}[htbp]
   \centering
   \small
-  \caption{Bidang utama pada berkas baris per run}
+  \caption{\textit{Field} utama pada berkas baris per \textit{run}}
   \label{tab:lampiran-skema}
   \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{5.4cm}|>{\raggedright\arraybackslash}X|}
     \hline
-    Bidang & Isi \\
+    \textit{Field} & Isi \\
     \hline
-    \texttt{run\_id}, \texttt{arm}, \texttt{scenario}, \texttt{rep} & Identitas run dan blok protokol (R2 untuk pengulangan 1--10, R1 untuk 11--15) \\
+    \texttt{run\_id}, \texttt{arm}, \texttt{scenario}, \texttt{rep} & Identitas \textit{run} dan blok protokol (R2 untuk pengulangan 1--10, R1 untuk 11--15) \\
     \hline
-    \texttt{status}, \texttt{stop\_reason} & Status terminal run dan alasan berhenti \\
+    \texttt{status}, \texttt{stop\_reason} & Status terminal \textit{run} dan alasan berhenti \\
     \hline
-    \texttt{detection\_seconds}, \texttt{evidence\_seconds}, \texttt{recovery\_seconds} & Tiga luaran waktu; bernilai kosong bila tidak teramati, tidak pernah nol \\
+    \texttt{detection\_seconds}, \texttt{evidence\_seconds}, \texttt{recovery\_seconds} & Tiga metrik waktu; bernilai kosong bila tidak teramati, tidak pernah nol \\
     \hline
     \texttt{detection\_status}, \texttt{evidence\_status} & Teramati, tersensor kanan, atau tidak teramati sebelum berhenti \\
     \hline
-    \texttt{r1\_baseline}, \texttt{r1\_first}, \texttt{r1\_last} & Skor kesetaraan bidang terpilih pada tiga titik \\
+    \texttt{r1\_baseline}, \texttt{r1\_first}, \texttt{r1\_last} & Skor kesetaraan \textit{field} terpilih pada tiga titik \\
     \hline
     \texttt{timing\_convention} & Penanda konvensi waktu agar data antar-konvensi tidak tercampur \\
     \hline
-    \texttt{baseline\_sha256} & Sidik jari keadaan dasar untuk mendeteksi perubahan apparatus \\
+    \texttt{baseline\_sha256} & Sidik jari kondisi awal untuk mendeteksi perubahan \textit{apparatus} \\
     \hline
   \end{tabularx}
 \end{table}
 
-Setiap run juga menyimpan bukti pendukung berupa cuplikan keadaan dasar, kontrak deklarasi, catatan injeksi, cuplikan pengambilan sampel, kondisi pascasyarat, dan catatan pembersihan. Berkas-berkas ini yang memungkinkan audit ulang tanpa menjalankan eksperimen kembali.
+Setiap \textit{run} juga menyimpan bukti pendukung berupa cuplikan kondisi awal, kontrak deklarasi, catatan injeksi, cuplikan pengambilan sampel, kondisi pascasyarat, dan catatan pembersihan. Berkas-berkas ini yang memungkinkan audit ulang tanpa menjalankan eksperimen kembali.
 
 \section{Perlindungan Informasi}
 
-Snapshot dan bukti disanitasi sebelum disimpan. Nilai Secret tidak dimasukkan ke keluaran, tangkapan layar, log, maupun dataset. Pencocokan bidang dilakukan di memori; artefak yang dibagikan hanya memuat identitas bidang dan hasil kesetaraan, tanpa nilai rahasia maupun hash yang dapat dipakai untuk menebak isinya. Kredensial pengumpulan berada pada berkas privat di luar repositori dan tidak disertakan pada lampiran ini.
+Snapshot dan bukti disanitasi sebelum disimpan. Nilai Secret tidak dimasukkan ke keluaran, tangkapan layar, log, maupun dataset. Pencocokan \textit{field} dilakukan di memori; artefak yang dibagikan hanya memuat identitas \textit{field} dan hasil kesetaraan, tanpa nilai rahasia maupun hash yang dapat dipakai untuk menebak isinya. Kredensial pengumpulan berada pada berkas privat di luar repositori dan tidak disertakan pada lampiran ini.
 
 \section{Pemetaan Keterbatasan dan Penanganannya}
 
@@ -129,11 +129,11 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \endhead
   \hline
   \endfoot
-  Satu klaster, satu stack, satu implementasi GitOps & Seluruh klaim dibatasi pada apparatus yang diuji; identitas apparatus dibekukan dan dilaporkan & Generalisasi ke lingkungan lain tidak dapat ditarik \\
+  Satu klaster, satu \textit{stack}, satu implementasi GitOps & Seluruh klaim dibatasi pada apparatus yang diuji; identitas apparatus dibekukan dan dilaporkan & Generalisasi ke lingkungan lain tidak dapat ditarik \\
   \hline
-  Kedua mode berurutan pada stack yang sama & Urutan berbasis \textit{seed}, gerbang kesiapan \textit{baseline}, prosedur reset, dan jeda 60 detik; urutan dilaporkan & Efek urutan dan beban latar tidak dihilangkan, hanya dimitigasi \\
+  Kedua mode berurutan pada \textit{stack} yang sama & Urutan berbasis \textit{seed}, pemeriksaan kesiapan \textit{baseline}, prosedur reset, dan jeda 60 detik; urutan dilaporkan & Efek urutan dan beban latar tidak dihilangkan, hanya dimitigasi \\
   \hline
-  Tidak ada stack kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari keadaan klaster bersama \\
+  Tidak ada \textit{stack} kembar terisolasi & Dinyatakan eksplisit sebagai batasan desain, bukan diklaim sebagai isolasi & Perlakuan tidak independen dari kondisi klaster bersama \\
   \hline
   Satu domain kegagalan penyimpanan & Dinyatakan bahwa penyimpanan primer dan cadangan berbagi server NFS yang sama; pemulihan byte berkas dari artefak cadangan diverifikasi terpisah (Tabel~\ref{tab:lampiran-recovery}) & Pemulihan lintas kehilangan penyimpanan primer tetap tidak diuji \\
   \hline
@@ -141,9 +141,9 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \hline
   Ketidakpastian jam antar-host & Batas kesegaran 30 detik diterapkan secara konservatif; sampel dari masa depan dianggap anomali dan menghentikan run & Selang waktu absolut tidak disertifikasi secara numerik \\
   \hline
-  Sensoring kanan & Dilaporkan sebagai tersensor, tidak diimputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
+  Sensoring kanan & Dilaporkan sebagai tersensor, tidak diberi imputasi, dan dianalisis dengan Kaplan--Meier serta RMST & Jumlah kejadian tersensor pada satu skenario membatasi presisi luaran pemulihan \\
   \hline
-  Empat baris dikecualikan & Setiap baris disebutkan dengan identitas run dan alasan; satu \textit{run} lengkap dengan \textit{non-zero exit code} diuji pada analisis sensitivitas Bab IV; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang; kesimpulan C lebih sensitif terhadap satu baris \\
+  Empat baris dikecualikan & Setiap baris disebutkan dengan identitas \textit{run} dan alasan; satu \textit{run} lengkap dengan \textit{non-zero exit code} diuji pada analisis sensitivitas Bab IV; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang; kesimpulan C lebih sensitif terhadap satu baris \\
   \hline
   Keluarga uji dua belas hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
   \hline
@@ -221,4 +221,9 @@ Direktori logo adalah \path{content/skripsi/diagrams/logos/}. Logo pada diagram 
 
 \section{Status Lampiran}
 
-Seluruh artefak yang dirujuk pada lampiran ini telah dihasilkan oleh eksperimen dan telah disanitasi. Dataset mentah, berkas bukti per run, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum masing-masing, sehingga integritasnya dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen yang dipublikasikan.
+Seluruh artefak yang dirujuk pada lampiran ini telah dihasilkan oleh eksperimen dan telah disanitasi. Dataset mentah, berkas bukti per \textit{run}, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum masing-masing, sehingga integritasnya dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen yang dipublikasikan.
+
+\subsection{Ketersediaan Artefak dan \textit{Provenance}}
+\label{subsec:provenance}
+
+Revisi instrumen pengumpulan yang dibekukan adalah \texttt{3572f3c1c11d3abc8b63882c4348b1b803d4256f}. Revisi terakhir kode analisis adalah \texttt{a1d43ea}; revisi tersebut bukan revisi pengumpulan dan tidak menggantikan identitas instrumen. Dataset mentah, berkas bukti per \textit{run}, dan tabel LaTeX hasil analisis disimpan di luar dokumen ini bersama checksum SHA-256 masing-masing. Dengan demikian, integritas berkas dapat diverifikasi ulang tanpa memuat data sensitif ke dalam dokumen, dan revisi instrumentasi dapat dibedakan dari kode yang dipakai setelah pengumpulan.
