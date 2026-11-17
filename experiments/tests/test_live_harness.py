@@ -7,22 +7,22 @@ an in-memory fake.
 
 import copy
 import csv
-from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 LIVE = ROOT / "live"
 sys.path.insert(0, str(LIVE))
 
-import harness  # noqa: E402
 import convert  # noqa: E402
+import harness  # noqa: E402
 
 
 def point(mono, utc="2026-10-27T00:00:00+00:00"):
@@ -604,9 +604,8 @@ class SafetyTests(unittest.TestCase):
             "../invenio",
             "",
         ):
-            with self.subTest(namespace=unsafe):
-                with self.assertRaises(harness.SafetyError):
-                    harness.validate_namespace(unsafe)
+            with self.subTest(namespace=unsafe), self.assertRaises(harness.SafetyError):
+                harness.validate_namespace(unsafe)
 
     def test_quarantine_is_an_exp_namespace(self):
         self.assertEqual(harness.quarantine_namespace("invenio"), "exp-invenio-drift")
@@ -815,9 +814,8 @@ class SafetyTests(unittest.TestCase):
         http = harness.Http("token")
         http._opener = mock.MagicMock()
         http._opener.open.side_effect = harness.urlerror.URLError("timed out")
-        with mock.patch("time.sleep") as sleep:
-            with self.assertRaises(harness.HarnessError):
-                http.get("/api/me")
+        with mock.patch("time.sleep") as sleep, self.assertRaises(harness.HarnessError):
+            http.get("/api/me")
         self.assertEqual(http._opener.open.call_count, 3)
         self.assertEqual([call.args[0] for call in sleep.call_args_list], [0.5, 1.0])
 
@@ -828,9 +826,11 @@ class SafetyTests(unittest.TestCase):
         http._opener.open.side_effect = harness.urlerror.URLError(
             f"dial failed with Authorization: Bearer {token}"
         )
-        with mock.patch("time.sleep", lambda _: None):
-            with self.assertRaises(harness.HarnessError) as caught:
-                http.get("/api/me")
+        with (
+            mock.patch("time.sleep", lambda _: None),
+            self.assertRaises(harness.HarnessError) as caught,
+        ):
+            http.get("/api/me")
         self.assertNotIn(token, str(caught.exception))
 
     def test_no_token_is_ever_printed(self):
@@ -998,9 +998,9 @@ class IndependentOracleTests(unittest.TestCase):
         with (
             mock.patch.object(harness, "Http") as http,
             mock.patch.object(harness, "verify_seed") as seed,
+            self.assertRaises(harness.SafetyError),
         ):
-            with self.assertRaises(harness.SafetyError):
-                harness.validate_live_args(args, environ={"INVENIO_TOKEN": "x"})
+            harness.validate_live_args(args, environ={"INVENIO_TOKEN": "x"})
         http.assert_not_called()
         seed.assert_not_called()
 
@@ -1034,9 +1034,9 @@ class IndependentOracleTests(unittest.TestCase):
             with (
                 mock.patch.object(harness, "Http") as http,
                 mock.patch.object(harness, "verify_seed") as seed,
+                self.assertRaises(harness.SafetyError),
             ):
-                with self.assertRaises(harness.SafetyError):
-                    harness.validate_live_args(args, environ={"INVENIO_TOKEN": "x"})
+                harness.validate_live_args(args, environ={"INVENIO_TOKEN": "x"})
             http.assert_not_called()
             seed.assert_not_called()
 
@@ -1240,9 +1240,8 @@ class DeclarationLoaderTests(unittest.TestCase):
             "non-object": b"[]",
         }
         for label, data in cases.items():
-            with self.subTest(case=label):
-                with self.assertRaises(harness.DeclarationError):
-                    self.load(data=data, digest=hashlib.sha256(data).hexdigest())
+            with self.subTest(case=label), self.assertRaises(harness.DeclarationError):
+                self.load(data=data, digest=hashlib.sha256(data).hexdigest())
         prefix = (
             b'{"format":"invenio-frozen-render-v1","source_revision":"'
             + b"b" * 40
@@ -1256,9 +1255,8 @@ class DeclarationLoaderTests(unittest.TestCase):
             ("overflow", b"1e999999"),
         ):
             data = prefix + literal + b"}}]}"
-            with self.subTest(case=label):
-                with self.assertRaises(harness.DeclarationError):
-                    self.load(data=data, digest=hashlib.sha256(data).hexdigest())
+            with self.subTest(case=label), self.assertRaises(harness.DeclarationError):
+                self.load(data=data, digest=hashlib.sha256(data).hexdigest())
 
     def test_duplicate_missing_and_wrong_namespace_targets_are_rejected(self):
         cases = {
@@ -1516,9 +1514,8 @@ class NodeMetricsTests(unittest.TestCase):
             "empty inventory": (node_metrics(node_metric("worker-01")), node_inventory()),
         }
         for label, (metrics, nodes) in cases.items():
-            with self.subTest(case=label):
-                with self.assertRaises(harness.InstrumentationError):
-                    self.ok(metrics, nodes)
+            with self.subTest(case=label), self.assertRaises(harness.InstrumentationError):
+                self.ok(metrics, nodes)
 
     def test_command_and_json_failures_are_instrumentation_errors(self):
         cases = [
@@ -1534,9 +1531,11 @@ class NodeMetricsTests(unittest.TestCase):
             ],
         ]
         for responses in cases:
-            with self.subTest(responses=len(responses)):
-                with self.assertRaises(harness.InstrumentationError):
-                    self.read(responses)
+            with (
+                self.subTest(responses=len(responses)),
+                self.assertRaises(harness.InstrumentationError),
+            ):
+                self.read(responses)
 
     def test_unbounded_quantity_and_duration_arithmetic_fail_closed(self):
         with self.assertRaises(harness.InstrumentationError):
@@ -1554,9 +1553,8 @@ class NodeMetricsTests(unittest.TestCase):
             ),
         }
         for label, (metrics, nodes) in cases.items():
-            with self.subTest(case=label):
-                with self.assertRaises(harness.InstrumentationError):
-                    self.ok(metrics, nodes)
+            with self.subTest(case=label), self.assertRaises(harness.InstrumentationError):
+                self.ok(metrics, nodes)
 
 
 class ReadinessClock:
@@ -1651,9 +1649,8 @@ class BaselineGateTests(unittest.TestCase):
         for value in (None, "NaN", -1, float("inf")):
             obs = self.ready_observation()
             obs.nodes = [node_reading(cpu=value, memory=10)]
-            with self.subTest(value=value):
-                with self.assertRaises(harness.InstrumentationError):
-                    harness.baseline_gate(obs, "gitops")
+            with self.subTest(value=value), self.assertRaises(harness.InstrumentationError):
+                harness.baseline_gate(obs, "gitops")
 
     def test_malformed_hpa_telemetry_fails_closed(self):
         cases = {
@@ -1664,9 +1661,8 @@ class BaselineGateTests(unittest.TestCase):
         for label, (key, value) in cases.items():
             obs = self.ready_observation()
             obs.hpa[key] = value
-            with self.subTest(case=label):
-                with self.assertRaises(harness.InstrumentationError):
-                    harness.baseline_gate(obs, "gitops")
+            with self.subTest(case=label), self.assertRaises(harness.InstrumentationError):
+                harness.baseline_gate(obs, "gitops")
 
 
 class NodeFreshnessGateTests(unittest.TestCase):
@@ -1712,17 +1708,15 @@ class NodeFreshnessGateTests(unittest.TestCase):
         missing = node_reading()
         del missing["metrics_timestamp"]
         for timestamp in (None, "", "not-a-time", "2026-10-27T00:00:00"):
-            with self.subTest(timestamp=timestamp):
-                with self.assertRaises(harness.InstrumentationError):
-                    self.issues(node_reading(timestamp=timestamp))
+            with self.subTest(timestamp=timestamp), self.assertRaises(harness.InstrumentationError):
+                self.issues(node_reading(timestamp=timestamp))
         with self.assertRaises(harness.InstrumentationError):
             self.issues(missing)
 
     def test_non_positive_or_non_finite_window_fails_closed(self):
         for window in (0, -1, float("inf"), float("nan"), None):
-            with self.subTest(window=window):
-                with self.assertRaises(harness.InstrumentationError):
-                    self.issues(node_reading(window=window))
+            with self.subTest(window=window), self.assertRaises(harness.InstrumentationError):
+                self.issues(node_reading(window=window))
 
     def test_missing_node_metrics_still_fails(self):
         obs = observation()
@@ -1884,9 +1878,8 @@ class ArmTests(unittest.TestCase):
             apps = {"apps": application("apps"), "invenio-bootstrap": application()}
             apps[name]["spec"]["syncPolicy"]["automated"]["selfHeal"] = False
             controller = harness.ArmController(FakeKubectl(apps=apps))
-            with self.subTest(app=name):
-                with self.assertRaises(harness.ArmStateError):
-                    controller.activate("gitops")
+            with self.subTest(app=name), self.assertRaises(harness.ArmStateError):
+                controller.activate("gitops")
 
     def test_gitops_makes_no_application_patch(self):
         fake = FakeKubectl()
@@ -3860,9 +3853,11 @@ class RetryCancellationTests(unittest.TestCase):
         def guard():
             return "stop" if stop["value"] else None
 
-        with mock.patch.object(harness.subprocess, "run", side_effect=run):
-            with self.assertRaises(harness.CaptureStopped) as caught:
-                self.snapshotter(kubectl, clock).capture(guard=guard)
+        with (
+            mock.patch.object(harness.subprocess, "run", side_effect=run),
+            self.assertRaises(harness.CaptureStopped) as caught,
+        ):
+            self.snapshotter(kubectl, clock).capture(guard=guard)
         self.assertEqual(len(calls), 1)
         self.assertEqual(caught.exception.reason, "stop")
         record = caught.exception.acquisition["reads"]["Deployment/invenio-web"]
@@ -3883,9 +3878,11 @@ class RetryCancellationTests(unittest.TestCase):
         def guard():
             return "deadline" if clock.now().mono >= deadline["value"] else None
 
-        with mock.patch.object(harness.subprocess, "run", side_effect=run):
-            with self.assertRaises(harness.CaptureStopped) as caught:
-                self.snapshotter(kubectl, clock).capture(guard=guard)
+        with (
+            mock.patch.object(harness.subprocess, "run", side_effect=run),
+            self.assertRaises(harness.CaptureStopped) as caught,
+        ):
+            self.snapshotter(kubectl, clock).capture(guard=guard)
         self.assertEqual(len(calls), 1)
         self.assertEqual(caught.exception.reason, "deadline")
 
@@ -3908,9 +3905,9 @@ class RetryCancellationTests(unittest.TestCase):
         with (
             mock.patch.object(harness.subprocess, "run", side_effect=run),
             mock.patch.object(harness.time, "sleep", side_effect=backoff),
+            self.assertRaises(harness.CaptureStopped) as caught,
         ):
-            with self.assertRaises(harness.CaptureStopped) as caught:
-                self.snapshotter(kubectl, clock).capture(guard=guard)
+            self.snapshotter(kubectl, clock).capture(guard=guard)
         self.assertEqual(len(calls), 1)
         self.assertEqual(caught.exception.reason, "stop")
 
@@ -3933,9 +3930,9 @@ class RetryCancellationTests(unittest.TestCase):
         with (
             mock.patch.object(harness.subprocess, "run", side_effect=run),
             mock.patch.object(harness.time, "sleep", side_effect=backoff),
+            self.assertRaises(harness.CaptureStopped) as caught,
         ):
-            with self.assertRaises(harness.CaptureStopped) as caught:
-                self.snapshotter(kubectl, clock).capture(guard=guard)
+            self.snapshotter(kubectl, clock).capture(guard=guard)
         self.assertEqual(len(calls), 1)
         self.assertEqual(caught.exception.reason, "deadline")
 

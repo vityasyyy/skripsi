@@ -4,9 +4,9 @@
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 from statistics import median
-import sys
 
 
 def summarize(rows):
@@ -106,7 +106,9 @@ def summarize(rows):
         "schema_version": 2,
         "formal_execution_approved": False,
         "timing_convention": convention,
-        "note": "Observed-only medians are not censoring-adjusted comparisons; no efficacy inference.",
+        "note": (
+            "Observed-only medians are not censoring-adjusted comparisons; no efficacy inference."
+        ),
         "groups": result,
     }
 

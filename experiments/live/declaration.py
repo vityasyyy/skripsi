@@ -8,12 +8,12 @@ Secret values and SealedSecret ciphertext are never selected or emitted.
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
 import hashlib
 import json
 import math
-from pathlib import Path
 import re
+from dataclasses import dataclass
+from pathlib import Path
 
 FORMAT = "invenio-frozen-render-v1"
 WEB_DEPLOYMENT = "invenio-web"
@@ -71,7 +71,7 @@ def _object_pairs(pairs):
     return result
 
 
-def _reject_constant(value):
+def _reject_constant(_value):
     raise DeclarationError("render bundle contains a non-finite number")
 
 

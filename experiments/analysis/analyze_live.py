@@ -30,11 +30,11 @@ import argparse
 import itertools
 import json
 import math
-from pathlib import Path
 import random
 import re
-from statistics import median
 import sys
+from pathlib import Path
+from statistics import median
 
 SCENARIOS = tuple("ABCDEFG")
 EFFICACY_SCENARIOS = frozenset("BCDE")
@@ -603,7 +603,7 @@ def wilcoxon_signed_rank(differences):
     else:
         mean = n * (n + 1) / 4.0
         tie_sum = 0
-        for value in set(abs(item) for item in nonzero):
+        for value in {abs(item) for item in nonzero}:
             count = sum(1 for item in nonzero if abs(item) == value)
             tie_sum += count**3 - count
         variance = n * (n + 1) * (2 * n + 1) / 24.0 - tie_sum / 48.0
@@ -633,11 +633,11 @@ def kaplan_meier(events, censored, horizon):
     """
     _require(_number(horizon) and horizon > 0, "horizon must be positive")
     _require(
-        all(_number(value) and 0 <= value for value in events),
+        all(_number(value) and value >= 0 for value in events),
         "event times must be finite and non-negative",
     )
     _require(
-        all(_number(value) and 0 <= value for value in censored),
+        all(_number(value) and value >= 0 for value in censored),
         "censor times must be finite and non-negative",
     )
     n = len(events) + len(censored)
@@ -1344,19 +1344,29 @@ def analyze(
         "notes": [
             "Exploratory single-case inference; no confirmatory claim.",
             "A is the HPA control and G a descriptive non-Argo case; only B-E enter efficacy.",
-            "F is a declared Service targetPort drift reported separately, not "
-            "pooled into efficacy: the twelve-hypothesis family was fixed before "
-            "collection, so adding F now would expand it post hoc.",
-            "G is excluded from efficacy even though batch rows carry "
-            "efficacy_eligible=true; the frozen method classifies G as "
-            "descriptive non-Argo.",
+            (
+                "F is a declared Service targetPort drift reported separately, not "
+                "pooled into efficacy: the twelve-hypothesis family was fixed before "
+                "collection, so adding F now would expand it post hoc."
+            ),
+            (
+                "G is excluded from efficacy even though batch rows carry "
+                "efficacy_eligible=true; the frozen method classifies G as "
+                "descriptive non-Argo."
+            ),
             "Censored observations are never imputed as zero.",
-            "Missing endpoints (unobserved_before_stop) are excluded from "
-            "survival and numeric tests; they are not censored observations.",
-            "Paired and unpaired tests are complete-case/observed-only; "
-            "missingness and censoring are not adjusted.",
-            "Paired tests require every scenario/rep block to have both arms "
-            "fully observed and at least two pairs.",
+            (
+                "Missing endpoints (unobserved_before_stop) are excluded from "
+                "survival and numeric tests; they are not censored observations."
+            ),
+            (
+                "Paired and unpaired tests are complete-case/observed-only; "
+                "missingness and censoring are not adjusted."
+            ),
+            (
+                "Paired tests require every scenario/rep block to have both arms "
+                "fully observed and at least two pairs."
+            ),
             "The RMST horizon is the smallest frozen censor limit per group.",
         ],
     }
@@ -1412,8 +1422,10 @@ def _overview_tex(result):
         r"\label{tab:live-overview}",
         r"\begin{tabular}{llrrrl}",
         r"\hline",
-        r"Skenario & Lengan & Baris R2 & Run teramati & Run tersensor & "
-        r"Populasi analisis \\",
+        (
+            r"Skenario & Lengan & Baris R2 & Run teramati & Run tersensor & "
+            r"Populasi analisis \\"
+        ),
         r"\hline",
     ]
     totals = [0, 0, 0]
@@ -1456,11 +1468,15 @@ def _overview_tex(result):
             + _tex_escape(batch["batch_id"])
             + f"; formal execution approved: {approved}; stack isolated: "
             + f"{isolated}; baris R1: {batch['r1_rows']}.",
-            r"\par\noindent\footnotesize Klaim: eksploratif studi kasus tunggal; "
-            r"tidak ada klaim konfirmatoris.",
+            (
+                r"\par\noindent\footnotesize Klaim: eksploratif studi kasus tunggal; "
+                r"tidak ada klaim konfirmatoris."
+            ),
             r"\par\noindent\footnotesize " + exclusion_text,
-            r"\par\noindent\footnotesize R3: not measured. Tidak ada klaim "
-            r"keterlacakan atau audit.",
+            (
+                r"\par\noindent\footnotesize R3: not measured. Tidak ada klaim "
+                r"keterlacakan atau audit."
+            ),
             "",
         ]
     )
@@ -1487,14 +1503,14 @@ def _exclusions_tex(result):
     elif excluded["count"] == 0:
         lines.append(r"\multicolumn{5}{l}{Tidak ada baris tereksklusi.} \\")
     else:
-        for item in excluded["rows"]:
-            lines.append(
-                f"{_tex_escape(item['run_id'])} & "
-                f"{_tex_escape(item['arm'] or '--')} & "
-                f"{_tex_escape(item['scenario'] or '--')} & "
-                f"{item['rep'] if item['rep'] is not None else '--'} & "
-                f"{_tex_escape(item['reason'])} \\\\"
-            )
+        lines.extend(
+            f"{_tex_escape(item['run_id'])} & "
+            f"{_tex_escape(item['arm'] or '--')} & "
+            f"{_tex_escape(item['scenario'] or '--')} & "
+            f"{item['rep'] if item['rep'] is not None else '--'} & "
+            f"{_tex_escape(item['reason'])} \\\\"
+            for item in excluded["rows"]
+        )
     lines.extend([r"\hline", r"\end{tabular}", r"\end{table}", ""])
     return "\n".join(lines)
 
@@ -1519,21 +1535,23 @@ def _r1_tex(result):
         r"Skenario & Lengan & Fase & $n$ & Baseline & First & Last \\",
         r"\hline",
     ]
-    for item in result["r1"]:
-        lines.append(
-            f"{item['scenario']} & {item['arm']} & {item['phase']} & "
-            f"{item['rows']} & {_r1_cell(item['baseline'])} & "
-            f"{_r1_cell(item['first'])} & {_r1_cell(item['last'])} \\\\"
-        )
+    lines.extend(
+        f"{item['scenario']} & {item['arm']} & {item['phase']} & "
+        f"{item['rows']} & {_r1_cell(item['baseline'])} & "
+        f"{_r1_cell(item['first'])} & {_r1_cell(item['last'])} \\\\"
+        for item in result["r1"]
+    )
     lines.extend(
         [
             r"\hline",
             r"\end{tabular}",
             r"\end{table}",
             r"\par\smallskip",
-            r"\noindent\footnotesize Nilai adalah median bagian teramati; angka "
-            r"dalam kurung adalah jumlah observasi. Nilai hilang tidak "
-            r"diimputasi.",
+            (
+                r"\noindent\footnotesize Nilai adalah median bagian teramati; angka "
+                r"dalam kurung adalah jumlah observasi. Nilai hilang tidak "
+                r"diimputasi."
+            ),
             "",
         ]
     )
@@ -1551,8 +1569,10 @@ def _survival_tex(result):
         r"\label{tab:live-survival}",
         r"\begin{tabular}{lllrrrrrrrrr}",
         r"\hline",
-        r"Skenario & Lengan & Metrik & $n$ & Event & Tersensor & Hilang & "
-        r"Eksklusi & Horizon (s) & Median (s) & RMST (s) \\",
+        (
+            r"Skenario & Lengan & Metrik & $n$ & Event & Tersensor & Hilang & "
+            r"Eksklusi & Horizon (s) & Median (s) & RMST (s) \\"
+        ),
         r"\hline",
     ]
     for item in result["survival"]:
@@ -1575,13 +1595,15 @@ def _survival_tex(result):
             r"\end{tabular}",
             r"\end{table}",
             r"\par\smallskip",
-            r"\noindent\footnotesize $^{*}$ Median tidak tercapai dalam horizon. "
-            r"$^{\dagger}$ Tidak terestimasi karena seluruh endpoint hilang "
-            r"sebelum berhenti, bukan tersensor. Data tersensor tidak diimputasi "
-            r"nol; RMST memakai horizon batas penyensoran terkecil per kelompok. "
-            r"Endpoint hilang tidak masuk Kaplan--Meier, RMST, atau uji numerik. "
-            r"A = kontrol HPA, F = batas visibilitas, G = deskriptif non-Argo; "
-            r"hanya B--E masuk efikasi.",
+            (
+                r"\noindent\footnotesize $^{*}$ Median tidak tercapai dalam horizon. "
+                r"$^{\dagger}$ Tidak terestimasi karena seluruh endpoint hilang "
+                r"sebelum berhenti, bukan tersensor. Data tersensor tidak diimputasi "
+                r"nol; RMST memakai horizon batas penyensoran terkecil per kelompok. "
+                r"Endpoint hilang tidak masuk Kaplan--Meier, RMST, atau uji numerik. "
+                r"A = kontrol HPA, F = batas visibilitas, G = deskriptif non-Argo; "
+                r"hanya B--E masuk efikasi."
+            ),
             "",
         ]
     )
@@ -1599,8 +1621,10 @@ def _tests_tex(result):
         r"\label{tab:live-tests}",
         r"\begin{tabular}{lllrrrrl}",
         r"\hline",
-        r"Skenario & Metrik & Uji & $n$ & Statistik & $p$ & "
-        r"$p_{\mathrm{Holm}}$ & Keputusan \\",
+        (
+            r"Skenario & Metrik & Uji & $n$ & Statistik & $p$ & "
+            r"$p_{\mathrm{Holm}}$ & Keputusan \\"
+        ),
         r"\hline",
     ]
     for item in result["efficacy"]:
@@ -1631,17 +1655,19 @@ def _tests_tex(result):
             r"\end{tabular}",
             r"\end{table}",
             r"\par\smallskip",
-            r"\noindent\footnotesize P = berpasangan; U = tidak berpasangan "
-            r"(tersensor, hilang, tanpa pasangan, atau kurang dari dua pasangan). "
-            r"Keputusan: ``tolak'' = tolak $H_0$ setelah Holm; ``gagal'' = gagal "
-            r"menolak $H_0$; ``--'' = tidak terestimasi. Semua uji eksploratif; "
-            r"tidak ada klaim konfirmatoris. Keluarga Holm berisi 12 hipotesis "
-            r"B--E $\times$ \{deteksi, bukti, pemulihan\} yang ditetapkan sebelum "
-            r"data; hipotesis tak teruji diperlakukan sebagai $p=1$. Statistik "
-            r"Wilcoxon adalah $W^+$; statistik Mann--Whitney adalah $U$ terkecil. "
-            r"Selisih nol diabaikan pada Wilcoxon. Mann--Whitney memakai "
-            r"aproksimasi normal dengan koreksi ties, hanya pada nilai teramati, "
-            r"dan tidak menyesuaikan penyensoran.",
+            (
+                r"\noindent\footnotesize P = berpasangan; U = tidak berpasangan "
+                r"(tersensor, hilang, tanpa pasangan, atau kurang dari dua pasangan). "
+                r"Keputusan: ``tolak'' = tolak $H_0$ setelah Holm; ``gagal'' = gagal "
+                r"menolak $H_0$; ``--'' = tidak terestimasi. Semua uji eksploratif; "
+                r"tidak ada klaim konfirmatoris. Keluarga Holm berisi 12 hipotesis "
+                r"B--E $\times$ \{deteksi, bukti, pemulihan\} yang ditetapkan sebelum "
+                r"data; hipotesis tak teruji diperlakukan sebagai $p=1$. Statistik "
+                r"Wilcoxon adalah $W^+$; statistik Mann--Whitney adalah $U$ terkecil. "
+                r"Selisih nol diabaikan pada Wilcoxon. Mann--Whitney memakai "
+                r"aproksimasi normal dengan koreksi ties, hanya pada nilai teramati, "
+                r"dan tidak menyesuaikan penyensoran."
+            ),
             "",
         ]
     )
@@ -1659,18 +1685,23 @@ def _effects_tex(result):
         r"\label{tab:live-effects}",
         r"\begin{tabular}{lllll}",
         r"\hline",
-        r"Skenario & Metrik & Cliff $\delta$ [95\% CI] & "
-        r"$\Delta$ median [95\% CI] & RB \\",
+        (
+            r"Skenario & Metrik & Cliff $\delta$ [95\% CI] & "
+            r"$\Delta$ median [95\% CI] & RB \\"
+        ),
         r"\hline",
     ]
     for item in result["efficacy"]:
         effect = item["effect"]
         rank = f"{_num(effect['rank_biserial'])}" if effect["rank_biserial"] is not None else "--"
+        difference = _interval(
+            effect["median_paired_difference"],
+            effect["median_paired_difference_ci"],
+        )
         lines.append(
             f"{item['scenario']} & {METRIC_LABELS[item['metric']]} & "
             f"{_interval(effect['cliffs_delta'], effect['cliffs_delta_ci'])} & "
-            f"{_interval(effect['median_paired_difference'], effect['median_paired_difference_ci'])} & "
-            f"{rank} \\\\"
+            f"{difference} & {rank} \\\\"
         )
     lines.extend(
         [
@@ -1678,11 +1709,13 @@ def _effects_tex(result):
             r"\end{tabular}",
             r"\end{table}",
             r"\par\smallskip",
-            r"\noindent\footnotesize Selisih berpasangan $\Delta$ = manual $-$ "
-            r"gitops; nilai positif berarti manual lebih lama. RB = "
-            r"rank-biserial. Interval adalah percentile bootstrap deterministik; "
-            r"resampling mengikuti blok berpasangan bila pemasangan "
-            r"dipertahankan, selain itu per lengan.",
+            (
+                r"\noindent\footnotesize Selisih berpasangan $\Delta$ = manual $-$ "
+                r"gitops; nilai positif berarti manual lebih lama. RB = "
+                r"rank-biserial. Interval adalah percentile bootstrap deterministik; "
+                r"resampling mengikuti blok berpasangan bila pemasangan "
+                r"dipertahankan, selain itu per lengan."
+            ),
             "",
         ]
     )

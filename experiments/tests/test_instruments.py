@@ -3,10 +3,10 @@
 import copy
 import json
 import os
-from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -45,13 +45,13 @@ class InstrumentsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "evidence.json"
             path.write_text(json.dumps(evidence))
-            result = subprocess.run(
+            return subprocess.run(
                 ["bash", str(ROOT / "scripts" / tool), "--evidence", str(path)],
                 capture_output=True,
+                check=False,
                 text=True,
                 timeout=5,
             )
-            return result
 
     def test_baseline_accepts_complete_offline_evidence(self):
         result = self.run_tool("baseline-check.sh", fixture())
@@ -407,6 +407,7 @@ class InstrumentsTest(unittest.TestCase):
                     result = subprocess.run(
                         ["bash", str(ROOT / "scripts" / tool), "--live"],
                         capture_output=True,
+                        check=False,
                         text=True,
                         timeout=5,
                         env=env,

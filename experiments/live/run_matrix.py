@@ -17,7 +17,6 @@ attempt keeps its own run id. See `README.md`.
 from __future__ import annotations
 
 import argparse
-from contextlib import redirect_stdout
 import hashlib
 import io
 import json
@@ -27,6 +26,7 @@ import random
 import re
 import sys
 import time
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -137,14 +137,14 @@ def parse_arms(values):
 def parse_scenarios(values):
     selected = set()
     for token in _as_list(values, "scenarios"):
-        token = token.upper()
-        if re.fullmatch(r"[A-Z]-[A-Z]", token):
-            start, end = token.split("-")
+        normalized = token.upper()
+        if re.fullmatch(r"[A-Z]-[A-Z]", normalized):
+            start, end = normalized.split("-")
             if start not in SCENARIOS or end not in SCENARIOS or start > end:
-                raise ValueError(f"unknown scenario range {token!r}")
+                raise ValueError(f"unknown scenario range {normalized!r}")
             selected.update(chr(code) for code in range(ord(start), ord(end) + 1))
             continue
-        for char in token:
+        for char in normalized:
             if char not in SCENARIOS:
                 raise ValueError(f"unknown scenario {char!r}; choose from A-G")
             selected.add(char)
@@ -966,7 +966,7 @@ def _summary(manifest, analysis_rows, exclusions):
     }
 
 
-def _write_batch_outputs(args, batch_id, paths, manifest, rows):
+def _write_batch_outputs(_args, _batch_id, paths, manifest, rows):
     by_id = {row.get("run_id"): row for row in rows}
     ordered = []
     for entry in manifest["runs"]:
@@ -1149,7 +1149,7 @@ def run_batch(args, run_one=None, sleep=None):
             run_id = entry["run_id"] if number == 0 else run_id_for_retry(entry["run_id"], number)
             try:
                 _ensure_run_slot(args, run_id)
-            except BatchSafetyError as error:
+            except BatchSafetyError:
                 manifest.update(
                     state="stopped",
                     stop_reason="output_conflict",
@@ -1159,7 +1159,7 @@ def run_batch(args, run_one=None, sleep=None):
                 manifest["counts"] = _counts(manifest["runs"])
                 summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
                 _print_result(paths, manifest, summary)
-                raise error
+                raise
             started = _utc_now()
             attempt = {
                 "attempt": number,
@@ -1189,7 +1189,7 @@ def run_batch(args, run_one=None, sleep=None):
             _write_batch_outputs(args, batch_id, paths, manifest, rows)
             try:
                 code, row, error = runner(args, item, run_id)
-            except Exception as exception:  # noqa: BLE001 - preserve batch evidence
+            except Exception as exception:
                 code, row = 1, None
                 error = _redact(f"{type(exception).__name__}: {exception}")
             if row is not None and not isinstance(row, dict):

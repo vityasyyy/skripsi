@@ -4,9 +4,9 @@
 import argparse
 import json
 import math
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 
 class EvidenceError(ValueError):
@@ -465,7 +465,8 @@ def main():
     if args.evidence is None:
         parser.exit(
             2,
-            "No actions executed. Use --evidence FILE for offline validation; live execution disabled.\n",
+            "No actions executed. Use --evidence FILE for offline validation; "
+            "live execution disabled.\n",
         )
     try:
         evidence = json.loads(args.evidence.read_text())

@@ -13,8 +13,8 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 
 def _load_jsonl(path: Path) -> list[dict]:
@@ -108,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
 
     c_rows = [
         row
-        for row in rows + [c_r02]
+        for row in [*rows, c_r02]
         if row.get("scenario") == "C" and row.get("batch_phase") == "R2"
     ]
     sensitivity = {}

@@ -1,9 +1,9 @@
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "analysis"))
@@ -57,6 +57,7 @@ class AnalysisTest(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(ROOT / "analysis/summarize.py"), "--in", str(source)],
                 capture_output=True,
+                check=False,
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -159,6 +160,7 @@ class AnalysisTest(unittest.TestCase):
                     directory,
                 ],
                 capture_output=True,
+                check=False,
                 text=True,
                 timeout=30,
             )

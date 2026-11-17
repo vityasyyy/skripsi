@@ -2,11 +2,11 @@
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -96,7 +96,8 @@ responses = {{
  ("--request-timeout=10s", "get", "nodes", "-o", "json"): "nodes",
  ("--request-timeout=10s", "get", "--raw", "/apis/metrics.k8s.io/v1beta1/nodes"): "metrics",
  ("--request-timeout=10s", "get", "pods", "-n", "exp-fixture", "-o", "json"): "pods",
- ("--request-timeout=10s", "get", "deployments,services,hpa", "-n", "exp-fixture", "-o", "json"): "resources"
+ ("--request-timeout=10s", "get", "deployments,services,hpa",
+  "-n", "exp-fixture", "-o", "json"): "resources"
 }}
 key = responses.get(tuple(sys.argv[1:]))
 if key is None: sys.exit(99)
@@ -119,6 +120,7 @@ print(json.dumps(json.loads(Path({str(source)!r}).read_text())[key]))
                     *args,
                 ],
                 capture_output=True,
+                check=False,
                 text=True,
                 timeout=5,
                 env={**os.environ, "PATH": directory + os.pathsep + os.environ["PATH"]},
@@ -182,7 +184,7 @@ print(json.dumps(json.loads(Path({str(source)!r}).read_text())[key]))
     def test_secret_and_arbitrary_pod_fields_cannot_be_exported(self):
         for path in ("/spec/template/spec/containers/0/env", "/data/password"):
             result = self.export(
-                lambda b: b["contract"]["resources"][0].update(fields={path: True})
+                lambda b, path=path: b["contract"]["resources"][0].update(fields={path: True})
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("NEVER-EXPORT-THIS", result.stdout + result.stderr)

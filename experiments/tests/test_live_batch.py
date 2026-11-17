@@ -5,16 +5,16 @@ No test reaches a cluster. Dry-run tests use the real harness with
 call `harness.main`.
 """
 
-import io
 import hashlib
+import io
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +22,6 @@ LIVE = ROOT / "live"
 sys.path.insert(0, str(LIVE))
 
 import run_matrix  # noqa: E402
-
 
 RENDER_REVISION = "a" * 40
 
@@ -542,7 +541,7 @@ class DeclarationBatchTests(unittest.TestCase):
                 render_bundle(image="ghcr.io/example/invenio:other"), sort_keys=True
             ).encode()
             path.write_bytes(changed)
-            resume = run_matrix.parse_args(argv + ["--resume"])
+            resume = run_matrix.parse_args([*argv, "--resume"])
             with self.assertRaises(run_matrix.BatchSafetyError):
                 run_quiet(resume, run_one=fake_runner()[0])
             self.assertEqual((out / "changed.manifest.json").read_text(), manifest_before)
@@ -664,7 +663,7 @@ class StopAndResumeTests(unittest.TestCase):
     def test_resume_rejects_tampered_manifest_and_pending_output(self):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)
-            runner, calls = fake_runner(statuses=["invalid_injection"])
+            runner, _calls = fake_runner(statuses=["invalid_injection"])
             args = self._stop_args(directory)
             self.assertEqual(run_quiet(args, run_one=runner), 1)
             manifest_path = out / "stop.manifest.json"
@@ -985,7 +984,7 @@ class AnalysisOutputTests(unittest.TestCase):
                     directory, "analysis", "gitops imperative", "B", "15", "--production-like"
                 )
             )
-            runner, calls = fake_runner()
+            runner, _calls = fake_runner()
             self.assertEqual(run_quiet(args, run_one=runner), 0)
             out = Path(directory)
             summary = json.loads((out / "analysis.summary.json").read_text())
@@ -1007,6 +1006,7 @@ class AnalysisOutputTests(unittest.TestCase):
                     str(out / "analysis.analysis.jsonl"),
                 ],
                 capture_output=True,
+                check=False,
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -1040,7 +1040,7 @@ class AnalysisOutputTests(unittest.TestCase):
             args = run_matrix.parse_args(
                 live_args(directory, "censor", "gitops imperative", "B", "1")
             )
-            runner, calls = fake_runner(mutate=mutate)
+            runner, _calls = fake_runner(mutate=mutate)
             self.assertEqual(run_quiet(args, run_one=runner), 0)
             summary = json.loads((Path(directory) / "censor.summary.json").read_text())
             self.assertEqual(summary["exclusions"], [])
@@ -1066,9 +1066,7 @@ class TokenSafetyTests(unittest.TestCase):
             )
             self.assertEqual(run_quiet(args, run_one=fake_runner()[0]), 0)
             texts = [stdout.getvalue(), stderr.getvalue()]
-            for path in Path(directory).iterdir():
-                if path.is_file():
-                    texts.append(path.read_text())
+            texts.extend(path.read_text() for path in Path(directory).iterdir() if path.is_file())
             for text in texts:
                 self.assertNotIn(token, text)
 
@@ -1092,9 +1090,7 @@ class TokenSafetyTests(unittest.TestCase):
             self.assertEqual(manifest["state"], "stopped")
             self.assertNotIn(token, (Path(directory) / "boom.manifest.json").read_text())
             texts = [stdout.getvalue(), stderr.getvalue()]
-            for path in Path(directory).iterdir():
-                if path.is_file():
-                    texts.append(path.read_text())
+            texts.extend(path.read_text() for path in Path(directory).iterdir() if path.is_file())
             for text in texts:
                 self.assertNotIn(token, text)
 

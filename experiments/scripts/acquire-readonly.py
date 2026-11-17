@@ -2,14 +2,15 @@
 """Export selected non-secret observations; never authorize a run or modify a cluster."""
 
 import argparse
-from datetime import datetime, timezone
-from decimal import Decimal
+import contextlib
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
+from decimal import Decimal
+from pathlib import Path
 
 
 def quantity(value):
@@ -35,15 +36,20 @@ def quantity(value):
 
 def selected_field(obj, kind, path):
     safe = (
-        kind == "Deployment"
-        and re.fullmatch(
-            r"/spec/(replicas|template/spec/containers/[0-9]+/(image|resources/(requests|limits)/(cpu|memory)))",
-            path,
+        (
+            kind == "Deployment"
+            and re.fullmatch(
+                r"/spec/(replicas|template/spec/containers/[0-9]+/(image|resources/(requests|limits)/(cpu|memory)))",
+                path,
+            )
         )
-        or kind == "Service"
-        and re.fullmatch(r"/spec/(type|selector|ports/[0-9]+/(port|targetPort|protocol))", path)
-        or kind == "HorizontalPodAutoscaler"
-        and path in ("/spec/minReplicas", "/spec/maxReplicas")
+        or (
+            kind == "Service"
+            and re.fullmatch(r"/spec/(type|selector|ports/[0-9]+/(port|targetPort|protocol))", path)
+        )
+        or (
+            kind == "HorizontalPodAutoscaler" and path in ("/spec/minReplicas", "/spec/maxReplicas")
+        )
     )
     if not safe:
         raise ValueError("unsupported/sensitive field; separate reviewed evidence required")
@@ -108,12 +114,11 @@ def export(bundle, namespace, run_id):
             )
         if not desired["fields"]:
             raise ValueError("selected fields required")
-        # Validate paths even when the object is absent; absence is not permission to read secrets later.
+        # Validate paths even when the object is absent; absence is not
+        # permission to read secrets later.
         for path in desired["fields"]:
-            try:
+            with contextlib.suppress(KeyError):
                 selected_field({}, kind, path)
-            except KeyError:
-                pass
         if identity in actual:
             resources.append(
                 {
@@ -206,7 +211,8 @@ def main():
             if args.contract is None:
                 parser.error("--contract required for read-only acquisition")
             spec = json.loads(args.contract.read_text())
-            # Fixed read-only calls only; no Secret/ConfigMap reads, shell, or user-provided command.
+            # Fixed read-only calls only; no Secret/ConfigMap reads, shell, or
+            # user-provided command.
             bundle = {
                 "contract": spec,
                 "nodes": kubectl_json(["get", "nodes"]),
@@ -228,9 +234,17 @@ def main():
             replay=args.input is not None,
         )
         print(json.dumps(result, allow_nan=False, sort_keys=True))
-    except (KeyError, IndexError, TypeError, ValueError, OSError, subprocess.SubprocessError):
+    except (
+        KeyError,
+        IndexError,
+        TypeError,
+        ValueError,
+        OSError,
+        subprocess.SubprocessError,
+    ):
         print(
-            "Read-only export failed: missing/unsupported evidence or API failure; no readiness claim.",
+            "Read-only export failed: missing/unsupported evidence or API failure; "
+            "no readiness claim.",
             file=sys.stderr,
         )
         return 1

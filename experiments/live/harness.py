@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import math
@@ -24,6 +23,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib import error as urlerror
 from urllib import parse as urlparse
@@ -400,6 +400,7 @@ class Http:
             except OSError as error:
                 raise HarnessError(f"Invenio API request failed: {type(error).__name__}") from None
             time.sleep(HTTP_RETRY_BACKOFF_SECONDS[attempt])
+        return None
 
 
 def verify_seed(
@@ -575,9 +576,10 @@ def application_state(app: dict) -> dict:
     sync = status.get("sync") or {}
     health = status.get("health") or {}
     operation = status.get("operationState") or {}
-    conditions = []
-    for condition in status.get("conditions") or []:
-        conditions.append({"type": condition.get("type"), "status": condition.get("status")})
+    conditions = [
+        {"type": condition.get("type"), "status": condition.get("status")}
+        for condition in status.get("conditions") or []
+    ]
     return {
         "name": (app.get("metadata") or {}).get("name"),
         "sync": sync.get("status"),
@@ -1241,7 +1243,7 @@ class Kubectl:
             except InstrumentationError:
                 reason = stopped()
                 if reason is not None:
-                    raise reason
+                    raise reason from None
                 raise
 
         result = request()
@@ -1428,7 +1430,7 @@ class Snapshotter:
                 "finished_mono": finished.mono,
                 "reads": copy.deepcopy(reads),
             }
-            raise CaptureStopped(acquisition, stopped.reason)
+            raise CaptureStopped(acquisition, stopped.reason) from None
         except InstrumentationError as error:
             bounds = getattr(error, "read_bounds", None)
             if bounds:
@@ -2225,7 +2227,7 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str, clock: Clock
             error=str(error),
             verification_started=acknowledged,
         )
-        raise error
+        raise
     except HarnessError as error:
         error.injection = Injection(
             started=started,
@@ -2253,7 +2255,7 @@ def inject(kubectl, contract: Contract, scenario: str, run_id: str, clock: Clock
     )
 
 
-def repair(kubectl, contract: Contract, observation: Observation, clock: Clock) -> list:
+def repair(kubectl, contract: Contract, observation: Observation, _clock: Clock) -> list:
     commands = []
     for expected in contract.resources:
         actual = observation.resources.get(expected["id"])
@@ -2384,7 +2386,7 @@ def cleanup_quarantine(
             results.append(result)
             if not result.ok and "not found" not in result.stderr.lower():
                 errors.append(f"delete {kind}/{name} failed: {result.stderr.strip()[:200]}")
-        except HarnessError as error:
+        except HarnessError as error:  # noqa: PERF203 - one delete must not abort cleanup
             errors.append(f"delete {kind}/{name} failed: {error}")
     deadline = time.monotonic() + wait_seconds
     try:
@@ -3050,17 +3052,14 @@ class Sampler(threading.Thread):
                 return
             started = self.clock.now()
             try:
-                if self.guarded:
-                    sample = self.capture(guard=self._guard)
-                else:
-                    sample = self.capture()
+                sample = self.capture(guard=self._guard) if self.guarded else self.capture()
             except CaptureStopped as stopped:
                 with self._lock:
                     self.stopped_capture = copy.deepcopy(stopped.acquisition)
                     self.capture_stop_reason = stopped.reason
                 self._ready_event.set()
                 return
-            except Exception as error:  # noqa: BLE001 - preserved as evidence
+            except Exception as error:
                 with self._lock:
                     self.error = error
                     if self._closed:
@@ -3332,41 +3331,44 @@ class LiveRunner:
                                         f"collector evidence write failed: {type(error).__name__}"
                                     ) from None
                                 collector_evidence_store_at = self.clock.now()
-                    if args.arm == "imperative" and args.scenario in "BCDEFG":
-                        if now >= next_repair and samples:
-                            latest = samples[-1]
-                            diffs = field_diffs(contract, latest)
-                            keys = sorted({diff["resource"] for diff in diffs})
-                            evaluated = self.clock.now()
-                            if keys and _reads_eligible(latest, keys, t0, deadline):
-                                if imperative is None:
-                                    imperative = ImperativeRun()
-                                if imperative.detection_at is None:
-                                    imperative.detection_at = evaluated
-                                    imperative.detection_reads = keys
-                                    imperative.evidence_at = evaluated
-                                    imperative.evidence_reads = keys
-                                    imperative.evidence_ref = "diff-" + _short(run_id) + ".json"
-                                    try:
-                                        _write_json(
-                                            evidence_dir / imperative.evidence_ref,
-                                            {
-                                                "run_id": run_id,
-                                                "at": _point_dict(latest.at),
-                                                "diffs": read_diff_evidence(contract, latest),
-                                            },
-                                        )
-                                    except OSError as error:
-                                        raise InstrumentationError(
-                                            "imperative evidence write failed: "
-                                            f"{type(error).__name__}"
-                                        ) from None
-                                    imperative.evidence_store_at = self.clock.now()
-                                commands = repair(self.kubectl, contract, latest, self.clock)
-                                imperative.commands.extend(commands)
-                                if any(not command.ok for command in commands):
-                                    imperative.failed = True
-                            next_repair = now + args.imperative_interval
+                    if (
+                        args.arm == "imperative"
+                        and args.scenario in "BCDEFG"
+                        and now >= next_repair
+                        and samples
+                    ):
+                        latest = samples[-1]
+                        diffs = field_diffs(contract, latest)
+                        keys = sorted({diff["resource"] for diff in diffs})
+                        evaluated = self.clock.now()
+                        if keys and _reads_eligible(latest, keys, t0, deadline):
+                            if imperative is None:
+                                imperative = ImperativeRun()
+                            if imperative.detection_at is None:
+                                imperative.detection_at = evaluated
+                                imperative.detection_reads = keys
+                                imperative.evidence_at = evaluated
+                                imperative.evidence_reads = keys
+                                imperative.evidence_ref = "diff-" + _short(run_id) + ".json"
+                                try:
+                                    _write_json(
+                                        evidence_dir / imperative.evidence_ref,
+                                        {
+                                            "run_id": run_id,
+                                            "at": _point_dict(latest.at),
+                                            "diffs": read_diff_evidence(contract, latest),
+                                        },
+                                    )
+                                except OSError as error:
+                                    raise InstrumentationError(
+                                        f"imperative evidence write failed: {type(error).__name__}"
+                                    ) from None
+                                imperative.evidence_store_at = self.clock.now()
+                            commands = repair(self.kubectl, contract, latest, self.clock)
+                            imperative.commands.extend(commands)
+                            if any(not command.ok for command in commands):
+                                imperative.failed = True
+                        next_repair = now + args.imperative_interval
                     if len(samples) >= 2:
                         candidate = analyze_timeline(
                             contract,
@@ -3442,7 +3444,7 @@ class LiveRunner:
                     applications={},
                     paused=True,
                 )
-        except Exception as error:  # noqa: BLE001 - preserve evidence, then fail
+        except Exception as error:
             failure = error
         finally:
             if sampler is not None and sampler_stop is None:
@@ -3469,13 +3471,13 @@ class LiveRunner:
                         results=cleanup.results + annotation_cleanup.results,
                         errors=cleanup.errors + annotation_cleanup.errors,
                     )
-            except Exception as error:  # noqa: BLE001 - cleanup must not skip restore
+            except Exception as error:
                 cleanup = CleanupReport(
                     ok=False, results=[], errors=[f"cleanup failed: {type(error).__name__}"]
                 )
             try:
                 arm_controller.restore()
-            except Exception as error:  # noqa: BLE001 - report, do not skip output
+            except Exception as error:
                 restore_error = str(error)
             if contract is not None:
                 for attempt in range(3):
@@ -3493,7 +3495,7 @@ class LiveRunner:
                             snapshotter, contract, args.scenario, args.arm
                         )
                         break
-                    except Exception as error:  # noqa: BLE001 - retry transient reads
+                    except Exception as error:
                         if attempt == 2:
                             postcondition = {
                                 "verified": False,
@@ -3508,7 +3510,6 @@ class LiveRunner:
             injection,
             timeline,
             failure,
-            arm_evidence,
             cleanup,
             restore_error,
             postcondition,
@@ -3650,7 +3651,6 @@ class LiveRunner:
         injection,
         timeline,
         failure,
-        arm_evidence,
         cleanup,
         restore_error,
         postcondition,

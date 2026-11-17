@@ -1,10 +1,10 @@
 import json
 import math
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "analysis"))
@@ -12,7 +12,6 @@ sys.path.insert(0, str(ROOT / "live"))
 
 import analyze_live  # noqa: E402
 import run_matrix  # noqa: E402
-
 
 REVISION = "a" * 40
 RENDER = "b" * 64
@@ -478,11 +477,8 @@ class LiveAnalysisTest(unittest.TestCase):
         self.assertFalse(all_censored["median_reached"])
         self.assertAlmostEqual(all_censored["rmst_seconds"], 5.0)
 
-        rows = []
-        for rep in range(1, 6):
-            rows.append(make_row("A", "imperative", rep, recovery=float(rep)))
-        for rep in (1, 3, 4, 5):
-            rows.append(make_row("A", "gitops", rep, recovery=float(rep)))
+        rows = [make_row("A", "imperative", rep, recovery=float(rep)) for rep in range(1, 6)]
+        rows.extend(make_row("A", "gitops", rep, recovery=float(rep)) for rep in (1, 3, 4, 5))
         rows.append(make_row("A", "gitops", 2, recovery=None))
         result = analyze_live.analyze(rows, bootstrap=100, seed=7)
         item = survival(result, "A", "gitops", "recovery")
@@ -589,9 +585,8 @@ class LiveAnalysisTest(unittest.TestCase):
         cases["run_id_mismatch"] = mismatched_identity
 
         for label, rows in cases.items():
-            with self.subTest(label):
-                with self.assertRaises(analyze_live.LiveAnalysisError):
-                    analyze_live.analyze(rows, bootstrap=100, seed=1)
+            with self.subTest(label), self.assertRaises(analyze_live.LiveAnalysisError):
+                analyze_live.analyze(rows, bootstrap=100, seed=1)
 
     def test_r1_descriptives_report_missing_values(self):
         rows = paired_batch(reps=range(11, 13))
@@ -704,6 +699,7 @@ class LiveAnalysisTest(unittest.TestCase):
                     "1",
                 ],
                 capture_output=True,
+                check=False,
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -872,16 +868,14 @@ class RetryIdentityTest(unittest.TestCase):
         partial = retry_row()
         del partial["batch_retry_of"]
         for label, row in (("missing", missing), ("partial", partial)):
-            with self.subTest(label):
-                with self.assertRaises(analyze_live.LiveAnalysisError):
-                    analyze_live.validate_rows([row])
+            with self.subTest(label), self.assertRaises(analyze_live.LiveAnalysisError):
+                analyze_live.validate_rows([row])
 
     def test_ambiguous_attempt_values_are_rejected(self):
         values = (True, False, 1.0, -1, "1", None, [], {})
         for value in values:
-            with self.subTest(value=value):
-                with self.assertRaises(analyze_live.LiveAnalysisError):
-                    analyze_live.validate_rows([retry_row(batch_attempt=value)])
+            with self.subTest(value=value), self.assertRaises(analyze_live.LiveAnalysisError):
+                analyze_live.validate_rows([retry_row(batch_attempt=value)])
 
     def test_mismatched_retry_parent_is_rejected(self):
         row = retry_row()
@@ -898,9 +892,8 @@ class RetryIdentityTest(unittest.TestCase):
     def test_malformed_retry_suffix_is_rejected(self):
         base_id = f"{BATCH}-imperative-C-r04"
         for suffix in ("-retry0", "-retry01", "-retry", "-retryx", "-retry1x", "-retry-1"):
-            with self.subTest(suffix):
-                with self.assertRaises(analyze_live.LiveAnalysisError):
-                    analyze_live.validate_rows([retry_row(run_id=base_id + suffix)])
+            with self.subTest(suffix), self.assertRaises(analyze_live.LiveAnalysisError):
+                analyze_live.validate_rows([retry_row(run_id=base_id + suffix)])
 
     def test_base_id_with_retry_metadata_is_rejected(self):
         base_id = f"{BATCH}-imperative-C-r04"
@@ -909,9 +902,8 @@ class RetryIdentityTest(unittest.TestCase):
             {"run_id": base_id, "batch_attempt": 0, "batch_retry_of": base_id},
         )
         for overrides in cases:
-            with self.subTest(overrides):
-                with self.assertRaises(analyze_live.LiveAnalysisError):
-                    analyze_live.validate_rows([retry_row(**overrides)])
+            with self.subTest(overrides), self.assertRaises(analyze_live.LiveAnalysisError):
+                analyze_live.validate_rows([retry_row(**overrides)])
 
     def test_base_identity_fields_must_match_the_run_id(self):
         cases = (
@@ -943,7 +935,7 @@ class RetryIdentityTest(unittest.TestCase):
 
     def test_raw_rows_reject_duplicate_run_ids(self):
         analysis_rows, raw_rows, _ = runner_view("formal-20261027c", ["observed"])
-        raw = raw_rows + [dict(raw_rows[0])]
+        raw = [*raw_rows, dict(raw_rows[0])]
         with self.assertRaises(analyze_live.LiveAnalysisError):
             analyze_live.analyze(analysis_rows, raw_rows=raw, bootstrap=100, seed=1)
 
@@ -1010,6 +1002,7 @@ class RetryIdentityTest(unittest.TestCase):
                     "1",
                 ],
                 capture_output=True,
+                check=False,
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)

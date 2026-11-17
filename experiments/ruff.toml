@@ -22,7 +22,14 @@ select = [
     "ARG",  # flake8-unused-arguments
     "C4",   # flake8-comprehensions
 ]
+ignore = [
+    # The harness raises one error type with a self-describing message at each
+    # evidence boundary; a custom class per message would obscure that contract.
+    "TRY003",
+    # Handlers attach partial evidence to the exception before re-raising it.
+    "TRY301",
+]
 
 [lint.per-file-ignores]
-"tests/*" = ["ARG002"]  # unittest helpers accept unused test-double arguments
+"tests/*" = ["ARG001", "ARG002", "ARG005"]  # test doubles keep callback signatures
 "analysis/analyze.py" = ["E501"]  # frozen historical analyzer; formatting is out of scope
