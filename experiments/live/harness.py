@@ -37,10 +37,6 @@ try:
 except ImportError:
     import declaration  # type: ignore[no-redef]
 
-# --------------------------------------------------------------------------
-# Constants
-# --------------------------------------------------------------------------
-
 # Architecture, top to bottom:
 # * arm control -- ArmController pauses and restores Argo automation.
 # * snapshot -- Snapshotter reads the scoped objects with bounded attempts.
@@ -50,6 +46,11 @@ except ImportError:
 # * sampler -- Sampler captures guarded snapshots on a background thread.
 # * timeline -- analyze_timeline derives detection/evidence/recovery bounds.
 # * row/evidence -- LiveRunner writes the analysis row and evidence artifacts.
+
+# --------------------------------------------------------------------------
+# Constants
+# --------------------------------------------------------------------------
+
 ARMS = ("gitops", "imperative")
 SCENARIOS = tuple("ABCDEFG")
 DEFAULT_NAMESPACE = "invenio"

@@ -2,8 +2,9 @@
 """Bab-3 comparative analysis: descriptives + Mann-Whitney U + effect sizes + boxplots.
 
 Usage:
-  python3 experiments/analysis/analyze.py --in experiments/analysis/outputs/mock_runs.csv
-  --out experiments/analysis/outputs
+  python3 experiments/analysis/analyze.py \
+    --in experiments/analysis/outputs/mock_runs.csv \
+    --out experiments/analysis/outputs
 
 Inputs: CSV with header
   subject,env,skenario,rep,t0,td,trci,t2,r1_t0,r1_t1,r1_t2,kubectl_cmds,notes

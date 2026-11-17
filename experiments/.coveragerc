@@ -1,7 +1,7 @@
 [run]
 branch = True
 source = experiments
-# The offline suite imports the measured modules directly. Only the frozen
+# The offline suite imports the measured modules directly. Only the excluded
 # historical pandas analyzer and its mock generator remain outside the line
 # gate: their third-party dependencies are not part of the experiment runtime.
 omit =
