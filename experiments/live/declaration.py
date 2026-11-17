@@ -40,6 +40,8 @@ class DeclarationError(ValueError):
 
 @dataclass(frozen=True)
 class Declaration:
+    """Frozen four-resource declaration and its render identity."""
+
     source_revision: str
     render_sha256: str
     configmap_name: str
@@ -85,6 +87,7 @@ def _finite_float(text: str) -> float:
 def load(
     path: str | Path, expected_sha256: str, expected_revision: str, namespace: str
 ) -> Declaration:
+    """Load a frozen render declaration from a file."""
     try:
         data = Path(path).read_bytes()
     except OSError as error:
@@ -95,6 +98,7 @@ def load(
 
 
 def loads(data: bytes, expected_sha256: str, expected_revision: str, namespace: str) -> Declaration:
+    """Validate and select resources from a frozen render bundle."""
     if not isinstance(expected_sha256, str) or not SHA256.fullmatch(expected_sha256):
         raise DeclarationError("render SHA-256 must be 64 lowercase hex")
     digest = hashlib.sha256(data).hexdigest()

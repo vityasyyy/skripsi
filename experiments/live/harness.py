@@ -5,6 +5,17 @@ The harness never mutates a cluster unless `--live` is explicit. It targets the
 single real InvenioRDM stack (`invenio-web`, `invenio-web-hpa`,
 `invenio-app-config-<hash>`, `invenio-app-secrets`) and never the legacy NGINX
 surrogate subjects.
+
+Architecture, top to bottom:
+
+* arm control -- `ArmController` pauses and restores Argo automation.
+* snapshot -- `Snapshotter` reads the scoped objects with bounded attempts.
+* contract -- `build_contract` freezes the baseline compared on every read.
+* baseline -- `stabilize_baseline` gates a clean, settled starting state.
+* injection/repair -- `inject` drifts one scenario; `repair` reverses it.
+* sampler -- `Sampler` captures guarded snapshots on a background thread.
+* timeline -- `analyze_timeline` derives detection/evidence/recovery bounds.
+* row/evidence -- `LiveRunner` writes the analysis row and evidence artifacts.
 """
 
 from __future__ import annotations
@@ -36,6 +47,10 @@ try:
     from . import declaration as declaration
 except ImportError:
     import declaration  # type: ignore[no-redef]
+
+# --------------------------------------------------------------------------
+# Constants
+# --------------------------------------------------------------------------
 
 ARMS = ("gitops", "imperative")
 SCENARIOS = tuple("ABCDEFG")
@@ -81,38 +96,47 @@ MAX_AGGREGATION_WINDOW_SECONDS = 30.0
 FUTURE_SAMPLE_TOLERANCE_SECONDS = 2.0
 
 
+# --------------------------------------------------------------------------
+# Errors and records
+# --------------------------------------------------------------------------
+
+
 class HarnessError(Exception):
+    """Base class for harness failures that map to exit code 1."""
+
     readiness_failures: list
     injection: Injection
 
 
 class SafetyError(HarnessError):
-    pass
+    """A refused operation that maps to exit code 2."""
 
 
 class ArmStateError(HarnessError):
-    pass
+    """Argo automation state does not match the requested arm."""
 
 
 class ArmRestoreError(HarnessError):
-    pass
+    """The original Argo automation state could not be restored."""
 
 
 class InjectionError(HarnessError):
-    pass
+    """A drift mutation or its verification failed."""
 
 
 class InstrumentationError(HarnessError):
+    """An observation or command result could not be trusted."""
+
     read_bounds: dict | None
     acquisition: dict | None
 
 
 class SeedVerificationError(HarnessError):
-    pass
+    """The live seed record failed closed verification."""
 
 
 class BaselineError(HarnessError):
-    pass
+    """The starting state did not satisfy the baseline gate."""
 
 
 class CaptureStopped(HarnessError):
@@ -135,12 +159,16 @@ class ReadStopped(HarnessError):
 
 @dataclass(frozen=True)
 class Point:
+    """One observation instant in monotonic and UTC form."""
+
     mono: float
     utc: str
 
 
 @dataclass
 class Clock:
+    """Real monotonic and UTC clock."""
+
     def now(self) -> Point:
         return Point(time.monotonic(), datetime.now(timezone.utc).isoformat())
 
@@ -161,6 +189,8 @@ class FakeClock:
 
 @dataclass
 class CommandResult:
+    """One recorded kubectl invocation."""
+
     argv: list
     returncode: int
     stdout: str
@@ -187,6 +217,8 @@ class CommandResult:
 
 @dataclass
 class Observation:
+    """One scoped configuration snapshot plus telemetry."""
+
     at: Point
     resources: dict
     extra_resources: list
@@ -203,6 +235,8 @@ class Observation:
 
 @dataclass
 class Contract:
+    """Frozen baseline identities, fields, and digests compared on every read."""
+
     namespace: str
     quarantine_namespace: str
     resources: list
@@ -232,6 +266,8 @@ class Contract:
 
 @dataclass
 class Injection:
+    """One drift injection attempt and its verification outcome."""
+
     started: Point
     acknowledged: Point
     verified: Point | None
@@ -264,6 +300,8 @@ class Injection:
 
 @dataclass
 class ImperativeRun:
+    """Automated imperative-arm detection, evidence, and repair state."""
+
     detection_at: Point | None = None
     evidence_at: Point | None = None
     evidence_store_at: Point | None = None
@@ -295,6 +333,8 @@ class ImperativeRun:
 
 @dataclass
 class ArmEvidence:
+    """Argo automation state observed before and after arm activation."""
+
     arm: str
     original: dict
     applications: dict
@@ -311,6 +351,8 @@ class ArmEvidence:
 
 @dataclass
 class CleanupReport:
+    """Aggregated result of quarantine and annotation cleanup."""
+
     ok: bool
     results: list
     errors: list
@@ -323,7 +365,13 @@ class CleanupReport:
         }
 
 
+# --------------------------------------------------------------------------
+# Safety helpers
+# --------------------------------------------------------------------------
+
+
 def validate_namespace(namespace: str) -> str:
+    """Accept only the real namespace or an exp-* experiment namespace."""
     if namespace == "invenio":
         return namespace
     if len(namespace or "") <= 63 and re.fullmatch(
@@ -336,6 +384,7 @@ def validate_namespace(namespace: str) -> str:
 
 
 def quarantine_namespace(namespace: str) -> str:
+    """Derive the validated exp-<namespace>-drift quarantine name."""
     namespace = validate_namespace(namespace)
     name = "exp-" + namespace + "-drift"
     if len(name) > 63:
@@ -344,6 +393,7 @@ def quarantine_namespace(namespace: str) -> str:
 
 
 def load_token(environ: Mapping[str, str] | None = None) -> str:
+    """Read the Invenio API token or fail closed."""
     environ = os.environ if environ is None else environ
     token = environ.get("INVENIO_TOKEN", "")
     if not token or not token.strip():
@@ -374,6 +424,11 @@ class _CrossHostRedirectHandler(urlrequest.HTTPRedirectHandler):
             redirected.remove_header("Authorization")
             redirected.remove_header("Accept")
         return redirected
+
+
+# --------------------------------------------------------------------------
+# Seed verification
+# --------------------------------------------------------------------------
 
 
 class Http:
@@ -428,6 +483,7 @@ def verify_seed(
     expected_md5: str,
     expected_sha256: str,
 ) -> dict:
+    """Verify the draft seed file by identity, size, and checksums."""
     status, body = http.get(f"/api/records/{record}/draft")
     if status != 200:
         raise SeedVerificationError(f"seed draft endpoint returned HTTP {status}; failing closed")
@@ -481,7 +537,13 @@ def verify_seed(
     }
 
 
+# --------------------------------------------------------------------------
+# Sanitization
+# --------------------------------------------------------------------------
+
+
 def sanitize_metadata(metadata: dict) -> dict:
+    """Drop volatile server-managed metadata before comparison or output."""
     result = {}
     for key in ("name", "namespace"):
         if metadata.get(key) is not None:
@@ -503,6 +565,7 @@ def sanitize_metadata(metadata: dict) -> dict:
 
 
 def sanitize_object(obj: dict) -> dict:
+    """Remove status and secret material from one observed object."""
     kind = obj.get("kind")
     if kind == "Application":
         return sanitize_application(obj)
@@ -535,6 +598,7 @@ def sanitize_object(obj: dict) -> dict:
 
 
 def sanitize_application(app: dict) -> dict:
+    """Reduce an Argo Application to its name, namespace, and spec."""
     spec = copy.deepcopy(app.get("spec") or {})
     return {
         "name": (app.get("metadata") or {}).get("name"),
@@ -544,6 +608,7 @@ def sanitize_application(app: dict) -> dict:
 
 
 def recovery_manifest(manifest: dict, hpa_owned: bool = False) -> dict:
+    """Build a sanitized apply manifest from a declared resource."""
     result = copy.deepcopy(manifest)
     result.pop("status", None)
     result["metadata"] = sanitize_metadata(result.get("metadata") or {})
@@ -562,6 +627,7 @@ def _resource_fields(doc: dict) -> dict:
 
 
 def resource_id(doc: dict) -> str:
+    """Return the Kind/name identity used by contract and evidence keys."""
     return f"{doc.get('kind')}/{(doc.get('metadata') or {}).get('name')}"
 
 
@@ -573,6 +639,7 @@ def observation_from_objects(
     extras: list | None = None,
     acquisition: dict | None = None,
 ) -> Observation:
+    """Build an Observation from raw Kubernetes objects."""
     resources = {}
     for doc in objects:
         if not isinstance(doc, dict) or not doc.get("kind"):
@@ -599,6 +666,7 @@ def observation_from_objects(
 
 
 def application_state(app: dict) -> dict:
+    """Extract the compared Argo sync and health fields."""
     status = app.get("status") or {}
     sync = status.get("sync") or {}
     health = status.get("health") or {}
@@ -618,6 +686,7 @@ def application_state(app: dict) -> dict:
 
 
 def hpa_state(hpa: dict, deployment: dict) -> dict:
+    """Extract the compared HPA fields and the Deployment replica spec."""
     spec = hpa.get("spec") or {}
     status = hpa.get("status") or {}
     conditions = status.get("conditions") or []
@@ -645,6 +714,11 @@ def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
+# --------------------------------------------------------------------------
+# Contract and scoring
+# --------------------------------------------------------------------------
+
+
 def build_contract(
     frozen: Declaration,
     observation: Observation,
@@ -652,6 +726,7 @@ def build_contract(
     quarantine_namespace: str,
     app: str = DEFAULT_APP,
 ) -> Contract:
+    """Freeze the four scoped resources and the baseline digest."""
     if not isinstance(frozen, Declaration):
         raise InstrumentationError("contract requires an independently loaded frozen declaration")
     if not re.fullmatch(r"[0-9a-f]{40}", frozen.source_revision):
@@ -754,6 +829,7 @@ def _resource_diffs(expected: dict, actual: dict | None) -> list:
 
 
 def resource_results(contract: Contract, observation: Observation) -> dict:
+    """Score and explain every contract resource against an observation."""
     if not contract.resources:
         return {"score": 0.0, "matched": 0, "total": 0, "resources": []}
     items = []
@@ -784,10 +860,12 @@ def resource_results(contract: Contract, observation: Observation) -> dict:
 
 
 def score(contract: Contract, observation: Observation) -> float:
+    """Return the R1 field-match percentage."""
     return resource_results(contract, observation)["score"]
 
 
 def field_diffs(contract: Contract, observation: Observation) -> list:
+    """List every contract field mismatch for an observation."""
     diffs = []
     for expected in contract.resources:
         diffs.extend(_resource_diffs(expected, observation.resources.get(expected["id"])))
@@ -795,6 +873,7 @@ def field_diffs(contract: Contract, observation: Observation) -> list:
 
 
 def hpa_settled(state: dict | None) -> bool:
+    """True when the HPA and Deployment replica state has converged."""
     if not state:
         return False
     values = (
@@ -824,6 +903,7 @@ def hpa_settled(state: dict | None) -> bool:
 
 
 def hpa_telemetry_valid(state: dict) -> bool:
+    """True when HPA telemetry is a well-formed non-negative state."""
     values = (
         state.get("desired"),
         state.get("current"),
@@ -845,6 +925,7 @@ def hpa_telemetry_valid(state: dict) -> bool:
 
 
 def hpa_changed(baseline: dict | None, current: dict | None) -> bool:
+    """True when HPA replica telemetry moved away from its baseline."""
     if not baseline or not current:
         return False
     keys = ("desired", "current", "deployment_spec_replicas", "last_scale_time")
@@ -852,6 +933,7 @@ def hpa_changed(baseline: dict | None, current: dict | None) -> bool:
 
 
 def argo_signal(state: dict | None) -> bool:
+    """True when Argo reports a drift-shaped sync or operation signal."""
     if not state:
         return False
     if state.get("sync") == "OutOfSync":
@@ -863,6 +945,10 @@ def argo_signal(state: dict | None) -> bool:
         for item in state.get("conditions") or []
     )
 
+
+# --------------------------------------------------------------------------
+# Kubernetes quantities and durations
+# --------------------------------------------------------------------------
 
 _QUANTITY_RE = re.compile(
     r"^(?P<number>[+-]?(?:\d+(?:\.\d*)?|\.\d+))"
@@ -953,9 +1039,15 @@ def _quantity_bytes(value: Any, field: str, positive: bool = False) -> int:
     return result
 
 
+# --------------------------------------------------------------------------
+# Frozen declaration loading
+# --------------------------------------------------------------------------
+
+
 def load_declaration(
     path: str | Path, expected_sha256: str, expected_revision: str, namespace: str
 ) -> Declaration:
+    """Load and sanitize a frozen render declaration from a file."""
     return _prepare_declaration(
         declaration.load(path, expected_sha256, expected_revision, namespace)
     )
@@ -964,6 +1056,7 @@ def load_declaration(
 def load_declaration_bytes(
     data: bytes, expected_sha256: str, expected_revision: str, namespace: str
 ) -> Declaration:
+    """Load and sanitize a frozen render declaration from bytes."""
     return _prepare_declaration(
         declaration.loads(data, expected_sha256, expected_revision, namespace)
     )
@@ -1107,6 +1200,11 @@ def _node_name(item: Any, field: str, seen: set) -> str:
     return name
 
 
+# --------------------------------------------------------------------------
+# Node metrics
+# --------------------------------------------------------------------------
+
+
 def parse_node_metrics(
     metrics_payload: Any,
     nodes_payload: Any,
@@ -1203,7 +1301,14 @@ def parse_node_metrics(
     return nodes
 
 
+# --------------------------------------------------------------------------
+# Cluster access
+# --------------------------------------------------------------------------
+
+
 class Kubectl:
+    """Thin kubectl wrapper with bounded reads and a mutation recorder."""
+
     def __init__(self, clock: Clock, timeout: float = 30, recorder: list | None = None) -> None:
         self.clock = clock
         self.timeout = timeout
@@ -1439,7 +1544,14 @@ class Kubectl:
         return pods
 
 
+# --------------------------------------------------------------------------
+# Snapshot capture
+# --------------------------------------------------------------------------
+
+
 class Snapshotter:
+    """Capture the scoped objects and Argo/HPA telemetry."""
+
     def __init__(
         self,
         kubectl: Kubectl,
@@ -1638,6 +1750,11 @@ class Snapshotter:
         )
 
 
+# --------------------------------------------------------------------------
+# Baseline readiness
+# --------------------------------------------------------------------------
+
+
 def _observation_key(observation: Observation) -> str:
     # Node metrics fluctuate between reads; the quiet-window threshold is
     # checked separately, so configuration stability excludes them.
@@ -1744,6 +1861,7 @@ def _baseline_issues(observation: Observation, arm: str, app: str = DEFAULT_APP)
 
 
 def baseline_gate(observation: Observation, arm: str, app: str = DEFAULT_APP) -> None:
+    """Raise when an observation is not a clean settled baseline."""
     issues = _baseline_issues(observation, arm, app)
     if issues:
         fatal = [issue for issue in issues if not issue["retryable"]]
@@ -1821,6 +1939,7 @@ def stabilize_baseline(
     sleep: Callable[[float], None] = time.sleep,
     app: str = DEFAULT_APP,
 ) -> Observation:
+    """Sample until two identical clean observations settle."""
     deadline = clock.now().mono + timeout
     previous_key = None
     failures: list[dict] = []
@@ -1918,7 +2037,14 @@ def stabilize_baseline(
         sleep(min(interval, deadline - now))
 
 
+# --------------------------------------------------------------------------
+# Arm control
+# --------------------------------------------------------------------------
+
+
 class ArmController:
+    """Pause and restore Argo automation for the imperative arm."""
+
     def __init__(
         self,
         kubectl: Kubectl,
@@ -2040,9 +2166,15 @@ def _configmap_name(contract: Contract) -> str:
     return contract.configmap_name
 
 
+# --------------------------------------------------------------------------
+# Injection and repair
+# --------------------------------------------------------------------------
+
+
 def inject(
     kubectl: Kubectl, contract: Contract, scenario: str, run_id: str, clock: Clock
 ) -> Injection:
+    """Apply exactly one scenario drift and verify that it changed."""
     if scenario not in SCENARIOS:
         raise SafetyError(f"unknown scenario {scenario!r}")
     started = clock.now()
@@ -2366,6 +2498,7 @@ def repair(
     observation: Observation,
     _clock: Clock,
 ) -> list:
+    """Reverse observed drift using the declared baselines."""
     commands = []
     for expected in contract.resources:
         actual = observation.resources.get(expected["id"])
@@ -2475,6 +2608,7 @@ def cleanup_quarantine(
     owner: str | None = None,
     wait_seconds: float = 30.0,
 ) -> CleanupReport:
+    """Delete the quarantine namespace after verifying ownership."""
     if not quarantine.startswith("exp-"):
         raise SafetyError("quarantine cleanup only accepts exp-* namespaces")
     validate_namespace(quarantine)
@@ -2514,6 +2648,7 @@ def cleanup_quarantine(
 
 
 def read_diff_evidence(contract: Contract, observation: Observation) -> list:
+    """Return sanitized field diffs for an evidence artifact."""
     diffs = field_diffs(contract, observation)
     sanitized = []
     for diff in diffs:
@@ -2709,6 +2844,11 @@ def _recovered(contract: Contract, observation: Observation, scenario: str) -> b
     return True
 
 
+# --------------------------------------------------------------------------
+# Timeline analysis
+# --------------------------------------------------------------------------
+
+
 def analyze_timeline(
     contract: Contract,
     samples: list,
@@ -2724,6 +2864,7 @@ def analyze_timeline(
     window_completed: bool | None = None,
     window_end: Point | None = None,
 ) -> dict:
+    """Derive detection, evidence, recovery, and censoring from samples."""
     samples = sorted(samples, key=lambda item: item.at.mono)
     for sample in samples:
         _validate_acquisition(sample)
@@ -2952,6 +3093,11 @@ def analyze_timeline(
     }
 
 
+# --------------------------------------------------------------------------
+# Rows and CLI
+# --------------------------------------------------------------------------
+
+
 def dry_run_row(
     run_id: str,
     arm: str,
@@ -2961,6 +3107,7 @@ def dry_run_row(
     app: str,
     args: argparse.Namespace,
 ) -> dict:
+    """Build the offline dry-run row with no observations."""
     return {
         "schema_version": 2,
         "run_id": run_id,
@@ -3042,6 +3189,7 @@ def dry_run_row(
 
 
 def planned_mutations(scenario: str) -> list:
+    """Describe the single mutation each scenario would perform."""
     table = {
         "A": ["patch Deployment/invenio-web /spec/replicas (HPA-owned)"],
         "B": ["patch Deployment/invenio-web container web image"],
@@ -3055,6 +3203,7 @@ def planned_mutations(scenario: str) -> list:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse harness CLI arguments and validate their bounds."""
     parser = argparse.ArgumentParser(description=__doc__)
     tokens = list(sys.argv[1:] if argv is None else argv)
     parser.add_argument("--arm", choices=ARMS, required=True)
@@ -3113,6 +3262,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def validate_live_args(
     args: argparse.Namespace, environ: Mapping[str, str] | None = None
 ) -> dict | None:
+    """Perform live preflight and return the verified context."""
     if not args.live:
         return None
     if not getattr(args, "namespace_explicit", False):
@@ -3144,7 +3294,14 @@ def validate_live_args(
     return {"http": http, "seed": seed, "declaration": frozen}
 
 
+# --------------------------------------------------------------------------
+# Background sampler
+# --------------------------------------------------------------------------
+
+
 class Sampler(threading.Thread):
+    """Background guarded snapshot collector with a join report."""
+
     def __init__(
         self,
         capture: Callable[..., Observation],
@@ -3247,7 +3404,13 @@ class Sampler(threading.Thread):
             }
 
 
+# --------------------------------------------------------------------------
+# Run output
+# --------------------------------------------------------------------------
+
+
 def verify_one_stack(kubectl: Kubectl, namespace: str, app: str, argo_namespace: str) -> None:
+    """Refuse a cluster that is not exactly the one declared stack."""
     deployments = kubectl.get(
         "Deployment", namespace=None, selector="app.kubernetes.io/name=" + WEB_DEPLOYMENT
     )
@@ -3273,6 +3436,7 @@ def _write_json(path: Path, payload: object) -> None:
 
 
 def ensure_new_run(args: argparse.Namespace, run_id: str) -> None:
+    """Refuse to reuse an existing run id or evidence directory."""
     out = Path(args.out)
     jsonl = out / (run_id + ".jsonl")
     evidence_dir = out / run_id
@@ -3281,6 +3445,7 @@ def ensure_new_run(args: argparse.Namespace, run_id: str) -> None:
 
 
 def write_outputs(row: dict, args: argparse.Namespace, evidence_dir: Path, evidence: dict) -> None:
+    """Write the row JSONL/CSV and per-run evidence files."""
     try:
         from .convert import write_csv
     except ImportError:
@@ -3307,7 +3472,27 @@ def _point_dict(point: Point | None) -> dict | None:
     return {"mono": point.mono, "utc": point.utc} if point else None
 
 
+@dataclass
+class _ObservationWindow:
+    """Mutable state handed to and returned from the sampler observation loop."""
+
+    injection: Injection | None = None
+    samples: list = field(default_factory=list)
+    imperative: ImperativeRun | None = None
+    sampler_stop: dict | None = None
+    evidence_at: Point | None = None
+    evidence_store_at: Point | None = None
+    evidence_ref: str | None = None
+
+
+# --------------------------------------------------------------------------
+# Live orchestration
+# --------------------------------------------------------------------------
+
+
 class LiveRunner:
+    """Own one live or dry run from preflight to evidence."""
+
     def __init__(
         self,
         args: argparse.Namespace,
@@ -3431,113 +3616,19 @@ class LiveRunner:
                 raise InstrumentationError(str(sampler.error))
             if not sampler.snapshot():
                 raise InstrumentationError("collector produced no sample")
+            window = _ObservationWindow()
             try:
-                injection = inject(self.kubectl, contract, args.scenario, run_id, self.clock)
-                deadline = injection.started.mono + args.timeout
-                sampler.deadline = deadline
-                t0 = injection.started.mono
-                next_repair = self.clock.now().mono
-                while self.clock.now().mono < deadline:
-                    if sampler.error:
-                        raise InstrumentationError(str(sampler.error))
-                    samples = sampler.snapshot()
-                    now = self.clock.now().mono
-                    if now >= deadline:
-                        break
-                    if samples and collector_evidence_at is None:
-                        latest = samples[-1]
-                        if args.scenario == "A":
-                            changed = hpa_changed(contract.baseline_hpa, latest.hpa)
-                            keys = _hpa_keys()
-                        else:
-                            diffs = field_diffs(contract, latest)
-                            changed = bool(diffs)
-                            keys = sorted({diff["resource"] for diff in diffs})
-                        evaluated = self.clock.now()
-                        latest.evaluated_at = evaluated
-                        latest.evaluated_signal = bool(changed)
-                        latest.evaluated_reads = list(keys)
-                        if changed and _reads_eligible(latest, keys, t0, deadline):
-                            collector_evidence_at = evaluated
-                            if args.scenario == "A":
-                                collector_evidence_ref = "samples.jsonl"
-                            else:
-                                collector_evidence_ref = (
-                                    "diff-" + _short(run_id) + "-collector.json"
-                                )
-                                try:
-                                    _write_json(
-                                        evidence_dir / collector_evidence_ref,
-                                        {
-                                            "run_id": run_id,
-                                            "at": _point_dict(latest.at),
-                                            "diffs": read_diff_evidence(contract, latest),
-                                        },
-                                    )
-                                except OSError as error:
-                                    raise InstrumentationError(
-                                        f"collector evidence write failed: {type(error).__name__}"
-                                    ) from None
-                                collector_evidence_store_at = self.clock.now()
-                    if (
-                        args.arm == "imperative"
-                        and args.scenario in "BCDEFG"
-                        and now >= next_repair
-                        and samples
-                    ):
-                        latest = samples[-1]
-                        diffs = field_diffs(contract, latest)
-                        keys = sorted({diff["resource"] for diff in diffs})
-                        evaluated = self.clock.now()
-                        if keys and _reads_eligible(latest, keys, t0, deadline):
-                            if imperative is None:
-                                imperative = ImperativeRun()
-                            if imperative.detection_at is None:
-                                imperative.detection_at = evaluated
-                                imperative.detection_reads = keys
-                                imperative.evidence_at = evaluated
-                                imperative.evidence_reads = keys
-                                imperative.evidence_ref = "diff-" + _short(run_id) + ".json"
-                                try:
-                                    _write_json(
-                                        evidence_dir / imperative.evidence_ref,
-                                        {
-                                            "run_id": run_id,
-                                            "at": _point_dict(latest.at),
-                                            "diffs": read_diff_evidence(contract, latest),
-                                        },
-                                    )
-                                except OSError as error:
-                                    raise InstrumentationError(
-                                        f"imperative evidence write failed: {type(error).__name__}"
-                                    ) from None
-                                imperative.evidence_store_at = self.clock.now()
-                            commands = repair(self.kubectl, contract, latest, self.clock)
-                            imperative.commands.extend(commands)
-                            if any(not command.ok for command in commands):
-                                imperative.failed = True
-                        next_repair = now + args.imperative_interval
-                    if len(samples) >= 2:
-                        candidate = analyze_timeline(
-                            contract,
-                            samples,
-                            injection,
-                            args.arm,
-                            args.scenario,
-                            args.timeout,
-                            imperative,
-                            evidence_at=collector_evidence_at,
-                            provided_evidence_ref=collector_evidence_ref,
-                            app=args.app,
-                            baseline=baseline,
-                        )
-                        if candidate["recovery_seconds"] is not None:
-                            break
-                    time.sleep(args.sample_interval)
+                self._observe_until_recovery(
+                    contract, run_id, evidence_dir, sampler, baseline, window
+                )
             finally:
-                if sampler is not None:
-                    sampler_stop = sampler.stop()
-                    samples = sampler.snapshot()
+                injection = window.injection
+                imperative = window.imperative
+                samples = window.samples
+                sampler_stop = window.sampler_stop
+                collector_evidence_at = window.evidence_at
+                collector_evidence_store_at = window.evidence_store_at
+                collector_evidence_ref = window.evidence_ref
             if injection is not None:
                 window_end = self.clock.now()
                 timeline = analyze_timeline(
@@ -3667,6 +3758,179 @@ class LiveRunner:
                 getattr(sampler, "stopped_capture", None)
             )
             sampler_stop["capture_stop_reason"] = getattr(sampler, "capture_stop_reason", None)
+        self._write_evidence(
+            args,
+            evidence_dir,
+            row=row,
+            baseline=baseline,
+            contract=contract,
+            injection=injection,
+            imperative=imperative,
+            arm_evidence=arm_evidence,
+            cleanup=cleanup,
+            postcondition=postcondition,
+            sampler_stop=sampler_stop,
+            readiness_failures=readiness_failures,
+            samples=samples,
+        )
+        print(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "status": row["status"],
+                    "jsonl": str(Path(args.out) / (run_id + ".jsonl")),
+                    "csv": str(Path(args.out) / (run_id + ".csv")),
+                },
+                sort_keys=True,
+            )
+        )
+        return (
+            0
+            if row["status"] in ("observed", "right_censored")
+            and not (cleanup and not cleanup.ok)
+            and not restore_error
+            else 1
+        )
+
+    def _observe_until_recovery(
+        self,
+        contract: Contract,
+        run_id: str,
+        evidence_dir: Path,
+        sampler: Sampler,
+        baseline: Observation,
+        window: _ObservationWindow,
+    ) -> None:
+        """Inject, repair, and sample until recovery or the frozen deadline."""
+        args = self.args
+        try:
+            injection = inject(self.kubectl, contract, args.scenario, run_id, self.clock)
+            window.injection = injection
+            deadline = injection.started.mono + args.timeout
+            sampler.deadline = deadline
+            t0 = injection.started.mono
+            next_repair = self.clock.now().mono
+            while self.clock.now().mono < deadline:
+                if sampler.error:
+                    raise InstrumentationError(str(sampler.error))
+                samples = sampler.snapshot()
+                window.samples = samples
+                now = self.clock.now().mono
+                if now >= deadline:
+                    break
+                if samples and window.evidence_at is None:
+                    latest = samples[-1]
+                    if args.scenario == "A":
+                        changed = hpa_changed(contract.baseline_hpa, latest.hpa)
+                        keys = _hpa_keys()
+                    else:
+                        diffs = field_diffs(contract, latest)
+                        changed = bool(diffs)
+                        keys = sorted({diff["resource"] for diff in diffs})
+                    evaluated = self.clock.now()
+                    latest.evaluated_at = evaluated
+                    latest.evaluated_signal = bool(changed)
+                    latest.evaluated_reads = list(keys)
+                    if changed and _reads_eligible(latest, keys, t0, deadline):
+                        window.evidence_at = evaluated
+                        if args.scenario == "A":
+                            window.evidence_ref = "samples.jsonl"
+                        else:
+                            evidence_ref = "diff-" + _short(run_id) + "-collector.json"
+                            window.evidence_ref = evidence_ref
+                            try:
+                                _write_json(
+                                    evidence_dir / evidence_ref,
+                                    {
+                                        "run_id": run_id,
+                                        "at": _point_dict(latest.at),
+                                        "diffs": read_diff_evidence(contract, latest),
+                                    },
+                                )
+                            except OSError as error:
+                                raise InstrumentationError(
+                                    f"collector evidence write failed: {type(error).__name__}"
+                                ) from None
+                            window.evidence_store_at = self.clock.now()
+                if (
+                    args.arm == "imperative"
+                    and args.scenario in "BCDEFG"
+                    and now >= next_repair
+                    and samples
+                ):
+                    latest = samples[-1]
+                    diffs = field_diffs(contract, latest)
+                    keys = sorted({diff["resource"] for diff in diffs})
+                    evaluated = self.clock.now()
+                    if keys and _reads_eligible(latest, keys, t0, deadline):
+                        if window.imperative is None:
+                            window.imperative = ImperativeRun()
+                        imperative = window.imperative
+                        if imperative.detection_at is None:
+                            imperative.detection_at = evaluated
+                            imperative.detection_reads = keys
+                            imperative.evidence_at = evaluated
+                            imperative.evidence_reads = keys
+                            evidence_ref = "diff-" + _short(run_id) + ".json"
+                            imperative.evidence_ref = evidence_ref
+                            try:
+                                _write_json(
+                                    evidence_dir / evidence_ref,
+                                    {
+                                        "run_id": run_id,
+                                        "at": _point_dict(latest.at),
+                                        "diffs": read_diff_evidence(contract, latest),
+                                    },
+                                )
+                            except OSError as error:
+                                raise InstrumentationError(
+                                    f"imperative evidence write failed: {type(error).__name__}"
+                                ) from None
+                            imperative.evidence_store_at = self.clock.now()
+                        commands = repair(self.kubectl, contract, latest, self.clock)
+                        imperative.commands.extend(commands)
+                        if any(not command.ok for command in commands):
+                            imperative.failed = True
+                    next_repair = now + args.imperative_interval
+                if len(samples) >= 2:
+                    candidate = analyze_timeline(
+                        contract,
+                        samples,
+                        injection,
+                        args.arm,
+                        args.scenario,
+                        args.timeout,
+                        window.imperative,
+                        evidence_at=window.evidence_at,
+                        provided_evidence_ref=window.evidence_ref,
+                        app=args.app,
+                        baseline=baseline,
+                    )
+                    if candidate["recovery_seconds"] is not None:
+                        break
+                time.sleep(args.sample_interval)
+        finally:
+            window.sampler_stop = sampler.stop()
+            window.samples = sampler.snapshot()
+
+    def _write_evidence(
+        self,
+        args: argparse.Namespace,
+        evidence_dir: Path,
+        *,
+        row: dict,
+        baseline: Observation | None,
+        contract: Contract | None,
+        injection: Injection | None,
+        imperative: ImperativeRun | None,
+        arm_evidence: ArmEvidence | None,
+        cleanup: CleanupReport | None,
+        postcondition: dict | None,
+        sampler_stop: dict | None,
+        readiness_failures: list,
+        samples: list,
+    ) -> None:
+        """Assemble the per-run evidence payload and write all artifacts."""
         evidence: dict[str, Any] = {
             "baseline": baseline if baseline else None,
             "contract": contract.as_dict() if contract else None,
@@ -3715,24 +3979,6 @@ class LiveRunner:
             for sample in samples
         ]
         write_outputs(row, args, evidence_dir, evidence)
-        print(
-            json.dumps(
-                {
-                    "run_id": run_id,
-                    "status": row["status"],
-                    "jsonl": str(Path(args.out) / (run_id + ".jsonl")),
-                    "csv": str(Path(args.out) / (run_id + ".csv")),
-                },
-                sort_keys=True,
-            )
-        )
-        return (
-            0
-            if row["status"] in ("observed", "right_censored")
-            and not (cleanup and not cleanup.ok)
-            and not restore_error
-            else 1
-        )
 
     def _postcondition(
         self, snapshotter: Snapshotter, contract: Contract, scenario: str, arm: str
@@ -3988,6 +4234,11 @@ class LiveRunner:
         return base
 
 
+# --------------------------------------------------------------------------
+# Entrypoint
+# --------------------------------------------------------------------------
+
+
 def _run_dry(args: argparse.Namespace) -> int:
     run_id = args.run_id or (
         "dryrun-"
@@ -4014,6 +4265,7 @@ def _run_dry(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint with the documented exit-code mapping."""
     try:
         args = parse_args(argv)
         validate_namespace(args.namespace)

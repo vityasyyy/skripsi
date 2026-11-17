@@ -1791,6 +1791,7 @@ def write_outputs(result: dict, outdir: str | Path, *, force: bool = False) -> d
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse analyzer CLI arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--in", dest="source", type=Path, required=True, help="<batch_id>.analysis.jsonl"
@@ -1819,6 +1820,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Load inputs, run the analysis, and write JSON and LaTeX artifacts."""
     args = parse_args(argv)
     try:
         rows = _load_jsonl(args.source)

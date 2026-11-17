@@ -98,11 +98,11 @@ MANIFEST_KEYS = (
 
 
 class BatchError(Exception):
-    pass
+    """Base class for batch runner failures."""
 
 
 class BatchSafetyError(BatchError):
-    pass
+    """A refused batch operation that maps to exit code 2."""
 
 
 def _utc_now() -> str:
@@ -127,6 +127,7 @@ def _as_list(values: str | list[str], label: str) -> list[str]:
 
 
 def parse_arms(values: str | list[str]) -> list[str]:
+    """Parse and order the selected arms."""
     selected: set[str] = set()
     for token in _as_list(values, "arms"):
         name = token.lower()
@@ -137,6 +138,7 @@ def parse_arms(values: str | list[str]) -> list[str]:
 
 
 def parse_scenarios(values: str | list[str]) -> list[str]:
+    """Parse scenario letters and ranges in A-G order."""
     selected: set[str] = set()
     for token in _as_list(values, "scenarios"):
         normalized = token.upper()
@@ -154,6 +156,7 @@ def parse_scenarios(values: str | list[str]) -> list[str]:
 
 
 def phase_for(rep: int) -> str:
+    """Return R2 or R1 for a frozen repetition number."""
     if rep in R2_REPS:
         return "R2"
     if rep in R1_REPS:
@@ -189,6 +192,7 @@ def build_plan(arms: list, scenarios: list, reps: int, seed: int) -> dict:
 
 
 def default_batch_id(args: argparse.Namespace) -> str:
+    """Derive the deterministic batch id from the invocation identity."""
     identity = {
         "arms": list(args.arms),
         "scenarios": list(args.scenarios),
@@ -207,10 +211,12 @@ def default_batch_id(args: argparse.Namespace) -> str:
 
 
 def run_id_for(batch_id: str, item: dict) -> str:
+    """Return the canonical run id for one planned cell."""
     return f"{batch_id}-{item['arm']}-{item['scenario']}-r{item['rep']:02d}"
 
 
 def run_id_for_retry(run_id: str, retry: int) -> str:
+    """Return the deterministic retry id for one attempt."""
     return f"{run_id}-retry{retry}"
 
 
@@ -222,6 +228,7 @@ def run_slots(run_id: str, retries: int) -> Iterator[str]:
 
 
 def final_run_id(entry: dict) -> str:
+    """Return the last attempt id recorded for a run."""
     attempts = entry.get("attempts") or []
     return attempts[-1]["run_id"] if attempts else entry["run_id"]
 
@@ -288,6 +295,7 @@ def _counts(runs: list) -> dict:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse batch CLI arguments and validate their bounds."""
     parser = argparse.ArgumentParser(description=__doc__)
     tokens = list(sys.argv[1:] if argv is None else argv)
     parser.add_argument("--arms", nargs="+", default=list(ARMS), metavar="ARM")
@@ -336,6 +344,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def validate_batch_args(args: argparse.Namespace) -> None:
+    """Perform the shared live preflight for a batch."""
     harness.validate_namespace(args.namespace)
     if not args.live:
         return
@@ -640,6 +649,7 @@ def _resolve_batch_id(args: argparse.Namespace, plan: dict) -> str:
 def annotate_row(
     row: dict, entry: dict, args: argparse.Namespace, batch_id: str, attempt: dict | None = None
 ) -> dict:
+    """Attach batch identity and provenance to one preserved row."""
     annotated = dict(row)
     marker = annotated.get("timing_convention")
     if marker != TIMING_CONVENTION:
@@ -1145,6 +1155,7 @@ def run_batch(
     | None = None,
     sleep: Callable[[float], None] | None = None,
 ) -> int:
+    """Execute or resume the planned batch and write its outputs."""
     sleep = sleep or time.sleep
     validate_batch_args(args)
     plan = build_plan(args.arms, args.scenarios, args.reps, args.seed)
@@ -1291,6 +1302,7 @@ def run_batch(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint with the documented exit-code mapping."""
     try:
         args = parse_args(argv)
         return run_batch(args)
