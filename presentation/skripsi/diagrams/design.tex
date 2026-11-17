@@ -21,26 +21,26 @@
 
 \node[box=gitopsblue, text width=2.5cm] (stack) {
     \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
-    \textbf{Satu stack}\\
+    \textbf{Satu \textit{stack}}\\
     InvenioRDM\\
     27 objek render
 };
 \node[box=gitopsblue, right=of stack] (gitops) {
     \includegraphics[height=9pt]{logos/argocd.png}\\[1pt]
-    \textbf{Lengan GitOps}\\
+    \textbf{Mode GitOps}\\
     ArgoCD aktif\\
-    15 run
+    15 \textit{run}
 };
 \node[box=manualgray, right=of gitops] (reset) {
     \textbf{Reset baseline}\\
     verifikasi inventaris\\
-    jeda 60 detik
+    penangguhan 60 detik
 };
 \node[box=manualgray, right=of reset] (imperative) {
     \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
-    \textbf{Lengan imperatif}\\
-    ArgoCD dijeda\\
-    checker + runbook
+    \textbf{Mode imperatif}\\
+    ArgoCD ditangguhkan\\
+    checker + \textit{runbook}
 };
 \node[box=metricyellow!85!black, right=of imperative, text width=2.5cm] (eval) {
     \textbf{Evaluator}\\
@@ -57,9 +57,9 @@
 \node[note, below=0.42cm of stack.south west, anchor=north west] (n1)
     {\textbf{Bukan dua deployment.}\\Satu stack dipakai bergantian.};
 \node[note, below=0.42cm of reset.south, anchor=north] (n2)
-    {\textbf{HPA aktif di kedua lengan.}\\Skenario A adalah kontrol HPA.};
+    {\textbf{HPA aktif pada kedua mode.}\\Skenario A adalah kontrol HPA.};
 \node[note, below=0.42cm of eval.south east, anchor=north east] (n3)
-    {\textbf{Tanpa waktu reaksi manusia.}\\Urutan lengan tetap dan tidak diacak.};
+    {\textbf{Tanpa waktu reaksi manusia.}\\Urutan mode tetap dan tidak diacak.};
 
 \end{tikzpicture}
 \end{document}
