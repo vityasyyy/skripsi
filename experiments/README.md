@@ -38,7 +38,7 @@ R1, p-value, ukuran efek, dan keputusan Holm).
 ## Verifikasi instrumen
 
 ```bash
-make test-experiments       # 470 tes offline (467 inti + 3 sensitivity)
+make test-experiments       # tes inti dan sensitivity
 make lint-experiments       # Ruff, mypy, ShellCheck, bash -n
 make coverage-experiments   # 100% baris dan cabang
 make check-experiments      # agregat
@@ -46,10 +46,12 @@ make check-experiments      # agregat
 
 Versi alat pengembangan ada di [`requirements-dev.txt`](requirements-dev.txt);
 CI menjalankan gerbang yang sama pada Python 3.9 dan 3.12. Gerbang cakupan
-mengukur enam modul yang diimpor suite offline (`analyze_live`, `summarize`,
-`convert`, `declaration`, `harness`, `run_matrix`). `scripts/`, `sensitivity/`,
-dan skrip analisis historis diuji lewat subprocess atau suite terpisah, tetapi
-tidak dihitung dalam gerbang baris karena tidak diimpor oleh suite tersebut.
+menggabungkan suite inti dan suite sensitivity, lalu mengukur seluruh modul
+runtime yang diimpor: `analyze_live`, `summarize`, `convert`, `declaration`,
+`harness`, `run_matrix`, `run_one`, `acquire-readonly`, `instruments`, dan
+`c_r02_sensitivity`. Hanya `analysis/analyze.py` dan `analysis/mockgen.py`
+(analisis historis dengan dependensi pandas/scipy) yang dikecualikan sebagai
+artefak historis.
 
 ## Dua mode berurutan pada satu stack
 

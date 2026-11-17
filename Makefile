@@ -125,6 +125,7 @@ lint-experiments:
 
 coverage-experiments:
 	uv run --with-requirements experiments/requirements-dev.txt coverage run --rcfile=experiments/.coveragerc -m unittest discover -s experiments/tests
+	uv run --with-requirements experiments/requirements-dev.txt coverage run -a --rcfile=experiments/.coveragerc -m unittest discover -s experiments/sensitivity -p 'test_*.py'
 	uv run --with-requirements experiments/requirements-dev.txt coverage report --rcfile=experiments/.coveragerc --fail-under=100
 
 check-experiments: test-experiments lint-experiments coverage-experiments

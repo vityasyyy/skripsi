@@ -53,6 +53,7 @@ jobs:
       - name: Enforce branch coverage
         run: |
           coverage run --rcfile=experiments/.coveragerc -m unittest discover -s experiments/tests
+          coverage run -a --rcfile=experiments/.coveragerc -m unittest discover -s experiments/sensitivity -p 'test_*.py'
           coverage report --rcfile=experiments/.coveragerc --fail-under=100
 
       - name: Ruff lint

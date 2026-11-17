@@ -1,19 +1,14 @@
 [run]
 branch = True
 source = experiments
-# The offline suite imports six modules. Modules exercised only through a
-# subprocess, the frozen historical analyzer, the standalone sensitivity
-# script, or not exercised by the offline suite (run_one.py, mockgen.py) are
-# listed explicitly so the measured scope is auditable rather than an accident
-# of import discovery.
+# The offline suite imports the measured modules directly. Only the frozen
+# historical pandas analyzer and its mock generator remain outside the line
+# gate: their third-party dependencies are not part of the experiment runtime.
 omit =
     experiments/tests/*
-    experiments/sensitivity/test_c_r02_sensitivity.py
-    experiments/sensitivity/c_r02_sensitivity.py
-    experiments/live/run_one.py
+    experiments/sensitivity/test_*.py
     experiments/analysis/analyze.py
     experiments/analysis/mockgen.py
-    experiments/scripts/*
 
 [report]
 fail_under = 100

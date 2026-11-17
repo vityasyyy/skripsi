@@ -32,4 +32,5 @@ ignore = [
 
 [lint.per-file-ignores]
 "tests/*" = ["ARG001", "ARG002", "ARG005"]  # test doubles keep callback signatures
+"sensitivity/test_*.py" = ["ARG001", "ARG005"]  # fake analyzer keeps callback signatures
 "analysis/analyze.py" = ["E501"]  # frozen historical analyzer; formatting is out of scope
