@@ -1,0 +1,11 @@
+[run]
+branch = True
+source = experiments
+omit = experiments/tests/*
+
+[report]
+fail_under = 100
+exclude_lines =
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    # pragma: no cover

@@ -1,0 +1,28 @@
+target-version = "py39"
+line-length = 100
+exclude = ["analysis/outputs"]
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+    "PLW",  # pylint warnings
+    "ISC",  # implicit string concatenation
+    "DTZ",  # datetime timezone
+    "TRY",  # tryceratops
+    "PERF", # perflint
+    "PIE",  # flake8-pie
+    "RET",  # flake8-return
+    "ARG",  # flake8-unused-arguments
+    "C4",   # flake8-comprehensions
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["ARG002"]  # unittest helpers accept unused test-double arguments
+"analysis/analyze.py" = ["E501"]  # frozen historical analyzer; formatting is out of scope
