@@ -57,7 +57,7 @@ satu sel tetap dianalisis melalui percobaan ulang.
 
 | Run / attempt | Status mentah | Alasan analyzer | Penyebab | Efek |
 |---|---|---|---|---|
-| `formal-20261029-gitops-C-r01` | `instrumentation_failure` | `status_not_analyzable` | Kolektor tidak menghasilkan sampel awal; metrics-server tidak tersedia | Sel C-r01 tidak punya baris analisis |
+| `formal-20261029-gitops-C-r01` | `instrumentation_failure` | `status_not_analyzable` | Kolektor tidak menghasilkan sampel awal, atau metrics-server tidak tersedia | Sel C-r01 tidak punya baris analisis |
 | `formal-20261029-gitops-C-r08` (attempt 0) | `baseline_failure` | `status_not_analyzable` | Application `invenio-bootstrap` tidak `Synced/Healthy` sebelum injeksi | Percobaan gagal; sel dianalisis lewat `-retry1` |
 | `formal-20261029-gitops-C-r02` | `observed` | `batch_stop` | Run lengkap dan teramati, tetapi proses harness keluar dengan kode 2 | Baris dikecualikan konservatif; dianalisis terpisah di sensitivity |
 | `formal-20261029-imperative-G-r05` | `instrumentation_failure` | `status_not_analyzable` | Kegagalan instrumentasi/metrik | Sel G-r05 tidak punya baris analisis |

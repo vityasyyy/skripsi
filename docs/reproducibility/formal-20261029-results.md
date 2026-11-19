@@ -29,7 +29,7 @@ mapping is in [`claim-traceability.md`](claim-traceability.md).
 
 | Reason | Count | Affected run | Detail |
 |---|---|---|---|
-| Instrumentation failure | 2 | `gitops-C-r01`, `imperative-G-r05` | Collector produced no initial sample; metrics-server unavailable |
+| Instrumentation failure | 2 | `gitops-C-r01`, `imperative-G-r05` | Collector produced no initial sample, or metrics-server was unavailable |
 | Baseline failure, retried | 1 | `gitops-C-r08` attempt 0 | `invenio-bootstrap` was not Synced/Healthy before injection; `-retry1` is observed and analyzed |
 | Batch stop | 1 | `gitops-C-r02` | Complete observed run; harness process exited non-zero, so the row is excluded conservatively |
 
