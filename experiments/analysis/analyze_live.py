@@ -43,6 +43,8 @@ METRICS = ("detection", "evidence", "recovery")
 STATUSES = frozenset({"observed", "right_censored"})
 METRIC_STATUSES = STATUSES | {"unobserved_before_stop"}
 TIMING_CONVENTION = "completed-observation-v1"
+# ``visibility_boundary`` is a retained output key for schema compatibility.
+# Scenario F is currently the declared Service/invenio-web targetPort drift.
 POPULATIONS = {
     "A": "hpa_control",
     "B": "managed_drift",

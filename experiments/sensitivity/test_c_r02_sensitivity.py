@@ -23,6 +23,29 @@ def _load_module() -> types.ModuleType:
     return module
 
 
+class DefaultsTest(unittest.TestCase):
+    def test_defaults_are_repo_relative_not_home_based(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.object(Path, "home", return_value=Path(tmp)),
+        ):
+            module = _load_module()
+        repo = Path(module.__file__ or __file__).resolve().parents[2]
+        expected = {
+            "_DEFAULT_BATCH_DIR": repo / "experiments" / "formal-20261029",
+            "_DEFAULT_ANALYSIS_JSON": (
+                repo / "experiments" / "analysis-formal-20261029" / "live_analysis.json"
+            ),
+        }
+        for name, path in expected.items():
+            with self.subTest(name=name):
+                default = getattr(module, name)
+                self.assertTrue(default.is_absolute())
+                self.assertEqual(default, path)
+                self.assertNotIn(Path(tmp), default.parents)
+        self.assertEqual(module._REPO_ROOT, repo)
+
+
 class FrozenOutputGuardTest(unittest.TestCase):
     def setUp(self) -> None:
         self.module = _load_module()
