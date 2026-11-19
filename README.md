@@ -108,7 +108,7 @@ skripsi/
 │   ├── live/                        # Harness dan orkestrator batch
 │   ├── analysis/                    # Analisis dan tabel LaTeX
 │   ├── sensitivity/                 # Analisis sensitivitas C-r02
-│   ├── tests/                       # 491 tes offline
+│   ├── tests/                       # 492 tes offline
 │   ├── REVISIONS.md                 # Tag beku dan provenance kode
 │   ├── DATA.md                      # Inventaris data dan checksum
 │   └── ARCHITECTURE.md              # Peta modul dan aliran bukti

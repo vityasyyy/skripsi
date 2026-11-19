@@ -62,7 +62,7 @@ make coverage-experiments   # 100% baris dan cabang
 make check-experiments      # agregat
 ```
 
-Status verifikasi 19 November 2026: 491 tes inti dan 9 tes sensitivity lulus;
+Status verifikasi 19 November 2026: 492 tes inti dan 9 tes sensitivity lulus;
 analisis beku direproduksi identik dengan seed `20261029`. Rincian perintah dan
 hasil ada di
 [`../docs/reproducibility/verification-2026-11-19.md`](../docs/reproducibility/verification-2026-11-19.md).

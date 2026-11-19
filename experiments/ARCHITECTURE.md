@@ -17,7 +17,7 @@ dokumen ini tidak mengubah skema atau perilaku.
 | [`analysis/summarize.py`](analysis/summarize.py) | Ringkasan deskriptif yang memisahkan sensor dan endpoint hilang | `summarize()` |
 | [`sensitivity/c_r02_sensitivity.py`](sensitivity/c_r02_sensitivity.py) | Analisis sensitivitas satu baris C-r02 | `main()` |
 | [`scripts/`](scripts/) | Validasi bukti offline; tidak menjalankan klaster | `*.sh`, `instruments.py` |
-| [`tests/`](tests/) | 491 tes inti offline | `python3 -m unittest discover -s experiments/tests` |
+| [`tests/`](tests/) | 492 tes inti offline | `python3 -m unittest discover -s experiments/tests` |
 | [`sensitivity/test_c_r02_sensitivity.py`](sensitivity/test_c_r02_sensitivity.py) | 9 tes sensitivity | `python3 -m unittest discover -s experiments/sensitivity` |
 
 ## Aliran data

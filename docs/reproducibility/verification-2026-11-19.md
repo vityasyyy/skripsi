@@ -89,11 +89,11 @@ Observed result: exit 0.
 
 | Gate | Result |
 |---|---|
-| Core tests | 491 passed |
+| Core tests | 492 passed |
 | Sensitivity tests | 9 passed |
-| Coverage | 100% lines and branches; 4,956 statements, 1,862 branches, 20 modules |
+| Coverage | 100% lines and branches; 4,926 statements, 1,924 branches, 20 modules |
 | Ruff check | All checks passed |
-| Ruff format check | 41 files already formatted |
+| Ruff format check | 44 files already formatted |
 | Mypy | No issues in 23 source files |
 | ShellCheck | No findings |
 | `bash -n` | No syntax errors |
@@ -102,7 +102,7 @@ The standalone commands in the worker brief also pass:
 
 ```bash
 python3 -m unittest discover -s experiments/tests -q
-# Ran 491 tests ... OK
+# Ran 492 tests ... OK
 python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -q
 # Ran 9 tests ... OK
 ```

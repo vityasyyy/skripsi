@@ -54,7 +54,7 @@ Setelah itu, branch integrasi 2026-11-19 menambahkan:
 - `45a7fa6` — `refactor(experiments): split harness and analyzer behind stable facades`;
 - commit dokumentasi/provenance, koreksi tesis/deck, dan refresh PDF.
 
-Pemisahan modul diuji dengan 491 tes inti + 9 tes sensitivity, keluaran analisis
+Pemisahan modul diuji dengan 492 tes inti + 9 tes sensitivity, keluaran analisis
 beku yang identik, dan dry-run 210 sel. Commit-commit tersebut tidak mengubah
 apparatus koleksi; `HEAD` tetap bukan revisi koleksi.
 
