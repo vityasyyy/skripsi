@@ -38,8 +38,10 @@ untuk batas `stack_isolated: false`, `r3_status: not_measured`, dan
 
 ### Analisis inferensial batch live
 
-`summarize.py` tetap deskriptif. `analyze_live.py` menerapkan keluarga uji yang
-dibekukan pada Bab III terhadap `<batch_id>.analysis.jsonl`. `--rows` opsional
+`summarize.py` tetap deskriptif. `analyze_live.py` adalah facade stabil yang
+menerapkan keluarga uji beku Bab III; perhitungan statistik, survival, dan
+render LaTeX berada di `stats.py`, `survival.py`, dan `latex.py`, dengan
+konstanta bersama di `core.py`. `--rows` opsional
 menambahkan hitungan eksklusi dari `<batch_id>.rows.jsonl`; tanpa berkas itu,
 eksklusi dilaporkan sebagai tidak dihitung, bukan nol.
 

@@ -27,55 +27,85 @@ descriptive non-Argo
 from __future__ import annotations
 
 import argparse
-import itertools
 import json
 import math
-import random
 import re
 import sys
 from pathlib import Path
 from statistics import median
-from typing import TypedDict, cast
+from typing import cast
 
-SCENARIOS = tuple("ABCDEFG")
-EFFICACY_SCENARIOS = frozenset("BCDE")
-METRICS = ("detection", "evidence", "recovery")
-STATUSES = frozenset({"observed", "right_censored"})
-METRIC_STATUSES = STATUSES | {"unobserved_before_stop"}
-TIMING_CONVENTION = "completed-observation-v1"
-# ``visibility_boundary`` is a retained output key for schema compatibility.
-# Scenario F is currently the declared Service/invenio-web targetPort drift.
-POPULATIONS = {
-    "A": "hpa_control",
-    "B": "managed_drift",
-    "C": "managed_drift",
-    "D": "managed_drift",
-    "E": "managed_drift",
-    "F": "visibility_boundary",
-    "G": "descriptive_non_argo",
-}
-ROW_GROUPS = {
-    "A": "hpa_control",
-    "B": "managed_drift",
-    "C": "managed_drift",
-    "D": "managed_drift",
-    "E": "managed_drift",
-    "F": "visibility_boundary",
-    "G": "managed_drift",
-}
-ARM_ENV = {"imperative": "manual", "gitops": "gitops"}
-ARM_ORDER = {"manual": 0, "gitops": 1}
-METRIC_LABELS = {
-    "detection": "Deteksi",
-    "evidence": "Bukti",
-    "recovery": "Pemulihan",
-}
-MIN_PAIRS = 2
-MIN_GROUP = 3
-FAMILY_SIZE = len(EFFICACY_SCENARIOS) * len(METRICS)
-DEFAULT_SEED = 20261027
-DEFAULT_BOOTSTRAP = 2000
-DEFAULT_ALPHA = 0.05
+try:
+    from . import core as core
+except ImportError:  # direct script execution
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import core as core  # type: ignore[no-redef]
+
+try:
+    from . import latex as latex
+except ImportError:  # direct script execution
+    import latex as latex  # type: ignore[no-redef]
+
+try:
+    from . import stats as stats
+except ImportError:  # direct script execution
+    import stats as stats  # type: ignore[no-redef]
+
+try:
+    from . import survival as survival
+except ImportError:  # direct script execution
+    import survival as survival  # type: ignore[no-redef]
+
+# Stable re-exports: the facade keeps the original analyzer namespace available.
+SCENARIOS = core.SCENARIOS
+EFFICACY_SCENARIOS = core.EFFICACY_SCENARIOS
+METRICS = core.METRICS
+STATUSES = core.STATUSES
+METRIC_STATUSES = core.METRIC_STATUSES
+TIMING_CONVENTION = core.TIMING_CONVENTION
+POPULATIONS = core.POPULATIONS
+ROW_GROUPS = core.ROW_GROUPS
+ARM_ENV = core.ARM_ENV
+ARM_ORDER = core.ARM_ORDER
+METRIC_LABELS = core.METRIC_LABELS
+MIN_PAIRS = core.MIN_PAIRS
+MIN_GROUP = core.MIN_GROUP
+FAMILY_SIZE = core.FAMILY_SIZE
+DEFAULT_SEED = core.DEFAULT_SEED
+DEFAULT_BOOTSTRAP = core.DEFAULT_BOOTSTRAP
+DEFAULT_ALPHA = core.DEFAULT_ALPHA
+_EndpointCounts = core._EndpointCounts
+LiveAnalysisError = core.LiveAnalysisError
+_number = core._number
+_require = core._require
+_excluded_count = core._excluded_count
+
+_average_ranks = stats._average_ranks
+cliffs_delta = stats.cliffs_delta
+mann_whitney_u = stats.mann_whitney_u
+wilcoxon_signed_rank = stats.wilcoxon_signed_rank
+holm_adjust = stats.holm_adjust
+_percentile = stats._percentile
+_bootstrap_cliff = stats._bootstrap_cliff
+_bootstrap_median = stats._bootstrap_median
+_pairing = stats._pairing
+_comparison = stats._comparison
+
+kaplan_meier = survival.kaplan_meier
+_survival_entries = survival._survival_entries
+
+_tex_escape = latex._tex_escape
+_num = latex._num
+_p = latex._p
+_interval = latex._interval
+_overview_tex = latex._overview_tex
+_exclusions_tex = latex._exclusions_tex
+_r1_cell = latex._r1_cell
+_r1_tex = latex._r1_tex
+_survival_tex = latex._survival_tex
+_tests_tex = latex._tests_tex
+_effects_tex = latex._effects_tex
+
 BATCH_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
 REVISION = re.compile(r"[0-9a-f]{40}")
 RENDER = re.compile(r"[0-9a-f]{64}")
@@ -155,21 +185,6 @@ REQUIRED_FIELDS = frozenset(
 )
 
 
-class _EndpointCounts(TypedDict):
-    observed: int
-    right_censored: int
-    missing: int
-    excluded: int | None
-
-
-class LiveAnalysisError(ValueError):
-    """Input is not a valid batch analysis dataset."""
-
-
-def _number(value: object) -> bool:
-    return type(value) in (int, float) and math.isfinite(cast(float, value))
-
-
 def _load_jsonl(path: str | Path) -> list[dict]:
     rows = []
     try:
@@ -189,11 +204,6 @@ def _load_jsonl(path: str | Path) -> list[dict]:
     if not rows:
         raise LiveAnalysisError("empty JSONL input")
     return rows
-
-
-def _require(condition: object, message: str) -> None:
-    if not condition:
-        raise LiveAnalysisError(message)
 
 
 def _validate_metric(row: dict, metric: str) -> None:
@@ -520,485 +530,6 @@ def validate_rows(rows: list) -> dict:
         "timing_convention": conventions.pop(),
         "analysis_rows": len(rows),
     }
-
-
-def _average_ranks(values: list) -> list[float]:
-    order = sorted(range(len(values)), key=lambda index: values[index])
-    ranks = [0.0] * len(values)
-    start = 0
-    while start < len(order):
-        end = start + 1
-        while end < len(order) and values[order[end]] == values[order[start]]:
-            end += 1
-        rank = (start + 1 + end) / 2.0
-        for position in range(start, end):
-            ranks[order[position]] = rank
-        start = end
-    return ranks
-
-
-def cliffs_delta(first: list, second: list) -> float | None:
-    """P(first > second) - P(first < second), in [-1, 1]."""
-    if not first or not second:
-        return None
-    greater = sum(1 for left in first for right in second if left > right)
-    less = sum(1 for left in first for right in second if left < right)
-    return (greater - less) / (len(first) * len(second))
-
-
-def mann_whitney_u(first: list, second: list) -> dict:
-    """Two-sided Mann--Whitney U via the tie-corrected normal approximation."""
-    n1, n2 = len(first), len(second)
-    if n1 < MIN_GROUP or n2 < MIN_GROUP:
-        return {
-            "statistic": None,
-            "p_value": None,
-            "method": "not_estimable",
-            "n_manual": n1,
-            "n_gitops": n2,
-            "note": "fewer than 3 per arm",
-        }
-    combined = list(first) + list(second)
-    ranks = _average_ranks(combined)
-    rank_sum = sum(ranks[:n1])
-    u1 = rank_sum - n1 * (n1 + 1) / 2.0
-    u2 = n1 * n2 - u1
-    total = n1 + n2
-    tie_sum = 0
-    for value in set(combined):
-        count = combined.count(value)
-        tie_sum += count**3 - count
-    variance = (n1 * n2 / 12.0) * ((total + 1) - tie_sum / (total * (total - 1)))
-    if variance <= 0:
-        return {
-            "statistic": min(u1, u2),
-            "p_value": 1.0,
-            "method": "normal_approximation_tie_corrected",
-            "n_manual": n1,
-            "n_gitops": n2,
-            "note": "all observations tied",
-        }
-    z = (abs(u1 - n1 * n2 / 2.0) - 0.5) / math.sqrt(variance)
-    p_value = 2.0 * (1.0 - 0.5 * (1.0 + math.erf(z / math.sqrt(2.0))))
-    p_value = min(1.0, max(0.0, p_value))
-    return {
-        "statistic": min(u1, u2),
-        "p_value": p_value,
-        "method": "normal_approximation_tie_corrected",
-        "n_manual": n1,
-        "n_gitops": n2,
-        "note": None,
-    }
-
-
-def wilcoxon_signed_rank(differences: list) -> dict:
-    """Two-sided Wilcoxon signed-rank test with exact p for n <= 16."""
-    nonzero = [value for value in differences if value != 0]
-    n = len(nonzero)
-    if n == 0:
-        return {
-            "statistic": 0.0,
-            "w_plus": 0.0,
-            "w_minus": 0.0,
-            "p_value": 1.0,
-            "method": "all_zero",
-            "n_nonzero": 0,
-            "n_pairs": len(differences),
-            "rank_biserial": 0.0,
-        }
-    ranks = _average_ranks([abs(value) for value in nonzero])
-    w_plus = sum(rank for rank, value in zip(ranks, nonzero) if value > 0)
-    w_minus = sum(rank for rank, value in zip(ranks, nonzero) if value < 0)
-    if n <= 16:
-        observed = round(w_plus, 9)
-        lower = upper = 0
-        for signs in itertools.product((1, -1), repeat=n):
-            total = round(sum(rank for rank, sign in zip(ranks, signs) if sign > 0), 9)
-            if total <= observed + 1e-9:
-                lower += 1
-            if total >= observed - 1e-9:
-                upper += 1
-        p_value = min(1.0, 2.0 * min(lower, upper) / (2**n))
-        method = "exact_sign_flip"
-    else:
-        mean = n * (n + 1) / 4.0
-        tie_sum = 0
-        for value in {abs(item) for item in nonzero}:
-            count = sum(1 for item in nonzero if abs(item) == value)
-            tie_sum += count**3 - count
-        variance = n * (n + 1) * (2 * n + 1) / 24.0 - tie_sum / 48.0
-        z = (abs(w_plus - mean) - 0.5) / math.sqrt(variance)
-        p_value = 2.0 * (1.0 - 0.5 * (1.0 + math.erf(z / math.sqrt(2.0))))
-        p_value = min(1.0, max(0.0, p_value))
-        method = "normal_approximation_tie_corrected"
-    total_rank = w_plus + w_minus
-    rank_biserial = ((w_plus - w_minus) / total_rank) if total_rank else 0.0
-    return {
-        "statistic": w_plus,
-        "w_plus": w_plus,
-        "w_minus": w_minus,
-        "p_value": p_value,
-        "method": method,
-        "n_nonzero": n,
-        "n_pairs": len(differences),
-        "rank_biserial": rank_biserial,
-    }
-
-
-def kaplan_meier(events: list, censored: list, horizon: float) -> dict:
-    """Kaplan--Meier curve and restricted mean survival to `horizon`.
-
-    Events beyond the horizon are administratively censored at the horizon.
-    Censored observations contribute risk time but never an event or a zero.
-    """
-    _require(_number(horizon) and horizon > 0, "horizon must be positive")
-    _require(
-        all(_number(value) and value >= 0 for value in events),
-        "event times must be finite and non-negative",
-    )
-    _require(
-        all(_number(value) and value >= 0 for value in censored),
-        "censor times must be finite and non-negative",
-    )
-    n = len(events) + len(censored)
-    if n == 0:
-        return {
-            "n": 0,
-            "events": 0,
-            "censored": 0,
-            "horizon_seconds": horizon,
-            "median_seconds": None,
-            "median_reached": False,
-            "rmst_seconds": None,
-            "survival_at_horizon": None,
-        }
-    timeline: dict[float, list[int]] = {}
-    observed = 0
-    for value in events:
-        if value > horizon:
-            timeline[horizon] = timeline.get(horizon, [0, 0])
-            timeline[horizon][1] += 1
-        else:
-            timeline.setdefault(value, [0, 0])[0] += 1
-            observed += 1
-    for value in censored:
-        at = min(value, horizon)
-        timeline.setdefault(at, [0, 0])[1] += 1
-    at_risk = n
-    survival = 1.0
-    previous = 0.0
-    rmst = 0.0
-    median_time = None
-    for time in sorted(timeline):
-        deaths, stopped = timeline[time]
-        rmst += survival * (time - previous)
-        previous = time
-        if at_risk > 0 and deaths:
-            survival *= 1.0 - deaths / at_risk
-            if median_time is None and survival <= 0.5:
-                median_time = time
-        at_risk -= deaths + stopped
-    rmst += survival * max(0.0, horizon - previous)
-    return {
-        "n": n,
-        "events": observed,
-        "censored": n - observed,
-        "horizon_seconds": horizon,
-        "median_seconds": median_time,
-        "median_reached": median_time is not None,
-        "rmst_seconds": rmst,
-        "survival_at_horizon": survival,
-    }
-
-
-def holm_adjust(p_values: list, family_size: int) -> list[float | None]:
-    """Holm step-down adjusted p-values, preserving input order."""
-    _require(family_size >= len(p_values), "family size cannot be smaller than tested hypotheses")
-    _require(
-        all(_number(value) and 0 <= value <= 1 for value in p_values), "p-values must be in [0, 1]"
-    )
-    adjusted: list[float | None] = [None] * len(p_values)
-    running = 0.0
-    for rank, index in enumerate(sorted(range(len(p_values)), key=lambda item: p_values[item]), 1):
-        candidate = min(1.0, (family_size - rank + 1) * p_values[index])
-        running = max(running, candidate)
-        adjusted[index] = running
-    return adjusted
-
-
-def _percentile(sorted_values: list, fraction: float) -> float | None:
-    if not sorted_values:
-        return None
-    position = (len(sorted_values) - 1) * fraction
-    lower = math.floor(position)
-    upper = math.ceil(position)
-    if lower == upper:
-        return sorted_values[lower]
-    weight = position - lower
-    return sorted_values[lower] * (1 - weight) + sorted_values[upper] * weight
-
-
-def _bootstrap_cliff(
-    first: list, second: list, resamples: int, seed: int, pairs: list | None = None
-) -> list[float | None] | None:
-    if not first or not second:
-        return None
-    rng = random.Random(f"{seed}:cliff")
-    values = []
-    if pairs:
-        for _ in range(resamples):
-            sample = [pairs[rng.randrange(len(pairs))] for _ in pairs]
-            values.append(cliffs_delta([item[0] for item in sample], [item[1] for item in sample]))
-    else:
-        for _ in range(resamples):
-            left = [rng.choice(first) for _ in first]
-            right = [rng.choice(second) for _ in second]
-            values.append(cliffs_delta(left, right))
-    values.sort()
-    return [_percentile(values, 0.025), _percentile(values, 0.975)]
-
-
-def _bootstrap_median(values: list, resamples: int, seed: int) -> list[float | None] | None:
-    if not values:
-        return None
-    rng = random.Random(f"{seed}:paired")
-    draws = sorted(median([rng.choice(values) for _ in values]) for _ in range(resamples))
-    return [_percentile(draws, 0.025), _percentile(draws, 0.975)]
-
-
-def _excluded_count(
-    exclusions: dict | None, scenario: str, arm: str, phase: str = "R2"
-) -> int | None:
-    if exclusions is None or exclusions.get("count") is None:
-        return None
-    return sum(
-        1
-        for item in exclusions["rows"]
-        if item.get("scenario") == scenario
-        and ARM_ENV.get(item.get("arm"), item.get("arm")) == arm
-        and item.get("phase") == phase
-    )
-
-
-def _pairing(rows: list, metric: str) -> dict:
-    arms: dict[str, dict[int, dict]] = {"manual": {}, "gitops": {}}
-    for row in rows:
-        arms[row["env"]][row["rep"]] = row
-    blocks = sorted(set(arms["manual"]) | set(arms["gitops"]))
-    matched = [rep for rep in blocks if rep in arms["manual"] and rep in arms["gitops"]]
-    complete = [
-        rep
-        for rep in matched
-        if arms["manual"][rep][metric + "_status"] == "observed"
-        and arms["gitops"][rep][metric + "_status"] == "observed"
-    ]
-    missing = [
-        rep
-        for rep in matched
-        if "unobserved_before_stop"
-        in (arms["manual"][rep][metric + "_status"], arms["gitops"][rep][metric + "_status"])
-    ]
-    censored = [
-        rep
-        for rep in matched
-        if rep not in missing
-        and "right_censored"
-        in (arms["manual"][rep][metric + "_status"], arms["gitops"][rep][metric + "_status"])
-    ]
-    unmatched = len(blocks) - len(matched)
-    if blocks and not unmatched and not missing and not censored and len(complete) >= MIN_PAIRS:
-        return {
-            "method": "paired",
-            "reason": "complete_paired_blocks",
-            "blocks": len(blocks),
-            "complete_pairs": len(complete),
-            "right_censored_blocks": 0,
-            "missing_blocks": 0,
-            "unmatched_blocks": 0,
-            "censored_blocks": 0,
-        }
-    if not blocks:
-        reason = "no_r2_rows"
-    elif unmatched:
-        reason = "unmatched_arm_blocks"
-    elif missing:
-        reason = "missing_blocks"
-    elif censored:
-        reason = "censored_blocks"
-    else:
-        reason = "fewer_than_2_pairs"
-    return {
-        "method": "unpaired",
-        "reason": reason,
-        "blocks": len(blocks),
-        "complete_pairs": len(complete),
-        "right_censored_blocks": len(censored),
-        "missing_blocks": len(missing),
-        "unmatched_blocks": unmatched,
-        "censored_blocks": len(censored),
-    }
-
-
-def _comparison(
-    rows: list,
-    scenario: str,
-    metric: str,
-    bootstrap: int,
-    seed: int,
-    exclusions: dict | None = None,
-) -> dict:
-    pairing = _pairing(rows, metric)
-    manual = {row["rep"]: row for row in rows if row["env"] == "manual"}
-    gitops = {row["rep"]: row for row in rows if row["env"] == "gitops"}
-    observed: dict[str, list[float]] = {"manual": [], "gitops": []}
-    counts: dict[str, _EndpointCounts] = {}
-    for arm, rows_by_rep in (("manual", manual), ("gitops", gitops)):
-        counts[arm] = {
-            "observed": 0,
-            "right_censored": 0,
-            "missing": 0,
-            "excluded": _excluded_count(exclusions, scenario, arm),
-        }
-        for row in rows_by_rep.values():
-            status = row[metric + "_status"]
-            if status == "observed":
-                observed[arm].append(row[metric + "_seconds"])
-                counts[arm]["observed"] += 1
-            elif status == "right_censored":
-                counts[arm]["right_censored"] += 1
-            else:
-                counts[arm]["missing"] += 1
-    differences: list[float] = []
-    pairs: list[tuple[float, float]] = []
-    if pairing["method"] == "paired":
-        for rep in sorted(set(manual) & set(gitops)):
-            left = manual[rep][metric + "_seconds"]
-            right = gitops[rep][metric + "_seconds"]
-            differences.append(left - right)
-            pairs.append((left, right))
-    effect = {
-        "cliffs_delta": cliffs_delta(observed["manual"], observed["gitops"]),
-        "cliffs_delta_ci": _bootstrap_cliff(
-            observed["manual"], observed["gitops"], bootstrap, seed, pairs=pairs or None
-        ),
-        "cliffs_delta_bootstrap": ("paired_blocks" if pairs else "independent_arms"),
-        "median_paired_difference": None,
-        "median_paired_difference_ci": None,
-        "rank_biserial": None,
-    }
-    if pairing["method"] == "paired":
-        difference_median = median(differences)
-        effect["median_paired_difference"] = difference_median
-        effect["median_paired_difference_ci"] = _bootstrap_median(differences, bootstrap, seed)
-        test = wilcoxon_signed_rank(differences)
-        effect["rank_biserial"] = test["rank_biserial"]
-        test_name = "wilcoxon_signed_rank"
-        statistic = test["statistic"]
-        p_value = test["p_value"]
-        method = test["method"]
-        size = {"n_pairs": len(differences), "n_nonzero": test["n_nonzero"]}
-    elif len(observed["manual"]) >= MIN_GROUP and len(observed["gitops"]) >= MIN_GROUP:
-        test = mann_whitney_u(observed["manual"], observed["gitops"])
-        test_name = "mann_whitney_u"
-        statistic = test["statistic"]
-        p_value = test["p_value"]
-        method = test["method"]
-        size = {"n_manual": len(observed["manual"]), "n_gitops": len(observed["gitops"])}
-    else:
-        test_name, statistic, p_value = "not_estimable", None, None
-        method = "not_estimable"
-        size = {"n_manual": len(observed["manual"]), "n_gitops": len(observed["gitops"])}
-    if pairing["method"] == "paired":
-        analysis_set = "paired_complete_blocks"
-        note = "Paired complete-case comparison; censored blocks are not used in the efficacy test."
-    elif test_name == "not_estimable":
-        analysis_set = "not_estimable"
-        note = "Not estimable from the available observations."
-    else:
-        analysis_set = "observed_values_only"
-        note = "Unpaired fallback uses observed values only; censoring is not adjusted."
-    if pairing["missing_blocks"]:
-        note += (
-            " Missing endpoints are excluded from the numeric test and "
-            "are not treated as censored observations."
-        )
-    return {
-        "scenario": scenario,
-        "metric": metric,
-        "population": "managed_drift",
-        "pairing": pairing,
-        "analysis_set": analysis_set,
-        "censoring_adjusted": False,
-        "note": note,
-        "endpoints": counts,
-        "test": {
-            "name": test_name,
-            "statistic": statistic,
-            "p_value": p_value,
-            "method": method,
-            **size,
-        },
-        "effect": effect,
-    }
-
-
-def _survival_entries(rows: list, exclusions: dict | None = None) -> list:
-    groups: dict[tuple[str, str], list[dict]] = {}
-    for row in rows:
-        groups.setdefault((row["scenario"], row["env"]), []).append(row)
-    entries = []
-    for (scenario, arm), group in sorted(
-        groups.items(), key=lambda item: (item[0][0], ARM_ORDER[item[0][1]])
-    ):
-        for metric in METRICS:
-            events = [
-                row[metric + "_seconds"] for row in group if row[metric + "_status"] == "observed"
-            ]
-            censored = [
-                row["censor_seconds"]
-                for row in group
-                if row[metric + "_status"] == "right_censored"
-            ]
-            missing = sum(1 for row in group if row[metric + "_status"] == "unobserved_before_stop")
-            excluded = _excluded_count(exclusions, scenario, arm)
-            horizon = min(row["censor_seconds"] for row in group)
-            curve = kaplan_meier(events, censored, horizon)
-            administrative = sum(1 for value in events if value > horizon)
-            estimable = bool(events or censored)
-            note = None
-            if not estimable:
-                note = (
-                    "not estimable: all endpoints are missing before stop; "
-                    "they are not censored observations"
-                )
-            elif administrative:
-                note = "observed events beyond the RMST horizon are administratively censored"
-            elif curve["events"] == 0:
-                note = "all observations censored"
-            elif missing:
-                note = "missing endpoints excluded from survival, not censored"
-            elif not curve["median_reached"]:
-                note = "median not reached within horizon"
-            entries.append(
-                {
-                    "scenario": scenario,
-                    "arm": arm,
-                    "metric": metric,
-                    "population": POPULATIONS[scenario],
-                    "included_in_efficacy": scenario in EFFICACY_SCENARIOS,
-                    **curve,
-                    "observed": len(events),
-                    "right_censored": len(censored),
-                    "missing": missing,
-                    "excluded_runs": excluded,
-                    "estimable": estimable,
-                    "censor_limits_seconds": sorted({row["censor_seconds"] for row in group}),
-                    "administratively_censored": administrative,
-                    "median_estimable": curve["median_reached"],
-                    "note": note,
-                }
-            )
-    return entries
 
 
 def _r1_entries(rows: list) -> list:
@@ -1409,356 +940,6 @@ def analyze(
             "The RMST horizon is the smallest frozen censor limit per group.",
         ],
     }
-
-
-def _tex_escape(value: object) -> str:
-    text = str(value).replace("\n", " ").replace("\r", " ").replace("\t", " ")
-    replacements = {
-        "\\": r"\textbackslash{}",
-        "&": r"\&",
-        "%": r"\%",
-        "$": r"\$",
-        "#": r"\#",
-        "_": r"\_",
-        "{": r"\{",
-        "}": r"\}",
-        "~": r"\textasciitilde{}",
-        "^": r"\textasciicircum{}",
-    }
-    return "".join(replacements.get(char, char) for char in text)
-
-
-def _num(value: float | None, digits: int = 3) -> str:
-    if value is None:
-        return "--"
-    return f"{value:.{digits}f}".replace(".", ",")
-
-
-def _p(value: float | None) -> str:
-    if value is None:
-        return "--"
-    if value < 0.001:
-        return "$<0{,}001$"
-    return f"{value:.3f}".replace(".", ",")
-
-
-def _interval(value: float | None, interval: list | None) -> str:
-    if value is None:
-        return "--"
-    if interval is None:
-        return _num(value)
-    return f"{_num(value)} [{_num(interval[0])}; {_num(interval[1])}]"
-
-
-def _overview_tex(result: dict) -> str:
-    lines = [
-        "% Generated by experiments/analysis/analyze_live.py; do not edit.",
-        r"\begin{table}[H]",
-        r"\centering",
-        r"\footnotesize",
-        r"\setlength{\tabcolsep}{4pt}",
-        r"\caption{Ringkasan populasi dan baris R2 batch live}",
-        r"\label{tab:live-overview}",
-        r"\begin{tabular}{llrrrl}",
-        r"\hline",
-        (
-            r"Skenario & Lengan & Baris R2 & Run teramati & Run tersensor & "
-            r"Populasi analisis \\"
-        ),
-        r"\hline",
-    ]
-    totals = [0, 0, 0]
-    for item in result["overview"]:
-        totals[0] += item["rows"]
-        totals[1] += item["observed_runs"]
-        totals[2] += item["right_censored_runs"]
-        lines.append(
-            f"{item['scenario']} & {item['arm']} & {item['rows']} & "
-            f"{item['observed_runs']} & {item['right_censored_runs']} & "
-            f"{_tex_escape(item['population'])} \\\\"
-        )
-    lines.extend(
-        [
-            r"\hline",
-            f"Total & -- & {totals[0]} & {totals[1]} & {totals[2]} & -- \\\\",
-            r"\hline",
-            r"\end{tabular}",
-            r"\end{table}",
-        ]
-    )
-    batch = result["batch"]
-    approved = "true" if batch["formal_execution_approved"] else "false"
-    isolated = "true" if batch["stack_isolated"] else "false"
-    excluded = result["exclusions"]
-    if excluded["count"] is None:
-        exclusion_text = "Eksklusi tidak dihitung karena rows.jsonl tidak diberikan."
-    else:
-        reasons = ", ".join(
-            f"{_tex_escape(key)}={value}" for key, value in excluded["by_reason"].items()
-        )
-        exclusion_text = (
-            f"Eksklusi: {excluded['count']} baris dari "
-            f"{excluded['raw_rows']} baris mentah" + (f" ({reasons})" if reasons else "") + "."
-        )
-    lines.extend(
-        [
-            r"\par\smallskip",
-            r"\noindent\footnotesize Batch: "
-            + _tex_escape(batch["batch_id"])
-            + f"; formal execution approved: {approved}; stack isolated: "
-            + f"{isolated}; baris R1: {batch['r1_rows']}.",
-            (
-                r"\par\noindent\footnotesize Klaim: eksploratif studi kasus tunggal; "
-                r"tidak ada klaim konfirmatoris."
-            ),
-            r"\par\noindent\footnotesize " + exclusion_text,
-            (
-                r"\par\noindent\footnotesize R3: not measured. Tidak ada klaim "
-                r"keterlacakan atau audit."
-            ),
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def _exclusions_tex(result: dict) -> str:
-    excluded = result["exclusions"]
-    lines = [
-        "% Generated by experiments/analysis/analyze_live.py; do not edit.",
-        r"\begin{table}[H]",
-        r"\centering",
-        r"\footnotesize",
-        r"\setlength{\tabcolsep}{4pt}",
-        r"\caption{Baris batch yang dieksklusi dari analisis}",
-        r"\label{tab:live-exclusions}",
-        r"\begin{tabular}{lllrl}",
-        r"\hline",
-        r"Run ID & Lengan & Skenario & Rep & Alasan \\",
-        r"\hline",
-    ]
-    if excluded["count"] is None:
-        lines.append(r"\multicolumn{5}{l}{Tidak dihitung (rows.jsonl tidak diberikan).} \\")
-    elif excluded["count"] == 0:
-        lines.append(r"\multicolumn{5}{l}{Tidak ada baris tereksklusi.} \\")
-    else:
-        lines.extend(
-            f"{_tex_escape(item['run_id'])} & "
-            f"{_tex_escape(item['arm'] or '--')} & "
-            f"{_tex_escape(item['scenario'] or '--')} & "
-            f"{item['rep'] if item['rep'] is not None else '--'} & "
-            f"{_tex_escape(item['reason'])} \\\\"
-            for item in excluded["rows"]
-        )
-    lines.extend([r"\hline", r"\end{tabular}", r"\end{table}", ""])
-    return "\n".join(lines)
-
-
-def _r1_cell(block: dict) -> str:
-    if block["present"] == 0:
-        return "-- (0)"
-    return f"{_num(block['median'])} ({block['present']})"
-
-
-def _r1_tex(result: dict) -> str:
-    lines = [
-        "% Generated by experiments/analysis/analyze_live.py; do not edit.",
-        r"\begin{table}[H]",
-        r"\centering",
-        r"\footnotesize",
-        r"\setlength{\tabcolsep}{4pt}",
-        r"\caption{Deskriptif R1 per skenario, lengan, dan fase (persen)}",
-        r"\label{tab:live-r1}",
-        r"\begin{tabular}{llrrrrr}",
-        r"\hline",
-        r"Skenario & Lengan & Fase & $n$ & Baseline & First & Last \\",
-        r"\hline",
-    ]
-    lines.extend(
-        f"{item['scenario']} & {item['arm']} & {item['phase']} & "
-        f"{item['rows']} & {_r1_cell(item['baseline'])} & "
-        f"{_r1_cell(item['first'])} & {_r1_cell(item['last'])} \\\\"
-        for item in result["r1"]
-    )
-    lines.extend(
-        [
-            r"\hline",
-            r"\end{tabular}",
-            r"\end{table}",
-            r"\par\smallskip",
-            (
-                r"\noindent\footnotesize Nilai adalah median bagian teramati; angka "
-                r"dalam kurung adalah jumlah observasi. Nilai hilang tidak "
-                r"diimputasi."
-            ),
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def _survival_tex(result: dict) -> str:
-    lines = [
-        "% Generated by experiments/analysis/analyze_live.py; do not edit.",
-        r"\begin{table}[H]",
-        r"\centering",
-        r"\footnotesize",
-        r"\setlength{\tabcolsep}{3pt}",
-        r"\caption{Kaplan--Meier dan RMST waktu R2 per skenario dan lengan}",
-        r"\label{tab:live-survival}",
-        r"\begin{tabular}{lllrrrrrrrrr}",
-        r"\hline",
-        (
-            r"Skenario & Lengan & Metrik & $n$ & Event & Tersensor & Hilang & "
-            r"Eksklusi & Horizon (s) & Median (s) & RMST (s) \\"
-        ),
-        r"\hline",
-    ]
-    for item in result["survival"]:
-        median_text = _num(item["median_seconds"])
-        if not item["estimable"]:
-            median_text = r"--$^{\dagger}$"
-        elif not item["median_reached"]:
-            median_text = "--$^{*}$"
-        lines.append(
-            f"{item['scenario']} & {item['arm']} & "
-            f"{METRIC_LABELS[item['metric']]} & {item['n']} & "
-            f"{item['events']} & {item['censored']} & {item['missing']} & "
-            f"{item['excluded_runs'] if item['excluded_runs'] is not None else '--'} & "
-            f"{_num(item['horizon_seconds'])} & {median_text} & "
-            f"{_num(item['rmst_seconds'])} \\\\"
-        )
-    lines.extend(
-        [
-            r"\hline",
-            r"\end{tabular}",
-            r"\end{table}",
-            r"\par\smallskip",
-            (
-                r"\noindent\footnotesize $^{*}$ Median tidak tercapai dalam horizon. "
-                r"$^{\dagger}$ Tidak terestimasi karena seluruh endpoint hilang "
-                r"sebelum berhenti, bukan tersensor. Data tersensor tidak diimputasi "
-                r"nol; RMST memakai horizon batas penyensoran terkecil per kelompok. "
-                r"Endpoint hilang tidak masuk Kaplan--Meier, RMST, atau uji numerik. "
-                r"A = kontrol HPA, F = batas visibilitas, G = deskriptif non-Argo; "
-                r"hanya B--E masuk efikasi."
-            ),
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def _tests_tex(result: dict) -> str:
-    lines = [
-        "% Generated by experiments/analysis/analyze_live.py; do not edit.",
-        r"\begin{table}[H]",
-        r"\centering",
-        r"\footnotesize",
-        r"\setlength{\tabcolsep}{2pt}",
-        r"\caption{Uji eksploratif efikasi drift terkelola B--E}",
-        r"\label{tab:live-tests}",
-        r"\begin{tabular}{lllrrrrl}",
-        r"\hline",
-        (
-            r"Skenario & Metrik & Uji & $n$ & Statistik & $p$ & "
-            r"$p_{\mathrm{Holm}}$ & Keputusan \\"
-        ),
-        r"\hline",
-    ]
-    for item in result["efficacy"]:
-        test = item["test"]
-        if test["name"] == "wilcoxon_signed_rank":
-            test_text = "Wilcoxon (P)"
-            size = f"{test['n_pairs']} pasang"
-        elif test["name"] == "mann_whitney_u":
-            test_text = "Mann--Whitney (U)"
-            size = f"{test['n_manual']} vs {test['n_gitops']}"
-        else:
-            test_text, size = "Tidak terestimasi", "--"
-        if item["reject_holm"] is None:
-            decision = "--"
-        elif item["reject_holm"]:
-            decision = "tolak"
-        else:
-            decision = "gagal"
-        lines.append(
-            f"{item['scenario']} & {METRIC_LABELS[item['metric']]} & "
-            f"{test_text} & {size} & {_num(test['statistic'])} & "
-            f"{_p(test['p_value'])} & {_p(item['holm_adjusted_p'])} & "
-            f"{decision} \\\\"
-        )
-    lines.extend(
-        [
-            r"\hline",
-            r"\end{tabular}",
-            r"\end{table}",
-            r"\par\smallskip",
-            (
-                r"\noindent\footnotesize P = berpasangan; U = tidak berpasangan "
-                r"(tersensor, hilang, tanpa pasangan, atau kurang dari dua pasangan). "
-                r"Keputusan: ``tolak'' = tolak $H_0$ setelah Holm; ``gagal'' = gagal "
-                r"menolak $H_0$; ``--'' = tidak terestimasi. Semua uji eksploratif; "
-                r"tidak ada klaim konfirmatoris. Keluarga Holm berisi 12 hipotesis "
-                r"B--E $\times$ \{deteksi, bukti, pemulihan\} yang ditetapkan sebelum "
-                r"data; hipotesis tak teruji diperlakukan sebagai $p=1$. Statistik "
-                r"Wilcoxon adalah $W^+$; statistik Mann--Whitney adalah $U$ terkecil. "
-                r"Selisih nol diabaikan pada Wilcoxon. Mann--Whitney memakai "
-                r"aproksimasi normal dengan koreksi ties, hanya pada nilai teramati, "
-                r"dan tidak menyesuaikan penyensoran."
-            ),
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def _effects_tex(result: dict) -> str:
-    lines = [
-        "% Generated by experiments/analysis/analyze_live.py; do not edit.",
-        r"\begin{table}[H]",
-        r"\centering",
-        r"\footnotesize",
-        r"\setlength{\tabcolsep}{4pt}",
-        r"\caption{Ukuran efek perbandingan manual terhadap gitops (B--E)}",
-        r"\label{tab:live-effects}",
-        r"\begin{tabular}{lllll}",
-        r"\hline",
-        (
-            r"Skenario & Metrik & Cliff $\delta$ [95\% CI] & "
-            r"$\Delta$ median [95\% CI] & RB \\"
-        ),
-        r"\hline",
-    ]
-    for item in result["efficacy"]:
-        effect = item["effect"]
-        rank = f"{_num(effect['rank_biserial'])}" if effect["rank_biserial"] is not None else "--"
-        difference = _interval(
-            effect["median_paired_difference"],
-            effect["median_paired_difference_ci"],
-        )
-        lines.append(
-            f"{item['scenario']} & {METRIC_LABELS[item['metric']]} & "
-            f"{_interval(effect['cliffs_delta'], effect['cliffs_delta_ci'])} & "
-            f"{difference} & {rank} \\\\"
-        )
-    lines.extend(
-        [
-            r"\hline",
-            r"\end{tabular}",
-            r"\end{table}",
-            r"\par\smallskip",
-            (
-                r"\noindent\footnotesize Selisih berpasangan $\Delta$ = manual $-$ "
-                r"gitops; nilai positif berarti manual lebih lama. RB = "
-                r"rank-biserial. Interval adalah percentile bootstrap deterministik; "
-                r"resampling mengikuti blok berpasangan bila pemasangan "
-                r"dipertahankan, selain itu per lengan."
-            ),
-            "",
-        ]
-    )
-    return "\n".join(lines)
 
 
 def write_outputs(result: dict, outdir: str | Path, *, force: bool = False) -> dict[str, str]:

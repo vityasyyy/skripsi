@@ -9,11 +9,11 @@ Kelulusan fixture tidak menyatakan klaster atau aplikasi siap.
 
 | Modul | Tanggung jawab |
 |---|---|
-| `live/harness.py` | Kontrol lengan, snapshot, kontrak R1, injeksi/repair, sampler, timeline, dan bukti per run |
+| `live/harness.py` | Facade stabil: `LiveRunner`, CLI, dan re-export; implementasi di `live/{model,transport,sampling,contract,scenarios,timeline}.py` |
 | `live/run_matrix.py` | Perencanaan urutan batch 210 run, retry baseline, resume, dan output analisis |
 | `live/declaration.py` | Validasi render beku dan pemilihan empat resource terukur |
 | `live/convert.py` | Jembatan arsip JSONL ke kolom CSV historis |
-| `analysis/analyze_live.py` | Uji eksploratif R2, survival, R1 deskriptif, dan tabel LaTeX |
+| `analysis/analyze_live.py` | Facade stabil: validasi input, orkestrasi analisis, dan re-export; statistik/survival/LaTeX di `analysis/{core,stats,survival,latex}.py` |
 | `analysis/summarize.py` | Ringkasan deskriptif v2 yang memisahkan sensor dan endpoint hilang |
 | `scripts/*.sh`, `scripts/instruments.py` | Validasi bukti offline; tidak menjalankan klaster |
 | `sensitivity/c_r02_sensitivity.py` | Analisis sensitivitas satu run C-r02 yang dieksklusi |
@@ -30,7 +30,8 @@ kolektor dan waktu UTC untuk audit.
 Instrumen formal dibekukan pada revisi
 `3572f3c1c11d3abc8b63882c4348b1b803d4256f` (`3572f3c`). Bentuk kode
 `live/harness.py` berubah pasca-koleksi (format, anotasi tipe, ekstraksi
-`_observe_until_recovery`/`_write_evidence`), tetapi perilaku instrumen
+`_observe_until_recovery`/`_write_evidence`, pemisahan modul di balik facade),
+tetapi perilaku instrumen
 dipertahankan dan diverifikasi oleh suite regresi. Golden test terpisah
 mengunci statistik `analyze_live` pada matriks sintetis (jumlah baris, median
 R1, p-value, ukuran efek, dan keputusan Holm).
