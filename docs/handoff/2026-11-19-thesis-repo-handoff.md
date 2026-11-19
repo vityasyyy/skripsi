@@ -2,7 +2,8 @@
 
 **Date:** 2026-11-19
 **Repository:** https://github.com/vityasyyy/skripsi
-**Base:** `main` at `e020630` (handoff merged as PR #46)
+**Base:** `main` at the time of writing; cleanup started at `b0c0f82`.
+Handoff merged as PRs #46 and #47.
 **Status:** planning and cleanup; no experiment behavior changed. The frozen
 instrument and analysis revisions remain the ones used for the thesis.
 
@@ -35,7 +36,8 @@ thesis/deck corrections listed below.
 
 ## Repository state (verified 2026-11-19)
 
-- `main` tip: `b0c0f82 chore: refactor experiment code and align CS terminology (#45)`.
+- `main` at cleanup start: `b0c0f82 chore: refactor experiment code and align CS terminology (#45)`.
+  The handoff documents were merged as PRs #46 and #47.
 - Tags pushed:
   - `thesis-collection-20261029` -> `3572f3c`
   - `thesis-analysis-20261030` -> `a1d43ea`
