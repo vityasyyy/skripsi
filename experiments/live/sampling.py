@@ -7,19 +7,19 @@ import threading
 from collections.abc import Callable
 from typing import Any, cast
 
-try:
+if __package__:
     from . import declaration as _declaration
-except ImportError:  # direct script execution
+else:  # direct script execution
     import declaration as _declaration  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import model as _model
-except ImportError:  # direct script execution
+else:  # direct script execution
     import model as _model  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import transport as _transport
-except ImportError:  # direct script execution
+else:  # direct script execution
     import transport as _transport  # type: ignore[no-redef]
 
 declaration = _declaration

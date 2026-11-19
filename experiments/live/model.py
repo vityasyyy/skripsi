@@ -10,9 +10,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-try:
+if __package__:
     from . import declaration as _declaration
-except ImportError:  # direct script execution
+else:  # direct script execution
     import declaration as _declaration  # type: ignore[no-redef]
 
 declaration = _declaration

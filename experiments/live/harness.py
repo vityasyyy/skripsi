@@ -28,35 +28,42 @@ from pathlib import Path
 from typing import Any
 from urllib import error as urlerror  # noqa: F401 - patched through the harness namespace
 
-try:
+if __package__:
     from . import contract as contract
-except ImportError:  # direct script execution
+else:  # direct script execution
     import contract as contract  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import model as model
-except ImportError:  # direct script execution
+else:  # direct script execution
     import model as model  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import sampling as sampling
-except ImportError:  # direct script execution
+else:  # direct script execution
     import sampling as sampling  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import scenarios as scenarios
-except ImportError:  # direct script execution
+else:  # direct script execution
     import scenarios as scenarios  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import timeline as timeline
-except ImportError:  # direct script execution
+else:  # direct script execution
     import timeline as timeline  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import transport as transport
-except ImportError:  # direct script execution
+else:  # direct script execution
     import transport as transport  # type: ignore[no-redef]
+
+if __package__:
+    from . import convert as _convert
+else:  # direct script execution
+    import convert as _convert  # type: ignore[no-redef]
+
+write_csv = _convert.write_csv
 
 # Stable re-exports: the facade keeps the original harness namespace available.
 ARMS = model.ARMS
@@ -404,10 +411,6 @@ def ensure_new_run(args: argparse.Namespace, run_id: str) -> None:
 
 def write_outputs(row: dict, args: argparse.Namespace, evidence_dir: Path, evidence: dict) -> None:
     """Write the row JSONL/CSV and per-run evidence files."""
-    try:
-        from .convert import write_csv
-    except ImportError:
-        from convert import write_csv  # type: ignore[no-redef]  # direct script execution
     run_id = row["run_id"]
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)

@@ -19,9 +19,9 @@ from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
 
-try:
+if __package__:
     from . import model as _model
-except ImportError:  # direct script execution
+else:  # direct script execution
     import model as _model  # type: ignore[no-redef]
 
 ARGO_NAMESPACE = _model.ARGO_NAMESPACE

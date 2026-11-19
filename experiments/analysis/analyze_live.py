@@ -35,25 +35,25 @@ from pathlib import Path
 from statistics import median
 from typing import cast
 
-try:
+if __package__:
     from . import core as core
-except ImportError:  # direct script execution
+else:  # direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import core as core  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import latex as latex
-except ImportError:  # direct script execution
+else:  # direct script execution
     import latex as latex  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import stats as stats
-except ImportError:  # direct script execution
+else:  # direct script execution
     import stats as stats  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import survival as survival
-except ImportError:  # direct script execution
+else:  # direct script execution
     import survival as survival  # type: ignore[no-redef]
 
 # Stable re-exports: the facade keeps the original analyzer namespace available.

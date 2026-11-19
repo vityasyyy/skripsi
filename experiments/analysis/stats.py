@@ -7,9 +7,9 @@ import math
 import random
 from statistics import median
 
-try:
+if __package__:
     from . import core as _core
-except ImportError:  # direct script execution
+else:  # direct script execution
     import core as _core  # type: ignore[no-redef]
 
 MIN_GROUP = _core.MIN_GROUP

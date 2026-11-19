@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-try:
+if __package__:
     from . import core as _core
-except ImportError:  # direct script execution
+else:  # direct script execution
     import core as _core  # type: ignore[no-redef]
 
 ARM_ORDER = _core.ARM_ORDER

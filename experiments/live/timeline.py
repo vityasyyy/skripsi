@@ -5,14 +5,14 @@ from __future__ import annotations
 import math
 from typing import Any, cast
 
-try:
+if __package__:
     from . import contract as _contract
-except ImportError:  # direct script execution
+else:  # direct script execution
     import contract as _contract  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import model as _model
-except ImportError:  # direct script execution
+else:  # direct script execution
     import model as _model  # type: ignore[no-redef]
 
 DEFAULT_APP = _model.DEFAULT_APP

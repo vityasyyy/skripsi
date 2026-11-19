@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import warnings
 from pathlib import Path
 from unittest import mock
 
@@ -39,6 +40,25 @@ class EntrypointSmokeTests(unittest.TestCase):
         self.assertTrue(callable(instruments.main))
         self.assertTrue(callable(acquire.main))
         self.assertTrue(callable(run_one.main))
+
+
+class PackageImportTests(unittest.TestCase):
+    def test_package_imports_avoid_relative_import_warnings(self):
+        root = str(ROOT.parent)
+        sys.path.insert(0, root)
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error")
+                from experiments.analysis import analyze_live as package_analyze_live
+                from experiments.live import harness as package_harness
+                from experiments.live import run_matrix as package_run_matrix
+                from experiments.live import run_one as package_run_one
+        finally:
+            sys.path.remove(root)
+        self.assertTrue(callable(package_analyze_live.main))
+        self.assertTrue(callable(package_harness.main))
+        self.assertTrue(callable(package_run_matrix.main))
+        self.assertTrue(callable(package_run_one.main))
 
 
 def bundle():

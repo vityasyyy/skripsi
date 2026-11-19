@@ -9,24 +9,24 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any, NoReturn, cast
 
-try:
+if __package__:
     from . import contract as _contract
-except ImportError:  # direct script execution
+else:  # direct script execution
     import contract as _contract  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import model as _model
-except ImportError:  # direct script execution
+else:  # direct script execution
     import model as _model  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import sampling as _sampling
-except ImportError:  # direct script execution
+else:  # direct script execution
     import sampling as _sampling  # type: ignore[no-redef]
 
-try:
+if __package__:
     from . import transport as _transport
-except ImportError:  # direct script execution
+else:  # direct script execution
     import transport as _transport  # type: ignore[no-redef]
 
 APP_OF_APPS = _model.APP_OF_APPS
