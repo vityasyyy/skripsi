@@ -1,0 +1,35 @@
+{
+  "archived_utc": "2026-10-30T05:05:49.969633+00:00",
+  "batch_id": "formal-20261029",
+  "cells_terminal": 210,
+  "cells_total": 210,
+  "pending": 0,
+  "raw_rows": 211,
+  "analysis_rows": 207,
+  "excluded": 4,
+  "freeze": {
+    "gitops": "81ddd259780e0e6aef333811a0126f86d70a094e",
+    "render_sha256": "a5efd711d661438590a730291c41b70d1c668b2672d51a54f68c0ff68e311703",
+    "thesis": "3572f3c1c11d3abc8b63882c4348b1b803d4256f",
+    "seed": 20261029,
+    "arm_order": [
+      "gitops",
+      "imperative"
+    ],
+    "scenario_order": [
+      "E",
+      "A",
+      "G",
+      "D",
+      "C",
+      "F",
+      "B"
+    ],
+    "convention": "completed-observation-v1"
+  },
+  "files_checksummed": {
+    "batch": 3024,
+    "analysis": 7
+  },
+  "note": "Collection complete. Four exclusions are instrumentation/environmental, never imputed. Exploratory single-case study; no confirmatory claim."
+}

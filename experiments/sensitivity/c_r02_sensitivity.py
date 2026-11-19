@@ -17,6 +17,12 @@ import sys
 import types
 from pathlib import Path
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_BATCH_DIR = _REPO_ROOT / "experiments" / "formal-20261029"
+_DEFAULT_ANALYSIS_JSON = (
+    _REPO_ROOT / "experiments" / "analysis-formal-20261029" / "live_analysis.json"
+)
+
 
 def _load_jsonl(path: Path) -> list[dict]:
     rows = []
@@ -62,22 +68,17 @@ def _reject_frozen_output(out: Path | None, batch_dir: Path, analysis_json: Path
 
 
 def main(argv: list[str] | None = None) -> int:
-    home = Path.home()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--batch-dir",
         type=Path,
-        default=home / "skripsi" / "experiments" / "formal-20261029",
+        default=_DEFAULT_BATCH_DIR,
         help="frozen formal batch directory (default: %(default)s)",
     )
     parser.add_argument(
         "--analysis-json",
         type=Path,
-        default=home
-        / "skripsi"
-        / "experiments"
-        / "analysis-formal-20261029"
-        / "live_analysis.json",
+        default=_DEFAULT_ANALYSIS_JSON,
         help="frozen primary live_analysis.json (default: %(default)s)",
     )
     parser.add_argument(

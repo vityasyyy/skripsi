@@ -1,11 +1,13 @@
 # Protokol observer dan kolektor otomatis
 
-**Status: rencana, bukan prosedur yang telah diuji secara formal.** Dokumen ini
-merinci observer/kolektor pasif untuk kedua mode pada Bab III. Tidak ada klaim
-hasil formal dalam dokumen ini. Eksperimen formal belum disetujui; seluruh
-gerbang pada Bab III tetap berlaku. Pilot terbatas pada 27 Oktober 2026 memakai
-stack yang sama dan merupakan bukti pilot; percobaan yang dihentikan tetap
-berstatus dihentikan dan bukan data formal.
+**Status: protokol historis; batch formal selesai.** Dokumen ini merinci
+observer/kolektor pasif yang dipakai batch `formal-20261029` pada 29--30 Oktober
+2026. Batch selesai dengan 210 sel terminal, 211 baris mentah, 207 baris
+analisis, dan 4 eksklusi. Analisis beku direproduksi identik dengan seed
+`20261029`. Dokumen ini bukan izin run baru dan tidak menambahkan klaim di luar
+[`../docs/reproducibility/formal-20261029-results.md`](../docs/reproducibility/formal-20261029-results.md).
+Pilot terbatas 27 Oktober 2026 tetap bukti pilot, bukan data formal; batch yang
+dihentikan sebelum `formal-20261029` tetap arsip historis.
 
 ## Ruang lingkup dan desain
 

@@ -1,13 +1,15 @@
 # Harness eksperimen live InvenioRDM
 
-**Status: implementasi offline-tested, dry-run default.** Dokumen ini bukan izin
-eksekusi. Pilot terbatas 27 Oktober 2026 berhasil dan tetap bukti pilot, bukan
-data formal. Percobaan formal yang tidak lengkap dihentikan; tidak ada
-peluncuran formal baru yang disetujui. Perubahan ini tidak menjalankan klaster.
-Gerbang formal yang tersisa pada `experiments/LIVE-OBSERVER.md` dan Bab III tetap
-berlaku; uji offline tidak membuktikan klaster, seed, kapasitas, recovery, atau
-metode siap. Batch formal 210 run (`run_matrix.py`) belum diselesaikan pada
-klaster.
+**Status: batch formal selesai; tidak ada run live baru yang disetujui.**
+Batch `formal-20261029` selesai pada 30 Oktober 2026 dengan 210 sel terminal,
+211 baris mentah, 207 baris analisis, dan 4 eksklusi terdokumentasi. Analisis
+beku direproduksi identik dengan seed `20261029`. Perintah `--live` di dokumen
+ini adalah prosedur historis yang dipakai batch tersebut dan tetap memerlukan
+izin, pembekuan apparatus, serta gate baru untuk batch berikutnya. Dry-run tetap
+default; uji offline tidak membuktikan klaster, seed, kapasitas, recovery, atau
+metode siap. Provenance ada di [`../REVISIONS.md`](../REVISIONS.md), inventaris
+data di [`../DATA.md`](../DATA.md), dan hasil di
+[`../../docs/reproducibility/formal-20261029-results.md`](../../docs/reproducibility/formal-20261029-results.md).
 
 Harness menargetkan **satu stack InvenioRDM nyata**:
 
@@ -31,7 +33,8 @@ namespace lengan kembar dan menolak run bila ada lebih dari satu stack
 |---|---|
 | `run_one.py` | CLI satu run; default dry-run, `--live` untuk mutasi nyata |
 | `run_matrix.py` | Orkestrator batch 210 run; manifest, resume, ringkasan R1/R2 |
-| `harness.py` | arm control, snapshot, kontrak R1, injeksi, repair, kolektor, timeline |
+| `harness.py` | facade stabil: `LiveRunner`, CLI, dan re-export |
+| `model.py`, `transport.py`, `sampling.py`, `contract.py`, `scenarios.py`, `timeline.py` | konstanta/rekaman, transport klaster, sampling, kontrak, kendali skenario, dan analisis timeline |
 | `declaration.py` | loader deklarasi render beku, seleksi empat resource, validasi identitas/bidang |
 | `convert.py` | konversi JSONL ke kolom CSV analisis historis |
 | `runs/` | keluaran runtime; diabaikan Git |
@@ -64,11 +67,18 @@ berurutan, bukan dua lingkungan serentak:
 - Batch memakai `--cooldown-seconds 60` dan `--baseline-retries 1` secara default;
   lihat bagian cooldown dan retry di bawah.
 
+Batch `formal-20261029` yang dijalankan memakai seed `20261029`, urutan mode
+`gitops, imperative`, urutan skenario `E, A, G, D, C, F, B`, dan konvensi
+`completed-observation-v1`. Hasilnya: 210 sel terminal, 211 baris mentah, 207
+baris analisis, dan 4 eksklusi. Perintah `--live` di bawah adalah prosedur
+historis yang dipakai batch itu; jangan menjalankannya tanpa batch ID, izin, dan
+pembekuan baru.
+
 Dry-run default (tanpa `kubectl`/HTTP):
 
 ```bash
 python3 experiments/live/run_matrix.py \
-  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
+  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261029 \
   --namespace invenio --out /tmp/invenio-batch-dry
 ```
 
@@ -79,7 +89,7 @@ Live hanya setelah izin formal dan setelah seluruh gate pada
 export INVENIO_TOKEN=...   # jangan pernah ditulis ke argumen, log, atau bukti
 python3 experiments/live/run_matrix.py \
   --live --confirm-single-stack --production-like \
-  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
+  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261029 \
   --namespace invenio --app invenio-bootstrap \
   --render-file /path/to/invenio-frozen-render.json \
   --source-revision <40-hex> --render-sha256 <64-hex> \
@@ -159,13 +169,13 @@ sel tetap satu observasi. Attempt baseline yang gagal tetap muncul di
 `rows.jsonl`/CSV sebagai bukti, tetapi tidak masuk `analysis.jsonl` maupun
 hitungan statistik.
 
-## Live (hanya setelah izin formal)
+## Live (historis; hanya dengan izin batch baru)
 
 ```bash
 export INVENIO_TOKEN=...   # jangan pernah ditulis ke argumen, log, atau bukti
 python3 experiments/live/run_one.py \
   --arm gitops --scenario B --rep 1 \
-  --namespace exp-arm-a --app invenio-bootstrap \
+  --namespace invenio --app invenio-bootstrap \
   --confirm-single-stack --live \
   --render-file /path/to/invenio-frozen-render.json \
   --source-revision <40-hex> --render-sha256 <64-hex> \
@@ -631,12 +641,16 @@ Tanpa flag, seluruh baris batch dan manifest tetap `formal_execution_approved:
 false`. Jangan menyalin metadata batch ke baris mentah harness atau menganggap
 dry-run sebagai observasi.
 
-## Gerbang formal yang belum tertutup
+## Batas dan gerbang historis
+
+Gerbang di bawah mendokumentasikan apa yang harus dibuka untuk batch berikutnya;
+batch `formal-20261029` sudah selesai dan tidak memerlukan gerbang ini lagi.
 
 1. **Kesiapan formal satu stack**: stack `invenio` adalah satu-satunya stack
    nyata pada arah desain satu stack berurutan. Ketersediaannya di guard tidak
    otomatis mensertifikasi kesiapan formal; izin, pembekuan, kapasitas, bukti
-   seed/recovery yang tersisa, dan bukti pendukung tetap harus ditutup.
+   seed/recovery yang tersisa, dan bukti pendukung tetap harus ditutup untuk
+   batch baru.
 2. **Audit API/R3 (dikecualikan)**: R3 tetap `not_measured`; audit API
    dikecualikan/ditunda dan bukan gerbang atau syarat mengaktifkan audit pada
    gelombang ini. Unsur pelaku tetap tidak dapat dinilai.
@@ -656,11 +670,10 @@ dry-run sebagai observasi.
    kontrol HPA, keluarga uji, dan penanganan data tersensor.
 7. **Kapasitas, NTP, SMTP, HA OpenSearch**: bukti jendela beban, sinkronisasi jam,
    relay email, dan HA belum ada; tidak boleh menjadi prasyarat diam-diam.
-8. **Pilot 27 Oktober dan percobaan formal yang dihentikan**: pilot terbatas
-   27 Oktober 2026 berhasil dan tetap bukti pilot, bukan data formal. Percobaan
-   formal yang tidak lengkap dihentikan dan bukan hasil; belum ada run formal
-   lengkap yang ditinjau. Tidak ada peluncuran formal baru yang disetujui, dan
-   harness belum terbukti siap untuk eksekusi formal.
+8. **Pilot dan batch formal**: pilot terbatas 27 Oktober 2026 berhasil dan
+   tetap bukti pilot, bukan data formal. Batch `formal-20261029` selesai dan
+   dianalisis; batch formal yang dihentikan sebelum itu tetap arsip historis,
+   bukan hasil. Tidak ada peluncuran formal baru yang disetujui.
 
 ## Keselamatan dan pengujian
 

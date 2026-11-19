@@ -52,3 +52,21 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 htmlcov/
+
+# Local experiment data and evidence (not publication-screened)
+experiments/formal-20261029/*/
+experiments/formal-20261029/*.jsonl
+experiments/formal-20261029/*.csv
+experiments/formal-20261029/*.manifest.json
+experiments/formal-20261029/*.summary.json
+!experiments/formal-20261029/SHA256SUMS
+!experiments/formal-20261029/PROVENANCE.json
+experiments/analysis-formal-20261029/
+experiments/evidence-local/
+experiments/pilot-*/
+
+# Local planning artifacts (never committed)
+docs/plans/
+
+experiments/pilot2-*/
+experiments/pilot3-*/

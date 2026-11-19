@@ -32,9 +32,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
-try:
+if __package__:
     from . import convert, harness
-except ImportError:
+else:  # direct script execution
     import convert  # type: ignore[no-redef]
     import harness  # type: ignore[no-redef]
 

@@ -1,4 +1,45 @@
-# Analisis bukti dan reproduksi historis
+# Analisis bukti, hasil formal, dan reproduksi historis
+
+## Hasil formal `formal-20261029`
+
+Batch formal selesai pada 30 Oktober 2026: 210 sel terminal, 211 baris mentah,
+207 baris analisis, dan 4 eksklusi. Analisis primer dan tabel LaTeX dibekukan di
+`experiments/analysis-formal-20261029/` (lokal, diabaikan Git): `live_analysis.json`
+dan enam tabel `.tex`. Checksum tujuh berkas ada di
+[`../DATA.md`](../DATA.md); ringkasan hasil ada di
+[`../../docs/reproducibility/formal-20261029-results.md`](../../docs/reproducibility/formal-20261029-results.md).
+
+Reproduksi identik:
+
+```bash
+python3 experiments/analysis/analyze_live.py \
+  --in experiments/formal-20261029/formal-20261029.analysis.jsonl \
+  --rows experiments/formal-20261029/formal-20261029.rows.jsonl \
+  --out /tmp/formal-20261029-rerun \
+  --bootstrap 2000 --seed 20261029 --alpha 0.05
+```
+
+`--seed` baku di kode adalah `20261027`; batch formal memakai `20261029`, jadi
+nilai itu harus diberikan eksplisit. Analisis sensitivitas C-r02 dijalankan
+dengan `python3 experiments/sensitivity/c_r02_sensitivity.py`; keluarannya tidak
+dikomit dan tidak mengubah analisis primer.
+
+### Taksonomi eksklusi
+
+Empat baris mentah tidak masuk analisis. Analyzer melaporkan
+`status_not_analyzable=3` dan `batch_stop=1`; prosa skripsi memecah tiga baris
+pertama menjadi dua kegagalan instrumentasi dan satu kegagalan baseline yang
+diulang. Himpunan barisnya sama:
+
+| Run | Alasan analyzer | Penyebab |
+|---|---|---|
+| `gitops-C-r01` | `status_not_analyzable` | Kegagalan instrumentasi; tidak ada sampel awal |
+| `gitops-C-r08` (attempt 0) | `status_not_analyzable` | Baseline gagal sebelum injeksi; diulang sebagai `-retry1` |
+| `gitops-C-r02` | `batch_stop` | Run lengkap dan teramati; harness keluar non-zero |
+| `imperative-G-r05` | `status_not_analyzable` | Kegagalan instrumentasi/metrik |
+
+Tiga sel tidak menghasilkan baris analisis; `gitops-C-r08` tetap dianalisis
+lewat percobaan ulang. Detail dan pemetaan lengkap ada di [`../DATA.md`](../DATA.md).
 
 ## Bukti v2 aktif
 
@@ -12,8 +53,8 @@ python3 experiments/analysis/summarize.py --in /path/hasil-v2.jsonl
 Ringkasan stdlib memisahkan skenario, lengan, kelompok analisis, data sintetis,
 revisi sumber, digest render, dan `timing_convention`. Dataset yang mencampur
 legacy dan baris bermarker, atau memakai marker tak dikenal, ditolak agar tidak
-dipool. A tetap `hpa_control`, F `visibility_boundary`, B--E/G `managed_drift`;
-tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap metrik, jumlah
+dipool. A tetap `hpa_control`, F `visibility_boundary`, B--E `managed_drift`,
+dan G `descriptive_non_argo`; tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap metrik, jumlah
 teramati, tersensor, dan hilang (`unobserved_before_stop`) tetap dilaporkan;
 missing hanya diterima dengan provenance recovery dini. Median hanya untuk
 bagian teramati dan **bukan** estimasi yang sudah disesuaikan terhadap
@@ -38,8 +79,10 @@ untuk batas `stack_isolated: false`, `r3_status: not_measured`, dan
 
 ### Analisis inferensial batch live
 
-`summarize.py` tetap deskriptif. `analyze_live.py` menerapkan keluarga uji yang
-dibekukan pada Bab III terhadap `<batch_id>.analysis.jsonl`. `--rows` opsional
+`summarize.py` tetap deskriptif. `analyze_live.py` adalah facade stabil yang
+menerapkan keluarga uji beku Bab III; perhitungan statistik, survival, dan
+render LaTeX berada di `stats.py`, `survival.py`, dan `latex.py`, dengan
+konstanta bersama di `core.py`. `--rows` opsional
 menambahkan hitungan eksklusi dari `<batch_id>.rows.jsonl`; tanpa berkas itu,
 eksklusi dilaporkan sebagai tidak dihitung, bukan nol.
 
@@ -51,9 +94,10 @@ python3 experiments/analysis/analyze_live.py \
 ```
 
 Keluaran yang sudah ada ditolak kecuali `--force` diberikan. Bootstrap bersifat
-deterministik: `--bootstrap 2000` (minimum 100), `--seed 20261027`, dan
-`--alpha 0.05` dapat diubah, tetapi nilai baku itulah yang harus dicatat untuk
-reproduksi. Tanpa `--rows`, eksklusi tidak dapat dihitung; `rows.jsonl` hanya
+deterministik: `--bootstrap 2000` (minimum 100), `--seed 20261027` (default
+kode), dan `--alpha 0.05` dapat diubah. Batch `formal-20261029` memakai
+`--seed 20261029`; nilai itulah yang harus dicatat untuk mereproduksi keluaran
+beku. Tanpa `--rows`, eksklusi tidak dapat dihitung; `rows.jsonl` hanya
 memuat run yang tercatat, sehingga run `not_run` tetap berada di manifest dan
 summary, dan tidak dihitung sebagai eksklusi di sini.
 
@@ -70,10 +114,16 @@ summary, dan tidak dihitung sebagai eksklusi di sini.
 Cara membaca hasil:
 
 - **Populasi.** Hanya B--E yang masuk efikasi *managed drift*. A tetap kontrol
-  HPA, F batas visibilitas, dan G deskriptif non-Argo. Ketiganya muncul di
-  tabel survival/overview tetapi tidak pernah dipool ke uji B--E. Baris batch
-  memberi G `efficacy_eligible: true` karena aturan runner hanya mengecualikan
-  A/F; analyzer menimpanya menjadi deskriptif non-Argo sesuai metode beku.
+  HPA, F drift Service terdeklarasi yang dilaporkan terpisah, dan G deskriptif
+  non-Argo. Ketiganya muncul di tabel survival/overview tetapi tidak pernah
+  dipool ke uji B--E. Kunci keluaran `visibility_boundary` untuk F adalah label
+  skema lama yang dipertahankan; arti prosa saat ini adalah drift
+  `Service/invenio-web` pada `targetPort` yang dideklarasikan, bukan objek tak
+  terkelola. Alasan F tetap di luar keluarga efikasi adalah keluarga dua belas
+  hipotesis ditetapkan sebelum koleksi, bukan karena F tidak terkelola. Baris
+  batch memberi G `efficacy_eligible: true` karena aturan runner hanya
+  mengecualikan A/F; analyzer menimpanya menjadi deskriptif non-Argo sesuai
+  metode beku.
 - **Pemilihan uji.** Wilcoxon *signed-rank* dipakai hanya bila setiap blok
   skenario-replikasi memiliki kedua lengan dan kedua nilai teramati; blok yang
   tersensor atau tanpa pasangan memaksa Mann--Whitney U. Alasan tercatat di

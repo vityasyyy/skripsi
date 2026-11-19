@@ -3,10 +3,10 @@
 
 import sys
 
-try:
+if __package__:
     from .harness import main
-except ImportError:
-    from harness import main  # type: ignore[no-redef]  # direct script execution
+else:  # direct script execution
+    from harness import main  # type: ignore[no-redef]
 
 
 if __name__ == "__main__":

@@ -2,8 +2,9 @@
 branch = True
 source = experiments
 # The offline suite imports the measured modules directly. Only the excluded
-# historical pandas analyzer and its mock generator remain outside the line
-# gate: their third-party dependencies are not part of the experiment runtime.
+# historical mock analyzer and its generator remain outside the line gate: they
+# use pandas/scipy/matplotlib and numpy, which are not part of the stdlib-only
+# experiment runtime (analyze.py also refuses measured input).
 omit =
     experiments/tests/*
     experiments/sensitivity/test_*.py
