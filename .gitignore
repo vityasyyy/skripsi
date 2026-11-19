@@ -64,3 +64,9 @@ experiments/formal-20261029/*.summary.json
 experiments/analysis-formal-20261029/
 experiments/evidence-local/
 experiments/pilot-*/
+
+# Local planning artifacts (never committed)
+docs/plans/
+
+experiments/pilot2-*/
+experiments/pilot3-*/
