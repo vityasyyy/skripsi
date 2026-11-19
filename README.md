@@ -6,6 +6,28 @@ Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi*
 
 > **Status metode:** Kedua mode dijalankan berurutan pada satu stack InvenioRDM produksi-like; HPA normal aktif pada kedua mode dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Harness live dan protokol kolektor ada di [`experiments/live/README.md`](experiments/live/README.md) dan [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md).
 
+## Status saat ini
+
+| Butir | Nilai |
+|---|---|
+| Skripsi | 68 halaman; 0 overfull, 14 underfull |
+| Deck sidang | 22 slide |
+| Batch formal | `formal-20261029` selesai 30 Oktober 2026; 210 sel terminal, 0 tertunda |
+| Baris analisis | 207 dari 211 baris mentah; 4 eksklusi terdokumentasi |
+| Analisis beku | Tujuh keluaran direproduksi identik dengan seed `20261029` |
+| Run live baru | Tidak ada; batch formal berikutnya memerlukan izin dan pembekuan baru |
+
+Angka hasil dan batas interpretasinya ada di
+[`docs/reproducibility/formal-20261029-results.md`](docs/reproducibility/formal-20261029-results.md).
+Provenance dan reproduksi:
+
+- [`experiments/REVISIONS.md`](experiments/REVISIONS.md) — tag beku dan status kode pasca-koleksi.
+- [`experiments/DATA.md`](experiments/DATA.md) — inventaris data, eksklusi, checksum, dan privasi.
+- [`experiments/ARCHITECTURE.md`](experiments/ARCHITECTURE.md) — peta modul, aliran data, dan batas kepercayaan.
+- [`docs/reproducibility/claim-traceability.md`](docs/reproducibility/claim-traceability.md) — klaim angka ke keluaran, kode, dan bukti mentah.
+- [`docs/reproducibility/verification-2026-11-19.md`](docs/reproducibility/verification-2026-11-19.md) — catatan verifikasi reproduksi.
+- [`docs/reproducibility/experiment-dossier.md`](docs/reproducibility/experiment-dossier.md) — indeks bukti untuk penguji.
+
 ---
 
 ## Quick Start
@@ -81,6 +103,20 @@ skripsi/
 ├── presentation/
 │   ├── proposal/                    # Deck proposal
 │   └── skripsi/                     # Deck sidang skripsi
+│
+├── experiments/
+│   ├── live/                        # Harness dan orkestrator batch
+│   ├── analysis/                    # Analisis dan tabel LaTeX
+│   ├── sensitivity/                 # Analisis sensitivitas C-r02
+│   ├── tests/                       # 491 tes offline
+│   ├── REVISIONS.md                 # Tag beku dan provenance kode
+│   ├── DATA.md                      # Inventaris data dan checksum
+│   └── ARCHITECTURE.md              # Peta modul dan aliran bukti
+│
+├── docs/
+│   ├── reproducibility/             # Dossier, hasil formal, traceability, verifikasi
+│   ├── handoff/                     # Catatan serah-terima
+│   └── plans/                       # Catatan perencanaan lokal
 │
 ├── docker/
 │   └── Dockerfile                  # LaTeX build image

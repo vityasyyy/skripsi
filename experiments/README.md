@@ -1,9 +1,19 @@
-# Instrumen bukti eksperimen (draf untuk tinjauan pemilik)
+# Instrumen bukti eksperimen
 
-Empat skrip lama adalah entrypoint validasi **offline**; mereka bukan pelaksana
-injeksi/polling/reset. Harness live yang terpisah ada di
+Batch formal `formal-20261029` selesai pada 30 Oktober 2026: 210 sel terminal,
+211 baris mentah, 207 baris analisis, dan 4 eksklusi terdokumentasi. Analisis
+beku direproduksi identik dengan seed `20261029`; tidak ada run live baru yang
+disetujui. Empat skrip lama adalah entrypoint validasi **offline**; mereka bukan
+pelaksana injeksi/polling/reset. Harness live yang terpisah ada di
 [`live/README.md`](live/README.md), dengan dry-run default dan `--live` eksplisit.
 Kelulusan fixture tidak menyatakan klaster atau aplikasi siap.
+
+Provenance dan batas data:
+
+- [`REVISIONS.md`](REVISIONS.md) — tag koleksi, analisis, sensitivity, dan status kode saat ini.
+- [`DATA.md`](DATA.md) — inventaris, eksklusi, checksum, privasi, dan perintah reproduksi.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — peta modul, aliran data, dan batas kepercayaan.
+- [`../docs/reproducibility/claim-traceability.md`](../docs/reproducibility/claim-traceability.md) — klaim angka ke bukti.
 
 ## Peta kode dan aliran data
 
@@ -28,12 +38,19 @@ kolektor dan waktu UTC untuk audit.
 ## Revisi beku
 
 Instrumen formal dibekukan pada revisi
-`3572f3c1c11d3abc8b63882c4348b1b803d4256f` (`3572f3c`). Bentuk kode
+`3572f3c1c11d3abc8b63882c4348b1b803d4256f` (`3572f3c`, tag
+`thesis-collection-20261029`). Analisis primer memakai revisi
+`a1d43eaf0d349249f1eb0a8e880badebe4eb851d` (tag `thesis-analysis-20261030`);
+analisis sensitivitas memakai berkas yang ditambahkan pada
+`6cfc99ec63a71825e88b53a96704c8c792891bd9` (tag
+`thesis-sensitivity-20261030`). Kode di `HEAD` bukan revisi koleksi: bentuk
 `live/harness.py` berubah pasca-koleksi (format, anotasi tipe, ekstraksi
-`_observe_until_recovery`/`_write_evidence`), tetapi perilaku instrumen
-dipertahankan dan diverifikasi oleh suite regresi. Golden test terpisah
-mengunci statistik `analyze_live` pada matriks sintetis (jumlah baris, median
-R1, p-value, ukuran efek, dan keputusan Holm).
+`_observe_until_recovery`/`_write_evidence`), dan refactor `b0c0f82` menambah
+tooling serta tes. Perilaku instrumen diklaim dipertahankan dan diverifikasi
+oleh suite regresi; bukti lengkap ada di [`REVISIONS.md`](REVISIONS.md).
+Golden test terpisah mengunci statistik `analyze_live` pada matriks sintetis
+(jumlah baris, median R1, p-value, ukuran efek, dan keputusan Holm), bukan pada
+angka batch formal.
 
 ## Verifikasi instrumen
 
@@ -43,6 +60,11 @@ make lint-experiments       # Ruff, mypy, ShellCheck, bash -n
 make coverage-experiments   # 100% baris dan cabang
 make check-experiments      # agregat
 ```
+
+Status verifikasi 19 November 2026: 491 tes inti dan 8 tes sensitivity lulus;
+analisis beku direproduksi identik dengan seed `20261029`. Rincian perintah dan
+hasil ada di
+[`../docs/reproducibility/verification-2026-11-19.md`](../docs/reproducibility/verification-2026-11-19.md).
 
 Target `lint-experiments` dan `coverage-experiments` memerlukan `uv` dan
 `shellcheck` terpasang lokal; CI memakai `pip` dan runner Ubuntu.
@@ -67,8 +89,8 @@ kedua mode memakai permutasi skenario yang sama. Mode imperatif adalah prosedur
 imperatif terotomasi tetap: Argo auto-sync/self-heal dijeda, pemeriksa dan runbook
 berjalan otomatis tanpa waktu reaksi manusia, lalu Argo dipulihkan. Evaluator
 bersama mengukur R1/R2; kolektor pasif merekam kedua mode. Rincian protokol ada di
-[LIVE-OBSERVER.md](LIVE-OBSERVER.md); dokumen itu rencana, bukan prosedur yang
-telah diuji.
+[LIVE-OBSERVER.md](LIVE-OBSERVER.md); dokumen itu sekarang berstatus protokol
+historis yang dipakai batch `formal-20261029`, bukan izin untuk run baru.
 
 ## Menjalankan tanpa instalasi atau akses klaster
 
@@ -84,11 +106,12 @@ bash experiments/scripts/recovery-runbook.sh --evidence experiments/tests/fixtur
 bash experiments/scripts/drift-inject.sh --evidence experiments/tests/fixtures/complete.json
 ```
 
-### Adapter akuisisi read-only (belum siap eksperimen)
+### Adapter akuisisi read-only (di luar jalur formal)
 
 `acquire-readonly.py --input FILE` memproses bundel API tersimpan tanpa menjalankan
-`kubectl`. Bundel input wajib memuat `run_id`, atau berikan `--run-id`; nilai yang
-berbeda ditolak. `--read-only --contract FILE --run-id RUN` memakai empat panggilan
+`kubectl`. Adapter ini bukan bagian dari batch `formal-20261029`, tidak dipakai
+oleh analisis beku, dan tidak mengubah status koleksi. Bundel input wajib memuat
+`run_id`, atau berikan `--run-id`; nilai yang berbeda ditolak. `--read-only --contract FILE --run-id RUN` memakai empat panggilan
 baca tetap (nodes, metrics mentah, pods namespace, dan deployments/services/HPA
 namespace), tanpa `Secret`/`ConfigMap`, shell, atau perintah dari input. Keluarannya
 adalah fragmen observasi bertanda `readiness_verified: false` dan membawa `run_id`;
@@ -179,15 +202,17 @@ sumber deployment yang diperiksa adalah `6cacea66`. Referensi kode rekonsiliasi
 menetapkan 30s, berbeda dari target proposal lama 60s. Jangan menyamakan interval
 repository reconciliation, self-heal retry, event watch dan interval evaluator.
 
-Bloker tetap terbuka: kapasitas hanya satu stack, sehingga dua mode harus
-berurutan; bukan dua stack. Audit API server tidak tersedia, sehingga R3 tidak
+Batas yang tetap berlaku pada apparatus: kapasitas hanya satu stack, sehingga
+dua mode harus berurutan; audit API server tidak tersedia, sehingga R3 tidak
 diukur dan hanya dilaporkan sebagai keterbatasan. SMTP masih placeholder,
-OpenSearch HA ditunda, dan private-draft seed serta recovery/reset aplikasi belum
-diverifikasi. Tidak ada izin purge queue/data, restore, deploy, migrasi atau
-injeksi dari dokumen ini.
+OpenSearch HA ditunda, dan pemulihan data awal belum menjadi bagian dari batch
+formal. Temuan ini membatasi klaim, bukan membatalkan koleksi yang sudah
+selesai. Tidak ada izin purge queue/data, restore, deploy, migrasi, atau injeksi
+baru dari dokumen ini; tidak ada run live baru yang disetujui.
 
 Adapter akuisisi langsung, ekspor render yang aman, bootstrap terpisah dari repair,
-dan verifikasi reset aplikasi harus ditinjau/diintegrasikan sebelum izin eksperimen.
-Antarmuka lifecycle lintas-repo perlu menyediakan revisi sumber dan digest render,
-inventaris/bidang eksplisit, kepemilikan pengendali, identitas serta waktu tindakan,
-exit code, dan postcondition; kegagalan wajib diteruskan ke pemanggil.
+dan verifikasi reset aplikasi tetap di luar jalur formal. Antarmuka lifecycle
+lintas-repo perlu menyediakan revisi sumber dan digest render, inventaris/bidang
+eksplisit, kepemilikan pengendali, identitas serta waktu tindakan, exit code, dan
+postcondition; kegagalan wajib diteruskan ke pemanggil. Untuk batch berikutnya,
+seluruh gate metode, kapasitas, dan seed harus dibuka ulang.
