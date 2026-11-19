@@ -1,6 +1,6 @@
 target-version = "py39"
 line-length = 100
-exclude = ["analysis/outputs"]
+exclude = ["analysis/outputs", "evidence-local"]
 
 [lint]
 select = [
