@@ -90,11 +90,11 @@ Observed result: exit 0.
 | Gate | Result |
 |---|---|
 | Core tests | 491 passed |
-| Sensitivity tests | 8 passed |
-| Coverage | 100% lines and branches; 4,478 statements, 1,862 branches, 10 modules |
+| Sensitivity tests | 9 passed |
+| Coverage | 100% lines and branches; 4,956 statements, 1,862 branches, 20 modules |
 | Ruff check | All checks passed |
-| Ruff format check | 34 files already formatted |
-| Mypy | No issues in 13 source files |
+| Ruff format check | 41 files already formatted |
+| Mypy | No issues in 23 source files |
 | ShellCheck | No findings |
 | `bash -n` | No syntax errors |
 

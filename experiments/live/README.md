@@ -78,7 +78,7 @@ Dry-run default (tanpa `kubectl`/HTTP):
 
 ```bash
 python3 experiments/live/run_matrix.py \
-  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
+  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261029 \
   --namespace invenio --out /tmp/invenio-batch-dry
 ```
 
@@ -89,7 +89,7 @@ Live hanya setelah izin formal dan setelah seluruh gate pada
 export INVENIO_TOKEN=...   # jangan pernah ditulis ke argumen, log, atau bukti
 python3 experiments/live/run_matrix.py \
   --live --confirm-single-stack --production-like \
-  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261027 \
+  --arms gitops imperative --scenarios A-G --reps 15 --seed 20261029 \
   --namespace invenio --app invenio-bootstrap \
   --render-file /path/to/invenio-frozen-render.json \
   --source-revision <40-hex> --render-sha256 <64-hex> \
@@ -175,7 +175,7 @@ hitungan statistik.
 export INVENIO_TOKEN=...   # jangan pernah ditulis ke argumen, log, atau bukti
 python3 experiments/live/run_one.py \
   --arm gitops --scenario B --rep 1 \
-  --namespace exp-arm-a --app invenio-bootstrap \
+  --namespace invenio --app invenio-bootstrap \
   --confirm-single-stack --live \
   --render-file /path/to/invenio-frozen-render.json \
   --source-revision <40-hex> --render-sha256 <64-hex> \

@@ -320,7 +320,7 @@ does not authorize a new live run.
    analyzer does not write it.
 4. Reproduce the C-r02 sensitivity with
    `python3 experiments/sensitivity/c_r02_sensitivity.py --out /tmp/c-r02-sensitivity.json`.
-5. Run the offline suites: 491 core tests and 8 sensitivity tests.
+5. Run the offline suites: 491 core tests and 9 sensitivity tests.
 
 ### 6.2 If a new live batch is ever approved
 

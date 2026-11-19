@@ -79,6 +79,11 @@ tidak menambah N statistik. Retry memakai id deterministik
 `formal-20261029-gitops-C-r08-retry1`; rantai attempt divalidasi oleh
 `_validate_raw_chain()` di `analysis/analyze_live.py`.
 
+Catatan inventaris: `formal-20261029.summary.json` hanya mencantumkan tiga sel
+terdampak (C-r01, C-r02, G-r05) karena baris C-r08 attempt 0 bukan sel yang
+kehilangan analisis; pandangan empat baris mentah ada di
+`live_analysis.json.exclusions.rows` dan di tabel Bab IV.
+
 ### Status manifest
 
 Manifest mencatat `state: "stopped"`, `stop_reason: "instrumentation_failure"`,

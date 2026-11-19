@@ -53,8 +53,8 @@ python3 experiments/analysis/summarize.py --in /path/hasil-v2.jsonl
 Ringkasan stdlib memisahkan skenario, lengan, kelompok analisis, data sintetis,
 revisi sumber, digest render, dan `timing_convention`. Dataset yang mencampur
 legacy dan baris bermarker, atau memakai marker tak dikenal, ditolak agar tidak
-dipool. A tetap `hpa_control`, F `visibility_boundary`, B--E/G `managed_drift`;
-tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap metrik, jumlah
+dipool. A tetap `hpa_control`, F `visibility_boundary`, B--E `managed_drift`,
+dan G `descriptive_non_argo`; tidak ada pooling kontrol ke efikasi ArgoCD. Untuk setiap metrik, jumlah
 teramati, tersensor, dan hilang (`unobserved_before_stop`) tetap dilaporkan;
 missing hanya diterima dengan provenance recovery dini. Median hanya untuk
 bagian teramati dan **bukan** estimasi yang sudah disesuaikan terhadap

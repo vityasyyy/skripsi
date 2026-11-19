@@ -14,7 +14,7 @@ inventaris data ada di [`DATA.md`](DATA.md).
 | Apparatus koleksi | `thesis-collection-20261029` | `066ad19f9d7ee7b564d6cc55ce823e180e8f05ce` | `3572f3c1c11d3abc8b63882c4348b1b803d4256f` | Kode yang menjalankan batch formal `formal-20261029` |
 | Analisis primer | `thesis-analysis-20261030` | `51aecc8ba97a9b5614d699cba200f6e6e42cb57c` | `a1d43eaf0d349249f1eb0a8e880badebe4eb851d` | Revisi kode analisis yang dilaporkan di Bab IV |
 | Analisis sensitivitas | `thesis-sensitivity-20261030` | `035916c60a672dd76d38fec8b974bd74354272aa` | `6cfc99ec63a71825e88b53a96704c8c792891bd9` | Berkas `experiments/sensitivity/` untuk C-r02 |
-| HEAD saat dokumen ini ditulis | — | — | `b6a4e3eace970269bb0b0e2b3058f6a6a000d23a` | Bukan revisi koleksi |
+| HEAD saat klasifikasi awal | — | — | `b6a4e3eace970269bb0b0e2b3058f6a6a000d23a` | Bukan revisi koleksi; HEAD bergerak setelah integrasi 2026-11-19 |
 
 Ketiga tag adalah annotated tag. Commit yang ditunjuk diverifikasi dengan:
 
@@ -45,7 +45,18 @@ Nilai-nilai ini juga tercatat di
 `experiments/formal-20261029/PROVENANCE.json`, dan
 `experiments/analysis-formal-20261029/live_analysis.json` (`batch.*`).
 
-## Commit pasca-koleksi (`3572f3c..HEAD`)
+## Commit pasca-koleksi yang diklasifikasikan (`3572f3c..b6a4e3e`)
+
+Tabel ini sengaja dibatasi pada `b6a4e3e`, titik handoff 19 November 2026.
+Setelah itu, branch integrasi 2026-11-19 menambahkan:
+
+- `9ba0a97` — `refactor(experiments): make sensitivity defaults repo-relative`;
+- `45a7fa6` — `refactor(experiments): split harness and analyzer behind stable facades`;
+- commit dokumentasi/provenance, koreksi tesis/deck, dan refresh PDF.
+
+Pemisahan modul diuji dengan 491 tes inti + 9 tes sensitivity, keluaran analisis
+beku yang identik, dan dry-run 210 sel. Commit-commit tersebut tidak mengubah
+apparatus koleksi; `HEAD` tetap bukan revisi koleksi.
 
 Klasifikasi yang dipakai:
 
@@ -72,8 +83,10 @@ Klasifikasi yang dipakai:
 | `90aa781` | 2026-11-19 | `docs(handoff): record merged handoff state` | docs | — |
 | `b6a4e3e` | 2026-11-19 | `docs(handoff): stop pinning the moving main tip` | docs | — |
 
-Total diff `3572f3c..HEAD`: 106 berkas, 15.137 baris ditambah dan 4.849 baris
-dihapus; 32 berkas di antaranya berada di `experiments/`.
+Total diff `3572f3c..b6a4e3e`: 106 berkas, 15.137 baris ditambah dan 4.849
+baris dihapus; 32 berkas di antaranya berada di `experiments/`. Untuk nilai
+terkini setelah integrasi, jalankan `git diff --shortstat 3572f3c..HEAD`; angka
+itu bergerak dan bukan identitas freeze.
 
 ## Teorema provenance
 
