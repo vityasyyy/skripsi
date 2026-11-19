@@ -33,7 +33,7 @@ Lingkungan, manifest, \textit{image}, dan instrumen dibekukan sebelum pengumpula
 
 \input{diagrams/fig-analysis-flow}
 
-\section{Kesetaraan Konfigurasi dan Kesehatan (R1)}
+\section{Kesetaraan Konfigurasi (R1)}
 
 R1 membandingkan skor kesetaraan \textit{field} terpilih pada empat sumber daya yang dideklarasikan dengan skala 0 sampai 100. Perbandingan memakai lima pengulangan protokol R1, yaitu pengulangan 11 sampai 15, per skenario per mode. Tabel~\ref{tab:hasil-r1} menyajikan median skor pada tiga titik: kondisi awal sebelum injeksi, pengamatan pertama setelah injeksi, dan kondisi akhir setelah pemulihan.
 
@@ -67,7 +67,9 @@ Pada skenario B sampai F, drift terdeteksi pada kedua mode, dan skor turun menja
 
 Skenario G merupakan satu-satunya asimetri: mode GitOps tidak mengembalikan anotasi pada SealedSecret ke \textit{desired state}, sedangkan pemeriksa imperatif melakukannya. Temuan ini bukan kegagalan instrumentasi karena barisnya tercatat tersensor kanan, bukan error, dan mekanisme penyebabnya tidak diatribusikan. Kemungkinan mekanisme yang konsisten dengan data adalah ArgoCD tidak menganggap anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen \textit{harness} melihat anotasi itu, sedangkan pengendali GitOps tidak memulihkannya. Mekanisme tersebut tidak diukur, sehingga atribusi formal tetap \texttt{unattributed} dan G bukan bukti masalah izin. G dilaporkan sebagai kasus batas deskriptif dan tidak digabungkan ke populasi efikasi.
 
-Kesehatan layanan tidak diubah menjadi skor dan tidak dipakai untuk mengubah nilai R1. Status Running dan Ready dipakai pada pemeriksaan kesiapan sebelum injeksi dan pada verifikasi setelah pemulihan. Karena itu, R1 menjawab kesetaraan \textit{field} konfigurasi, bukan kesehatan layanan secara umum, dan kesetaraan skor juga tidak membuktikan kebenaran semantik konfigurasi; kedua mode dapat mencapai kondisi yang identik dan sama-sama salah apabila deklarasi sumbernya keliru.
+\subsection{Kesehatan Layanan sebagai Guardrail}
+
+Kesehatan layanan tidak diubah menjadi skor dan tidak dipakai untuk mengubah nilai R1. Status \textit{Running} dan \textit{Ready} dipakai sebagai \textit{guardrail} kesiapan sebelum injeksi dan sebagai \textit{postcondition} pada verifikasi setelah pemulihan; kesehatan tidak dibandingkan antarmode dan tidak masuk penyebut R1. Karena itu, R1 menjawab kesetaraan \textit{field} konfigurasi, bukan kesehatan layanan secara umum, dan kesetaraan skor juga tidak membuktikan kebenaran semantik konfigurasi; kedua mode dapat mencapai kondisi yang identik dan sama-sama salah apabila deklarasi sumbernya keliru.
 
 \section{Waktu Deteksi, Bukti, dan Pemulihan (R2)}
 
@@ -97,7 +99,7 @@ R2 membandingkan tiga metrik waktu pada pengulangan 1 sampai 10: durasi deteksi 
   \end{tabularx}
 \end{table}
 
-\noindent\footnotesize Setiap metrik R2 memuat 137 baris analisis dari 140 sel (tiga sel tidak dianalisis); R1 memuat 70 dari 70 sel.\normalsize
+\noindent\begin{minipage}{\textwidth}\footnotesize Catatan kelengkapan: pengumpulan menghasilkan 210 sel terminal tanpa sel tertunda dan 211 baris mentah; 207 baris masuk analisis dan empat baris mentah dikecualikan. Kunci \texttt{status\_not\_analyzable=3} mencakup dua kegagalan instrumentasi dan satu kegagalan \textit{baseline} pra-injeksi (\texttt{gitops-C-r08}) yang diulang, sedangkan \texttt{batch\_stop=1} adalah \texttt{gitops-C-r02}; tiga sel tidak menghasilkan baris analisis dan \texttt{gitops-C-r08} tetap dianalisis melalui percobaan ulang. Setiap metrik R2 memuat 137 baris analisis dari 140 sel: deteksi 121 teramati, 10 tersensor kanan, dan 6 \textit{unobserved\_before\_stop}; bukti 134, 0, dan 3; pemulihan 127, 10, dan 0. R1 memuat 70 baris analisis dari 70 sel. Status \textit{unobserved\_before\_stop} bukan penyensoran, tidak diimputasi, dan tidak disertakan dalam uji numerik.\end{minipage}
 
 Seluruh 15 kejadian sensoring pada metrik pemulihan berasal dari mode GitOps pada skenario G, dan tidak ada nilai tersensor yang diberi imputasi. Titik akhir yang hilang karena pemulihan terkonfirmasi lebih awal dilaporkan terpisah sebagai \textit{tidak teramati sebelum berhenti}. Nilai tersebut bukan observasi tersensor dan tidak disertakan dalam uji numerik maupun analisis kelangsungan hidup. Empat baris analisis GitOps mencatat $t_e<t_d$, dan selang bertanda tersebut dilaporkan sebagai bukti yang mendahului sinyal deteksi, bukan dibulatkan menjadi nol.
 
@@ -143,7 +145,7 @@ Populasi efikasi terdiri atas skenario B, C, D, dan E. Masing-masing memiliki ti
 
 \noindent\footnotesize Baris dengan dua angka pada kolom $n$ memakai Mann--Whitney U (GitOps versus imperatif); baris dengan satu angka memakai Wilcoxon \textit{signed-rank} berpasangan. Keterangan ``tidak dilaporkan'' pada kolom $\Delta$ median berarti statistik berpasangan tidak tersedia pada fallback.\normalsize
 
-Seluruh dua belas perbandingan menolak hipotesis nol setelah koreksi Holm, dengan nilai $p$ terkoreksi berkisar 0,0054 sampai 0,0195. Nilai $\Delta$ median berpasangan yang positif menunjukkan arah mode imperatif lebih lambat bila tersedia. Uji berpasangan dipakai pada skenario B untuk ketiga metrik, D pemulihan dengan 10 pasang, dan E untuk ketiga metrik. Uji Mann--Whitney U dipakai pada C untuk ketiga metrik dengan 8 versus 10 nilai teramati, D deteksi dengan 4 versus 10, dan D bukti dengan 8 versus 10. Pada baris fallback, selisih median berpasangan dan \textit{rank-biserial} tidak tersedia, dan peralihan tersebut mengikuti aturan cadangan yang ditetapkan sebelum analisis, bukan dipilih setelah melihat hasil.
+Seluruh dua belas perbandingan menolak hipotesis nol setelah koreksi Holm, dengan nilai $p$ terkoreksi berkisar 0,0054 sampai 0,0195. Nilai $\Delta$ median berpasangan yang positif menunjukkan arah mode imperatif lebih lambat bila tersedia. Uji berpasangan dipakai pada skenario B untuk ketiga metrik, D pemulihan dengan 10 pasang, dan E untuk ketiga metrik. Uji Mann--Whitney U dipakai pada C untuk ketiga metrik dengan 8 versus 10 nilai teramati, D deteksi dengan 4 versus 10, dan D bukti dengan 8 versus 10. Pada baris fallback, selisih median berpasangan dan \textit{rank-biserial} tidak tersedia, dan peralihan tersebut mengikuti aturan cadangan yang ditetapkan sebelum analisis, bukan dipilih setelah melihat hasil. Perlu ditegaskan bahwa pasangan pada uji Wilcoxon adalah blok skenario--pengulangan, bukan subjek atau \textit{run} yang sama: kedua mode dijalankan berurutan pada satu \textit{stack}, sehingga uji tersebut adalah perbandingan blok, bukan pengukuran berulang pada unit yang sama, dan efek periode tidak dapat dipisahkan dari efek mode.
 
 Pola yang paling menonjol adalah perbedaan antara deteksi dan pemulihan. Pada perbandingan berpasangan B dan E, selisih median deteksi dan bukti teramati berada pada kisaran 4,0 sampai 4,3 detik. C dan D memakai fallback Mann--Whitney untuk deteksi dan bukti sehingga selisih median berpasangan tidak tersedia. Pemeriksa imperatif memakai interval nominal 5 detik, tetapi nilai itu tidak identik dengan kisaran selisih teramati dan bukan hasil pengukuran langsung. Pemeriksaan berkala merupakan faktor desain yang mungkin menyumbang, tetapi kontribusi kausalnya tidak dapat diisolasi dalam rancangan satu \textit{stack} dengan urutan tetap ini. Karena itu, hasil tidak dapat ditafsirkan sebagai bukti bahwa selisih sepenuhnya berasal dari mekanisme pengamatan.
 

@@ -51,7 +51,7 @@ Gambar~\ref{fig:arsitektur-runtime} memisahkan jalur deklarasi dari jalur pengam
 
 \subsection{Pemeriksaan Kesiapan}
 \label{sec:gerbang-kesiapan}
-Pengulangan hanya dimulai setelah seluruh prasyarat berikut diperiksa dan dicatat. Manifest dan inventaris sumber daya telah dibekukan, \textit{stack} berada pada kesetaraan nilai yang ditetapkan, dan kesehatan layanan memenuhi kriteria kesiapan. Selain itu, \textit{auto-sync}, \textit{self-heal}, cakupan aplikasi, dan kebijakan \textit{prune} ArgoCD telah diverifikasi, termasuk prosedur penangguhan sementara dan pemulihan untuk mode imperatif. Pemeriksa imperatif, pengumpul bukti, dan pembanding \textit{field} telah lulus validasi offline. Jam pencatat waktu tersinkronisasi. Tidak ada pengujian atau perubahan lain pada lingkup sumber daya yang diamati.
+Pengulangan hanya dimulai setelah seluruh prasyarat berikut diperiksa dan dicatat. Manifest dan inventaris sumber daya telah dibekukan, \textit{stack} berada pada kesetaraan nilai yang ditetapkan, serta kesehatan layanan memenuhi kriteria kesiapan. Selain itu, \textit{auto-sync}, \textit{self-heal}, cakupan aplikasi, dan kebijakan \textit{prune} ArgoCD telah diverifikasi, termasuk prosedur penangguhan sementara dan pemulihan untuk mode imperatif. Pemeriksa imperatif, pengumpul bukti, dan pembanding \textit{field} telah lulus validasi offline. Jam pencatat waktu tersinkronisasi. Tidak ada pengujian atau perubahan lain pada lingkup sumber daya yang diamati.
 
 Pemeriksaan kesiapan menetapkan pemakaian CPU dan memori node kurang dari 70\%, sehingga nilai 70,0\% atau lebih ditolak; memori dihitung dari \textit{working set} metrics-server dibagi \textit{allocatable}. Usia sampel maksimum 30 detik dan jendela agregasi maksimum 30 detik, sedangkan nilai operasional yang dipakai adalah pengamatan nominal 1 detik, pemeriksa imperatif nominal 5 detik, horizon pengamatan 300 detik, dan jeda antar-\textit{run} 60 detik. \textit{Timeout baseline} 600 detik ditetapkan pada skrip peluncuran, dan nilai 1, 5, serta 300 detik berasal dari nilai bawaan instrumen, bukan dari daftar identitas beku.
 
@@ -99,7 +99,7 @@ Pada skenario G, perubahan berupa penambahan anotasi metadata pada SealedSecret,
 
 \section{Definisi Variabel dan Metrik}
 
-\subsection{R1: Kesetaraan Konfigurasi dan Kesehatan}
+\subsection{R1: Kesetaraan Konfigurasi}
 
 Kesetaraan konfigurasi dinilai dengan aturan yang sama pada kedua mode, dan sebelum pengumpulan skema \textit{field} yang diperiksa serta inventaris sumber daya yang diharapkan dibekukan. \textit{Field} dinamis yang tidak relevan bagi deklarasi dikecualikan secara eksplisit. Untuk setiap sumber daya yang diharapkan, sumber daya dinyatakan cocok jika keberadaannya sesuai inventaris dan semua \textit{field} terpilih sama dengan nilai yang diinginkan. Penyebut R1 adalah empat sumber daya terpilih, sehingga satu ketidakcocokan menghasilkan skor 75.
 
@@ -111,7 +111,7 @@ Evaluator menghitung $R1_{eq}$ dari pembacaan \textit{actual state} dan inventar
 
 Kontrak \textit{field} mencakup \textit{image} serta \textit{requests/limits} \texttt{Deployment/invenio-web}, seluruh nilai data \texttt{ConfigMap/invenio-app-config-6dg2chdbh4}, port, \texttt{targetPort}, \textit{selector}, dan tipe \texttt{Service/invenio-web}, serta anotasi metadata \texttt{SealedSecret/invenio-app-secrets}; \textit{field} dinamis HPA tidak dibandingkan dengan nilai replika statis Git, dan \texttt{/spec/replicas} tidak termasuk \textit{field} yang diperiksa. \textit{Field} yang tidak diperiksa atau kegagalan API menggagalkan bukti, dan sumber daya yang benar-benar tidak ada pada daftar lengkap memberi ketidakcocokan.
 
-Kesehatan layanan dilaporkan sebagai hasil terpisah berdasarkan kriteria kesiapan yang ditetapkan sebelum pengumpulan, dan kesehatan tidak dimasukkan ke pembilang kesetaraan konfigurasi. Sumber daya ekstra di luar empat sumber daya terpilih dilaporkan terpisah dan tidak mengubah penyebut R1; untuk SealedSecret, hanya anotasi metadata yang dipilih, dan nilai \texttt{spec.encryptedData} tidak dibaca, ditulis, atau disalin ke log maupun laporan.
+Kesehatan layanan dipakai sebagai \textit{guardrail} kesiapan dan \textit{postcondition}; kesehatan tidak dibandingkan antarmode dan tidak masuk R1 maupun keluarga uji. Sumber daya ekstra di luar empat sumber daya terpilih dilaporkan terpisah dan tidak mengubah penyebut R1; untuk SealedSecret, hanya anotasi metadata yang dipilih, dan nilai \texttt{spec.encryptedData} tidak dibaca, ditulis, atau disalin ke log maupun laporan.
 
 \subsection{R2: Deteksi, Ketersediaan Bukti, dan Pemulihan}
 
@@ -130,7 +130,7 @@ Durasi utama adalah waktu deteksi $t_d-t_0$, waktu ketersediaan bukti $t_e-t_0$,
 
 Gambar~\ref{fig:timeline-pengukuran} menempatkan $t_d$, $t_e$, dan $t_r$ pada satu garis waktu dari $t_0$, sehingga urutan kejadian dapat dibaca tanpa menyamakan ketiganya dengan jenis respons yang sama. Posisi $t_e$ yang dapat mendahului $t_d$ berasal dari dua jalur pengamatan, bukan dari pemulihan yang terjadi lebih awal.
 
-Pemeriksa imperatif berjalan pada interval nominal lima detik, terpisah dari \textit{sampler} satu detik dan dari interval rekonsiliasi internal ArgoCD. Waktu deteksi GitOps dibatasi oleh resolusi \textit{sampler} dan oleh kapan ArgoCD melaporkan status yang berbeda. Interval rekonsiliasi internal ArgoCD tidak diukur secara terpisah, sehingga kontribusinya tidak dapat dipisahkan dari resolusi \textit{sampler}. Kedua prosedur berjalan otomatis tanpa waktu reaksi manusia dan tanpa jeda buatan. Karena $t_d$ dan $t_e$ berasal dari sumber pengamatan yang berbeda, $t_e$ dapat mendahului $t_d$, dan pada data ini terdapat empat baris analisis GitOps dengan $t_e<t_d$. Kesehatan layanan dilaporkan terpisah.
+Pemeriksa imperatif berjalan pada interval nominal lima detik, terpisah dari \textit{sampler} satu detik dan dari interval rekonsiliasi internal ArgoCD. Waktu deteksi GitOps dibatasi oleh resolusi \textit{sampler} dan oleh kapan ArgoCD melaporkan status yang berbeda. Interval rekonsiliasi internal ArgoCD tidak diukur secara terpisah, sehingga kontribusinya tidak dapat dipisahkan dari resolusi \textit{sampler}. Kedua prosedur berjalan otomatis tanpa waktu reaksi manusia dan tanpa jeda buatan. Karena $t_d$ dan $t_e$ berasal dari sumber pengamatan yang berbeda, $t_e$ dapat mendahului $t_d$, dan pada data ini terdapat empat baris analisis GitOps dengan $t_e<t_d$. Kesehatan layanan dipakai sebagai \textit{guardrail} kesiapan dan \textit{postcondition}, bukan sebagai metrik komparatif.
 
 \section{Protokol Pengulangan dan Penanganan Kegagalan}
 
@@ -155,7 +155,7 @@ Analisis dilakukan per skenario dan tidak menggabungkan seluruh intervensi menja
 
 Ukuran efek (\textit{effect size}) dilaporkan sebagai Cliff's $\delta$ dengan interval kepercayaan \textit{bootstrap} persentil, sedangkan selisih median berpasangan dan \textit{rank-biserial} hanya dilaporkan bila uji berpasangan dipakai dan tidak tersedia pada fallback \textit{Mann--Whitney}. Waktu yang tersensor kanan (\textit{right-censored}) dianalisis dengan Kaplan--Meier dan \textit{restricted mean survival time} (RMST) pada horizon batas penyensoran terkecil per kelompok. Nilai tersensor tidak diberi imputasi nol, dan \textit{endpoint} yang hilang karena pemulihan awal tidak dimasukkan sebagai observasi tersensor.
 
-Keluarga uji terdiri atas dua belas hipotesis B sampai E untuk metrik deteksi, bukti, dan pemulihan, dengan $\alpha=0{,}05$ dan koreksi Holm. Hipotesis yang tidak dapat diuji tidak diuji, dan keluarga tetap berukuran dua belas sehingga koreksi bersifat konservatif. Keluarga ini ditetapkan sebelum pengumpulan, dan F, G, serta A tidak ditambahkan ke dalamnya. Penggabungan lintas skenario tidak menjadi analisis utama karena bentuk dan dampak intervensinya berbeda, sedangkan R1, kesehatan, dan kasus F/G dilaporkan deskriptif tanpa klaim konfirmatoris.
+Keluarga uji terdiri atas dua belas hipotesis B sampai E untuk metrik deteksi, bukti, dan pemulihan, dengan $\alpha=0{,}05$ dan koreksi Holm. Hipotesis yang tidak dapat diuji tidak diuji, dan keluarga tetap berukuran dua belas sehingga koreksi bersifat konservatif. Keluarga ini ditetapkan sebelum pengumpulan, dan F, G, serta A tidak ditambahkan ke dalamnya. Penggabungan lintas skenario tidak menjadi analisis utama karena bentuk dan dampak intervensinya berbeda, sedangkan R1 serta kasus F/G dilaporkan deskriptif tanpa klaim konfirmatoris; kesehatan layanan hanya dipakai sebagai \textit{guardrail}.
 
 \section{Ancaman terhadap Validitas dan Keterbatasan Rancangan}
 
@@ -169,7 +169,7 @@ Skenario A dibatasi oleh plafon HPA 4 replika dan tidak menguji perilaku di atas
 
 Validitas internal dapat terancam oleh perbedaan beban klaster dari waktu ke waktu, perubahan konfigurasi selain intervensi, ketidaksetaraan inventaris, dan perbedaan jadwal rekonsiliasi. Kedua mode berurutan pada satu \textit{stack} tanpa isolasi penuh. Beban latar dan \textit{state} klaster dapat berubah antarblok, dan urutan mode tidak diacak ulang sehingga efek periode dan efek urutan tidak dapat dipisahkan dari efek mode.
 
-Nilai acuan yang dibekukan, pemeriksaan kesiapan, penangguhan sementara dan pemulihan ArgoCD, serta jeda 60 detik mengurangi ancaman tersebut, tetapi tidak menjamin bahwa satu-satunya perbedaan adalah paradigma abstrak. Pemasangan berdasarkan nomor pengulangan juga tidak menghapus korelasi antarwaktu, dan perbandingan tetap mengikutsertakan perbedaan implementasi yang melekat pada pemeriksa dan korektor \texttt{kubectl} serta ArgoCD.
+Nilai acuan yang dibekukan, pemeriksaan kesiapan, penangguhan sementara dan pemulihan ArgoCD, serta jeda 60 detik mengurangi ancaman tersebut, tetapi tidak menjamin bahwa satu-satunya perbedaan adalah paradigma abstrak. Pemasangan yang dipakai uji berpasangan adalah blok skenario--pengulangan, bukan subjek atau \textit{run} yang sama; karena kedua mode berurutan dengan urutan tetap, efek periode tidak dapat dipisahkan dari efek mode, dan pemasangan berdasarkan nomor pengulangan tidak menghapus korelasi antarwaktu. Perbandingan juga tetap mengikutsertakan perbedaan implementasi yang melekat pada pemeriksa dan korektor \texttt{kubectl} serta ArgoCD.
 
 \subsection{Validitas Eksternal}
 

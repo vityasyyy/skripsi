@@ -2,7 +2,7 @@
 
 \section{Kesimpulan}
 
-Penelitian ini membandingkan prosedur imperatif otomatis berbasis \texttt{kubectl} dengan GitOps berbasis ArgoCD pada satu \textit{stack} InvenioRDM mirip produksi. Prosedur imperatif mewakili \textit{baseline} manual pada tingkat prosedur, bukan kinerja operator manusia. Desain memakai tujuh skenario drift, lima belas pengulangan per skenario per mode, dan total 210 sel. Dari jumlah tersebut, 207 sel dianalisis. Empat baris mentah dikecualikan dan dilaporkan terbuka pada Bab IV, dan kedua mode dijalankan berurutan pada \textit{stack} yang sama dengan urutan mode yang tetap.
+Penelitian ini membandingkan prosedur imperatif otomatis berbasis \texttt{kubectl} dengan GitOps berbasis ArgoCD pada satu \textit{stack} InvenioRDM mirip produksi. Prosedur imperatif mewakili \textit{baseline} manual pada tingkat prosedur, bukan kinerja operator manusia. Desain memakai tujuh skenario drift, lima belas pengulangan per skenario per mode, dan total 210 sel. Dari 211 baris mentah, 207 baris dianalisis; 210 sel terminal, tiga sel tidak menghasilkan baris analisis, dan satu percobaan \textit{baseline} yang gagal diulang. Empat baris mentah dikecualikan dan dilaporkan terbuka pada Bab IV, dan kedua mode dijalankan berurutan pada \textit{stack} yang sama dengan urutan mode yang tetap.
 
 \subsection{Jawaban RQ1: Kesetaraan Konfigurasi}
 \label{subsec:jawaban-rq1}
@@ -11,7 +11,7 @@ Pada skenario B sampai F, skor kesetaraan \textit{field} terpilih dimulai dari 1
 
 Satu-satunya asimetri adalah skenario G, tetapi penyebabnya tidak diatribusikan. Mode GitOps tidak mengembalikan anotasi pada SealedSecret ke \textit{desired state}, sedangkan mode imperatif melakukannya. Baris hasil mencatat status \texttt{recovery\_controller} sebagai \texttt{unattributed}. Mekanisme yang paling mungkin adalah ArgoCD tidak menganggap anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen \textit{harness} melihat anotasi itu, sedangkan pengendali GitOps tidak memulihkannya. Mekanisme tersebut tidak diukur, dan tidak ada bukti bahwa G disebabkan masalah izin. Temuan ini menunjukkan bahwa kesetaraan akhir bergantung pada \textit{field} yang diperiksa dan mekanisme yang bertanggung jawab.
 
-Kesetaraan skor tidak membuktikan kebenaran semantik konfigurasi. Kedua mode dapat mencapai kondisi yang identik dan sama-sama salah apabila deklarasi sumbernya keliru. Penelitian ini mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi itu sendiri. Kesehatan layanan juga tidak diringkas menjadi skor komparatif karena status Running dan Ready dipakai pada pemeriksaan kesiapan.
+Kesetaraan skor tidak membuktikan kebenaran semantik konfigurasi. Kedua mode dapat mencapai kondisi yang identik dan sama-sama salah apabila deklarasi sumbernya keliru. Penelitian ini mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi itu sendiri. Kesehatan layanan juga tidak diringkas menjadi skor komparatif: status \textit{Running} dan \textit{Ready} dipakai sebagai \textit{guardrail} kesiapan dan \textit{postcondition}, bukan sebagai hasil yang dibandingkan.
 
 \subsection{Jawaban RQ2: Waktu Deteksi, Bukti, dan Pemulihan}
 
@@ -72,7 +72,7 @@ Apabila tersedia sumber daya komputasi dan anggaran yang lebih besar, beberapa p
   \item \textbf{Volume data dan skala klaster.} Mengulang pada volume objek dan jumlah node yang jauh lebih besar akan menguji apakah perbedaan mode berskala atau justru menyempit ketika biaya rekonsiliasi meningkat.
   \item \textbf{Daya statistik per skenario.} Menambah jumlah pengulangan per skenario berdasarkan perhitungan daya yang memakai varians teramati pada studi ini dapat mempersempit interval kepercayaan pada metrik pemulihan.
   \item \textbf{Skenario drift yang lebih kompleks.} Menambahkan drift berganda yang saling bergantung, drift yang melibatkan beberapa objek sekaligus, dan drift yang bersaing dengan rekonsiliasi lain akan menguji perilaku ketika penyimpangan tidak berdiri sendiri.
-  \item \textbf{Kesehatan layanan sebagai hasil.} Mengukur kesiapan dan ketersediaan layanan secara sistematis akan melengkapi R1 dan R2 dengan dampak terhadap pengguna.
+  \item \textbf{Dampak layanan sebagai hasil.} Mengukur kesiapan dan ketersediaan layanan secara sistematis akan melengkapi R1 dan R2 dengan dampak terhadap pengguna.
 \end{enumerate}
 
 \subsection{Mengurangi Batasan Protokol}
