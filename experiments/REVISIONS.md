@@ -52,6 +52,7 @@ Setelah itu, branch integrasi 2026-11-19 menambahkan:
 
 - `9ba0a97` — `refactor(experiments): make sensitivity defaults repo-relative`;
 - `45a7fa6` — `refactor(experiments): split harness and analyzer behind stable facades`;
+- `3ac64af` — `fix(experiments): avoid ImportWarning in direct-script fallbacks`;
 - commit dokumentasi/provenance, koreksi tesis/deck, dan refresh PDF.
 
 Pemisahan modul diuji dengan 492 tes inti + 9 tes sensitivity, keluaran analisis
