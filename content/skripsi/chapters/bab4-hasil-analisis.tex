@@ -33,7 +33,7 @@ Lingkungan, manifest, \textit{image}, dan instrumen dibekukan sebelum pengumpula
 
 \input{diagrams/fig-analysis-flow}
 
-\section{Kesetaraan Konfigurasi dan Kesehatan (R1)}
+\section{Kesetaraan Konfigurasi (R1)}
 
 R1 membandingkan skor kesetaraan \textit{field} terpilih pada empat sumber daya yang dideklarasikan dengan skala 0 sampai 100. Perbandingan memakai lima pengulangan protokol R1, yaitu pengulangan 11 sampai 15, per skenario per mode. Tabel~\ref{tab:hasil-r1} menyajikan median skor pada tiga titik: kondisi awal sebelum injeksi, pengamatan pertama setelah injeksi, dan kondisi akhir setelah pemulihan.
 
@@ -67,7 +67,9 @@ Pada skenario B sampai F, drift terdeteksi pada kedua mode, dan skor turun menja
 
 Skenario G merupakan satu-satunya asimetri: mode GitOps tidak mengembalikan anotasi pada SealedSecret ke \textit{desired state}, sedangkan pemeriksa imperatif melakukannya. Temuan ini bukan kegagalan instrumentasi karena barisnya tercatat tersensor kanan, bukan error, dan mekanisme penyebabnya tidak diatribusikan. Kemungkinan mekanisme yang konsisten dengan data adalah ArgoCD tidak menganggap anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen \textit{harness} melihat anotasi itu, sedangkan pengendali GitOps tidak memulihkannya. Mekanisme tersebut tidak diukur, sehingga atribusi formal tetap \texttt{unattributed} dan G bukan bukti masalah izin. G dilaporkan sebagai kasus batas deskriptif dan tidak digabungkan ke populasi efikasi.
 
-Kesehatan layanan tidak diubah menjadi skor dan tidak dipakai untuk mengubah nilai R1. Status Running dan Ready dipakai pada pemeriksaan kesiapan sebelum injeksi dan pada verifikasi setelah pemulihan. Karena itu, R1 menjawab kesetaraan \textit{field} konfigurasi, bukan kesehatan layanan secara umum, dan kesetaraan skor juga tidak membuktikan kebenaran semantik konfigurasi; kedua mode dapat mencapai kondisi yang identik dan sama-sama salah apabila deklarasi sumbernya keliru.
+\subsection{Kesehatan Layanan sebagai Guardrail}
+
+Kesehatan layanan tidak diubah menjadi skor dan tidak dipakai untuk mengubah nilai R1. Status \textit{Running} dan \textit{Ready} dipakai sebagai \textit{guardrail} kesiapan sebelum injeksi dan sebagai \textit{postcondition} pada verifikasi setelah pemulihan; kesehatan tidak dibandingkan antarmode dan tidak masuk penyebut R1. Karena itu, R1 menjawab kesetaraan \textit{field} konfigurasi, bukan kesehatan layanan secara umum, dan kesetaraan skor juga tidak membuktikan kebenaran semantik konfigurasi; kedua mode dapat mencapai kondisi yang identik dan sama-sama salah apabila deklarasi sumbernya keliru.
 
 \section{Waktu Deteksi, Bukti, dan Pemulihan (R2)}
 

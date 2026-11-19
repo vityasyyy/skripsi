@@ -119,7 +119,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \scriptsize
             \textbf{Yang belum dipisahkan}
             \begin{itemize}\setlength{\itemsep}{3pt}
-                \item Kesetaraan konfigurasi dari kesehatan layanan.
+                \item Kesetaraan konfigurasi dari sinyal kesehatan yang dipakai sebagai \textit{guardrail}.
                 \item Sinyal deteksi dari ketersediaan bukti dan pemulihan.
                 \item \textit{Baseline} manual yang tetap dari kecepatan operator.
             \end{itemize}
@@ -149,9 +149,9 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \end{beamercolorbox}
             \vspace{0.05cm}
             \scriptsize
-            Bagaimana kesetaraan \textit{field} konfigurasi yang ditetapkan dan kesehatan layanan berubah
-            setelah injeksi dan koreksi pada mode imperatif otomatis dibandingkan dengan mode GitOps?
-            Kedua metrik dilaporkan secara terpisah.
+            Bagaimana skor kesetaraan \textit{field} konfigurasi terpilih berubah
+            setelah injeksi dan koreksi pada mode imperatif otomatis dibandingkan dengan mode GitOps,
+            dan pada skenario mana perbedaan itu muncul atau menghilang?
         \end{column}
         \begin{column}{0.48\textwidth}
             \begin{beamercolorbox}[wd=\textwidth, sep=0.14cm, center, rounded=true]{structure}
@@ -164,7 +164,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \end{column}
     \end{columns}
     \vspace{0.12cm}
-    \smallnote{R1 = kesetaraan \textit{field}; R2 = tiga metrik waktu. Skenario A, F, dan G dilaporkan terpisah. Atribusi pelaku mutasi tidak diukur karena audit API server tidak tersedia.}
+    \smallnote{R1 = kesetaraan \textit{field}; R2 = tiga metrik waktu. Kesehatan layanan = \textit{guardrail} kesiapan dan \textit{postcondition}, bukan hasil komparatif. Skenario A, F, dan G dilaporkan terpisah.}
 \end{frame}
 }
 
@@ -282,7 +282,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \vspace{0.06cm}
 
             \textbf{\textit{Field} dinamis} seperti \texttt{/spec/replicas} dikecualikan karena dimiliki HPA.
-            Kesehatan layanan dilaporkan terpisah dan tidak masuk skor.
+            Kesehatan layanan adalah \textit{guardrail} kesiapan dan \textit{postcondition}; tidak dinilai dan tidak masuk skor.
         \end{column}
         \begin{column}{0.46\textwidth}
             \centering
@@ -536,12 +536,12 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \begin{frame}
     \frametitle{Kesimpulan RQ1: Kesetaraan \textit{Field}}
     \scriptsize
-    \begin{itemize}\setlength{\itemsep}{5pt}
+    \begin{itemize}\setlength{\itemsep}{3pt}
         \item Pada skenario B sampai F, kedua mode menurunkan skor dari 100 ke 75 saat drift terdeteksi, lalu kembali ke 100 setelah pemulihan.
         \item Skenario A tetap 100 karena \texttt{/spec/replicas} dimiliki HPA. Ini kontrol HPA, bukan ukuran efikasi ArgoCD atau prosedur imperatif.
         \item Skenario G adalah satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret dalam 300 detik, sedangkan prosedur imperatif melakukannya.
         \item Mekanisme G tidak diatribusikan, sehingga G dilaporkan deskriptif dan tidak digabungkan ke estimasi efikasi B-E.
-        \item Kesetaraan skor tidak membuktikan kebenaran semantik. Kedua mode dapat mencapai konfigurasi yang identik dan sama-sama salah bila deklarasi sumbernya keliru.
+        \item Kesetaraan skor tidak membuktikan kebenaran semantik; kedua mode dapat mencapai konfigurasi yang identik dan sama-sama salah bila deklarasi sumbernya keliru. Kesehatan layanan adalah \textit{guardrail} kesiapan dan \textit{postcondition}, bukan hasil komparatif, dan tidak masuk R1.
     \end{itemize}
     \vspace{0.12cm}
     \slidelead{Pada cakupan \textit{field} yang diuji, kedua mode mencapai konfigurasi akhir yang setara, dengan satu pengecualian deskriptif.}
@@ -589,7 +589,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \scriptsize
             \textbf{Memperluas cakupan}
             \begin{itemize}\setlength{\itemsep}{4pt}
-                \item Beban pengguna yang realistis dan pengukuran kesehatan layanan.
+                \item Beban pengguna yang realistis dan pengukuran dampak layanan.
                 \item Perbandingan beberapa implementasi GitOps, misalnya Flux dan ArgoCD.
                 \item Infrastruktur cadangan independen dan skenario drift berganda.
             \end{itemize}
