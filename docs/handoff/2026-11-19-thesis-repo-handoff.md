@@ -84,11 +84,11 @@ export ANALYSIS_DIR=/path/to/analysis-formal-20261029
 
 wc -l "$DATASET_DIR"/*.jsonl
 find "$DATASET_DIR" -maxdepth 1 -type f -print0 \
-  | sort -z | xargs -0 shasum -a 256 > "$DATASET_DIR/SHA256SUMS"
+  | xargs -0 shasum -a 256 | sort > "$DATASET_DIR/SHA256SUMS"
 # Linux: use sha256sum instead of shasum -a 256
 
 find "$ANALYSIS_DIR" -maxdepth 1 -type f -print0 \
-  | sort -z | xargs -0 shasum -a 256 > "$ANALYSIS_DIR/SHA256SUMS"
+  | xargs -0 shasum -a 256 | sort > "$ANALYSIS_DIR/SHA256SUMS"
 ```
 
 Return both checksum files. Do not put secret values or credentials in the
