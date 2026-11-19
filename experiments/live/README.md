@@ -33,7 +33,8 @@ namespace lengan kembar dan menolak run bila ada lebih dari satu stack
 |---|---|
 | `run_one.py` | CLI satu run; default dry-run, `--live` untuk mutasi nyata |
 | `run_matrix.py` | Orkestrator batch 210 run; manifest, resume, ringkasan R1/R2 |
-| `harness.py` | arm control, snapshot, kontrak R1, injeksi, repair, kolektor, timeline |
+| `harness.py` | facade stabil: `LiveRunner`, CLI, dan re-export |
+| `model.py`, `transport.py`, `sampling.py`, `contract.py`, `scenarios.py`, `timeline.py` | konstanta/rekaman, transport klaster, sampling, kontrak, kendali skenario, dan analisis timeline |
 | `declaration.py` | loader deklarasi render beku, seleksi empat resource, validasi identitas/bidang |
 | `convert.py` | konversi JSONL ke kolom CSV analisis historis |
 | `runs/` | keluaran runtime; diabaikan Git |
