@@ -114,8 +114,9 @@ owning replicas and `/spec/replicas` being excluded from the declaration.
 | R1 | evidence | 70 | 0 | 0 |
 | R1 | recovery | 65 | 5 | 0 |
 
-All 15 recovery censoring events are GitOps scenario G. No censored value was
-imputed; no missing endpoint was treated as a censored observation.
+All 15 recovery censoring events (10 in R2 and 5 in R1) are GitOps scenario G.
+No censored value was imputed; no missing endpoint was treated as a censored
+observation.
 
 ## Interpretation boundaries
 
