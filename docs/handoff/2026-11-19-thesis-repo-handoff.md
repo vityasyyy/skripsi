@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-19
 **Repository:** https://github.com/vityasyyy/skripsi
-**Base:** `main` at `b0c0f82`
+**Base:** `main` at `e020630` (handoff merged as PR #46)
 **Status:** planning and cleanup; no experiment behavior changed. The frozen
 instrument and analysis revisions remain the ones used for the thesis.
 
@@ -45,7 +45,7 @@ thesis/deck corrections listed below.
   Verify with `git bundle verify ~/backups/skripsi-branches-2026-11-19.bundle`.
 - Deleted: 27 remote branches (26 merged PRs plus closed PR #4) and 3 local
   integrated branches. No open PRs remain.
-- Remaining: `main` and the handoff branch `docs/handoff-2026-11-19`.
+- Remaining: `main` only. The handoff branch was merged as PR #46 and deleted.
 - Working tree currently has five modified generated PDFs from the verification
   builds. They are not part of this handoff; keep or discard them deliberately.
 - Last verified gates:
@@ -151,8 +151,8 @@ Cleanup executed on 2026-11-19 after creating the bundle:
 - deleted 3 local branches whose content is in `main`;
 - pruned remote-tracking refs.
 
-There are no active feature branches and no open PRs. The only active branch is
-`docs/handoff-2026-11-19`; merge it, then delete it.
+There are no active feature branches and no open PRs. The handoff branch was
+merged as PR #46 and deleted; `main` is the only branch.
 
 Future branch policy:
 
