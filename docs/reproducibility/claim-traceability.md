@@ -139,7 +139,7 @@ These are not experiment outputs and must not be traced to the frozen analysis.
 |---|---|---|---|
 | 719 configuration defects in 2,260 Kubernetes scripts; 533 (74.1%) caused crash/wrong operation/outage | Deck slide 2 | Zhang et al. (2026), external literature; see `content/skripsi/references.bib` | **External** |
 | Security misconfiguration categories in open-source manifests | Deck slide 2 | Rahman et al. (2023), external literature | **External** |
-| Thesis is 68 pages; 0 overfull, 14 underfull | Repository status | `content/skripsi/main.log` build output | **External build metadata** |
+| Thesis is 69 pages; 0 overfull, 18 underfull | Repository status | `content/skripsi/main.log` build output | **External build metadata** |
 | Deck is 22 slides | Repository status | `presentation/skripsi/main.pdf` metadata | **External build metadata** |
 
 ## 8. Summary of gaps

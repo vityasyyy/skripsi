@@ -174,7 +174,7 @@ Verifikasi instrumen offline:
 
 ```bash
 python3 -m unittest discover -s experiments/tests -q          # 491 tes
-python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -q  # 8 tes
+python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -q  # 9 tes
 ```
 
 ## Privasi dan batas berbagi

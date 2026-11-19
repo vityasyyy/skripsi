@@ -104,15 +104,15 @@ The standalone commands in the worker brief also pass:
 python3 -m unittest discover -s experiments/tests -q
 # Ran 491 tests ... OK
 python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -q
-# Ran 8 tests ... OK
+# Ran 9 tests ... OK
 ```
 
 ## 5. Build counts
 
 | Artifact | Value | Source |
 |---|---|---|
-| Thesis | 68 pages | `pdfinfo content/skripsi/main.pdf` |
-| Thesis log | 0 overfull, 14 underfull | `content/skripsi/main.log` |
+| Thesis | 69 pages | `pdfinfo content/skripsi/main.pdf` |
+| Thesis log | 0 overfull, 18 underfull | `content/skripsi/main.log` |
 | Defense deck | 22 pages | `pdfinfo presentation/skripsi/main.pdf` |
 
 This worker did not rebuild the thesis or deck; the counts are read from the

@@ -10,7 +10,7 @@ Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi*
 
 | Butir | Nilai |
 |---|---|
-| Skripsi | 68 halaman; 0 overfull, 14 underfull |
+| Skripsi | 69 halaman; 0 overfull, 18 underfull |
 | Deck sidang | 22 slide |
 | Batch formal | `formal-20261029` selesai 30 Oktober 2026; 210 sel terminal, 0 tertunda |
 | Baris analisis | 207 dari 211 baris mentah; 4 eksklusi terdokumentasi |
