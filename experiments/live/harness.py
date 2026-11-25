@@ -442,6 +442,34 @@ class _ObservationWindow:
     evidence_ref: str | None = None
 
 
+@dataclass
+class _RunContext:
+    """Mutable state shared by the run phases and the final row."""
+
+    run_id: str
+    evidence_dir: Path
+    arm_controller: ArmController
+    arm_evidence: ArmEvidence | None = None
+    cleanup: CleanupReport | None = None
+    injection: Injection | None = None
+    timeline: dict | None = None
+    contract: Contract | None = None
+    baseline: Observation | None = None
+    readiness_failures: list = field(default_factory=list)
+    samples: list = field(default_factory=list)
+    imperative: ImperativeRun | None = None
+    collector_evidence_at: Point | None = None
+    collector_evidence_store_at: Point | None = None
+    collector_evidence_ref: str | None = None
+    sampler: Sampler | None = None
+    sampler_stop: dict | None = None
+    restore_error: str | None = None
+    postcondition: dict | None = None
+    failure: Exception | None = None
+    window_end: Point | None = None
+    allow_cleanup: bool = False
+
+
 class LiveRunner:
     """Own one live or dry run from preflight to evidence."""
 
@@ -509,229 +537,248 @@ class LiveRunner:
         evidence_dir = Path(args.out) / run_id
         ensure_new_run(args, run_id)
         evidence_dir.mkdir(parents=True, exist_ok=True)
-        arm_controller = ArmController(
-            self.kubectl, app=args.app, argo_namespace=args.argocd_namespace
+        context = _RunContext(
+            run_id=run_id,
+            evidence_dir=evidence_dir,
+            arm_controller=ArmController(
+                self.kubectl, app=args.app, argo_namespace=args.argocd_namespace
+            ),
         )
-        arm_evidence: ArmEvidence | None = None
-        cleanup: CleanupReport | None = None
-        injection: Injection | None = None
-        timeline: dict | None = None
-        contract: Contract | None = None
-        baseline: Observation | None = None
-        readiness_failures: list = []
-        samples: list[Observation] = []
-        imperative: ImperativeRun | None = None
-        collector_evidence_at: Point | None = None
-        collector_evidence_store_at: Point | None = None
-        collector_evidence_ref: str | None = None
-        sampler: Sampler | None = None
-        sampler_stop: dict | None = None
-        restore_error: str | None = None
-        postcondition: dict | None = None
-        failure: Exception | None = None
-        window_end: Point | None = None
-        allow_cleanup = False
         try:
-            frozen = self._declaration()
-            verify_one_stack(self.kubectl, args.namespace, args.app, args.argocd_namespace)
-            allow_cleanup = True
-            snapshotter = Snapshotter(
-                self.kubectl,
-                args.namespace,
-                self.quarantine,
-                self.clock,
-                configmap_name=frozen.configmap_name,
-                argo_namespace=args.argocd_namespace,
-                app=args.app,
-            )
-            arm_evidence = arm_controller.activate(args.arm)
-            baseline = stabilize_baseline(
-                snapshotter,
-                self.kubectl,
-                args.arm,
-                args.baseline_timeout,
-                args.sample_interval,
-                self.clock,
-                app=args.app,
-            )
-            readiness_failures = list(baseline.readiness_failures)
-            contract = build_contract(
-                frozen, baseline, args.namespace, self.quarantine, app=args.app
-            )
-            self._require_baseline_agreement(contract, baseline)
-            sampler = Sampler(snapshotter.capture, self.clock, args.sample_interval, guarded=True)
-            self.collector_started = self.clock.now()
-            sampler.start()
-            if not sampler.wait_ready(timeout=10):
-                raise InstrumentationError("collector did not produce an initial sample")
-            if sampler.error:
-                raise InstrumentationError(str(sampler.error))
-            if not sampler.snapshot():
-                raise InstrumentationError("collector produced no sample")
-            window = _ObservationWindow()
-            try:
-                self._observe_until_recovery(
-                    contract, run_id, evidence_dir, sampler, baseline, window
-                )
-            finally:
-                injection = window.injection
-                imperative = window.imperative
-                samples = window.samples
-                sampler_stop = window.sampler_stop
-                collector_evidence_at = window.evidence_at
-                collector_evidence_store_at = window.evidence_store_at
-                collector_evidence_ref = window.evidence_ref
-            if injection is not None:
-                window_end = self.clock.now()
-                timeline = analyze_timeline(
-                    contract,
-                    samples,
-                    injection,
-                    args.arm,
-                    args.scenario,
-                    args.timeout,
-                    imperative,
-                    evidence_at=collector_evidence_at,
-                    provided_evidence_ref=collector_evidence_ref,
-                    app=args.app,
-                    baseline=baseline,
-                    window_end=window_end,
-                )
-                if timeline is not None:
-                    timeline["window_completed"] = (
-                        timeline["recovery_seconds"] is not None
-                        or window_end.mono >= injection.started.mono + args.timeout
-                    )
-                    if (
-                        timeline["recovery_seconds"] is None
-                        and not timeline["window_completed"]
-                        and failure is None
-                    ):
-                        failure = InstrumentationError(
-                            "observation window did not reach its deadline"
-                        )
-                if (
-                    timeline is not None
-                    and collector_evidence_store_at
-                    and timeline.get("t_e") is not None
-                    and not (args.arm == "imperative" and args.scenario in "BCDEFG")
-                ):
-                    timeline["t_e_store"] = collector_evidence_store_at
-            if sampler is not None and sampler.error is not None:
-                raise InstrumentationError(str(sampler.error))
-            if sampler_stop is not None and sampler_stop.get("in_flight"):
-                raise InstrumentationError("collector did not join before evidence finalization")
+            snapshotter = self._prepare(context)
+            self._execute(context, snapshotter)
         except HarnessError as error:
-            failure = error
-            readiness_failures = list(getattr(error, "readiness_failures", readiness_failures))
-            injection = getattr(error, "injection", injection)
-            if arm_evidence is None and arm_controller.original:
-                arm_evidence = ArmEvidence(
+            context.failure = error
+            context.readiness_failures = list(
+                getattr(error, "readiness_failures", context.readiness_failures)
+            )
+            context.injection = getattr(error, "injection", context.injection)
+            if context.arm_evidence is None and context.arm_controller.original:
+                context.arm_evidence = ArmEvidence(
                     arm=args.arm,
                     original={
                         name: copy.deepcopy(item["spec"])
-                        for name, item in arm_controller.original.items()
+                        for name, item in context.arm_controller.original.items()
                     },
                     applications={},
                     paused=True,
                 )
         except Exception as error:
-            failure = error
+            context.failure = error
         finally:
-            if sampler is not None and sampler_stop is None:
-                sampler_stop = sampler.stop()
-                samples = sampler.snapshot()
-            g_annotation_owned = bool(
-                args.scenario == "G"
-                and injection is not None
-                and any(
-                    command.argv[:2] == ["annotate", "SealedSecret"]
-                    for command in injection.commands
-                )
-            )
-            try:
-                cleanup = (
-                    cleanup_quarantine(self.kubectl, self.quarantine, owner=run_id)
-                    if allow_cleanup
-                    else CleanupReport(True, [], [])
-                )
-                if args.scenario == "G" and allow_cleanup and g_annotation_owned:
-                    annotation_cleanup = cleanup_g_annotation(self.kubectl, args.namespace)
-                    cleanup = CleanupReport(
-                        ok=cleanup.ok and annotation_cleanup.ok,
-                        results=cleanup.results + annotation_cleanup.results,
-                        errors=cleanup.errors + annotation_cleanup.errors,
-                    )
-            except Exception as error:
-                cleanup = CleanupReport(
-                    ok=False, results=[], errors=[f"cleanup failed: {type(error).__name__}"]
-                )
-            try:
-                arm_controller.restore()
-            except Exception as error:
-                restore_error = str(error)
-            if contract is not None:
-                for attempt in range(3):
-                    try:
-                        snapshotter = Snapshotter(
-                            self.kubectl,
-                            args.namespace,
-                            self.quarantine,
-                            self.clock,
-                            configmap_name=contract.configmap_name,
-                            argo_namespace=args.argocd_namespace,
-                            app=args.app,
-                        )
-                        postcondition = self._postcondition(
-                            snapshotter, contract, args.scenario, args.arm
-                        )
-                        break
-                    except Exception as error:
-                        if attempt == 2:
-                            postcondition = {
-                                "verified": False,
-                                "error": f"{type(error).__name__}: {error}",
-                            }
-                        else:
-                            time.sleep(1)
-        row = self._row(
-            run_id,
-            args,
-            contract,
-            injection,
-            timeline,
-            failure,
-            cleanup,
-            restore_error,
-            postcondition,
+            self._finalize(context)
+        return self._report(context)
+
+    def _prepare(self, context: _RunContext) -> Snapshotter:
+        """Validate the frozen declaration and settle the live baseline."""
+        args = self.args
+        frozen = self._declaration()
+        verify_one_stack(self.kubectl, args.namespace, args.app, args.argocd_namespace)
+        context.allow_cleanup = True
+        snapshotter = Snapshotter(
+            self.kubectl,
+            args.namespace,
+            self.quarantine,
+            self.clock,
+            configmap_name=frozen.configmap_name,
+            argo_namespace=args.argocd_namespace,
+            app=args.app,
         )
-        if sampler is not None and sampler_stop is not None:
-            sampler_stop["partial_acquisition"] = copy.deepcopy(
-                getattr(sampler, "stopped_capture", None)
+        context.arm_evidence = context.arm_controller.activate(args.arm)
+        context.baseline = stabilize_baseline(
+            snapshotter,
+            self.kubectl,
+            args.arm,
+            args.baseline_timeout,
+            args.sample_interval,
+            self.clock,
+            app=args.app,
+        )
+        context.readiness_failures = list(context.baseline.readiness_failures)
+        context.contract = build_contract(
+            frozen, context.baseline, args.namespace, self.quarantine, app=args.app
+        )
+        self._require_baseline_agreement(context.contract, context.baseline)
+        return snapshotter
+
+    def _execute(self, context: _RunContext, snapshotter: Snapshotter) -> None:
+        """Start the collector, inject, and sample until recovery or deadline."""
+        args = self.args
+        assert context.contract is not None
+        assert context.baseline is not None
+        sampler = Sampler(snapshotter.capture, self.clock, args.sample_interval, guarded=True)
+        context.sampler = sampler
+        self.collector_started = self.clock.now()
+        sampler.start()
+        if not sampler.wait_ready(timeout=10):
+            raise InstrumentationError("collector did not produce an initial sample")
+        if sampler.error:
+            raise InstrumentationError(str(sampler.error))
+        if not sampler.snapshot():
+            raise InstrumentationError("collector produced no sample")
+        window = _ObservationWindow()
+        try:
+            self._observe_until_recovery(
+                context.contract,
+                context.run_id,
+                context.evidence_dir,
+                sampler,
+                context.baseline,
+                window,
             )
-            sampler_stop["capture_stop_reason"] = getattr(sampler, "capture_stop_reason", None)
+        finally:
+            context.injection = window.injection
+            context.imperative = window.imperative
+            context.samples = window.samples
+            context.sampler_stop = window.sampler_stop
+            context.collector_evidence_at = window.evidence_at
+            context.collector_evidence_store_at = window.evidence_store_at
+            context.collector_evidence_ref = window.evidence_ref
+        if context.injection is not None:
+            window_end = self.clock.now()
+            context.window_end = window_end
+            timeline = analyze_timeline(
+                context.contract,
+                context.samples,
+                context.injection,
+                args.arm,
+                args.scenario,
+                args.timeout,
+                context.imperative,
+                evidence_at=context.collector_evidence_at,
+                provided_evidence_ref=context.collector_evidence_ref,
+                app=args.app,
+                baseline=context.baseline,
+                window_end=window_end,
+            )
+            context.timeline = timeline
+            if timeline is not None:
+                timeline["window_completed"] = (
+                    timeline["recovery_seconds"] is not None
+                    or window_end.mono >= context.injection.started.mono + args.timeout
+                )
+                if (
+                    timeline["recovery_seconds"] is None
+                    and not timeline["window_completed"]
+                    and context.failure is None
+                ):
+                    context.failure = InstrumentationError(
+                        "observation window did not reach its deadline"
+                    )
+                if (
+                    context.collector_evidence_store_at
+                    and timeline.get("t_e") is not None
+                    and not (args.arm == "imperative" and args.scenario in "BCDEFG")
+                ):
+                    timeline["t_e_store"] = context.collector_evidence_store_at
+        if sampler.error is not None:
+            raise InstrumentationError(str(sampler.error))
+        if context.sampler_stop is not None and context.sampler_stop.get("in_flight"):
+            raise InstrumentationError("collector did not join before evidence finalization")
+
+    def _finalize(self, context: _RunContext) -> None:
+        """Stop the collector, clean up, restore the arm, and check the reset."""
+        args = self.args
+        if context.sampler is not None and context.sampler_stop is None:
+            context.sampler_stop = context.sampler.stop()
+            context.samples = context.sampler.snapshot()
+        g_annotation_owned = bool(
+            args.scenario == "G"
+            and context.injection is not None
+            and any(
+                command.argv[:2] == ["annotate", "SealedSecret"]
+                for command in context.injection.commands
+            )
+        )
+        try:
+            context.cleanup = (
+                cleanup_quarantine(self.kubectl, self.quarantine, owner=context.run_id)
+                if context.allow_cleanup
+                else CleanupReport(True, [], [])
+            )
+            if args.scenario == "G" and context.allow_cleanup and g_annotation_owned:
+                annotation_cleanup = cleanup_g_annotation(self.kubectl, args.namespace)
+                context.cleanup = CleanupReport(
+                    ok=context.cleanup.ok and annotation_cleanup.ok,
+                    results=context.cleanup.results + annotation_cleanup.results,
+                    errors=context.cleanup.errors + annotation_cleanup.errors,
+                )
+        except Exception as error:
+            context.cleanup = CleanupReport(
+                ok=False, results=[], errors=[f"cleanup failed: {type(error).__name__}"]
+            )
+        try:
+            context.arm_controller.restore()
+        except Exception as error:
+            context.restore_error = str(error)
+        if context.contract is not None:
+            for attempt in range(3):
+                try:
+                    snapshotter = Snapshotter(
+                        self.kubectl,
+                        args.namespace,
+                        self.quarantine,
+                        self.clock,
+                        configmap_name=context.contract.configmap_name,
+                        argo_namespace=args.argocd_namespace,
+                        app=args.app,
+                    )
+                    context.postcondition = self._postcondition(
+                        snapshotter, context.contract, args.scenario, args.arm
+                    )
+                    break
+                except Exception as error:
+                    if attempt == 2:
+                        context.postcondition = {
+                            "verified": False,
+                            "error": f"{type(error).__name__}: {error}",
+                        }
+                    else:
+                        time.sleep(1)
+
+    def _report(self, context: _RunContext) -> int:
+        """Build the row, persist evidence, and return the process exit code."""
+        args = self.args
+        row = self._row(
+            context.run_id,
+            args,
+            context.contract,
+            context.injection,
+            context.timeline,
+            context.failure,
+            context.cleanup,
+            context.restore_error,
+            context.postcondition,
+        )
+        if context.sampler is not None and context.sampler_stop is not None:
+            context.sampler_stop["partial_acquisition"] = copy.deepcopy(
+                getattr(context.sampler, "stopped_capture", None)
+            )
+            context.sampler_stop["capture_stop_reason"] = getattr(
+                context.sampler, "capture_stop_reason", None
+            )
         self._write_evidence(
             args,
-            evidence_dir,
+            context.evidence_dir,
             row=row,
-            baseline=baseline,
-            contract=contract,
-            injection=injection,
-            imperative=imperative,
-            arm_evidence=arm_evidence,
-            cleanup=cleanup,
-            postcondition=postcondition,
-            sampler_stop=sampler_stop,
-            readiness_failures=readiness_failures,
-            samples=samples,
+            baseline=context.baseline,
+            contract=context.contract,
+            injection=context.injection,
+            imperative=context.imperative,
+            arm_evidence=context.arm_evidence,
+            cleanup=context.cleanup,
+            postcondition=context.postcondition,
+            sampler_stop=context.sampler_stop,
+            readiness_failures=context.readiness_failures,
+            samples=context.samples,
         )
         print(
             json.dumps(
                 {
-                    "run_id": run_id,
+                    "run_id": context.run_id,
                     "status": row["status"],
-                    "jsonl": str(Path(args.out) / (run_id + ".jsonl")),
-                    "csv": str(Path(args.out) / (run_id + ".csv")),
+                    "jsonl": str(Path(args.out) / (context.run_id + ".jsonl")),
+                    "csv": str(Path(args.out) / (context.run_id + ".csv")),
                 },
                 sort_keys=True,
             )
@@ -739,8 +786,8 @@ class LiveRunner:
         return (
             0
             if row["status"] in ("observed", "right_censored")
-            and not (cleanup and not cleanup.ok)
-            and not restore_error
+            and not (context.cleanup and not context.cleanup.ok)
+            and not context.restore_error
             else 1
         )
 
@@ -991,18 +1038,10 @@ class LiveRunner:
                 }
             time.sleep(self.args.sample_interval)
 
-    def _row(
-        self,
-        run_id: str,
-        args: argparse.Namespace,
-        contract: Contract | None,
-        injection: Injection | None,
-        timeline: dict | None,
-        failure: Exception | None,
-        cleanup: CleanupReport | None,
-        restore_error: str | None,
-        postcondition: dict | None,
+    def _row_identity(
+        self, run_id: str, args: argparse.Namespace, contract: Contract | None
     ) -> dict:
+        """Identity and provenance fields shared by every row."""
         base = {
             "schema_version": 2,
             "run_id": run_id,
@@ -1018,6 +1057,24 @@ class LiveRunner:
             "quarantine_namespace": self.quarantine,
             "source_revision": getattr(args, "source_revision", None),
             "render_sha256": getattr(args, "render_sha256", None),
+            "analysis_group": (
+                "hpa_control"
+                if args.scenario == "A"
+                else "visibility_boundary"
+                if args.scenario == "F"
+                else "managed_drift"
+            ),
+            "efficacy_eligible": args.scenario not in ("A", "F"),
+        }
+        if contract:
+            base["configmap_name"] = contract.configmap_name
+            base["baseline_sha256"] = contract.baseline_sha256
+        return base
+
+    @staticmethod
+    def _row_defaults(args: argparse.Namespace) -> dict:
+        """Unobserved metric and timing defaults before timeline or injection."""
+        return {
             "detection_seconds": None,
             "evidence_seconds": None,
             "evidence_store_seconds": None,
@@ -1063,97 +1120,113 @@ class LiveRunner:
             "window_completed": False,
             "window_end_utc": None,
             "window_end_mono": None,
+            "max_sample_gap_seconds": None,
+            "observation_end_utc": None,
+            "observation_end_mono": None,
+        }
+
+    def _row_operation_status(
+        self,
+        restore_error: str | None,
+        cleanup: CleanupReport | None,
+        postcondition: dict | None,
+    ) -> dict:
+        """Restore, cleanup, postcondition, and collector provenance fields."""
+        return {
             "arm_restore_status": "failed" if restore_error else "restored",
             "arm_restore_error": restore_error,
             "cleanup_status": "failed" if cleanup and not cleanup.ok else "ok",
             "cleanup_errors": cleanup.errors if cleanup else [],
             "postcondition": postcondition,
-            "max_sample_gap_seconds": None,
-            "observation_end_utc": None,
-            "observation_end_mono": None,
             "collector_started_utc": (
                 self.collector_started.utc if self.collector_started else None
             ),
             "collector_started_mono": (
                 self.collector_started.mono if self.collector_started else None
             ),
-            "analysis_group": (
-                "hpa_control"
-                if args.scenario == "A"
-                else "visibility_boundary"
-                if args.scenario == "F"
-                else "managed_drift"
-            ),
-            "efficacy_eligible": args.scenario not in ("A", "F"),
         }
-        if contract:
-            base["configmap_name"] = contract.configmap_name
-            base["baseline_sha256"] = contract.baseline_sha256
-        if timeline:
-            for key in (
-                "analysis_group",
-                "efficacy_eligible",
-                "stop_reason",
-                "injection_seconds",
-                "detection_seconds",
-                "evidence_seconds",
-                "recovery_seconds",
-                "detection_status",
-                "evidence_status",
-                "recovery_status",
-                "detection_controller",
-                "recovery_controller",
-                "detection_ref",
-                "evidence_ref",
-                "detection_reads",
-                "evidence_reads",
-                "recovery_reads",
-                "t_r_first_seconds",
-                "t_r_confirmed_seconds",
-                "recovery_confirmation",
-                "r1_baseline_reason",
-                "r1_first_reason",
-                "r1_last_reason",
-                "window_completed",
-                "r1_baseline",
-                "r1_first",
-                "r1_last",
-                "kubectl_cmds",
-                "r1_baseline_details",
-                "r1_first_details",
-                "r1_last_details",
-                "max_sample_gap_seconds",
-            ):
-                base[key] = timeline[key]
-            for key in (
-                "t_d",
-                "t_e",
-                "t_e_store",
-                "t_r",
-                "t_r_first",
-                "t_r_confirmed",
-                "window_end",
-            ):
-                point = timeline[key]
-                base[key + "_utc"] = point.utc if point else None
-                base[key + "_mono"] = point.mono if point else None
-            if timeline.get("t_e_store") is not None:
-                base["t_e_store_utc"] = timeline["t_e_store"].utc
-                base["t_e_store_mono"] = timeline["t_e_store"].mono
-                base["evidence_store_seconds"] = timeline["t_e_store"].mono - timeline["t0"].mono
-            observation_end = timeline.get("observation_end")
-            base["observation_end_utc"] = observation_end.utc if observation_end else None
-            base["observation_end_mono"] = observation_end.mono if observation_end else None
-        if injection:
-            base.update(
-                {
-                    "t0_utc": injection.started.utc,
-                    "t0_mono": injection.started.mono,
-                    "t_a_utc": injection.acknowledged.utc,
-                    "t_a_mono": injection.acknowledged.mono,
-                    "injection": injection.as_dict(),
-                }
-            )
+
+    @staticmethod
+    def _apply_timeline(base: dict, timeline: dict) -> None:
+        """Copy the timeline fields and point aliases into the row."""
+        for key in (
+            "analysis_group",
+            "efficacy_eligible",
+            "stop_reason",
+            "injection_seconds",
+            "detection_seconds",
+            "evidence_seconds",
+            "recovery_seconds",
+            "detection_status",
+            "evidence_status",
+            "recovery_status",
+            "detection_controller",
+            "recovery_controller",
+            "detection_ref",
+            "evidence_ref",
+            "detection_reads",
+            "evidence_reads",
+            "recovery_reads",
+            "t_r_first_seconds",
+            "t_r_confirmed_seconds",
+            "recovery_confirmation",
+            "r1_baseline_reason",
+            "r1_first_reason",
+            "r1_last_reason",
+            "window_completed",
+            "r1_baseline",
+            "r1_first",
+            "r1_last",
+            "kubectl_cmds",
+            "r1_baseline_details",
+            "r1_first_details",
+            "r1_last_details",
+            "max_sample_gap_seconds",
+        ):
+            base[key] = timeline[key]
+        for key in (
+            "t_d",
+            "t_e",
+            "t_e_store",
+            "t_r",
+            "t_r_first",
+            "t_r_confirmed",
+            "window_end",
+        ):
+            point = timeline[key]
+            base[key + "_utc"] = point.utc if point else None
+            base[key + "_mono"] = point.mono if point else None
+        if timeline.get("t_e_store") is not None:
+            base["t_e_store_utc"] = timeline["t_e_store"].utc
+            base["t_e_store_mono"] = timeline["t_e_store"].mono
+            base["evidence_store_seconds"] = timeline["t_e_store"].mono - timeline["t0"].mono
+        observation_end = timeline.get("observation_end")
+        base["observation_end_utc"] = observation_end.utc if observation_end else None
+        base["observation_end_mono"] = observation_end.mono if observation_end else None
+
+    @staticmethod
+    def _apply_injection(base: dict, injection: Injection) -> None:
+        """Copy injection start/acknowledgement and its serialized evidence."""
+        base.update(
+            {
+                "t0_utc": injection.started.utc,
+                "t0_mono": injection.started.mono,
+                "t_a_utc": injection.acknowledged.utc,
+                "t_a_mono": injection.acknowledged.mono,
+                "injection": injection.as_dict(),
+            }
+        )
+
+    @staticmethod
+    def _apply_outcome(
+        base: dict,
+        failure: Exception | None,
+        restore_error: str | None,
+        cleanup: CleanupReport | None,
+        postcondition: dict | None,
+        timeline: dict | None,
+    ) -> None:
+        """Resolve the row status from the run outcome."""
         if failure:
             base["status"] = (
                 "arm_state_mismatch"
@@ -1183,6 +1256,28 @@ class LiveRunner:
             and base["status"] in ("observed", "right_censored")
         ):
             base["status"] = "reset_failure"
+
+    def _row(
+        self,
+        run_id: str,
+        args: argparse.Namespace,
+        contract: Contract | None,
+        injection: Injection | None,
+        timeline: dict | None,
+        failure: Exception | None,
+        cleanup: CleanupReport | None,
+        restore_error: str | None,
+        postcondition: dict | None,
+    ) -> dict:
+        """Assemble one analysis row from identity, timeline, and outcome."""
+        base = self._row_identity(run_id, args, contract)
+        base.update(self._row_defaults(args))
+        base.update(self._row_operation_status(restore_error, cleanup, postcondition))
+        if timeline:
+            self._apply_timeline(base, timeline)
+        if injection:
+            self._apply_injection(base, injection)
+        self._apply_outcome(base, failure, restore_error, cleanup, postcondition, timeline)
         return base
 
 
