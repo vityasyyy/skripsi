@@ -6,6 +6,7 @@ import copy
 import math
 import time
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NoReturn, cast
 
@@ -466,6 +467,277 @@ def _configmap_name(contract: Contract) -> str:
     return contract.configmap_name
 
 
+@dataclass
+class _InjectionPlan:
+    """One scenario's mutation commands and the read-back they must satisfy."""
+
+    expected_path: str
+    commands: list = field(default_factory=list)
+    expected_value: Any = None
+    expected_baseline: Any = None
+    effect: str = "value_changed"
+
+
+def _plan_a(
+    kubectl: Kubectl,
+    contract: Contract,
+    short: str,  # noqa: ARG001 - uniform dispatch
+) -> _InjectionPlan:
+    baseline_replicas = (contract.baseline_hpa or {}).get("deployment_spec_replicas")
+    if type(baseline_replicas) is not int:
+        raise InjectionError("baseline HPA did not retain the observed replicas")
+    minimum = (contract.baseline_hpa or {}).get("min") or 2
+    target = max(1, int(minimum) - 1) if int(minimum) > 1 else int(minimum) + 1
+    if target == baseline_replicas:
+        candidates = (max(1, int(minimum) - 1), int(minimum) + 1)
+        target = next(value for value in candidates if value != baseline_replicas)
+    command = kubectl.patch(
+        "Deployment",
+        WEB_DEPLOYMENT,
+        contract.namespace,
+        {"spec": {"replicas": target}},
+        "merge",
+    )
+    return _InjectionPlan(
+        expected_path="/spec/replicas",
+        commands=[command],
+        expected_value=target,
+        expected_baseline=baseline_replicas,
+    )
+
+
+def _plan_b(kubectl: Kubectl, contract: Contract, short: str) -> _InjectionPlan:
+    image = _field(
+        contract, "Deployment/" + WEB_DEPLOYMENT, "/spec/template/spec/containers/web/image"
+    )
+    repository = image.split("@")[0]
+    if ":" in repository.rsplit("/", 1)[-1]:
+        repository = repository.rsplit(":", 1)[0]
+    target = repository + ":drift-" + short
+    if target == image:
+        raise InjectionError("drift image is identical to the declared image")
+    command = kubectl.patch(
+        "Deployment",
+        WEB_DEPLOYMENT,
+        contract.namespace,
+        {"spec": {"template": {"spec": {"containers": [{"name": "web", "image": target}]}}}},
+        "strategic",
+    )
+    return _InjectionPlan(
+        expected_path="/spec/template/spec/containers/web/image",
+        commands=[command],
+        expected_value=target,
+        expected_baseline=image,
+    )
+
+
+def _plan_c(kubectl: Kubectl, contract: Contract, short: str) -> _InjectionPlan:
+    name = _configmap_name(contract)
+    key = CONFIG_KEY
+    expected_baseline = _field(contract, "ConfigMap/" + name, "/data/" + key)
+    target = CONFIG_DRIFT + "-" + short
+    if target == expected_baseline:
+        raise InjectionError("drift ConfigMap value is identical to the declared value")
+    command = kubectl.patch("ConfigMap", name, contract.namespace, {"data": {key: target}}, "merge")
+    return _InjectionPlan(
+        expected_path="/data/" + key,
+        commands=[command],
+        expected_value=target,
+        expected_baseline=expected_baseline,
+    )
+
+
+def _plan_d(
+    kubectl: Kubectl,
+    contract: Contract,
+    short: str,  # noqa: ARG001 - uniform dispatch
+) -> _InjectionPlan:
+    command = kubectl.delete("Deployment", WEB_DEPLOYMENT, contract.namespace, wait=True)
+    return _InjectionPlan(
+        expected_path="/metadata/name",
+        commands=[command],
+        expected_baseline="present",
+        effect="deleted",
+    )
+
+
+def _plan_e(
+    kubectl: Kubectl,
+    contract: Contract,
+    short: str,  # noqa: ARG001 - uniform dispatch
+) -> _InjectionPlan:
+    path = "/spec/template/spec/containers/web/resources/limits/memory"
+    baseline = _field(contract, "Deployment/" + WEB_DEPLOYMENT, path)
+    target = next(
+        (
+            candidate
+            for candidate in (MEMORY_LIMIT_DRIFT, MEMORY_LIMIT_DRIFT_FALLBACK)
+            if not _field_matches(path, baseline, candidate)
+        ),
+        None,
+    )
+    if target is None:  # pragma: no cover - the two drift limits are distinct
+        raise InjectionError(
+            "no distinct memory limit drift quantity is available"
+        )  # pragma: no cover
+    command = kubectl.patch(
+        "Deployment",
+        WEB_DEPLOYMENT,
+        contract.namespace,
+        {
+            "spec": {
+                "template": {
+                    "spec": {
+                        "containers": [{"name": "web", "resources": {"limits": {"memory": target}}}]
+                    }
+                }
+            }
+        },
+        "strategic",
+    )
+    return _InjectionPlan(
+        expected_path=path,
+        commands=[command],
+        expected_value=target,
+        expected_baseline=baseline,
+    )
+
+
+def _plan_f(
+    kubectl: Kubectl,
+    contract: Contract,
+    short: str,  # noqa: ARG001 - uniform dispatch
+) -> _InjectionPlan:
+    path = "/spec/ports/0/targetPort"
+    port = _field(contract, "Service/" + WEB_SERVICE, "/spec/ports/0/port")
+    expected_baseline = _field(contract, "Service/" + WEB_SERVICE, path)
+    expected_value = expected_baseline % 65535 + 1 if type(expected_baseline) is int else 65535
+    if _field_matches(
+        path, expected_baseline, expected_value
+    ):  # pragma: no cover - derived value differs
+        raise InjectionError(
+            "no distinct Service targetPort drift value is available"
+        )  # pragma: no cover
+    command = kubectl.patch(
+        "Service",
+        WEB_SERVICE,
+        contract.namespace,
+        {"spec": {"ports": [{"port": port, "targetPort": expected_value}]}},
+        "strategic",
+    )
+    return _InjectionPlan(
+        expected_path=path,
+        commands=[command],
+        expected_value=expected_value,
+        expected_baseline=expected_baseline,
+    )
+
+
+def _plan_g(kubectl: Kubectl, contract: Contract, short: str) -> _InjectionPlan:
+    target = "scenario-g-" + short
+    command = kubectl.annotate(
+        "SealedSecret", SEALED_SECRET, contract.namespace, DRIFT_ANNOTATION, target
+    )
+    return _InjectionPlan(
+        expected_path="/metadata/annotations/" + DRIFT_ANNOTATION,
+        commands=[command],
+        expected_value=target,
+    )
+
+
+_INJECTORS: dict[str, Callable[[Kubectl, Contract, str], _InjectionPlan]] = {
+    "A": _plan_a,
+    "B": _plan_b,
+    "C": _plan_c,
+    "D": _plan_d,
+    "E": _plan_e,
+    "F": _plan_f,
+    "G": _plan_g,
+}
+
+
+def _changed_record(resource: str, plan: _InjectionPlan, actual: Any) -> dict:
+    return {
+        "resource": resource,
+        "path": plan.expected_path,
+        "effect": plan.effect,
+        "matches_desired": False,
+        "expected": plan.expected_baseline,
+        "actual": actual,
+    }
+
+
+def _verify_a(kubectl: Kubectl, contract: Contract, plan: _InjectionPlan) -> dict:
+    observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
+    actual = (observed or {}).get("spec", {}).get("replicas")
+    if actual != plan.expected_value:
+        raise InjectionError("/spec/replicas did not change")
+    return _changed_record("Deployment/" + WEB_DEPLOYMENT, plan, actual)
+
+
+def _verify_b(kubectl: Kubectl, contract: Contract, plan: _InjectionPlan) -> dict:
+    observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
+    container = _container(observed or {})
+    actual = container.get("image") if container else None
+    if actual != plan.expected_value:
+        raise InjectionError("/spec/template/spec/containers/web/image did not change")
+    return _changed_record("Deployment/" + WEB_DEPLOYMENT, plan, actual)
+
+
+def _verify_c(kubectl: Kubectl, contract: Contract, plan: _InjectionPlan) -> dict:
+    name = _configmap_name(contract)
+    observed = kubectl.get("ConfigMap", name, contract.namespace)
+    actual = (observed or {}).get("data", {}).get(CONFIG_KEY)
+    if actual != plan.expected_value:
+        raise InjectionError("/data/" + CONFIG_KEY + " did not change")
+    return _changed_record("ConfigMap/" + name, plan, actual)
+
+
+def _verify_d(kubectl: Kubectl, contract: Contract, plan: _InjectionPlan) -> dict:
+    if kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace) is not None:
+        raise InjectionError("Deployment/invenio-web was not deleted")
+    return _changed_record("Deployment/" + WEB_DEPLOYMENT, plan, "deleted")
+
+
+def _verify_e(kubectl: Kubectl, contract: Contract, plan: _InjectionPlan) -> dict:
+    observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
+    container = _container(observed or {})
+    actual = (container or {}).get("resources", {}).get("limits", {}).get("memory")
+    if actual is None or not _field_matches(plan.expected_path, plan.expected_value, actual):
+        raise InjectionError(
+            "/spec/template/spec/containers/web/resources/limits/memory did not change"
+        )
+    return _changed_record("Deployment/" + WEB_DEPLOYMENT, plan, actual)
+
+
+def _verify_f(kubectl: Kubectl, contract: Contract, plan: _InjectionPlan) -> dict:
+    observed = kubectl.get("Service", WEB_SERVICE, contract.namespace)
+    ports = ((observed or {}).get("spec") or {}).get("ports") or []
+    actual = ports[0].get("targetPort") if ports else None
+    if actual != plan.expected_value:
+        raise InjectionError("/spec/ports/0/targetPort did not change")
+    return _changed_record("Service/" + WEB_SERVICE, plan, actual)
+
+
+def _verify_g(kubectl: Kubectl, contract: Contract, plan: _InjectionPlan) -> dict:
+    observed = kubectl.get("SealedSecret", SEALED_SECRET, contract.namespace)
+    actual = ((observed or {}).get("metadata", {}).get("annotations") or {}).get(DRIFT_ANNOTATION)
+    if actual != plan.expected_value:
+        raise InjectionError("metadata annotation did not change")
+    return _changed_record("SealedSecret/" + SEALED_SECRET, plan, actual)
+
+
+_VERIFIERS: dict[str, Callable[[Kubectl, Contract, _InjectionPlan], dict]] = {
+    "A": _verify_a,
+    "B": _verify_b,
+    "C": _verify_c,
+    "D": _verify_d,
+    "E": _verify_e,
+    "F": _verify_f,
+    "G": _verify_g,
+}
+
+
 def inject(
     kubectl: Kubectl, contract: Contract, scenario: str, run_id: str, clock: Clock
 ) -> Injection:
@@ -473,160 +745,15 @@ def inject(
     if scenario not in SCENARIOS:
         raise SafetyError(f"unknown scenario {scenario!r}")
     started = clock.now()
-    short = _short(run_id)
-    commands = []
-    changed = []
-    expected_path: str | None = None
-    expected_value: Any = None
-    expected_baseline: Any = None
-    target: Any = None
-    effect = "value_changed"
     try:
-        if scenario == "A":
-            baseline_replicas = (contract.baseline_hpa or {}).get("deployment_spec_replicas")
-            if type(baseline_replicas) is not int:
-                raise InjectionError("baseline HPA did not retain the observed replicas")
-            minimum = (contract.baseline_hpa or {}).get("min") or 2
-            target = max(1, int(minimum) - 1) if int(minimum) > 1 else int(minimum) + 1
-            if target == baseline_replicas:
-                candidates = (max(1, int(minimum) - 1), int(minimum) + 1)
-                target = next(value for value in candidates if value != baseline_replicas)
-            commands.append(
-                kubectl.patch(
-                    "Deployment",
-                    WEB_DEPLOYMENT,
-                    contract.namespace,
-                    {"spec": {"replicas": target}},
-                    "merge",
-                )
-            )
-            expected_path = "/spec/replicas"
-            expected_value = target
-            expected_baseline = baseline_replicas
-        elif scenario == "B":
-            image = _field(
-                contract, "Deployment/" + WEB_DEPLOYMENT, "/spec/template/spec/containers/web/image"
-            )
-            repository = image.split("@")[0]
-            if ":" in repository.rsplit("/", 1)[-1]:
-                repository = repository.rsplit(":", 1)[0]
-            target = repository + ":drift-" + short
-            if target == image:
-                raise InjectionError("drift image is identical to the declared image")
-            commands.append(
-                kubectl.patch(
-                    "Deployment",
-                    WEB_DEPLOYMENT,
-                    contract.namespace,
-                    {
-                        "spec": {
-                            "template": {"spec": {"containers": [{"name": "web", "image": target}]}}
-                        }
-                    },
-                    "strategic",
-                )
-            )
-            expected_path = "/spec/template/spec/containers/web/image"
-            expected_value = target
-            expected_baseline = image
-        elif scenario == "C":
-            name = _configmap_name(contract)
-            key = CONFIG_KEY
-            expected_baseline = _field(contract, "ConfigMap/" + name, "/data/" + key)
-            target = CONFIG_DRIFT + "-" + short
-            if target == expected_baseline:
-                raise InjectionError("drift ConfigMap value is identical to the declared value")
-            commands.append(
-                kubectl.patch(
-                    "ConfigMap", name, contract.namespace, {"data": {key: target}}, "merge"
-                )
-            )
-            expected_path = "/data/" + key
-            expected_value = target
-        elif scenario == "D":
-            commands.append(
-                kubectl.delete("Deployment", WEB_DEPLOYMENT, contract.namespace, wait=True)
-            )
-            expected_path = "/metadata/name"
-            expected_baseline = "present"
-            effect = "deleted"
-        elif scenario == "E":
-            path = "/spec/template/spec/containers/web/resources/limits/memory"
-            baseline = _field(contract, "Deployment/" + WEB_DEPLOYMENT, path)
-            target = next(
-                (
-                    candidate
-                    for candidate in (MEMORY_LIMIT_DRIFT, MEMORY_LIMIT_DRIFT_FALLBACK)
-                    if not _field_matches(path, baseline, candidate)
-                ),
-                None,
-            )
-            if target is None:  # pragma: no cover - the two drift limits are distinct
-                raise InjectionError(
-                    "no distinct memory limit drift quantity is available"
-                )  # pragma: no cover
-            commands.append(
-                kubectl.patch(
-                    "Deployment",
-                    WEB_DEPLOYMENT,
-                    contract.namespace,
-                    {
-                        "spec": {
-                            "template": {
-                                "spec": {
-                                    "containers": [
-                                        {"name": "web", "resources": {"limits": {"memory": target}}}
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "strategic",
-                )
-            )
-            expected_path = path
-            expected_value = target
-            expected_baseline = baseline
-        elif scenario == "F":
-            path = "/spec/ports/0/targetPort"
-            port = _field(contract, "Service/" + WEB_SERVICE, "/spec/ports/0/port")
-            expected_baseline = _field(contract, "Service/" + WEB_SERVICE, path)
-            expected_value = (
-                expected_baseline % 65535 + 1 if type(expected_baseline) is int else 65535
-            )
-            if _field_matches(
-                path, expected_baseline, expected_value
-            ):  # pragma: no cover - derived value differs
-                raise InjectionError(
-                    "no distinct Service targetPort drift value is available"
-                )  # pragma: no cover
-            commands.append(
-                kubectl.patch(
-                    "Service",
-                    WEB_SERVICE,
-                    contract.namespace,
-                    {"spec": {"ports": [{"port": port, "targetPort": expected_value}]}},
-                    "strategic",
-                )
-            )
-            expected_path = path
-        elif scenario == "G":  # pragma: no branch - final scenario alternative
-            target = "scenario-g-" + short
-            commands.append(
-                kubectl.annotate(
-                    "SealedSecret", SEALED_SECRET, contract.namespace, DRIFT_ANNOTATION, target
-                )
-            )
-            expected_path = "/metadata/annotations/" + DRIFT_ANNOTATION
-            expected_value = target
-            expected_baseline = None
+        plan = _INJECTORS[scenario](kubectl, contract, _short(run_id))
     except HarnessError:
         raise
     except Exception as error:
         raise InjectionError(f"injection command failed: {type(error).__name__}") from None
 
     acknowledged = clock.now()
-    failed = next((command for command in commands if not command.ok), None)
+    failed = next((command for command in plan.commands if not command.ok), None)
     if failed is not None:
         mutation_error = InjectionError(f"kubectl mutation failed with exit {failed.returncode}")
         mutation_error.injection = Injection(
@@ -635,137 +762,14 @@ def inject(
             verified=None,
             accepted=False,
             changed=[],
-            commands=commands,
+            commands=plan.commands,
             error=str(mutation_error),
         )
         raise mutation_error
 
+    changed: list = []
     try:
-        if scenario == "A":
-            observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
-            actual = (observed or {}).get("spec", {}).get("replicas")
-            if actual != expected_value:
-                raise InjectionError("/spec/replicas did not change")
-            changed.append(
-                {
-                    "resource": "Deployment/" + WEB_DEPLOYMENT,
-                    "path": expected_path,
-                    "effect": effect,
-                    "matches_desired": False,
-                    "expected": expected_baseline,
-                    "actual": actual,
-                }
-            )
-        elif scenario == "B":
-            observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
-            container = _container(observed or {})
-            actual = container.get("image") if container else None
-            if actual != expected_value:
-                raise InjectionError("/spec/template/spec/containers/web/image did not change")
-            changed.append(
-                {
-                    "resource": "Deployment/" + WEB_DEPLOYMENT,
-                    "path": expected_path,
-                    "effect": effect,
-                    "matches_desired": False,
-                    "expected": expected_baseline,
-                    "actual": actual,
-                }
-            )
-        elif scenario == "C":
-            name = _configmap_name(contract)
-            observed = kubectl.get("ConfigMap", name, contract.namespace)
-            actual = (observed or {}).get("data", {}).get(CONFIG_KEY)
-            if actual != expected_value:
-                raise InjectionError("/data/" + CONFIG_KEY + " did not change")
-            changed.append(
-                {
-                    "resource": "ConfigMap/" + name,
-                    "path": expected_path,
-                    "effect": effect,
-                    "matches_desired": False,
-                    "expected": expected_baseline,
-                    "actual": actual,
-                }
-            )
-        elif scenario == "D":
-            if kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace) is not None:
-                raise InjectionError("Deployment/invenio-web was not deleted")
-            changed.append(
-                {
-                    "resource": "Deployment/" + WEB_DEPLOYMENT,
-                    "path": expected_path,
-                    "effect": effect,
-                    "matches_desired": False,
-                    "expected": expected_baseline,
-                    "actual": "deleted",
-                }
-            )
-        elif scenario == "E":
-            observed = kubectl.get("Deployment", WEB_DEPLOYMENT, contract.namespace)
-            container = _container(observed or {})
-            actual = (container or {}).get("resources", {}).get("limits", {}).get("memory")
-            if actual is None or not _field_matches(
-                cast(str, expected_path), expected_value, actual
-            ):
-                raise InjectionError(
-                    "/spec/template/spec/containers/web/resources/limits/memory did not change"
-                )
-            changed.append(
-                {
-                    "resource": "Deployment/" + WEB_DEPLOYMENT,
-                    "path": expected_path,
-                    "effect": effect,
-                    "matches_desired": False,
-                    "expected": expected_baseline,
-                    "actual": actual,
-                }
-            )
-        elif scenario == "F":
-            observed = kubectl.get("Service", WEB_SERVICE, contract.namespace)
-            ports = ((observed or {}).get("spec") or {}).get("ports") or []
-            actual = ports[0].get("targetPort") if ports else None
-            if actual != expected_value:
-                raise InjectionError("/spec/ports/0/targetPort did not change")
-            changed.append(
-                {
-                    "resource": "Service/" + WEB_SERVICE,
-                    "path": expected_path,
-                    "effect": effect,
-                    "matches_desired": False,
-                    "expected": expected_baseline,
-                    "actual": actual,
-                }
-            )
-        elif scenario == "G":  # pragma: no branch - final scenario alternative
-            observed = kubectl.get("SealedSecret", SEALED_SECRET, contract.namespace)
-            actual = ((observed or {}).get("metadata", {}).get("annotations") or {}).get(
-                DRIFT_ANNOTATION
-            )
-            if actual != expected_value:
-                raise InjectionError("metadata annotation did not change")
-            changed.append(
-                {
-                    "resource": "SealedSecret/" + SEALED_SECRET,
-                    "path": expected_path,
-                    "effect": effect,
-                    "matches_desired": False,
-                    "expected": expected_baseline,
-                    "actual": actual,
-                }
-            )
-    except InjectionError as error:
-        error.injection = Injection(
-            started=started,
-            acknowledged=acknowledged,
-            verified=None,
-            accepted=False,
-            changed=changed,
-            commands=commands,
-            error=str(error),
-            verification_started=acknowledged,
-        )
-        raise
+        changed.append(_VERIFIERS[scenario](kubectl, contract, plan))
     except HarnessError as error:
         error.injection = Injection(
             started=started,
@@ -773,7 +777,7 @@ def inject(
             verified=None,
             accepted=False,
             changed=changed,
-            commands=commands,
+            commands=plan.commands,
             error=str(error),
             verification_started=acknowledged,
         )
@@ -787,7 +791,7 @@ def inject(
         verified=clock.now(),
         accepted=True,
         changed=changed,
-        commands=commands,
+        commands=plan.commands,
         error=None,
         verification_started=acknowledged,
     )

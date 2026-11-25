@@ -1153,18 +1153,10 @@ def _print_result(paths: dict, manifest: dict, summary: dict) -> None:
     )
 
 
-def run_batch(
-    args: argparse.Namespace,
-    run_one: Callable[[argparse.Namespace, dict, str], tuple[int, dict | None, str | None]]
-    | None = None,
-    sleep: Callable[[float], None] | None = None,
-) -> int:
-    """Execute or resume the planned batch and write its outputs."""
-    sleep = sleep or time.sleep
-    validate_batch_args(args)
-    plan = build_plan(args.arms, args.scenarios, args.reps, args.seed)
-    batch_id = _resolve_batch_id(args, plan)
-    paths = _batch_paths(args.out, batch_id)
+def _prepare_batch(
+    args: argparse.Namespace, plan: dict, batch_id: str, paths: dict
+) -> tuple[dict, list]:
+    """Load or create the manifest and its annotated rows."""
     if args.resume:
         manifest = _validate_resume(args, plan, batch_id, paths)
         rows = _rebuild_rows(args, manifest, batch_id)
@@ -1176,116 +1168,124 @@ def run_batch(
     manifest["updated_utc"] = _utc_now()
     manifest["counts"] = _counts(manifest["runs"])
     _write_batch_outputs(args, batch_id, paths, manifest, rows)
+    return manifest, rows
 
-    runner = run_one or _run_one
-    for entry in manifest["runs"]:
-        if entry["status"] not in PENDING_STATUSES:
-            continue
-        attempts = entry.setdefault("attempts", [])
-        while attempts and attempts[-1].get("status") in PENDING_STATUSES:
-            attempts.pop()
-        item = {key: entry[key] for key in ("index", "arm", "scenario", "rep", "phase")}
-        while True:
-            number = len(attempts)
-            run_id = entry["run_id"] if number == 0 else run_id_for_retry(entry["run_id"], number)
-            try:
-                _ensure_run_slot(args, run_id)
-            except BatchSafetyError:
-                manifest.update(
-                    state="stopped",
-                    stop_reason="output_conflict",
-                    stop_run_id=run_id,
-                    updated_utc=_utc_now(),
-                )
-                manifest["counts"] = _counts(manifest["runs"])
-                summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
-                _print_result(paths, manifest, summary)
-                raise
-            started = _utc_now()
-            attempt = {
-                "attempt": number,
-                "run_id": run_id,
-                "retry_of": entry["run_id"] if number else None,
-                "status": "running",
-                "started_utc": started,
-                "finished_utc": None,
-                "exit_code": None,
-                "stop_reason": None,
-                "error": None,
-                "row_path": None,
-            }
-            attempts.append(attempt)
-            entry.update(
-                status="running",
-                started_utc=started,
-                finished_utc=None,
-                exit_code=None,
-                stop_reason=None,
-                error=None,
-                row_path=None,
-            )
-            manifest["state"] = "running"
-            manifest["updated_utc"] = _utc_now()
-            manifest["counts"] = _counts(manifest["runs"])
-            _write_batch_outputs(args, batch_id, paths, manifest, rows)
-            try:
-                code, row, error = runner(args, item, run_id)
-            except Exception as exception:
-                code, row = 1, None
-                error = _redact(f"{type(exception).__name__}: {exception}")
-            if row is not None and not isinstance(row, dict):
-                error = "runner returned a non-object row"
-                row = None
-            status, stop_reason = _classify(args, code, row, error)
-            row_path = _row_path(args.out, run_id)
-            if row is not None and not row_path.exists():
-                stop_reason = stop_reason or "missing_row_file"
-                error = error or f"row file missing: {row_path.name}"
-            outcome = {
-                "status": status,
-                "finished_utc": _utc_now(),
-                "exit_code": code,
-                "stop_reason": stop_reason,
-                "error": error,
-                "row_path": (str(row_path) if row is not None and row_path.exists() else None),
-            }
-            attempt.update(outcome)
-            entry.update(outcome)
-            if row is not None:
-                rows.append(annotate_row(row, entry, args, batch_id, attempt))
-            manifest["updated_utc"] = _utc_now()
-            manifest["counts"] = _counts(manifest["runs"])
-            retry = (
-                stop_reason == "baseline_failure"
-                and number < args.baseline_retries
-                and _baseline_retryable(status, row)
-            )
-            if stop_reason and not retry:
-                manifest.update(state="stopped", stop_reason=stop_reason, stop_run_id=run_id)
-                summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
-                _print_result(paths, manifest, summary)
-                return 1
-            if retry:
-                entry.update(
-                    status="retrying",
-                    finished_utc=None,
-                    exit_code=None,
-                    stop_reason=None,
-                    error=None,
-                    row_path=None,
-                )
-                manifest["state"] = "running"
-            summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
-            next_run_id = (
-                run_id_for_retry(entry["run_id"], number + 1)
-                if retry
-                else _next_pending_run_id(manifest, entry)
-            )
-            if next_run_id is not None:
-                _cooldown(args, batch_id, paths, manifest, rows, run_id, next_run_id, sleep)
-            if not retry:
-                break
 
+def _record_stop(
+    args: argparse.Namespace,
+    batch_id: str,
+    paths: dict,
+    manifest: dict,
+    rows: list,
+    reason: str,
+    run_id: str,
+) -> dict:
+    """Persist a stopped batch and return its summary."""
+    manifest.update(
+        state="stopped",
+        stop_reason=reason,
+        stop_run_id=run_id,
+        updated_utc=_utc_now(),
+    )
+    manifest["counts"] = _counts(manifest["runs"])
+    summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
+    _print_result(paths, manifest, summary)
+    return summary
+
+
+def _begin_attempt(
+    args: argparse.Namespace,
+    batch_id: str,
+    paths: dict,
+    manifest: dict,
+    rows: list,
+    entry: dict,
+    attempts: list,
+) -> dict:
+    """Open one attempt, persist the manifest, and return the attempt record."""
+    number = len(attempts)
+    run_id = entry["run_id"] if number == 0 else run_id_for_retry(entry["run_id"], number)
+    try:
+        _ensure_run_slot(args, run_id)
+    except BatchSafetyError:
+        _record_stop(args, batch_id, paths, manifest, rows, "output_conflict", run_id)
+        raise
+    started = _utc_now()
+    attempt = {
+        "attempt": number,
+        "run_id": run_id,
+        "retry_of": entry["run_id"] if number else None,
+        "status": "running",
+        "started_utc": started,
+        "finished_utc": None,
+        "exit_code": None,
+        "stop_reason": None,
+        "error": None,
+        "row_path": None,
+    }
+    attempts.append(attempt)
+    entry.update(
+        status="running",
+        started_utc=started,
+        finished_utc=None,
+        exit_code=None,
+        stop_reason=None,
+        error=None,
+        row_path=None,
+    )
+    manifest["state"] = "running"
+    manifest["updated_utc"] = _utc_now()
+    manifest["counts"] = _counts(manifest["runs"])
+    _write_batch_outputs(args, batch_id, paths, manifest, rows)
+    return attempt
+
+
+def _finish_attempt(
+    args: argparse.Namespace,
+    batch_id: str,
+    manifest: dict,
+    rows: list,
+    entry: dict,
+    attempt: dict,
+    code: int,
+    row: object,
+    error: str | None,
+) -> tuple[dict, bool]:
+    """Classify and record one attempt; return its outcome and retry decision."""
+    if row is not None and not isinstance(row, dict):
+        error = "runner returned a non-object row"
+        row = None
+    status, stop_reason = _classify(args, code, row, error)
+    row_path = _row_path(args.out, attempt["run_id"])
+    if row is not None and not row_path.exists():
+        stop_reason = stop_reason or "missing_row_file"
+        error = error or f"row file missing: {row_path.name}"
+    outcome = {
+        "status": status,
+        "finished_utc": _utc_now(),
+        "exit_code": code,
+        "stop_reason": stop_reason,
+        "error": error,
+        "row_path": (str(row_path) if row is not None and row_path.exists() else None),
+    }
+    attempt.update(outcome)
+    entry.update(outcome)
+    if row is not None:
+        rows.append(annotate_row(row, entry, args, batch_id, attempt))
+    manifest["updated_utc"] = _utc_now()
+    manifest["counts"] = _counts(manifest["runs"])
+    retry = (
+        stop_reason == "baseline_failure"
+        and attempt["attempt"] < args.baseline_retries
+        and _baseline_retryable(status, row)
+    )
+    return outcome, retry
+
+
+def _finalize_batch(
+    args: argparse.Namespace, batch_id: str, paths: dict, manifest: dict, rows: list
+) -> int:
+    """Mark the batch complete or stopped and return its exit code."""
     failures = [entry for entry in manifest["runs"] if entry.get("stop_reason")]
     if failures:
         first = failures[0]
@@ -1303,6 +1303,68 @@ def run_batch(
     summary = _write_batch_outputs(args, batch_id, paths, manifest, rows)
     _print_result(paths, manifest, summary)
     return 1 if failures else 0
+
+
+def run_batch(
+    args: argparse.Namespace,
+    run_one: Callable[[argparse.Namespace, dict, str], tuple[int, dict | None, str | None]]
+    | None = None,
+    sleep: Callable[[float], None] | None = None,
+) -> int:
+    """Execute or resume the planned batch and write its outputs."""
+    sleep = sleep or time.sleep
+    validate_batch_args(args)
+    plan = build_plan(args.arms, args.scenarios, args.reps, args.seed)
+    batch_id = _resolve_batch_id(args, plan)
+    paths = _batch_paths(args.out, batch_id)
+    manifest, rows = _prepare_batch(args, plan, batch_id, paths)
+
+    runner = run_one or _run_one
+    for entry in manifest["runs"]:
+        if entry["status"] not in PENDING_STATUSES:
+            continue
+        attempts = entry.setdefault("attempts", [])
+        while attempts and attempts[-1].get("status") in PENDING_STATUSES:
+            attempts.pop()
+        item = {key: entry[key] for key in ("index", "arm", "scenario", "rep", "phase")}
+        while True:
+            attempt = _begin_attempt(args, batch_id, paths, manifest, rows, entry, attempts)
+            try:
+                code, row, error = runner(args, item, attempt["run_id"])
+            except Exception as exception:
+                code, row = 1, None
+                error = _redact(f"{type(exception).__name__}: {exception}")
+            outcome, retry = _finish_attempt(
+                args, batch_id, manifest, rows, entry, attempt, code, row, error
+            )
+            if outcome["stop_reason"] and not retry:
+                _record_stop(
+                    args, batch_id, paths, manifest, rows, outcome["stop_reason"], attempt["run_id"]
+                )
+                return 1
+            if retry:
+                entry.update(
+                    status="retrying",
+                    finished_utc=None,
+                    exit_code=None,
+                    stop_reason=None,
+                    error=None,
+                    row_path=None,
+                )
+                manifest["state"] = "running"
+            _write_batch_outputs(args, batch_id, paths, manifest, rows)
+            next_run_id = (
+                run_id_for_retry(entry["run_id"], attempt["attempt"] + 1)
+                if retry
+                else _next_pending_run_id(manifest, entry)
+            )
+            if next_run_id is not None:
+                _cooldown(
+                    args, batch_id, paths, manifest, rows, attempt["run_id"], next_run_id, sleep
+                )
+            if not retry:
+                break
+    return _finalize_batch(args, batch_id, paths, manifest, rows)
 
 
 def main(argv: list[str] | None = None) -> int:
