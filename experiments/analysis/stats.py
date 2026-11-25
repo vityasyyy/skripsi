@@ -170,6 +170,11 @@ def _percentile(sorted_values: list, fraction: float) -> float | None:
     return sorted_values[lower] * (1 - weight) + sorted_values[upper] * weight
 
 
+def percentile(sorted_values: list, fraction: float) -> float | None:
+    """Linear-interpolated percentile of an already sorted list."""
+    return _percentile(sorted_values, fraction)
+
+
 def _bootstrap_cliff(
     first: list, second: list, resamples: int, seed: int, pairs: list | None = None
 ) -> list[float | None] | None:
@@ -370,5 +375,6 @@ __all__ = [
     "cliffs_delta",
     "holm_adjust",
     "mann_whitney_u",
+    "percentile",
     "wilcoxon_signed_rank",
 ]

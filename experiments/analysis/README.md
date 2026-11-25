@@ -81,8 +81,9 @@ untuk batas `stack_isolated: false`, `r3_status: not_measured`, dan
 
 `summarize.py` tetap deskriptif. `analyze_live.py` adalah facade stabil yang
 menerapkan keluarga uji beku Bab III; perhitungan statistik, survival, dan
-render LaTeX berada di `stats.py`, `survival.py`, dan `latex.py`, dengan
-konstanta bersama di `core.py`. `--rows` opsional
+render LaTeX berada di `stats.py`, `survival.py`, `latex.py`, dan
+`rq2_tables.py`, dengan format bersama di `formatting.py`, pemuatan JSONL di
+`data.py`, dan konstanta bersama di `core.py`. `--rows` opsional
 menambahkan hitungan eksklusi dari `<batch_id>.rows.jsonl`; tanpa berkas itu,
 eksklusi dilaporkan sebagai tidak dihitung, bukan nol.
 
