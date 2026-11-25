@@ -5,7 +5,7 @@
 \definecolor{detectblue}{RGB}{51,108,229}
 \definecolor{evidencegreen}{RGB}{0,150,136}
 \definecolor{recoveryorange}{RGB}{239,108,0}
-\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{imperativegray}{RGB}{102,102,102}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -15,7 +15,7 @@
     value/.style={font=\scriptsize\bfseries, anchor=west}
 ]
 
-\node[label] at (-0.10,4.40) {B deteksi};
+\node[font=\scriptsize\bfseries, anchor=west] at (-0.10,4.95) {Selisih median waktu RQ (detik)};
 \node[bar=detectblue, minimum width=4.27cm, minimum height=0.26cm, anchor=west] at (0,4.40) {};
 \node[value] at (4.32,4.40) {4,27};
 
@@ -44,17 +44,19 @@
 \node[value] at (5.10,1.55) {5,05};
 
 % Axis
-\draw[manualgray, line width=0.7pt] (0,0.95) -- (5.8,0.95);
+\draw[imperativegray, line width=0.7pt] (0,0.95) -- (5.8,0.95);
 \foreach \x in {0,1,2,3,4,5} {
-    \draw[manualgray, line width=0.5pt] (\x,0.95) -- (\x,0.87);
-    \node[font=\scriptsize, text=manualgray, anchor=north] at (\x,0.84) {\x};
+    \draw[imperativegray, line width=0.5pt] (\x,0.95) -- (\x,0.87);
+    \node[font=\scriptsize, text=imperativegray, anchor=north] at (\x,0.84) {\x};
 }
-\node[font=\scriptsize, text=manualgray, anchor=north west] at (6.0,0.95) {detik};
+\node[font=\scriptsize, text=imperativegray, anchor=north west] at (6.0,0.95) {detik};
 
 % Reference line
-\draw[manualgray, dashed, line width=0.8pt] (5.0,1.00) -- (5.0,4.72);
-\node[font=\scriptsize, text=manualgray, anchor=south west, align=left] at (5.08,4.20)
+\draw[imperativegray, dashed, line width=0.8pt] (5.0,1.00) -- (5.0,4.72);
+\node[font=\scriptsize, text=imperativegray, anchor=south west, align=left] at (5.08,4.20)
     {5 detik: interval\\nominal pemeriksa};
+\node[font=\scriptsize, text=imperativegray, anchor=north west, align=left] at (0,0.62)
+    {Selisih 4,0--4,3 dtk berdekatan dengan interval pemeriksa 5 dtk;\\bukan estimasi murni respons pengendali.};
 
 \end{tikzpicture}
 \end{document}

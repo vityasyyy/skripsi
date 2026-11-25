@@ -13,11 +13,12 @@ dokumen ini tidak mengubah skema atau perilaku.
 | [`live/run_matrix.py`](live/run_matrix.py) | Rencana 210 sel, manifest, resume, retry baseline, cooldown, ringkasan, dan baris analisis | `main()`, `run_batch()` |
 | [`live/declaration.py`](live/declaration.py) | Loader render beku, hash byte, validasi revisi/identitas, dan pemilihan empat resource | `load()`, `loads()` |
 | [`live/convert.py`](live/convert.py) | Jembatan JSONL ke kolom CSV historis | `row_to_csv()`, `write_csv()` |
-| [`analysis/analyze_live.py`](analysis/analyze_live.py) | Validasi fail-closed, eksklusi, R1, survival, uji, efek, dan tabel LaTeX | `analyze()`, `main()` |
+| [`analysis/analyze_live.py`](analysis/analyze_live.py) | Validasi fail-closed, eksklusi, R1, survival, uji, efek, dan tabel LaTeX; analisis primer dan beku | `analyze()`, `main()` |
+| [`analysis/rq2_report.py`](analysis/rq2_report.py) | View tesis di atas analisis beku: medan RQ, cacah validitas R1, dan selisih deskriptif $t_r-t_d$; tidak mengubah analisis primer | `build_view()`, `main()` |
 | [`analysis/summarize.py`](analysis/summarize.py) | Ringkasan deskriptif yang memisahkan sensor dan endpoint hilang | `summarize()` |
 | [`sensitivity/c_r02_sensitivity.py`](sensitivity/c_r02_sensitivity.py) | Analisis sensitivitas satu baris C-r02 | `main()` |
 | [`scripts/`](scripts/) | Validasi bukti offline; tidak menjalankan klaster | `*.sh`, `instruments.py` |
-| [`tests/`](tests/) | 492 tes inti offline | `python3 -m unittest discover -s experiments/tests` |
+| [`tests/`](tests/) | 502 tes inti offline | `python3 -m unittest discover -s experiments/tests` |
 | [`sensitivity/test_c_r02_sensitivity.py`](sensitivity/test_c_r02_sensitivity.py) | 9 tes sensitivity | `python3 -m unittest discover -s experiments/sensitivity` |
 
 ## Aliran data
@@ -33,9 +34,19 @@ flowchart TD
     E --> B[Manifest, rows, analysis.jsonl, summary]
     B --> A[analyze_live.py]
     A --> O[live_analysis.json + 6 tabel LaTeX]
-    O --> T[Angka Bab IV/V, abstrak, dan deck]
+    O --> R[rq2_report.py: view waktu RQ + validitas R1]
+    R --> T[Angka Bab IV/V, abstrak, dan deck]
     B --> S[c_r02_sensitivity.py]
 ```
+
+`analyze_live.py` tetap menjadi analisis primer dan beku. `rq2_report.py`
+hanya memilih enam medan (`batch`, `exclusions`, `overview`, `survival`,
+`efficacy`, `families`), memetakan alias skema historis `env=manual` menjadi
+tampilan `arm=imperative` dengan `legacy_env=manual`, dan menghasilkan tabel
+waktu serta cacah validitas R1. Modul ini tidak menulis tabel perbandingan R1
+dan tidak menjalankan uji baru. `--check-frozen` keluar 1 saat medan terpilih
+berbeda dan keluar 2 saat berkas beku tidak tersedia (`PENDING`), bukan
+kecocokan palsu.
 
 Urutan koleksi per sel: baseline gate, injeksi satu drift, verifikasi perubahan,
 sampling sampai pemulihan atau deadline, postcondition/reset, lalu restore mode.
@@ -116,7 +127,7 @@ dibandingkan sebagai keberadaan/anotasi metadata.
   dilaporkan terpisah dari keluarga efikasi B--E.
 - **Populasi.** A = kontrol HPA, B--E = efikasi managed drift, F = drift Service
   terpisah, G = kasus deskriptif non-Argo. Tidak ada pooling A/F/G ke keluarga
-  dua belas hipotesis.
+  12 hipotesis.
 
 ## Bukti per run
 

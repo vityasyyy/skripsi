@@ -112,6 +112,21 @@ Konsekuensi praktis:
    `experiments/sensitivity/`; berkas itu ditambahkan pada `6cfc99e` dan tidak
    mengubah analisis primer.
 
+## View pasca-freeze: `rq2_report.py`
+
+`experiments/analysis/rq2_report.py` ditambahkan setelah pembekuan sebagai view
+tesis di atas analisis primer. Modul ini memilih enam medan keluaran
+`analyze_live.py`, memetakan alias skema historis `env=manual` menjadi
+`arm=imperative` dengan `legacy_env=manual`, menghitung cacah validitas R1, dan
+menurunkan selisih deskriptif $t_r-t_d$. Modul ini tidak mengubah
+`analyze_live.py`, `core.py`, `stats.py`, `survival.py`, `latex.py`, berkas
+mentah, atau keluaran beku; tidak ada angka baru dan tidak ada run live baru.
+Suite offline saat ini berjumlah 502 tes inti, termasuk 10 tes untuk view ini,
+dan 9 tes sensitivity. Mode `--check-frozen` membandingkan medan terpilih dengan
+`live_analysis.json` dan keluar 1 saat berbeda. Bila berkas beku tidak tersedia
+di checkout, mode itu melaporkan `PENDING`, mencatat `frozen_check: pending`,
+dan keluar 2, bukan kecocokan palsu.
+
 ## Verifikasi
 
 ```bash

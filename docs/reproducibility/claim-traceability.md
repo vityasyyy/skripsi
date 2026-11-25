@@ -22,7 +22,11 @@ Status legend:
 
 Tests use synthetic fixtures. A passing test locks the algorithm, not the
 observed batch numbers; the observed numbers are locked by the frozen outputs
-and their SHA-256 manifest.
+and their SHA-256 manifest. `experiments/analysis/rq2_report.py` is a
+post-freeze view over the same analyzer; its `--check-frozen` mode compares the
+selected RQ fields to `live_analysis.json` and reports `PENDING` when that file
+is absent. In this checkout the frozen rows and `live_analysis.json` are not
+present, so numeric checks that depend on them are pending, not passed.
 
 ## 1. Collection accounting and exclusions
 
@@ -38,28 +42,28 @@ and their SHA-256 manifest.
 | C-r08 attempt 0 is `baseline_failure`; `-retry1` is observed and supplies the cell | Bab IV §4.1; Bab V §5.3 | `MAN.runs[].attempts`; ROWS attempt 0/1; ANA has only `-retry1` | `run_matrix._baseline_retryable()`, `_validate_attempt()`; `analyze_live._validate_raw_chain()` | `test_baseline_failure_retries_with_new_id_and_preserved_evidence`, `test_runner_retry_flows_through_analysis_view_into_analyzer`, `test_issue_example_retry_identity_is_accepted` | MAN, ROWS, ANA | Frozen + Test-locked |
 | Manifest `state=stopped` despite 210 terminal cells | [`formal-20261029-results.md`](formal-20261029-results.md); [`../../experiments/DATA.md`](../../experiments/DATA.md) | `MAN.state`, `MAN.stop_reason`, `MAN.stop_run_id`, `MAN.counts` | `run_batch()` final state block | `test_resume_rejects_malformed_manifests`, `test_resume_rejects_each_manifest_identity_violation`, `test_summary_counts_censoring_and_exclusions` | MAN | Frozen |
 
-## 2. R1 — selected-field equality
+## 2. R1 — manipulation validity (recovery predicate)
 
 | Claim | Manuscript location | Frozen output / key | Code | Test | Raw evidence | Status |
 |---|---|---|---|---|---|---|
-| Median R1 B–F = 100 / 75 / 100 in both arms; A = 100 / 100 / 100 | Bab IV §4.2, Table 4.2 (`tab:hasil-r1`); Bab V §5.1.1; abstract; deck 11, 15, B2 | `LA.r1[scenario/arm/R1].{baseline,first,last}.median` | `analyze_live._r1_entries()`; `harness.score()`, `resource_results()` | `test_r1_descriptives_report_missing_values`, `test_synthetic_matrix_matches_the_frozen_summary` | ANA `r1_*`; per-run `samples.jsonl` | Frozen + Test-locked |
-| G GitOps = 100 / 75 / 75; G imperative = 100 / 75 / 100 | Bab IV §4.2, Table 4.2; Bab V §5.1.1; abstract; deck 11, 15, B2 | `LA.r1[G/gitops/R1].last.median=75`, `LA.r1[G/manual/R1].last.median=100` | `_r1_entries()`, `score()` | No test embeds the observed G values; algorithm tests cover scoring | ANA `r1_last` for G; per-run `samples.jsonl` | Frozen (no observed-value test) |
-| A stays 100 because `/spec/replicas` is HPA-owned and excluded | Bab IV §4.2; Bab V §5.1.1; abstract; deck 11 | `LA.r1[A/*/*].{baseline,first,last}.median=100` | `declaration.selected_fields()`; `harness.build_contract()`, `recovery_manifest(hpa_owned=True)` | `test_hpa_owned_replicas_are_excluded_and_retained_separately` | ANA, `contract.json` | Frozen + Test-locked |
-| F is a declared `Service/invenio-web` `targetPort` drift; F is outside B–E efficacy | Bab IV §4.2; Bab V §5.1.2; abstract; deck 7, 11 | `LA.batch.efficacy_ineligible` contains F; `LA.batch.efficacy_ineligible_reason.F="visibility_boundary"`; `LA.notes[]` states current definition | `harness.inject()` F branch, `planned_mutations()`; `analyze_live.POPULATIONS` / `ROW_GROUPS` | `test_service_targetport_injection_patches_the_declared_service`, `test_service_targetport_drift_is_always_distinct`, `test_control_boundary_and_g_are_outside_efficacy` | `injection.json`, `contract.json`, ANA | Frozen + Test-locked |
-| G is the only R1 asymmetry; its mechanism is unattributed | Bab IV §4.2; Bab V §5.1.1; deck 11, 15, B3 | `LA.r1[G/gitops/R1].last.median=75`; ANA `recovery_controller=unattributed` for all 15 G GitOps rows | `_r1_entries()`; runner row builder | `test_scenario_g_annotation_is_removed` (injection/cleanup only) | ANA R1 G rows, `imperative.json`/`postcondition.json` | Frozen; mechanism claim is interpretive |
+| Median R1 B–F = 100 / 75 / 100 in both arms; A = 100 / 100 / 100 | Bab IV §Validitas Manipulasi; Lampiran A Table `tab:audit-r1`; Bab V §Validitas Manipulasi; abstract; deck 11, 16, B2 | `LA.r1[scenario/arm/R1].{baseline,first,last}.median` | `analyze_live._r1_entries()`; `harness.score()`, `resource_results()` | `test_r1_descriptives_report_missing_values`, `test_synthetic_matrix_matches_the_frozen_summary` | ANA `r1_*`; per-run `samples.jsonl` | Frozen + Test-locked |
+| G GitOps = 100 / 75 / 75; G imperative = 100 / 75 / 100 | Bab IV §Validitas Manipulasi; Lampiran A Table `tab:audit-r1`; Bab V §Validitas Manipulasi; abstract; deck 11, 16, B2 | `LA.r1[G/gitops/R1].last.median=75`, `LA.r1[G/manual/R1].last.median=100` | `_r1_entries()`, `score()` | No test embeds the observed G values; algorithm tests cover scoring | ANA `r1_last` for G; per-run `samples.jsonl` | Frozen (no observed-value test) |
+| A stays 100 because `/spec/replicas` is HPA-owned and excluded | Bab IV §Validitas Manipulasi; Bab V §Validitas Manipulasi; abstract; deck 11 | `LA.r1[A/*/*].{baseline,first,last}.median=100` | `declaration.selected_fields()`; `harness.build_contract()`, `recovery_manifest(hpa_owned=True)` | `test_hpa_owned_replicas_are_excluded_and_retained_separately` | ANA, `contract.json` | Frozen + Test-locked |
+| F is a declared `Service/invenio-web` `targetPort` drift; F is outside B–E efficacy | Bab IV §Validitas Manipulasi; Bab V §Jawaban RQ; abstract; deck 7, 11 | `LA.batch.efficacy_ineligible` contains F; `LA.batch.efficacy_ineligible_reason.F="visibility_boundary"`; `LA.notes[]` states current definition | `harness.inject()` F branch, `planned_mutations()`; `analyze_live.POPULATIONS` / `ROW_GROUPS` | `test_service_targetport_injection_patches_the_declared_service`, `test_service_targetport_drift_is_always_distinct`, `test_control_boundary_and_g_are_outside_efficacy` | `injection.json`, `contract.json`, ANA | Frozen + Test-locked |
+| G is the only R1 asymmetry; its mechanism is unattributed | Bab IV §Validitas Manipulasi; Bab V §Validitas Manipulasi; deck 11, 16, B3 | `LA.r1[G/gitops/R1].last.median=75`; ANA `recovery_controller=unattributed` for all 15 G GitOps rows | `_r1_entries()`; runner row builder | `test_scenario_g_annotation_is_removed` (injection/cleanup only) | ANA R1 G rows, `imperative.json`/`postcondition.json` | Frozen; mechanism claim is interpretive |
 
-## 3. R2 — censoring, direction, and gaps
+## 3. Timing RQ — censoring, direction, and gaps
 
 | Claim | Manuscript location | Frozen output / key | Code | Test | Raw evidence | Status |
 |---|---|---|---|---|---|---|
-| R2 censoring: detection 121/10/6, evidence 134/0/3, recovery 127/10/0 | Bab IV §4.3, Table 4.3 (`tab:hasil-censoring`); deck 10, B2 | `SU.censoring.R2.*` | `run_matrix._censoring()` | `test_summary_counts_censoring_and_exclusions` | ANA status fields | Frozen + Test-locked |
-| R1 censoring: detection 61/5/4, evidence 70/0/0, recovery 65/5/0 | Bab IV §4.3, Table 4.3; deck B2 | `SU.censoring.R1.*` | `run_matrix._censoring()` | `test_summary_counts_censoring_and_exclusions` | ANA status fields | Frozen + Test-locked |
-| All 15 recovery censoring events (10 R2 + 5 R1) are GitOps G | Bab IV §4.3; Bab V §5.3; deck B2 | `SU.censoring.R2.recovery.right_censored=10`, `SU.censoring.R1.recovery.right_censored=5`; ANA rows with `recovery_status=right_censored` are all `gitops/G` | `_censoring()`; `_survival_entries()` | `test_censored_pair_falls_back_to_exploratory_mann_whitney`, `test_survival_table_reports_missing_and_excluded_endpoints` | ANA | Frozen + Test-locked |
-| Four GitOps analysis rows have `t_e < t_d` | Bab IV §4.3 | No aggregate field. Derived query below | `analyze_live._validate_timing()` allows signed differences | No test embeds the observed four rows | ANA | **Derived** |
-| Detection/evidence median gaps for B and E are 4.0–4.3 s | Bab IV §4.3, §4.4; Bab V §5.1.2; abstract; deck 12, 13, 16 | `LA.efficacy[B/detection].effect.median_paired_difference=4.2747`; `B/evidence=4.0478`; `E/detection=4.2927`; `E/evidence=4.0441` | `_comparison()`, `_bootstrap_median()` | `test_complete_pairs_use_wilcoxon_signed_rank` | ANA | Frozen + Test-locked |
-| Recovery median gaps: B 2.95, D 5.05, E 3.03 s | Bab IV §4.3, §4.4; Bab V §5.1.2; deck 13 | `LA.efficacy[B/recovery].effect.median_paired_difference=2.9462`; `D/recovery=5.0523`; `E/recovery=3.0314` | `_comparison()` | `test_complete_pairs_use_wilcoxon_signed_rank`, `test_bootstrap_is_deterministic_for_a_fixed_seed` | ANA | Frozen + Test-locked |
-| Positive direction means the imperative arm is slower (GitOps faster) | Bab IV §4.4; Bab V §5.1.2; abstract; deck 12, 16 | `LA.efficacy[].effect.cliffs_delta` positive; `median_paired_difference` positive | `cliffs_delta()` computes P(manual > gitops) − P(manual < gitops); `_comparison()` uses `manual - gitops` | `test_complete_pairs_use_wilcoxon_signed_rank` | ANA | Frozen + Test-locked |
-| Observation horizon is 300 s; values beyond are censored, not zero | Bab IV §4.3; Bab V §5.3; deck 9, 14 | ANA `censor_seconds=300.0`; `SU.censoring.*.right_censored` | `harness.parse_args(--timeout=300)`, row builder | `test_new_right_censored_row_requires_deadline_completion`, `test_kaplan_meier_and_rmst_never_impute_censored_as_zero` | ANA, ROWS | Frozen + Test-locked |
+| Timing censoring: detection 121/10/6, evidence 134/0/3, recovery 127/10/0 | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan, Table 4.3 (`tab:hasil-censoring`); deck 10, B2 | `SU.censoring.R2.*` | `run_matrix._censoring()` | `test_summary_counts_censoring_and_exclusions` | ANA status fields | Frozen + Test-locked |
+| Validity censoring: detection 61/5/4, evidence 70/0/0, recovery 65/5/0 | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan, Table 4.3; deck B2 | `SU.censoring.R1.*` | `run_matrix._censoring()` | `test_summary_counts_censoring_and_exclusions` | ANA status fields | Frozen + Test-locked |
+| All 15 recovery censoring events (10 timing + 5 validity) are GitOps G | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Keterbatasan; deck B2 | `SU.censoring.R2.recovery.right_censored=10`, `SU.censoring.R1.recovery.right_censored=5`; ANA rows with `recovery_status=right_censored` are all `gitops/G` | `_censoring()`; `_survival_entries()` | `test_censored_pair_falls_back_to_exploratory_mann_whitney`, `test_survival_table_reports_missing_and_excluded_endpoints` | ANA | Frozen + Test-locked |
+| Four GitOps analysis rows have `t_e < t_d` | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan | No aggregate field. Derived query below | `analyze_live._validate_timing()` allows signed differences | No test embeds the observed four rows | ANA | **Derived** |
+| Detection/evidence median gaps for B and E are 4.0–4.3 s | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Jawaban RQ; abstract; deck 12, 13, 15 | `LA.efficacy[B/detection].effect.median_paired_difference=4.2747`; `B/evidence=4.0478`; `E/detection=4.2927`; `E/evidence=4.0441` | `_comparison()`, `_bootstrap_median()` | `test_complete_pairs_use_wilcoxon_signed_rank` | ANA | Frozen + Test-locked |
+| Recovery median gaps: B 2.95, D 5.05, E 3.03 s | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Jawaban RQ; deck 13 | `LA.efficacy[B/recovery].effect.median_paired_difference=2.9462`; `D/recovery=5.0523`; `E/recovery=3.0314` | `_comparison()` | `test_complete_pairs_use_wilcoxon_signed_rank`, `test_bootstrap_is_deterministic_for_a_fixed_seed` | ANA | Frozen + Test-locked |
+| Positive direction means the imperative arm is slower on the observed signal | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Jawaban RQ; abstract; deck 12, 15 | `LA.efficacy[].effect.cliffs_delta` positive; `median_paired_difference` positive | `cliffs_delta()` computes P(manual > gitops) − P(manual < gitops); `_comparison()` uses `manual - gitops` | `test_complete_pairs_use_wilcoxon_signed_rank` | ANA | Frozen + Test-locked |
+| Observation horizon is 300 s; values beyond are censored, not zero | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Keterbatasan; deck 9, 14 | ANA `censor_seconds=300.0`; `SU.censoring.*.right_censored` | `harness.parse_args(--timeout=300)`, row builder | `test_new_right_censored_row_requires_deadline_completion`, `test_kaplan_meier_and_rmst_never_impute_censored_as_zero` | ANA, ROWS | Frozen + Test-locked |
 
 Derived query for the four signed rows:
 
@@ -77,7 +81,7 @@ PY
 #  'formal-20261029-gitops-B-r02', 'formal-20261029-gitops-B-r06']
 ```
 
-## 4. Efficacy B–E — twelve comparisons
+## 4. Timing RQ — 12 B–E comparisons
 
 All p-values are Holm-adjusted, two-sided, α = 0.05. The frozen fields are
 `LA.efficacy[scenario/metric].holm_adjusted_p`, `.reject_holm`,
@@ -86,22 +90,22 @@ All p-values are Holm-adjusted, two-sided, α = 0.05. The frozen fields are
 
 | Claim | Manuscript location | Frozen output / key | Code | Test | Status |
 |---|---|---|---|---|---|
-| All 12 B–E comparisons reject Holm | Bab IV §4.4, Table 4.4 (`tab:hasil-uji`); Bab V §5.1.2; abstract; deck 12, 16 | `LA.efficacy[].reject_holm=true` | `analyze()`, `holm_adjust()` | `test_holm_adjustment_uses_predeclared_family`, `test_synthetic_matrix_matches_the_frozen_summary` | Frozen + Test-locked |
-| Holm p range 0.0054–0.0195 | Bab IV §4.4; Bab V §5.1.2; abstract; deck 12, 16 | min/max of `LA.efficacy[].holm_adjusted_p` | `holm_adjust()` | same | Frozen + Test-locked |
+| All 12 B–E comparisons have Holm-adjusted p < 0.05 (exploratory model) | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan, Table 4.4 (`tab:hasil-uji`); Bab V §Jawaban RQ; abstract; deck 12, 15 | `LA.efficacy[].reject_holm=true` | `analyze()`, `holm_adjust()` | `test_holm_adjustment_uses_predeclared_family`, `test_synthetic_matrix_matches_the_frozen_summary` | Frozen + Test-locked |
+| Holm p range 0.0054–0.0195 | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Jawaban RQ; abstract; deck 12, 15 | min/max of `LA.efficacy[].holm_adjusted_p` | `holm_adjust()` | same | Frozen + Test-locked |
 | B detection: p=0.0176, δ=1.00 [1.00,1.00], Δ=4.27 s | Bab IV Table 4.4; deck 12 | `LA.efficacy[B/detection]` | `_comparison()`, `wilcoxon_signed_rank()`, `cliffs_delta()` | `test_complete_pairs_use_wilcoxon_signed_rank` | Frozen + Test-locked |
 | B evidence: p=0.0176, δ=1.00 [1.00,1.00], Δ=4.05 s | Bab IV Table 4.4; deck 12 | `LA.efficacy[B/evidence]` | same | same | Frozen + Test-locked |
-| B recovery: p=0.0195, δ=0.48 [−0.08,1.00], Δ=2.95 s | Bab IV Table 4.4; Bab V §5.1.2; abstract; deck 12, 16 | `LA.efficacy[B/recovery]` | same | same | Frozen + Test-locked |
+| B recovery: p=0.0195, δ=0.48 [−0.08,1.00], Δ=2.95 s; CI includes zero | Bab IV Table 4.4; Bab V §Jawaban RQ; abstract; deck 12, 15 | `LA.efficacy[B/recovery]` | same | same | Frozen + Test-locked |
 | C detection: p=0.0054, δ=1.00 [1.00,1.00], Mann–Whitney 8 vs 10 | Bab IV Table 4.4; deck 12 | `LA.efficacy[C/detection].pairing={method:unpaired,n_gitops:8,n_manual:10}` | `_pairing()`, `mann_whitney_u()` | `test_censored_pair_falls_back_to_exploratory_mann_whitney` | Frozen + Test-locked |
 | C evidence: p=0.0054, δ=1.00 [1.00,1.00], Mann–Whitney 8 vs 10 | Bab IV Table 4.4; deck 12 | `LA.efficacy[C/evidence]` | same | same | Frozen + Test-locked |
-| C recovery: p=0.0176, δ=0.75 [0.25,1.00], Mann–Whitney 8 vs 10 | Bab IV Table 4.4; Bab V §5.1.2; abstract; deck 12, 16 | `LA.efficacy[C/recovery]` | same | same | Frozen + Test-locked |
+| C recovery: p=0.0176, δ=0.75 [0.25,1.00], Mann–Whitney 8 vs 10 | Bab IV Table 4.4; Bab V §Jawaban RQ; abstract; deck 12, 15 | `LA.efficacy[C/recovery]` | same | same | Frozen + Test-locked |
 | D detection: p=0.0176, δ=1.00 [1.00,1.00], Mann–Whitney 4 vs 10 | Bab IV Table 4.4; deck 12 | `LA.efficacy[D/detection].pairing={method:unpaired,n_gitops:4,n_manual:10,reason:missing_blocks}` | same | same | Frozen + Test-locked |
 | D evidence: p=0.0054, δ=1.00 [1.00,1.00], Mann–Whitney 8 vs 10 | Bab IV Table 4.4; deck 12 | `LA.efficacy[D/evidence]` | same | same | Frozen + Test-locked |
-| D recovery: p=0.0176, δ=1.00 [1.00,1.00], Δ=5.05 s | Bab IV Table 4.4; Bab V §5.1.2; deck 12, 13, 16 | `LA.efficacy[D/recovery]` | same | same | Frozen + Test-locked |
+| D recovery: p=0.0176, δ=1.00 [1.00,1.00], Δ=5.05 s | Bab IV Table 4.4; Bab V §Jawaban RQ; deck 12, 13, 15 | `LA.efficacy[D/recovery]` | same | same | Frozen + Test-locked |
 | E detection: p=0.0176, δ=1.00 [1.00,1.00], Δ=4.29 s | Bab IV Table 4.4; deck 12 | `LA.efficacy[E/detection]` | same | same | Frozen + Test-locked |
 | E evidence: p=0.0176, δ=1.00 [1.00,1.00], Δ=4.04 s | Bab IV Table 4.4; deck 12 | `LA.efficacy[E/evidence]` | same | same | Frozen + Test-locked |
-| E recovery: p=0.0176, δ=0.86 [0.64,1.00], Δ=3.03 s | Bab IV Table 4.4; Bab V §5.1.2; abstract; deck 12, 13, 16 | `LA.efficacy[E/recovery]` | same | same | Frozen + Test-locked |
-| C and D fallback to Mann–Whitney because complete pairs are insufficient | Bab IV §4.4, Table 4.4 footnote; deck 12 | `LA.efficacy[].pairing.{method,reason}` | `_pairing()` | `test_censored_pair_falls_back_to_exploratory_mann_whitney` | Frozen + Test-locked |
-| Recovery effect is smaller than detection/evidence for B and C, not uniformly | Bab IV §4.4; Bab V §5.1.2; abstract; deck 12, 16 | `LA.efficacy[B/recovery].effect.cliffs_delta=0.48`, `C/recovery=0.75`; `D=1.00`, `E=0.86` | `_comparison()`, `cliffs_delta()` | `test_complete_pairs_use_wilcoxon_signed_rank` | Frozen + Test-locked |
+| E recovery: p=0.0176, δ=0.86 [0.64,1.00], Δ=3.03 s | Bab IV Table 4.4; Bab V §Jawaban RQ; abstract; deck 12, 13, 15 | `LA.efficacy[E/recovery]` | same | same | Frozen + Test-locked |
+| C and D fallback to Mann–Whitney because complete pairs are insufficient | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan, Table 4.4 footnote; deck 12 | `LA.efficacy[].pairing.{method,reason}` | `_pairing()` | `test_censored_pair_falls_back_to_exploratory_mann_whitney` | Frozen + Test-locked |
+| Recovery effect is smaller than detection/evidence for B and C, not uniformly | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Jawaban RQ; abstract; deck 12, 15 | `LA.efficacy[B/recovery].effect.cliffs_delta=0.48`, `C/recovery=0.75`; `D=1.00`, `E=0.86` | `_comparison()`, `cliffs_delta()` | `test_complete_pairs_use_wilcoxon_signed_rank` | Frozen + Test-locked |
 
 ## 5. Sensitivity — `gitops-C-r02`
 
@@ -112,24 +116,24 @@ observed values are not embedded in a test.
 
 | Claim | Manuscript location | Output source | Code | Test | Status |
 |---|---|---|---|---|---|
-| C-r02 is complete and observed: detection 0.98 s, evidence 1.16 s, recovery 5.77 s, R1 100/75/100 | Bab IV §4.4.1 (`subsec:sensitivitas-c`); Bab V §5.1.2 | Sensitivity JSON `c_r02.*`; also ROWS | `c_r02_sensitivity.main()` | `test_main_prints_or_writes_the_sensitivity_report` (plumbing) | **Gap: no committed output**; reproducible |
+| C-r02 is complete and observed: detection 0.98 s, evidence 1.16 s, recovery 5.77 s, R1 100/75/100 | Bab IV §Analisis Sensitivitas (`subsec:sensitivitas-c`); Bab V §Jawaban RQ | Sensitivity JSON `c_r02.*`; also ROWS | `c_r02_sensitivity.main()` | `test_main_prints_or_writes_the_sensitivity_report` (plumbing) | **Gap: no committed output**; reproducible |
 | C sensitivity uses 10 imperative vs 9 GitOps; Mann–Whitney | Bab IV Table 4.5 (`tab:sensitivitas-c`) | Sensitivity JSON `sensitivity_c.*.n_manual/n_gitops` | `c_r02_sensitivity.main()`; `_comparison()` | same | **Gap: no committed output**; reproducible |
 | C detection/evidence p=0.0003, Holm=0.0034, δ=1.00 [1.00,1.00] | Bab IV Table 4.5 | Sensitivity JSON `sensitivity_c.detection/evidence`, `holm_family` | same | same | **Gap** |
-| C recovery p=0.0200, Holm=0.0391, δ=0.64 [0.11,1.00] | Bab IV Table 4.5; Bab V §5.1.2; abstract | Sensitivity JSON `sensitivity_c.recovery`, `holm_family` | same | same | **Gap** |
-| B recovery Holm rises from 0.0195 to 0.0391 in the sensitivity family | Bab IV Table 4.5 footnote; Bab V §5.1.2 | Sensitivity JSON `holm_family[B/recovery]` | same | same | **Gap** |
-| All 12 comparisons still reject Holm in sensitivity | Bab IV §4.4.1; Bab V §5.1.2 | Sensitivity JSON `holm_family[].holm_adjusted_p < 0.05` | same | same | **Gap** |
+| C recovery p=0.0200, Holm=0.0391, δ=0.64 [0.11,1.00] | Bab IV Table 4.5; Bab V §Jawaban RQ; abstract | Sensitivity JSON `sensitivity_c.recovery`, `holm_family` | same | same | **Gap** |
+| B recovery Holm rises from 0.0195 to 0.0391 in the sensitivity family | Bab IV Table 4.5 footnote; Bab V §Jawaban RQ | Sensitivity JSON `holm_family[B/recovery]` | same | same | **Gap** |
+| All 12 sensitivity comparisons remain below α = 0.05 | Bab IV §Analisis Sensitivitas; Bab V §Jawaban RQ | Sensitivity JSON `holm_family[].holm_adjusted_p < 0.05` | same | same | **Gap** |
 
 ## 6. Boundary and interpretive claims
 
 | Claim | Manuscript location | Frozen output / key | Code | Test | Raw evidence | Status |
 |---|---|---|---|---|---|---|
-| R3 is not measured; no attribution claim | Bab IV §4.3, §4.5; Bab V §5.3; deck 4, 14, B1 | `LA.r3.status="not_measured"`, `.statement="R3: not measured"` | `analyze()` | `test_control_boundary_and_g_are_outside_efficacy` | ANA `r3_status` | Frozen + Test-locked |
-| One stack, sequential arms, fixed order `gitops, imperative`; effects not isolated | Bab IV §4.5; Bab V §5.3; deck 5, 14 | `LA.batch.stack_isolated=false`; `MAN.arm_order`, `MAN.scenario_order` | `run_matrix.run_batch()` sequential loop | `test_seed_reproduces_order_and_both_arms_share_scenarios`, `test_plan_keeps_one_stack_and_records_dry_run_metadata` | MAN | Frozen + Test-locked |
-| A is an HPA control, not ArgoCD efficacy evidence | Bab IV §4.2, §4.5; Bab V §5.1.1; deck 11 | `LA.batch.efficacy_ineligible` contains A; `LA.overview[A/*].population="hpa_control"` | `analyze()`, `POPULATIONS` | `test_control_boundary_and_g_are_outside_efficacy` | ANA | Frozen + Test-locked |
-| G is descriptive, non-Argo, not pooled into efficacy | Bab IV §4.2, §4.5; Bab V §5.1.1, §5.3; deck 11, 15, B3 | `LA.batch.efficacy_ineligible` contains G; `LA.batch.population_by_scenario.G="descriptive_non_argo"` | `analyze()` | `test_control_boundary_and_g_are_outside_efficacy` | ANA | Frozen + Test-locked |
-| 15 repetitions per cell are not a per-scenario power guarantee | Bab IV §4.5; Bab V §5.3 | Design claim, not an output field | `run_matrix.build_plan()` | `test_reps_one_to_ten_are_r2_and_eleven_to_fifteen_are_r1` | MAN | **No numeric output**; design limitation |
-| Imperative checker nominal interval is 5 s; sampler nominal interval is 1 s | Bab IV §4.4; Bab V §5.1.2, §5.3; deck 9, 13, 14 | Design parameters, not result fields | `harness.parse_args(--imperative-interval=5.0, --sample-interval=1)` | `test_argument_parsers...` | MAN, row metadata | Design parameter |
-| 300 s observation horizon | Bab IV §4.2–4.3; Bab V §5.3; deck 9 | ANA `censor_seconds=300.0` | `harness.parse_args(--timeout=300.0)` | `test_new_right_censored_row_requires_deadline_completion` | ANA | Frozen + Test-locked |
+| R3 is not measured; no attribution claim | Bab IV §Batas Interpretasi; Bab V §Keterbatasan; deck 4, 14, B1 | `LA.r3.status="not_measured"`, `.statement="R3: not measured"` | `analyze()` | `test_control_boundary_and_g_are_outside_efficacy` | ANA `r3_status` | Frozen + Test-locked |
+| One stack, sequential arms, fixed order `gitops, imperative`; effects not isolated | Bab IV §Batas Klaim; Bab V §Keterbatasan; deck 5, 14, 15 | `LA.batch.stack_isolated=false`; `MAN.arm_order`, `MAN.scenario_order` | `run_matrix.run_batch()` sequential loop | `test_seed_reproduces_order_and_both_arms_share_scenarios`, `test_plan_keeps_one_stack_and_records_dry_run_metadata` | MAN | Frozen + Test-locked |
+| A is an HPA control, not ArgoCD efficacy evidence | Bab IV §Validitas Manipulasi; Bab V §Validitas Manipulasi; deck 11 | `LA.batch.efficacy_ineligible` contains A; `LA.overview[A/*].population="hpa_control"` | `analyze()`, `POPULATIONS` | `test_control_boundary_and_g_are_outside_efficacy` | ANA | Frozen + Test-locked |
+| G is descriptive, non-Argo, not pooled into efficacy | Bab IV §Validitas Manipulasi, §Batas Interpretasi; Bab V §Validitas Manipulasi, §Keterbatasan; deck 11, 15, B3 | `LA.batch.efficacy_ineligible` contains G; `LA.batch.population_by_scenario.G="descriptive_non_argo"` | `analyze()` | `test_control_boundary_and_g_are_outside_efficacy` | ANA | Frozen + Test-locked |
+| 15 repetitions per cell are not a per-scenario power guarantee | Bab IV §Batas Klaim; Bab V §Keterbatasan | Design claim, not an output field | `run_matrix.build_plan()` | `test_reps_one_to_ten_are_r2_and_eleven_to_fifteen_are_r1` | MAN | **No numeric output**; design limitation |
+| Imperative checker nominal interval is 5 s; sampler nominal interval is 1 s | Bab IV §Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Jawaban RQ, §Keterbatasan; deck 9, 13, 14 | Design parameters, not result fields | `harness.parse_args(--imperative-interval=5.0, --sample-interval=1)` | `test_argument_parsers...` | MAN, row metadata | Design parameter |
+| 300 s observation horizon | Bab IV §Validitas Manipulasi–§Waktu Deteksi, Bukti, dan Pemulihan; Bab V §Keterbatasan; deck 9 | ANA `censor_seconds=300.0` | `harness.parse_args(--timeout=300.0)` | `test_new_right_censored_row_requires_deadline_completion` | ANA | Frozen + Test-locked |
 
 ## 7. External literature and build metadata
 
@@ -139,7 +143,7 @@ These are not experiment outputs and must not be traced to the frozen analysis.
 |---|---|---|---|
 | 719 configuration defects in 2,260 Kubernetes scripts; 533 (74.1%) caused crash/wrong operation/outage | Deck slide 2 | Zhang et al. (2026), external literature; see `content/skripsi/references.bib` | **External** |
 | Security misconfiguration categories in open-source manifests | Deck slide 2 | Rahman et al. (2023), external literature | **External** |
-| Thesis is 69 pages; 0 overfull, 18 underfull | Repository status | `content/skripsi/main.log` build output | **External build metadata** |
+| Thesis is 73 pages; 0 overfull, 17 underfull | Repository status | `content/skripsi/main.log` build output | **External build metadata** |
 | Deck is 22 slides | Repository status | `presentation/skripsi/main.pdf` metadata | **External build metadata** |
 
 ## 8. Summary of gaps
