@@ -1,8 +1,8 @@
-# Skripsi: Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes
+# Skripsi: Perbandingan Terkontrol Prosedur Imperatif dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes
 
 > Studi Kasus InvenioRDM | Departemen Ilmu Komputer dan Elektronika, FMIPA UGM
 
-Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol paradigma deployment manual dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM. Baseline manual direpresentasikan oleh prosedur imperatif terotomasi berbasis kubectl; baseline ini konservatif karena mewakili versi tercepat prosedur manual, dan waktu reaksi manusia tidak diukur.
+Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi** penelitian tentang perbandingan terkontrol prosedur imperatif dan GitOps dalam menghadapi penyimpangan konfigurasi pada klaster Kubernetes, dengan studi kasus InvenioRDM. Prosedur imperatif dijalankan otomatis dengan pemeriksa dan runbook kubectl tetap; prosedur ini konservatif karena mewakili versi otomatis yang dibakukan, dan waktu reaksi manusia tidak diukur.
 
 > **Status metode:** Kedua mode dijalankan berurutan pada satu stack InvenioRDM produksi-like; HPA normal aktif pada kedua mode dan skenario A adalah kontrol HPA, terpisah dari efikasi ArgoCD. Harness live dan protokol kolektor ada di [`experiments/live/README.md`](experiments/live/README.md) dan [`experiments/LIVE-OBSERVER.md`](experiments/LIVE-OBSERVER.md).
 
@@ -10,11 +10,12 @@ Repository ini berisi source LaTeX untuk **Proposal Tugas Akhir** dan **Skripsi*
 
 | Butir | Nilai |
 |---|---|
-| Skripsi | 69 halaman; 0 overfull, 18 underfull |
+| Skripsi | 73 halaman; 0 overfull, 17 underfull |
 | Deck sidang | 22 slide |
 | Batch formal | `formal-20261029` selesai 30 Oktober 2026; 210 sel terminal, 0 tertunda |
 | Baris analisis | 207 dari 211 baris mentah; 4 eksklusi terdokumentasi |
 | Analisis beku | Tujuh keluaran direproduksi identik dengan seed `20261029` |
+| View tesis | `experiments/analysis/rq2_report.py`; `--check-frozen` PENDING tanpa `live_analysis.json` lokal |
 | Run live baru | Tidak ada; batch formal berikutnya memerlukan izin dan pembekuan baru |
 
 Angka hasil dan batas interpretasinya ada di
@@ -25,6 +26,8 @@ Provenance dan reproduksi:
 - [`experiments/DATA.md`](experiments/DATA.md) — inventaris data, eksklusi, checksum, dan privasi.
 - [`experiments/ARCHITECTURE.md`](experiments/ARCHITECTURE.md) — peta modul, aliran data, dan batas kepercayaan.
 - [`docs/reproducibility/claim-traceability.md`](docs/reproducibility/claim-traceability.md) — klaim angka ke keluaran, kode, dan bukti mentah.
+- [`docs/defense/source-map.md`](docs/defense/source-map.md) — peta bagian skripsi ke kode, tag beku, dan perintah.
+- [`docs/thesis-style.md`](docs/thesis-style.md) — aturan istilah, klaim, dan tipografi; audit report-only.
 - [`docs/reproducibility/verification-2026-11-19.md`](docs/reproducibility/verification-2026-11-19.md) — catatan verifikasi reproduksi.
 - [`docs/reproducibility/experiment-dossier.md`](docs/reproducibility/experiment-dossier.md) — indeks bukti untuk penguji.
 
@@ -50,6 +53,8 @@ make proposal          # Kompilasi proposal
 make skripsi           # Kompilasi skripsi
 make presentation      # Kompilasi deck proposal
 make presentation-skripsi # Kompilasi deck sidang skripsi
+make check-experiments # Tes, lint, dan coverage apparatus
+make thesis-style      # Audit gaya report-only (tidak menggagalkan build)
 make all               # Kompilasi proposal, skripsi, dan kedua deck
 make clean             # Bersihkan file build
 
@@ -61,7 +66,7 @@ make presentation-skripsi-docker
 make all-docker
 ```
 
-### Manual (tanpa Makefile)
+### Tanpa Makefile
 
 ```bash
 cd content/proposal  # atau content/skripsi
@@ -106,12 +111,15 @@ skripsi/
 │
 ├── experiments/
 │   ├── live/                        # Harness dan orkestrator batch
-│   ├── analysis/                    # Analisis dan tabel LaTeX
+│   ├── analysis/                    # Analisis, view RQ, dan tabel LaTeX
 │   ├── sensitivity/                 # Analisis sensitivitas C-r02
-│   ├── tests/                       # 492 tes offline
+│   ├── tests/                       # 502 tes offline
 │   ├── REVISIONS.md                 # Tag beku dan provenance kode
 │   ├── DATA.md                      # Inventaris data dan checksum
 │   └── ARCHITECTURE.md              # Peta modul dan aliran bukti
+│
+├── scripts/
+│   └── check_thesis_style.py        # Audit gaya report-only
 │
 ├── docs/
 │   ├── reproducibility/             # Dossier, hasil formal, traceability, verifikasi
@@ -144,7 +152,7 @@ Setiap push ke `main`/`master` yang mengubah berkas LaTeX, `Makefile`, atau work
 
 ## Deck Sidang
 
-`presentation/skripsi/main.pdf` adalah deck sidang skripsi 22 halaman. Build lokal: `make presentation-skripsi`; build Docker: `make presentation-skripsi-docker`.
+`presentation/skripsi/main.pdf` adalah deck sidang skripsi 22 slide: satu pertanyaan waktu, satu slide validitas R1, satu slide hasil waktu, dan batas klaim eksplisit. Build lokal: `make presentation-skripsi`; build Docker: `make presentation-skripsi-docker`.
 
 ## Release
 

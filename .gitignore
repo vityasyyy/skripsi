@@ -62,6 +62,7 @@ experiments/formal-20261029/*.summary.json
 !experiments/formal-20261029/SHA256SUMS
 !experiments/formal-20261029/PROVENANCE.json
 experiments/analysis-formal-20261029/
+experiments/analysis-rq2-formal-20261029/
 experiments/evidence-local/
 experiments/pilot-*/
 

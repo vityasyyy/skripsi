@@ -1,7 +1,7 @@
 # Skripsi Makefile
 # Supports local compilation (requires texlive) and Docker compilation
 
-.PHONY: help proposal skripsi skripsi-diagrams presentation presentation-diagrams presentation-skripsi presentation-skripsi-diagrams clean clean-proposal clean-skripsi clean-presentation clean-presentation-skripsi proposal-docker skripsi-docker presentation-docker presentation-diagrams-docker presentation-skripsi-docker presentation-skripsi-diagrams-docker shell test-experiments lint-experiments coverage-experiments check-experiments
+.PHONY: help proposal skripsi skripsi-diagrams presentation presentation-diagrams presentation-skripsi presentation-skripsi-diagrams clean clean-proposal clean-skripsi clean-presentation clean-presentation-skripsi proposal-docker skripsi-docker presentation-docker presentation-diagrams-docker presentation-skripsi-docker presentation-skripsi-diagrams-docker shell test-experiments lint-experiments coverage-experiments check-experiments thesis-style
 
 help:
 	@echo "Skripsi - Build Options"
@@ -15,6 +15,7 @@ help:
 	@echo "  make presentation-skripsi - Compile diagrams then presentation/skripsi/main.tex (xelatex)"
 	@echo "  make presentation-diagrams - Compile only presentation diagrams"
 	@echo "  make presentation-skripsi-diagrams - Compile only skripsi presentation diagrams"
+	@echo "  make thesis-style      - Report thesis/deck style findings (never fails)"
 	@echo "  make clean             - Remove build artifacts"
 	@echo "  make all               - Compile proposal, skripsi, and both presentations"
 	@echo ""
@@ -129,3 +130,7 @@ coverage-experiments:
 	uv run --with-requirements experiments/requirements-dev.txt coverage report --rcfile=experiments/.coveragerc --fail-under=100
 
 check-experiments: test-experiments lint-experiments coverage-experiments
+
+# Report-only style audit; prints counts and file:line locations and always exits 0.
+thesis-style:
+	python3 scripts/check_thesis_style.py

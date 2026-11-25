@@ -7,7 +7,7 @@ flowchart TB
   subgraph GIT["GitOps: pengendali ArgoCD"]
     direction LR
     G1["Amati status live"] --> G2["Bandingkan dengan<br/>render deklarasi Git"] --> G3["Sync atau self-heal"]
-    G3 -. "berkelanjutan" .-> G1
+    G3 -. "periodik/event-driven; interval tidak diukur" .-> G1
   end
   IMP ~~~ GIT
   classDef imp fill:#eef2f7,stroke:#64748b,color:#14212b;

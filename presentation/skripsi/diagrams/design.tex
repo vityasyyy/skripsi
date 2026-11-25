@@ -5,7 +5,7 @@
 \usepackage{xcolor}
 
 \definecolor{gitopsblue}{RGB}{51,108,229}
-\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{imperativegray}{RGB}{102,102,102}
 \definecolor{metricyellow}{RGB}{251,192,45}
 
 \begin{document}
@@ -31,12 +31,12 @@
     ArgoCD aktif\\
     15 \textit{run}
 };
-\node[box=manualgray, right=of gitops] (reset) {
+\node[box=imperativegray, right=of gitops] (reset) {
     \textbf{Reset \textit{baseline}}\\
     verifikasi inventaris\\
     penangguhan 60 detik
 };
-\node[box=manualgray, right=of reset] (imperative) {
+\node[box=imperativegray, right=of reset] (imperative) {
     \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
     \textbf{Mode imperatif}\\
     ArgoCD ditangguhkan\\
@@ -44,9 +44,9 @@
 };
 \node[box=metricyellow!85!black, right=of imperative, text width=2.5cm] (eval) {
     \textbf{Evaluator}\\
-    R1 kesetaraan\\
-    R2 tiga waktu\\
-    kesehatan terpisah
+    RQ: tiga waktu\\
+    R1: validitas pemulihan\\
+    kesehatan: \textit{guardrail}
 };
 
 \draw[arrow] (stack) -- (gitops);

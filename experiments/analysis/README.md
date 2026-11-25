@@ -119,7 +119,7 @@ Cara membaca hasil:
   dipool ke uji B--E. Kunci keluaran `visibility_boundary` untuk F adalah label
   skema lama yang dipertahankan; arti prosa saat ini adalah drift
   `Service/invenio-web` pada `targetPort` yang dideklarasikan, bukan objek tak
-  terkelola. Alasan F tetap di luar keluarga efikasi adalah keluarga dua belas
+  terkelola. Alasan F tetap di luar keluarga efikasi adalah keluarga 12
   hipotesis ditetapkan sebelum koleksi, bukan karena F tidak terkelola. Baris
   batch memberi G `efficacy_eligible: true` karena aturan runner hanya
   mengecualikan A/F; analyzer menimpanya menjadi deskriptif non-Argo sesuai

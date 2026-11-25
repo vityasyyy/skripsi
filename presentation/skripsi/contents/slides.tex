@@ -8,14 +8,14 @@
 \usetikzlibrary{positioning,fit,calc,arrows.meta}
 
 \hypersetup{
-    pdftitle={Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes},
+    pdftitle={Perbandingan Terkontrol Prosedur Imperatif dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes},
     pdfauthor={Muhammad Argya Vityasy},
     pdfsubject={Sidang Skripsi},
 }
 \pdfstringdefDisableCommands{\def\translate#1{#1}}
 
 \definecolor{gitopsblue}{RGB}{51,108,229}
-\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{imperativegray}{RGB}{102,102,102}
 \definecolor{driftred}{RGB}{229,115,115}
 \definecolor{okgreen}{RGB}{76,175,80}
 
@@ -25,7 +25,7 @@
 % -------------------------------------------------------
 % Presentation metadata
 % -------------------------------------------------------
-\title{\texorpdfstring{\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000 Perbandingan Terkontrol Paradigma \textit{Deployment} Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}{Perbandingan Terkontrol Paradigma Deployment Manual dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}}
+\title{\texorpdfstring{\raggedright\hyphenpenalty=10000\exhyphenpenalty=10000 Perbandingan Terkontrol Prosedur Imperatif dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}{Perbandingan Terkontrol Prosedur Imperatif dan GitOps dalam Menghadapi Penyimpangan Konfigurasi pada Klaster Kubernetes}}
 \subtitle{Sidang Skripsi\texorpdfstring{\\}{} Studi Kasus InvenioRDM}
 \author{Muhammad Argya Vityasy\texorpdfstring{\\[3pt]}{, }%
 NIM: 23/522547/PA/22475\texorpdfstring{\\[2pt]}{, }%
@@ -121,7 +121,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \begin{itemize}\setlength{\itemsep}{3pt}
                 \item Kesetaraan konfigurasi dari sinyal kesehatan yang dipakai sebagai \textit{guardrail}.
                 \item Sinyal deteksi dari ketersediaan bukti dan pemulihan.
-                \item \textit{Baseline} manual yang tetap dari kecepatan operator.
+                \item Prosedur imperatif otomatis yang tetap, terpisah dari kecepatan operator.
             \end{itemize}
         \end{column}
     \end{columns}
@@ -138,33 +138,40 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Rumusan Masalah}
+    \frametitle{Rumusan Masalah: Satu Pertanyaan Waktu}
     \vspace{0.04cm}
-    \slidelead{Bagaimana dua prosedur manajemen merespons drift pada satu \textit{stack} InvenioRDM?}
-    \vspace{0.08cm}
+    \begin{beamercolorbox}[wd=\textwidth, sep=0.18cm, rounded=true]{structure}
+        \scriptsize
+        Seberapa besar perbedaan waktu deteksi, waktu tersedianya bukti yang dapat diverifikasi,
+        dan waktu pemulihan konfigurasi penuh antara prosedur imperatif otomatis dan GitOps
+        pada setiap skenario drift, dan pada kondisi apa keunggulan waktu menyusut atau bertahan?
+    \end{beamercolorbox}
+    \vspace{0.10cm}
     \begin{columns}[T]
-        \begin{column}{0.48\textwidth}
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.14cm, center, rounded=true]{structure}
-                \small\bfseries RQ1
+        \begin{column}{0.31\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{frametitle}
+                \scriptsize\bfseries (a) Deteksi
             \end{beamercolorbox}
-            \vspace{0.05cm}
-            \scriptsize
-            Bagaimana skor kesetaraan \textit{field} konfigurasi terpilih berubah
-            setelah injeksi dan koreksi pada mode imperatif otomatis dibandingkan dengan mode GitOps,
-            dan pada skenario mana perbedaan itu muncul atau menghilang?
+            \vspace{0.04cm}
+            \centering\scriptsize $t_d - t_0$
         \end{column}
-        \begin{column}{0.48\textwidth}
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.14cm, center, rounded=true]{structure}
-                \small\bfseries RQ2
+        \begin{column}{0.31\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{frametitle}
+                \scriptsize\bfseries (b) Bukti
             \end{beamercolorbox}
-            \vspace{0.05cm}
-            \scriptsize
-            Bagaimana distribusi waktu deteksi, waktu tersedianya bukti yang dapat diverifikasi,
-            dan waktu pemulihan konfigurasi penuh berbeda antara kedua mode pada setiap skenario?
+            \vspace{0.04cm}
+            \centering\scriptsize $t_e - t_0$
+        \end{column}
+        \begin{column}{0.31\textwidth}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{frametitle}
+                \scriptsize\bfseries (c) Pemulihan
+            \end{beamercolorbox}
+            \vspace{0.04cm}
+            \centering\scriptsize $t_r - t_0$
         \end{column}
     \end{columns}
     \vspace{0.12cm}
-    \smallnote{R1 = kesetaraan \textit{field}; R2 = tiga metrik waktu. Kesehatan layanan = \textit{guardrail} kesiapan dan \textit{postcondition}, bukan hasil komparatif. Skenario A, F, dan G dilaporkan terpisah.}
+    \smallnote{``Pada kondisi apa'' dijawab oleh perbandingan per skenario, bukan subpertanyaan keempat. R1 = validitas pemulihan; kesehatan layanan = \textit{guardrail}. A, F, dan G dilaporkan terpisah.}
 \end{frame}
 }
 
@@ -210,7 +217,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
                 \scriptsize\bfseries 210 sel
             \end{beamercolorbox}
             \vspace{0.03cm}
-            \scriptsize 7 skenario $\times$ 2 mode $\times$ 15 pengulangan: 10 protokol R2 dan 5 protokol R1.
+            \scriptsize 7 skenario $\times$ 2 mode $\times$ 15 pengulangan: 10 pengulangan blok waktu dan 5 pengulangan blok validitas.
         \end{column}
         \begin{column}{0.32\textwidth}
             \begin{beamercolorbox}[wd=\textwidth, sep=0.10cm, center, rounded=true]{structure}
@@ -260,12 +267,12 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 }
 
 % =============================================
-% 8. R1 metric
+% 8. R1 validity
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{R1: Kesetaraan \textit{Field} Terpilih}
+    \frametitle{R1: Validitas Pemulihan, Bukan Perbandingan}
     \begin{columns}[T]
         \begin{column}{0.50\textwidth}
             \scriptsize
@@ -286,32 +293,32 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \end{column}
         \begin{column}{0.46\textwidth}
             \centering
-            \begin{beamercolorbox}[wd=\textwidth, sep=0.28cm, center, rounded=true]{structure}
+            \begin{beamercolorbox}[wd=\textwidth, sep=0.24cm, center, rounded=true]{structure}
                 \normalsize
                 \[
-                    R1_{eq} =
-                    \frac{\text{cocok}}{\text{4}}
-                    \times 100\%
+                    R1 = 100
+                    \;\Longleftrightarrow\;
+                    \text{semua \textit{field} cocok}
                 \]
             \end{beamercolorbox}
-            \vspace{0.10cm}
+            \vspace{0.08cm}
             \scriptsize
-            Cocok berarti jumlah sumber daya yang sesuai inventaris. Satu ketidakcocokan menghasilkan skor 75.
-            Status \textit{Synced} ArgoCD bukan pengganti aturan kesetaraan.
+            Pemeriksa dan evaluator memakai kontrak beku yang sama, sehingga B--F harus kembali ke 100 bila prosedur bekerja.
+            Penyebutnya empat sumber daya; satu ketidakcocokan menghasilkan 75.
         \end{column}
     \end{columns}
     \vspace{0.06cm}
-    \slidelead{Kesetaraan \textit{field} tidak menilai kebenaran semantik.}
+    \slidelead{R1 memeriksa apakah manipulasi bekerja; R1 tidak diuji antarmode dan tidak menjadi hasil komparatif.}
 \end{frame}
 }
 
 % =============================================
-% 9. R2 metric
+% 9. RQ timing
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{R2: Deteksi, Bukti, dan Pemulihan}
+    \frametitle{Mengukur Waktu: Tiga Titik Akhir}
     \centering
     \scriptsize
     \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.1cm}>{\raggedright\arraybackslash}p{9.8cm}@{}}
@@ -324,21 +331,19 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         $t_r$ & Observasi pertama ketika inventaris dan seluruh \textit{field} R1 kembali cocok, dikonfirmasi observasi berikutnya. \\
         \bottomrule
     \end{tabular}
-    \par\vspace{0.22cm}
+    \par\vspace{0.16cm}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
-            \scriptsize
-            \textbf{Durasi utama:} $t_d-t_0$, $t_e-t_0$, dan $t_r-t_0$.
-            Selang $t_e-t_d$ bertanda; nilai negatif berarti bukti mendahului sinyal deteksi dan tidak dibulatkan menjadi nol.
+            \raggedright\scriptsize
+            \textbf{Bukti asimetris:} pada mode imperatif $t_e=t_d$ menurut konstruksi; pada GitOps $t_e$ berasal dari kolektor independen.
         \end{column}
         \begin{column}{0.48\textwidth}
-            \scriptsize
-            \textbf{Penyensoran:} titik akhir yang tidak tercapai dalam 300 detik dicatat tersensor kanan.
-            Waktu hilang tidak diimputasi nol dan bukan kegagalan instrumen.
+            \raggedright\scriptsize
+            \textbf{Cadence:} \textit{sampler} 1 detik, pemeriksa imperatif 5 detik; interval rekonsiliasi ArgoCD tidak diukur terpisah.
         \end{column}
     \end{columns}
     \vspace{0.06cm}
-    \smallnote{\textit{Sampler} berjalan pada interval nominal 1 detik; pemeriksa imperatif pada interval nominal 5 detik.}
+    \smallnote{Titik akhir yang tidak tercapai dalam 300 detik dicatat tersensor kanan; waktu hilang tidak diimputasi nol.}
 \end{frame}
 }
 
@@ -375,7 +380,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \textbf{Uji komparatif}
             \begin{itemize}\setlength{\itemsep}{2pt}
                 \item Wilcoxon \textit{signed-rank} bila pasangan lengkap; Mann-Whitney U sebagai cadangan eksploratif.
-                \item Dua belas hipotesis B-E untuk deteksi, bukti, dan pemulihan; $\alpha=0{,}05$ dengan koreksi Holm.
+                \item 12 hipotesis B-E untuk deteksi, bukti, dan pemulihan; $\alpha=0{,}05$ dengan koreksi Holm.
                 \item Cliff's $\delta$ dengan interval kepercayaan \textit{bootstrap}; Kaplan-Meier dan RMST untuk data tersensor.
             \end{itemize}
             \vspace{0.04cm}
@@ -389,12 +394,12 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 }
 
 % =============================================
-% 11. R1 results
+% 11. Validity result
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Hasil R1: Pola yang Sama, Satu Asimetri}
+    \frametitle{Hasil Validitas: B--F Konvergen, G Batas}
     \centering
     \scriptsize
     \begin{tabular}{@{}cccc@{}}
@@ -402,11 +407,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \textbf{Skenario} & \textbf{GitOps} & \textbf{Imperatif} & \textbf{Catatan} \\
         \midrule
         A & 100 / 100 / 100 & 100 / 100 / 100 & Replika dimiliki HPA \\
-        B & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
-        C & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
-        D & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
-        E & 100 / 75 / 100 & 100 / 75 / 100 & Kembali setara \\
-        F & 100 / 75 / 100 & 100 / 75 / 100 & Drift Service \\
+        B--F & 100 / 75 / 100 & 100 / 75 / 100 & Kembali ke predikat 100 \\
         G & 100 / 75 / \textbf{75} & 100 / 75 / 100 & Anotasi SealedSecret \\
         \bottomrule
     \end{tabular}
@@ -418,38 +419,38 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \raggedright\scriptsize
-            B sampai F kembali ke 100 pada kedua mode. A tetap 100 karena \texttt{/spec/replicas} dikecualikan dari pemeriksaan statis.
+            B--F kembali ke 100 pada kedua mode. Pemeriksa dan evaluator berbagi kontrak beku, sehingga konvergensi adalah syarat validitas manipulasi.
         \end{column}
         \begin{column}{0.48\textwidth}
             \raggedright\scriptsize
-            G satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret dalam 300 detik. Mekanisme penyebabnya tidak diatribusikan.
+            G satu-satunya pengecualian: GitOps tidak mengembalikan anotasi dalam 300 detik. Penyebabnya tidak diatribusikan; G deskriptif, bukan uji \textit{self-heal}.
         \end{column}
     \end{columns}
     \vspace{0.04cm}
-    \slidelead{Pada \textit{field} yang diuji, kedua mode mencapai konfigurasi akhir yang setara, dengan satu pengecualian deskriptif.}
+    \slidelead{R1 tidak dibandingkan antarmode dan tidak diuji; tabel audit lengkap ada di lampiran.}
 \end{frame}
 }
 
 % =============================================
-% 12. R2 results
+% 12. RQ result
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Hasil R2: Dua Belas Perbandingan Menolak H0}
+    \frametitle{Hasil Waktu RQ: B--E}
     \centering
     \scriptsize
     \begin{tabular}{@{}lcccc@{}}
         \toprule
         \textbf{Skenario} & \textbf{Deteksi $\delta$} & \textbf{Bukti $\delta$} & \textbf{Pemulihan $\delta$} & \textbf{$p$ Holm} \\
         \midrule
-        B & 1,00 & 1,00 & 0,48 & 0,0176-0,0195 \\
-        C & 1,00 & 1,00 & 0,75 & 0,0054-0,0176 \\
-        D & 1,00 & 1,00 & 1,00 & 0,0054-0,0176 \\
+        B & 1,00 & 1,00 & 0,48 & 0,0176--0,0195 \\
+        C & 1,00 & 1,00 & 0,75 & 0,0054--0,0176 \\
+        D & 1,00 & 1,00 & 1,00 & 0,0054--0,0176 \\
         E & 1,00 & 1,00 & 0,86 & 0,0176 \\
         \bottomrule
     \end{tabular}
-    \vspace{0.08cm}
+    \vspace{0.06cm}
 
     \raggedleft\scriptsize
     $n=10$ pasangan kecuali C (8 versus 10), D deteksi (4 versus 10), dan D bukti (8 versus 10).
@@ -458,27 +459,25 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
             \raggedright\scriptsize
-            Semua dua belas perbandingan menolak hipotesis nol setelah koreksi Holm.
-            Nilai $p$ terkoreksi berkisar 0,0054 sampai 0,0195.
+            12 perbandingan B--E: $p$ terkoreksi 0,0054--0,0195 di bawah model uji eksploratif, bukan estimasi populasi. Arah positif berarti imperatif lebih lama.
         \end{column}
         \begin{column}{0.48\textwidth}
             \raggedright\scriptsize
-            Arah selisih positif berarti mode imperatif lebih lambat.
-            Uji Mann-Whitney dipakai pada C dan sebagian D karena pasangan lengkap tidak tersedia.
+            Pemulihan B: $\delta=0{,}48$ dengan IK 95\% $[-0{,}08;\,1{,}00]$ yang mencakup nol, sehingga bukan keunggulan yang jelas.
         \end{column}
     \end{columns}
     \vspace{0.04cm}
-    \slidelead{Efek deteksi dan bukti maksimum; efek pemulihan lebih kecil pada B dan C, tetapi tetap tinggi pada D dan E.}
+    \slidelead{Deteksi dan bukti paling terpisah; pemulihan tidak seragam.}
 \end{frame}
 }
 
 % =============================================
-% 13. R2 pattern
+% 13. RQ pattern
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Deteksi Cepat, Pemulihan Tidak Selalu}
+    \frametitle{Cadence dan Bukti yang Asimetris}
     \begin{columns}[T]
         \begin{column}{0.55\textwidth}
             \centering
@@ -489,10 +488,9 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \textbf{Pola utama}
             \begin{itemize}\setlength{\itemsep}{3pt}
                 \item Selisih median deteksi dan bukti B serta E: 4,0 sampai 4,3 detik.
-                \item Pemeriksa imperatif memakai interval nominal 5 detik.
-                      Kontribusi kausalnya tidak dapat diisolasi.
+                \item Pemeriksa imperatif 5 detik, \textit{sampler} 1 detik; selisih berdekatan dengan cadence, bukan estimasi murni respons pengendali.
                 \item Pemulihan B 2,95 detik dan E 3,03 detik; D tetap 5,05 detik.
-                \item Deteksi cepat bukan jaminan pemulihan cepat.
+                \item Pada mode imperatif $t_e=t_d$ menurut konstruksi.
             \end{itemize}
         \end{column}
     \end{columns}
@@ -502,7 +500,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 }
 
 % =============================================
-% 14. Limitations
+% 14. Limits
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -515,12 +513,12 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \textbf{Keterbatasan} & \textbf{Dampak pada klaim} \\
         \midrule
         Satu klaster, satu \textit{stack}, satu implementasi GitOps & Tidak dapat digeneralisasi ke semua organisasi atau alat GitOps \\
-        Mode berurutan dan urutan tetap & Efek periode dan efek urutan tidak dapat dipisahkan dari efek mode \\
+        Seluruh run GitOps mendahului seluruh run imperatif & Efek periode dan efek urutan tidak dapat dipisahkan dari efek mode \\
+        Pengulangan berbagi satu \textit{stack} dan satu periode & Pengulangan pseudoreplikat; $p$ ringkasan deskriptif, bukan estimasi kausal \\
         \textit{Sampler} 1 detik, pemeriksa 5 detik, horizon 300 detik & Ketelitian waktu terbatas pada resolusi instrumen \\
         15 pengulangan per sel & Bukan jaminan daya statistik per skenario \\
         R1 mengukur kesetaraan \textit{field} & Tidak menilai kebenaran semantik atau keamanan konfigurasi \\
-        Atribusi pelaku mutasi tidak diukur & Audit API server tidak tersedia; pelaku mutasi tidak dapat dihubungkan dengan perubahan \\
-        G dan HPA & G tidak dapat digeneralisasi; HPA dibatasi 2-4 replika \\
+        G dan HPA & G tidak dapat digeneralisasi; HPA dibatasi 2--4 replika \\
         \bottomrule
     \end{tabular}
     \vspace{0.08cm}
@@ -529,42 +527,41 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 }
 
 % =============================================
-% 15. Conclusion RQ1
+% 15. Claim boundaries
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Kesimpulan RQ1: Kesetaraan \textit{Field}}
+    \frametitle{Batas Klaim: Cara Membaca Hasil}
     \scriptsize
-    \begin{itemize}\setlength{\itemsep}{3pt}
-        \item Pada skenario B sampai F, kedua mode menurunkan skor dari 100 ke 75 saat drift terdeteksi, lalu kembali ke 100 setelah pemulihan.
-        \item Skenario A tetap 100 karena \texttt{/spec/replicas} dimiliki HPA. Ini kontrol HPA, bukan ukuran efikasi ArgoCD atau prosedur imperatif.
-        \item Skenario G adalah satu-satunya asimetri: GitOps tidak mengembalikan anotasi SealedSecret dalam 300 detik, sedangkan prosedur imperatif melakukannya.
-        \item Mekanisme G tidak diatribusikan, sehingga G dilaporkan deskriptif dan tidak digabungkan ke estimasi efikasi B-E.
-        \item Kesetaraan skor tidak membuktikan kebenaran semantik; kedua mode dapat mencapai konfigurasi yang identik dan sama-sama salah bila deklarasi sumbernya keliru. Kesehatan layanan adalah \textit{guardrail} kesiapan dan \textit{postcondition}, bukan hasil komparatif, dan tidak masuk R1.
+    \begin{itemize}\setlength{\itemsep}{5pt}
+        \item \textbf{Urutan blok.} Seluruh run GitOps mendahului seluruh run imperatif; urutan tetap dan tidak diacak ulang. Pengulangan bersifat pseudoreplikat, sehingga nilai $p$ bukan estimasi kausal.
+        \item \textbf{Bukti asimetris.} $t_e$ imperatif sama dengan $t_d$ menurut konstruksi; $t_e$ GitOps berasal dari kolektor independen. Perbandingan $t_e$ tidak setara secara mekanisme.
+        \item \textbf{Cadence.} Selisih 4,0--4,3 detik berdekatan dengan interval pemeriksa 5 detik dan \textit{sampler} 1 detik, sehingga nilainya bukan estimasi murni respons pengendali.
+        \item \textbf{Pemulihan B.} $\delta=0{,}48$ dengan IK 95\% $[-0{,}08;\,1{,}00]$ yang mencakup nol; tidak dibaca sebagai keunggulan yang jelas.
+        \item \textbf{Batas G.} G deskriptif dan tidak diatribusikan; tidak ada klaim umum bahwa ArgoCD gagal memulihkan drift.
     \end{itemize}
     \vspace{0.12cm}
-    \slidelead{Pada cakupan \textit{field} yang diuji, kedua mode mencapai konfigurasi akhir yang setara, dengan satu pengecualian deskriptif.}
+    \slidelead{Klaim dibatasi pada sinyal yang teramati di bawah cadence masing-masing.}
 \end{frame}
 }
 
 % =============================================
-% 16. Conclusion RQ2
+% 16. Conclusion
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
-    \frametitle{Kesimpulan RQ2: Tiga Waktu yang Berbeda}
+    \frametitle{Kesimpulan: Waktu RQ dan Validitas R1}
     \scriptsize
-    \begin{itemize}\setlength{\itemsep}{5pt}
-        \item Dua belas perbandingan B sampai E menolak hipotesis nol setelah koreksi Holm, dengan $p$ terkoreksi 0,0054 sampai 0,0195.
-        \item Deteksi dan bukti mencapai ukuran efek maksimum ($\delta=1{,}00$). Selisih median B dan E berada pada 4,0 sampai 4,3 detik, dekat dengan interval nominal pemeriksa 5 detik.
-        \item Pemulihan lebih sulit dipisahkan pada B ($\delta=0{,}48$) dan C ($\delta=0{,}75$), tetapi tetap besar pada D ($\delta=1{,}00$) dan E ($\delta=0{,}86$).
-        \item Kecepatan deteksi tidak otomatis berarti kecepatan pemulihan. Pemilihan mode perlu mempertimbangkan skenario drift dan lama drift yang dapat ditoleransi.
-        \item Tidak ada klaim superioritas umum, kelayakan adopsi, atau kesetaraan semantik konfigurasi.
+    \begin{itemize}\setlength{\itemsep}{4pt}
+        \item \textbf{Validitas.} Median R1 untuk B--F kembali ke 100 pada kedua mode; G GitOps tetap 75. B--F adalah syarat validitas manipulasi, bukan hasil komparatif.
+        \item \textbf{Waktu.} Pada B--E, GitOps lebih cepat pada sinyal yang teramati di bawah cadence masing-masing untuk 12 perbandingan, dengan $p$ terkoreksi 0,0054--0,0195 di bawah model uji eksploratif.
+        \item \textbf{Pemulihan.} Selisih pemulihan tidak seragam: B $\delta=0{,}48$ dengan IK yang mencakup nol, C $0{,}75$, D $1{,}00$, dan E $0{,}86$.
+        \item \textbf{Batas.} Tidak ada klaim superioritas umum, kelayakan adopsi, atau kesetaraan semantik konfigurasi. Kecepatan deteksi bukan pengganti jalur pemulihan yang teruji.
     \end{itemize}
     \vspace{0.12cm}
-    \slidelead{Kecepatan deteksi bukan pengganti jalur pemulihan yang teruji.}
+    \slidelead{Satu pertanyaan waktu, satu pemeriksaan validitas, dan batas klaim yang eksplisit.}
 \end{frame}
 }
 
@@ -610,8 +607,8 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
     \vspace{0.16cm}
     \begin{enumerate}\setlength{\itemsep}{7pt}
         \item \textbf{Perbandingan terkontrol pada \textit{workload} multi-service nyata:} satu \textit{stack} InvenioRDM, dua mode berurutan, tujuh skenario drift.
-        \item \textbf{Protokol yang dapat diaudit:} definisi R1 dan R2, penanganan data tersensor, dan keluarga uji yang ditetapkan sebelum pengumpulan.
-        \item \textbf{Hasil yang dibatasi:} kesetaraan \textit{field} tercapai pada B sampai F, dengan satu asimetri deskriptif pada G; deteksi cepat tidak selalu diikuti pemulihan cepat.
+        \item \textbf{Protokol yang dapat diaudit:} definisi waktu dan validitas R1; penanganan data tersensor; keluarga pengujian yang ditetapkan sebelum pengumpulan.
+        \item \textbf{Hasil yang dibatasi:} B--F kembali ke predikat R1, dengan G sebagai batas deskriptif; deteksi cepat tidak selalu diikuti pemulihan cepat.
     \end{enumerate}
     \vspace{0.18cm}
     \begin{beamercolorbox}[wd=0.92\textwidth, sep=0.20cm, center, rounded=true]{structure}
@@ -626,7 +623,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 \appendix
 
 % ---------------------------------------------
-% B1: Why only R1 and R2
+% B1: Why only timing and validity
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -637,7 +634,7 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
         \item Atribusi pelaku mutasi memerlukan audit API server untuk menghubungkan perubahan dengan pelakunya.
         \item Audit API server tidak tersedia pada lingkungan penelitian, sehingga atribusi tidak dapat diukur.
         \item Memaksakan metrik atribusi akan menghasilkan klaim yang tidak dapat diverifikasi. Karena itu, atribusi dilaporkan sebagai keterbatasan.
-        \item R1 dan R2 tetap dapat diukur dengan aturan yang sama pada kedua mode dan didefinisikan sebelum pengumpulan.
+        \item Waktu dan validitas R1 tetap dapat diukur dengan aturan yang sama pada kedua mode dan didefinisikan sebelum pengumpulan.
     \end{itemize}
     \vspace{0.12cm}
     \slidelead{Ketiadaan atribusi adalah batas \textit{apparatus}, bukan hasil yang disembunyikan.}

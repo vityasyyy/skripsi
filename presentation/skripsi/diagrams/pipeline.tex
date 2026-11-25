@@ -4,7 +4,7 @@
 \usepackage{xcolor}
 
 \definecolor{gitopsblue}{RGB}{51,108,229}
-\definecolor{manualgray}{RGB}{102,102,102}
+\definecolor{imperativegray}{RGB}{102,102,102}
 \definecolor{metricyellow}{RGB}{251,192,45}
 \definecolor{driftred}{RGB}{229,115,115}
 
@@ -20,20 +20,20 @@
 \node[box=gitopsblue] (freeze) {
     \textbf{Bekukan}\\\textit{apparatus}\\27 objek render
 };
-\node[box=manualgray, right=of freeze] (gate) {
+\node[box=imperativegray, right=of freeze] (gate) {
     \textbf{Pemeriksaan}\\\textbf{kesiapan}\\CPU dan memori $<70\%$
 };
 \node[box=gitopsblue, right=of gate] (gitops) {
     \textbf{Blok GitOps}\\ArgoCD aktif\\15 \textit{run}
 };
-\node[box=manualgray, right=of gitops] (reset) {
+\node[box=imperativegray, right=of gitops] (reset) {
     \textbf{Reset \textit{baseline}}\\verifikasi\\tunggu 60 detik
 };
-\node[box=manualgray, right=of reset] (imp) {
+\node[box=imperativegray, right=of reset] (imp) {
     \textbf{Imperatif}\\ArgoCD ditangguhkan\\15 \textit{run}
 };
-\node[box=metricyellow!85!black, right=of imp] (analysis) {
-    \textbf{Pemulihan dan}\\\textbf{analisis}\\207 baris
+\node[box=metricyellow!85!black, right=of imp, text width=2.2cm] (analysis) {
+    \textbf{Pemulihan +}\\\textbf{validitas R1}\\analisis waktu RQ
 };
 
 \draw[arrow] (freeze) -- (gate);

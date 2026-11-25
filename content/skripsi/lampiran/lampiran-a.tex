@@ -73,7 +73,21 @@ python3 -B experiments/analysis/analyze_live.py \
   --out experiments/analysis-formal-20261029 --seed 20261029
 \end{lstlisting}
 
-Analisis sensitivitas untuk \texttt{gitops-C-r02} dijalankan terpisah dengan skrip di \path{experiments/sensitivity/}. Skrip tersebut hanya membaca berkas mentah beku dan tidak mengubah analisis primer; hasilnya dilaporkan pada Bab IV.
+Tampilan waktu yang dipakai Bab IV dibangun dari keluaran analisis beku dengan perintah berikut. Perintah ini tidak mengubah analisis primer; ia hanya memilih medan RQ, menghitung cacah validitas R1, dan menurunkan selisih deskriptif $t_r-t_d$.
+
+\begin{lstlisting}[breaklines=true,basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,numbers=none]
+python3 experiments/analysis/rq2_report.py \
+  --in experiments/formal-20261029/formal-20261029.analysis.jsonl \
+  --rows experiments/formal-20261029/formal-20261029.rows.jsonl \
+  --frozen experiments/analysis-formal-20261029/live_analysis.json \
+  --out experiments/analysis-rq2-formal-20261029 \
+  --bootstrap 2000 --seed 20261029 --alpha 0.05 \
+  --check-frozen
+\end{lstlisting}
+
+Skema beku memakai alias historis untuk mode imperatif. Alias itu dipertahankan agar pemeriksaan beku dapat dibandingkan; pemetaan tampilan dan nama alias dicatat pada \path{docs/defense/source-map.md}.
+
+Analisis sensitivitas untuk \texttt{gitops-C-r02} dijalankan terpisah dengan skrip di \path{experiments/sensitivity/}. Skrip itu hanya membaca berkas mentah beku dan tidak mengubah analisis primer; hasilnya dilaporkan pada Bab IV.
 
 \section{Skema Data per \textit{Run}}
 
@@ -88,7 +102,7 @@ Setiap \textit{run} menulis satu berkas baris JSON dengan \textit{field} berikut
     \hline
     \textit{Field} & Isi \\
     \hline
-    \texttt{run\_id}, \texttt{arm}, \texttt{scenario}, \texttt{rep} & Identitas \textit{run} dan blok protokol (R2 untuk pengulangan 1--10, R1 untuk 11--15) \\
+    \texttt{run\_id}, \texttt{arm}, \texttt{scenario}, \texttt{rep} & Identitas \textit{run} dan blok protokol (blok waktu untuk pengulangan 1--10, blok validitas untuk 11--15) \\
     \hline
     \texttt{status}, \texttt{stop\_reason} & Status terminal \textit{run} dan alasan berhenti \\
     \hline
@@ -145,7 +159,7 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
   \hline
   Empat baris dikecualikan & Setiap baris disebutkan dengan identitas \textit{run} dan alasan; satu \textit{run} lengkap dengan \textit{non-zero exit code} diuji pada analisis sensitivitas Bab IV; tidak ada penggantian nilai & Jumlah observasi pada sel terkait berkurang; kesimpulan C lebih sensitif terhadap satu baris \\
   \hline
-  Keluarga uji dua belas hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
+  Keluarga uji 12 hipotesis & Ditetapkan sebelum pengumpulan; F tidak ditambahkan setelah melihat data & Pertanyaan tentang F tidak diuji secara inferensial \\
   \hline
   Uji berpasangan tidak selalu dapat dipakai & Aturan cadangan Mann--Whitney ditetapkan sebelum analisis dan dilaporkan terbuka & Daya statistik pada C dan D lebih rendah \\
   \hline
@@ -155,7 +169,7 @@ Tabel~\ref{tab:lampiran-keterbatasan} menyatakan setiap keterbatasan, cara penan
 
 \section{Verifikasi Pemulihan Berkas dari Artefak Cadangan}
 
-Selain pengukuran waktu pada Bab IV, dilakukan satu pemeriksaan terpisah untuk menjawab pertanyaan yang tidak diukur oleh R1 maupun R2: apakah byte berkas benar-benar dapat dipulihkan dari artefak cadangan, bukan dari salinan sumber yang sedang aktif. Pemeriksaan ini menggunakan identitas khusus yang hanya boleh membaca bucket cadangan dan menulis ke bucket uji terpisah, tanpa hak menghapus.
+Selain pengukuran waktu pada Bab IV, dilakukan satu pemeriksaan terpisah untuk menjawab pertanyaan yang tidak diukur oleh validitas manipulasi maupun blok waktu: apakah byte berkas benar-benar dapat dipulihkan dari artefak cadangan, bukan dari salinan sumber yang sedang aktif. Pemeriksaan ini menggunakan identitas khusus yang hanya boleh membaca bucket cadangan dan menulis ke bucket uji terpisah, tanpa hak menghapus.
 
 Pemulihan dilakukan dari titik cadangan \texttt{\seqsplit{20261029T121353Z-4d0b1d71a53f}} ke bucket uji privat, kemudian objek hasil pemulihan dibaca kembali dan di-\textit{hash} secara independen, bukan hanya mengandalkan laporan alat.
 
@@ -179,9 +193,54 @@ Pemulihan dilakukan dari titik cadangan \texttt{\seqsplit{20261029T121353Z-4d0b1
   \end{tabularx}
 \end{table}
 
-Hak akses identitas uji juga diperiksa secara langsung: membaca bucket cadangan diizinkan, menulis bucket uji diizinkan, dan menghapus ditolak. Penolakan tersebut merupakan bukti bahwa prinsip hak minimum benar-benar diterapkan, bukan hanya diklaim.
+Hak akses identitas uji juga diperiksa secara langsung: membaca bucket cadangan diizinkan, menulis bucket uji diizinkan, dan menghapus ditolak. Penolakan itu merupakan bukti bahwa prinsip hak minimum benar-benar diterapkan, bukan hanya diklaim.
 
-Perlu ditegaskan batas hasil ini. Verifikasi membuktikan bahwa byte berkas dapat dipulihkan dari artefak cadangan dan bahwa integritasnya dapat diperiksa ulang. Verifikasi ini tidak membuktikan pemulihan tingkat aplikasi, karena pemulihan basis data dari cadangan yang dibuat setelah \textit{seed} diunggah belum berhasil diselesaikan pada pemeriksaan ini; kegagalan tersebut dilaporkan apa adanya dan tidak ditutupi. Verifikasi juga tidak membuktikan pemulihan dari kehilangan penyimpanan primer, karena penyimpanan primer dan cadangan berbagi server yang sama.
+Perlu ditegaskan batas hasil ini. Verifikasi membuktikan bahwa byte berkas dapat dipulihkan dari artefak cadangan dan bahwa integritasnya dapat diperiksa ulang. Verifikasi ini tidak membuktikan pemulihan tingkat aplikasi, karena pemulihan basis data dari cadangan yang dibuat setelah \textit{seed} diunggah belum berhasil diselesaikan pada pemeriksaan ini; kegagalan itu dilaporkan apa adanya dan tidak ditutupi. Verifikasi juga tidak membuktikan pemulihan dari kehilangan penyimpanan primer, karena penyimpanan primer dan cadangan berbagi server yang sama.
+
+\section{Audit Validitas Manipulasi (R1)}
+\label{app:audit-r1}
+
+Tabel ini memindahkan tabel R1 dari Bab IV ke lampiran sebagai audit, bukan sebagai hasil komparatif. Nilai adalah median skor R1 pada blok validitas (lima pengulangan per skenario per mode), dengan format kondisi awal / pascainjeksi / pascapemulihan.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Audit median skor R1 pada blok validitas, format awal / pascainjeksi / pascapemulihan}
+  \label{tab:audit-r1}
+  \begin{tabularx}{\textwidth}{|c|X|X|}
+    \hline
+    Skenario & GitOps ($n=5$) & Imperatif ($n=5$) \\
+    \hline
+    A & 100 / 100 / 100 & 100 / 100 / 100 \\
+    \hline
+    B & 100 / 75 / 100 & 100 / 75 / 100 \\
+    \hline
+    C & 100 / 75 / 100 & 100 / 75 / 100 \\
+    \hline
+    D & 100 / 75 / 100 & 100 / 75 / 100 \\
+    \hline
+    E & 100 / 75 / 100 & 100 / 75 / 100 \\
+    \hline
+    F & 100 / 75 / 100 & 100 / 75 / 100 \\
+    \hline
+    G & 100 / 75 / \textbf{75} & 100 / 75 / 100 \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+Skor 100 adalah predikat pemulihan. Tabel ini tidak diuji dan tidak dipakai untuk membandingkan mode; nilainya hanya menunjukkan apakah manipulasi bekerja pada kontrak \textit{field} yang dibekukan.
+
+\section{Catatan Perubahan dari Proposal}
+
+Proposal menetapkan judul dan beberapa definisi yang kemudian diperbarui sebelum pengumpulan formal. Perubahan dicatat di sini agar naskah skripsi dan proposal historis dapat dibaca bersama tanpa menyunting proposal.
+
+\begin{enumerate}
+  \item \textbf{Judul.} Istilah ``Prosedur Imperatif Terotomasi'' diganti menjadi ``Prosedur Imperatif'' agar tidak menyiratkan otomasi yang tidak diukur. % style-allow: proposal-history
+  \item \textbf{Skenario F.} Proposal menyebut objek di namespace yang salah; definisi final adalah drift \texttt{targetPort} pada \texttt{Service/invenio-web} yang dideklarasikan. Perubahan ini menempatkan F dalam jangkauan kedua mode dan dilaporkan terpisah dari keluarga efikasi B--E.
+  \item \textbf{Skenario G.} Proposal menyebut anotasi sintetis pada Secret; definisi final adalah anotasi pada SealedSecret hidup. Nilai \texttt{spec.encryptedData} tidak dibaca atau ditulis, dan mekanisme pemulihan GitOps tetap tidak diatribusikan.
+\end{enumerate}
+
+Ketiga perubahan ditetapkan sebelum pengumpulan 29--30 Oktober 2026 (UTC) dan tidak mengubah data yang dianalisis. Proposal tidak disunting karena merupakan artefak historis; catatan ini menjadi jejak perbedaannya.
 
 \section{Cara Membaca Hasil}
 
@@ -189,7 +248,7 @@ Untuk pembaca yang tidak terbiasa dengan statistik, dua panduan berikut membantu
 
 Pertama, nilai $p$ yang kecil menunjukkan bahwa perbedaan yang teramati sulit dijelaskan oleh kebetulan, tetapi tidak menunjukkan besarnya perbedaan. Karena itu setiap perbandingan disertai ukuran efek. Pada penelitian ini seluruh perbandingan deteksi memiliki ukuran efek maksimum, sedangkan pemulihan tidak, dan justru perbedaan pada kolom ukuran efek itulah temuan yang paling penting.
 
-Kedua, pengamatan tersensor bukan pengamatan gagal. Apabila pemulihan belum terjadi sampai batas pengamatan, yang diketahui adalah bahwa waktunya melebihi batas tersebut; nilainya tidak diketahui dan tidak diisi dengan angka karangan. Pada penelitian ini seluruh sensoring pemulihan berasal dari satu skenario pada satu mode, sehingga kejadian tersebut dilaporkan sebagai temuan, bukan dibuang.
+Kedua, pengamatan tersensor bukan pengamatan gagal. Apabila pemulihan belum terjadi sampai batas pengamatan, yang diketahui adalah bahwa waktunya melebihi batas itu; nilainya tidak diketahui dan tidak diisi dengan angka karangan. Pada penelitian ini seluruh sensoring pemulihan berasal dari satu skenario pada satu mode, sehingga kejadian itu dilaporkan sebagai temuan, bukan dibuang.
 
 \section{Sumber dan Lisensi Logo Diagram}
 

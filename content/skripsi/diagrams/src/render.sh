@@ -28,6 +28,11 @@ for source in ./*.mmd; do
   name="${source%.mmd}"
   name="${name#./}"
   mmdc -i "$source" -o "../${name}.svg" -c mermaid-config.json -b white --quiet
-  mmdc -i "$source" -o "../${name}.pdf" -c mermaid-config.json -f --quiet
+  # mermaid-cli 11 needs -f to fit the PDF page; 12 fits by default and rejects -f.
+  pdf_fit=()
+  if mmdc --help 2>&1 | grep -q -- '--pdfFit'; then
+    pdf_fit=(-f)
+  fi
+  mmdc -i "$source" -o "../${name}.pdf" -c mermaid-config.json ${pdf_fit[@]+"${pdf_fit[@]}"} --quiet
   echo "rendered ${name}.svg and ${name}.pdf"
 done
