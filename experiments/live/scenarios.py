@@ -745,8 +745,9 @@ def inject(
     if scenario not in SCENARIOS:
         raise SafetyError(f"unknown scenario {scenario!r}")
     started = clock.now()
+    short = _short(run_id)
     try:
-        plan = _INJECTORS[scenario](kubectl, contract, _short(run_id))
+        plan = _INJECTORS[scenario](kubectl, contract, short)
     except HarnessError:
         raise
     except Exception as error:
