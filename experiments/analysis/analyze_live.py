@@ -42,6 +42,16 @@ else:  # direct script execution
     import core as core  # type: ignore[no-redef]
 
 if __package__:
+    from . import data as data
+else:  # direct script execution
+    import data as data  # type: ignore[no-redef]
+
+if __package__:
+    from . import formatting as formatting
+else:  # direct script execution
+    import formatting as formatting  # type: ignore[no-redef]
+
+if __package__:
     from . import latex as latex
 else:  # direct script execution
     import latex as latex  # type: ignore[no-redef]
@@ -94,10 +104,16 @@ _comparison = stats._comparison
 kaplan_meier = survival.kaplan_meier
 _survival_entries = survival._survival_entries
 
-_tex_escape = latex._tex_escape
-_num = latex._num
-_p = latex._p
-_interval = latex._interval
+load_jsonl = data.load_jsonl
+_load_jsonl = data.load_jsonl
+tex_escape = formatting.tex_escape
+format_num = formatting.format_num
+format_p = formatting.format_p
+format_interval = formatting.format_interval
+_tex_escape = formatting.tex_escape
+_num = formatting.format_num
+_p = formatting.format_p
+_interval = formatting.format_interval
 _overview_tex = latex._overview_tex
 _exclusions_tex = latex._exclusions_tex
 _r1_cell = latex._r1_cell
@@ -185,27 +201,6 @@ REQUIRED_FIELDS = frozenset(
 )
 
 
-def _load_jsonl(path: str | Path) -> list[dict]:
-    rows = []
-    try:
-        text = Path(path).read_text()
-    except (OSError, UnicodeError) as error:
-        raise LiveAnalysisError(f"cannot read {path}: {error}") from error
-    for number, line in enumerate(text.splitlines(), 1):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError as error:
-            raise LiveAnalysisError(f"invalid JSON on line {number}") from error
-        if not isinstance(row, dict):
-            raise LiveAnalysisError(f"line {number} is not a JSON object")
-        rows.append(row)
-    if not rows:
-        raise LiveAnalysisError("empty JSONL input")
-    return rows
-
-
 def _validate_metric(row: dict, metric: str) -> None:
     value = row.get(metric + "_seconds")
     status = row.get(metric + "_status")
@@ -232,14 +227,10 @@ def _validate_metric(row: dict, metric: str) -> None:
         )
 
 
-def _validate_timing(row: dict, strict: bool) -> None:
-    """Validate completed-observation bounds for new-convention rows.
-
-    Legacy rows predate the convention and are validated by the older field
-    contract only; no new bound is invented for them.
-    """
+def _validate_timing_header(row: dict, strict: bool) -> tuple[float, float, float] | None:
+    """Validate required bounds and return t0, censor limit, and window end."""
     if not strict:
-        return
+        return None
     required = (
         "t0_mono",
         "t_a_mono",
@@ -284,6 +275,11 @@ def _validate_timing(row: dict, strict: bool) -> None:
         _require(
             window_end >= t0 + limit, "right-censored row did not complete its observation window"
         )
+    return t0, limit, window_end
+
+
+def _validate_metric_points(row: dict, t0: float, limit: float, window_end: float) -> None:
+    """Validate each metric's point bound and duration."""
     for metric in METRICS:
         key = {"detection": "t_d", "evidence": "t_e", "recovery": "t_r"}[metric]
         point: float | None = row.get(key + "_mono")
@@ -305,6 +301,10 @@ def _validate_timing(row: dict, strict: bool) -> None:
             f"{metric}_seconds disagrees with its bounds",
         )
         _require(status == "observed", f"{key}_mono is present for a non-observed metric")
+
+
+def _validate_recovery_bounds(row: dict, t0: float, limit: float, window_end: float) -> None:
+    """Validate the recovery confirmation bounds and evidence-store bound."""
     t_r_first: float | None = row.get("t_r_first_mono")
     t_r_confirmed: float | None = row.get("t_r_confirmed_mono")
     if t_r_first is not None:
@@ -370,6 +370,20 @@ def _validate_timing(row: dict, strict: bool) -> None:
             )
 
 
+def _validate_timing(row: dict, strict: bool) -> None:
+    """Validate completed-observation bounds for new-convention rows.
+
+    Legacy rows predate the convention and are validated by the older field
+    contract only; no new bound is invented for them.
+    """
+    bounds = _validate_timing_header(row, strict)
+    if bounds is None:
+        return
+    t0, limit, window_end = bounds
+    _validate_metric_points(row, t0, limit, window_end)
+    _validate_recovery_bounds(row, t0, limit, window_end)
+
+
 def _run_attempt(row: dict, label: str, base_run_id: str) -> int:
     """Attempt number encoded by the run id; retries use `-retry<N>`."""
     run_id = row["run_id"]
@@ -400,6 +414,111 @@ def _validate_attempt_metadata(row: dict, label: str, base_run_id: str, attempt:
     _require(value == attempt, f"{label} has inconsistent retry suffix")
 
 
+def _validate_row_identity(
+    row: dict, index: int, seen_runs: set[str], conventions: set[str | None]
+) -> dict:
+    """Validate the row's identity, phase, grouping, and convention."""
+    missing = sorted(REQUIRED_FIELDS - set(row))
+    _require(not missing, f"row {index} missing fields: {missing}")
+    marker = row.get("timing_convention")
+    _require(
+        marker is None or isinstance(marker, str),
+        f"row {index} has an invalid timing_convention",
+    )
+    if marker is not None:
+        _require(marker == TIMING_CONVENTION, f"row {index} has an unsupported timing_convention")
+    conventions.add(marker)
+    _require(
+        type(row["schema_version"]) is int and row["schema_version"] == 2,
+        f"row {index} has unsupported schema_version",
+    )
+    run_id = row["run_id"]
+    _require(isinstance(run_id, str) and 0 < len(run_id) <= 128, f"row {index} has invalid run_id")
+    _require(run_id not in seen_runs, f"row {index} repeats a run_id")
+    seen_runs.add(run_id)
+
+    scenario = row["scenario"]
+    _require(scenario in SCENARIOS, f"row {index} has invalid scenario")
+    arm = row["arm"]
+    _require(isinstance(arm, str) and arm in ARM_ENV, f"row {index} has invalid arm")
+    _require(row["env"] == ARM_ENV[arm], f"row {index} violates arm/env mapping")
+    rep = row["rep"]
+    _require(type(rep) is int and 1 <= rep <= 15, f"row {index} has invalid rep")
+    expected_phase = "R2" if rep <= 10 else "R1"
+    _require(row["batch_phase"] == expected_phase, f"row {index} has phase/rep mismatch")
+    _require(
+        row["analysis_group"] == ROW_GROUPS[scenario], f"row {index} has invalid analysis_group"
+    )
+    _require(
+        type(row["efficacy_eligible"]) is bool
+        and row["efficacy_eligible"] == (scenario not in ("A", "F")),
+        f"row {index} has invalid efficacy_eligible",
+    )
+    _require(row["synthetic"] is False, f"row {index} is synthetic and cannot be analyzed")
+    _require(
+        isinstance(row["status"], str) and row["status"] in STATUSES,
+        f"row {index} is not an analyzable run status",
+    )
+    _require(row["batch_mode"] == "live", f"row {index} is not from a live batch")
+    batch_id = row["batch_id"]
+    _require(
+        isinstance(batch_id, str) and BATCH_ID.fullmatch(batch_id),
+        f"row {index} has invalid batch_id",
+    )
+    return {
+        "marker": marker,
+        "scenario": scenario,
+        "arm": arm,
+        "env": row["env"],
+        "rep": rep,
+        "batch_id": batch_id,
+    }
+
+
+def _validate_row_provenance(row: dict, index: int, identity: dict) -> None:
+    """Validate the frozen revision, render, approval, and censor limit."""
+    base_run_id = (
+        f"{identity['batch_id']}-{identity['arm']}-{identity['scenario']}-r{identity['rep']:02d}"
+    )
+    attempt = _run_attempt(row, f"row {index}", base_run_id)
+    _validate_attempt_metadata(row, f"row {index}", base_run_id, attempt)
+    _require(
+        REVISION.fullmatch(str(row["source_revision"])),
+        f"row {index} has invalid source_revision",
+    )
+    _require(RENDER.fullmatch(str(row["render_sha256"])), f"row {index} has invalid render_sha256")
+    _require(
+        type(row["formal_execution_approved"]) is bool,
+        f"row {index} has invalid formal_execution_approved",
+    )
+    _require(type(row["stack_isolated"]) is bool, f"row {index} has invalid stack_isolated")
+    _require(row["r3_status"] == "not_measured", f"row {index} has unsupported r3_status")
+    limit = row["censor_seconds"]
+    _require(_number(limit) and limit > 0, f"row {index} has invalid censor_seconds")
+
+
+def _validate_r1_fields(row: dict, index: int) -> None:
+    for field in ("r1_baseline", "r1_first", "r1_last"):
+        value = row[field]
+        _require(
+            value is None or (_number(value) and 0 <= value <= 100),
+            f"row {index} has invalid {field}",
+        )
+
+
+def _validate_run_status(row: dict, index: int) -> None:
+    if row["status"] == "observed":
+        _require(
+            row["recovery_status"] == "observed",
+            f"row {index} has inconsistent run/recovery status",
+        )
+    else:
+        _require(
+            row["recovery_status"] == "right_censored",
+            f"row {index} has inconsistent run/recovery status",
+        )
+
+
 def validate_rows(rows: list) -> dict:
     """Validate one batch analysis dataset; raise on any inconsistency."""
     _require(isinstance(rows, list) and rows, "dataset must be a non-empty list")
@@ -414,99 +533,18 @@ def validate_rows(rows: list) -> dict:
     seen_blocks: set[tuple[str, str, int]] = set()
     for index, row in enumerate(rows, 1):
         _require(isinstance(row, dict), f"row {index} is not an object")
-        missing = sorted(REQUIRED_FIELDS - set(row))
-        _require(not missing, f"row {index} missing fields: {missing}")
-        marker = row.get("timing_convention")
-        _require(
-            marker is None or isinstance(marker, str),
-            f"row {index} has an invalid timing_convention",
-        )
-        if marker is not None:
-            _require(
-                marker == TIMING_CONVENTION, f"row {index} has an unsupported timing_convention"
-            )
-        conventions.add(marker)
-        _require(
-            type(row["schema_version"]) is int and row["schema_version"] == 2,
-            f"row {index} has unsupported schema_version",
-        )
-        run_id = row["run_id"]
-        _require(
-            isinstance(run_id, str) and 0 < len(run_id) <= 128, f"row {index} has invalid run_id"
-        )
-        _require(run_id not in seen_runs, f"row {index} repeats a run_id")
-        seen_runs.add(run_id)
-
-        scenario = row["scenario"]
-        _require(scenario in SCENARIOS, f"row {index} has invalid scenario")
-        arm = row["arm"]
-        _require(isinstance(arm, str) and arm in ARM_ENV, f"row {index} has invalid arm")
-        _require(row["env"] == ARM_ENV[arm], f"row {index} violates arm/env mapping")
-        rep = row["rep"]
-        _require(type(rep) is int and 1 <= rep <= 15, f"row {index} has invalid rep")
-        expected_phase = "R2" if rep <= 10 else "R1"
-        _require(row["batch_phase"] == expected_phase, f"row {index} has phase/rep mismatch")
-        _require(
-            row["analysis_group"] == ROW_GROUPS[scenario], f"row {index} has invalid analysis_group"
-        )
-        _require(
-            type(row["efficacy_eligible"]) is bool
-            and row["efficacy_eligible"] == (scenario not in ("A", "F")),
-            f"row {index} has invalid efficacy_eligible",
-        )
-        _require(row["synthetic"] is False, f"row {index} is synthetic and cannot be analyzed")
-        _require(
-            isinstance(row["status"], str) and row["status"] in STATUSES,
-            f"row {index} is not an analyzable run status",
-        )
-        _require(row["batch_mode"] == "live", f"row {index} is not from a live batch")
-        batch_id = row["batch_id"]
-        _require(
-            isinstance(batch_id, str) and BATCH_ID.fullmatch(batch_id),
-            f"row {index} has invalid batch_id",
-        )
-        base_run_id = f"{batch_id}-{arm}-{scenario}-r{rep:02d}"
-        attempt = _run_attempt(row, f"row {index}", base_run_id)
-        _validate_attempt_metadata(row, f"row {index}", base_run_id, attempt)
-        _require(
-            REVISION.fullmatch(str(row["source_revision"])),
-            f"row {index} has invalid source_revision",
-        )
-        _require(
-            RENDER.fullmatch(str(row["render_sha256"])), f"row {index} has invalid render_sha256"
-        )
-        _require(
-            type(row["formal_execution_approved"]) is bool,
-            f"row {index} has invalid formal_execution_approved",
-        )
-        _require(type(row["stack_isolated"]) is bool, f"row {index} has invalid stack_isolated")
-        _require(row["r3_status"] == "not_measured", f"row {index} has unsupported r3_status")
-        limit = row["censor_seconds"]
-        _require(_number(limit) and limit > 0, f"row {index} has invalid censor_seconds")
+        identity = _validate_row_identity(row, index, seen_runs, conventions)
+        _validate_row_provenance(row, index, identity)
         for metric in METRICS:
             _validate_metric(row, metric)
-        _validate_timing(row, marker == TIMING_CONVENTION)
-        for field in ("r1_baseline", "r1_first", "r1_last"):
-            value = row[field]
-            _require(
-                value is None or (_number(value) and 0 <= value <= 100),
-                f"row {index} has invalid {field}",
-            )
-        if row["status"] == "observed":
-            _require(
-                row["recovery_status"] == "observed",
-                f"row {index} has inconsistent run/recovery status",
-            )
-        else:
-            _require(
-                row["recovery_status"] == "right_censored",
-                f"row {index} has inconsistent run/recovery status",
-            )
+        _validate_timing(row, identity["marker"] == TIMING_CONVENTION)
+        _validate_r1_fields(row, index)
+        _validate_run_status(row, index)
 
-        block = (scenario, row["env"], rep)
+        block = (identity["scenario"], identity["env"], identity["rep"])
         _require(block not in seen_blocks, f"row {index} duplicates a scenario/arm/rep block")
         seen_blocks.add(block)
-        batches.add(batch_id)
+        batches.add(identity["batch_id"])
         revisions.add(row["source_revision"])
         renders.add(row["render_sha256"])
         approvals.add(row["formal_execution_approved"])
@@ -775,21 +813,8 @@ def _exclusions(rows: list, raw_rows: list | None) -> dict:
     }
 
 
-def analyze(
-    rows: list,
-    raw_rows: list | None = None,
-    *,
-    bootstrap: int = DEFAULT_BOOTSTRAP,
-    seed: int = DEFAULT_SEED,
-    alpha: float = DEFAULT_ALPHA,
-) -> dict:
-    """Return the complete analysis result; raise on invalid input."""
-    _require(type(bootstrap) is int and bootstrap >= 100, "bootstrap must be an integer >= 100")
-    _require(type(seed) is int and seed >= 0, "seed must be a non-negative integer")
-    _require(_number(alpha) and 0 < alpha < 1, "alpha must be in (0, 1)")
-    meta = validate_rows(rows)
-    exclusions = _exclusions(rows, raw_rows)
-    r2_rows = [row for row in rows if row["batch_phase"] == "R2"]
+def _overview_entries(r2_rows: list, exclusions: dict) -> list:
+    """Count observed, censored, missing, and excluded rows per cell."""
     overview = []
     for scenario in SCENARIOS:
         for arm in ("manual", "gitops"):
@@ -821,7 +846,13 @@ def analyze(
                     "metrics": counts,
                 }
             )
-    survival_entries = _survival_entries(r2_rows, exclusions)
+    return overview
+
+
+def _efficacy_entries(
+    r2_rows: list, exclusions: dict, bootstrap: int, seed: int, alpha: float
+) -> tuple[list, int]:
+    """Build the predeclared comparisons and apply the Holm family."""
     efficacy = []
     for scenario in sorted(EFFICACY_SCENARIOS):
         for metric in METRICS:
@@ -841,104 +872,144 @@ def analyze(
             item["holm_adjusted_p"] = adjusted_p
             item["reject_holm"] = adjusted_p < alpha
             position += 1
+    return efficacy, len(p_values)
+
+
+def _batch_block(
+    meta: dict, rows: list, r2_rows: list, alpha: float, bootstrap: int, seed: int
+) -> dict:
+    """Assemble the batch metadata block."""
     ineligible = [scenario for scenario in SCENARIOS if scenario not in EFFICACY_SCENARIOS]
+    return {
+        **meta,
+        "r2_rows": len(r2_rows),
+        "r1_rows": len(rows) - len(r2_rows),
+        "efficacy_population": sorted(EFFICACY_SCENARIOS),
+        "efficacy_ineligible": ineligible,
+        "efficacy_ineligible_reason": {
+            "A": "hpa_control",
+            "F": "visibility_boundary",
+            "G": "descriptive_non_argo",
+        },
+        "population_by_scenario": POPULATIONS,
+        "analysis_group_by_scenario": ROW_GROUPS,
+        "alpha": alpha,
+        "bootstrap_resamples": bootstrap,
+        "bootstrap_seed": seed,
+        "timing_convention": meta["timing_convention"],
+        "claim_status": "exploratory_case_study",
+        "confirmatory_claims": False,
+    }
+
+
+def _method_block() -> dict:
+    """Return the frozen method description."""
+    return {
+        "timing_convention": (
+            "completed read/evaluation endpoints; right-censored only after a valid window"
+        ),
+        "pairing_rule": (
+            "all scenario/rep blocks complete for the metric, with at least two pairs"
+        ),
+        "paired_test": (
+            "two-sided Wilcoxon signed-rank; exact sign-flip "
+            "for <=16 pairs; zero differences dropped"
+        ),
+        "fallback_test": (
+            "two-sided Mann-Whitney U; tie-corrected normal approximation; observed values only"
+        ),
+        "effect_sizes": (
+            "Cliff's delta with percentile bootstrap CI; paired median difference; rank-biserial"
+        ),
+        "holm_family": ("B-E x detection/evidence/recovery, 12 predeclared hypotheses"),
+        "survival": (
+            "Kaplan-Meier and RMST to the smallest frozen censor "
+            "limit per group; missing endpoints are excluded"
+        ),
+        "r1": ("descriptive median baseline/first/last with explicit missing counts"),
+        "claims": "exploratory case study; no confirmatory claims",
+    }
+
+
+def _family_block(alpha: float, tested: int) -> list:
+    """Return the single predeclared Holm family."""
+    return [
+        {
+            "id": "r2_efficacy_managed_drift",
+            "description": ("B-E x detection/evidence/recovery, two-sided, Holm correction"),
+            "predeclared_size": FAMILY_SIZE,
+            "tested": tested,
+            "untested": FAMILY_SIZE - tested,
+            "alpha": alpha,
+            "correction": "holm",
+            "note": (
+                "Untestable hypotheses are treated as p=1, so the correction is conservative."
+            ),
+        }
+    ]
+
+
+def _notes_block() -> list:
+    """Return the interpretation limits attached to every analysis."""
+    return [
+        "Exploratory single-case inference; no confirmatory claim.",
+        "A is the HPA control and G a descriptive non-Argo case; only B-E enter efficacy.",
+        (
+            "F is a declared Service targetPort drift reported separately, not "
+            "pooled into efficacy: the twelve-hypothesis family was fixed before "
+            "collection, so adding F now would expand it post hoc."
+        ),
+        (
+            "G is excluded from efficacy even though batch rows carry "
+            "efficacy_eligible=true; the frozen method classifies G as "
+            "descriptive non-Argo."
+        ),
+        "Censored observations are never imputed as zero.",
+        (
+            "Missing endpoints (unobserved_before_stop) are excluded from "
+            "survival and numeric tests; they are not censored observations."
+        ),
+        (
+            "Paired and unpaired tests are complete-case/observed-only; "
+            "missingness and censoring are not adjusted."
+        ),
+        (
+            "Paired tests require every scenario/rep block to have both arms "
+            "fully observed and at least two pairs."
+        ),
+        "The RMST horizon is the smallest frozen censor limit per group.",
+    ]
+
+
+def analyze(
+    rows: list,
+    raw_rows: list | None = None,
+    *,
+    bootstrap: int = DEFAULT_BOOTSTRAP,
+    seed: int = DEFAULT_SEED,
+    alpha: float = DEFAULT_ALPHA,
+) -> dict:
+    """Return the complete analysis result; raise on invalid input."""
+    _require(type(bootstrap) is int and bootstrap >= 100, "bootstrap must be an integer >= 100")
+    _require(type(seed) is int and seed >= 0, "seed must be a non-negative integer")
+    _require(_number(alpha) and 0 < alpha < 1, "alpha must be in (0, 1)")
+    meta = validate_rows(rows)
+    exclusions = _exclusions(rows, raw_rows)
+    r2_rows = [row for row in rows if row["batch_phase"] == "R2"]
+    efficacy, tested = _efficacy_entries(r2_rows, exclusions, bootstrap, seed, alpha)
     return {
         "schema_version": 1,
         "analysis": "live_batch_r2_inferential",
-        "batch": {
-            **meta,
-            "r2_rows": len(r2_rows),
-            "r1_rows": len(rows) - len(r2_rows),
-            "efficacy_population": sorted(EFFICACY_SCENARIOS),
-            "efficacy_ineligible": ineligible,
-            "efficacy_ineligible_reason": {
-                "A": "hpa_control",
-                "F": "visibility_boundary",
-                "G": "descriptive_non_argo",
-            },
-            "population_by_scenario": POPULATIONS,
-            "analysis_group_by_scenario": ROW_GROUPS,
-            "alpha": alpha,
-            "bootstrap_resamples": bootstrap,
-            "bootstrap_seed": seed,
-            "timing_convention": meta["timing_convention"],
-            "claim_status": "exploratory_case_study",
-            "confirmatory_claims": False,
-        },
-        "method": {
-            "timing_convention": (
-                "completed read/evaluation endpoints; right-censored only after a valid window"
-            ),
-            "pairing_rule": (
-                "all scenario/rep blocks complete for the metric, with at least two pairs"
-            ),
-            "paired_test": (
-                "two-sided Wilcoxon signed-rank; exact sign-flip "
-                "for <=16 pairs; zero differences dropped"
-            ),
-            "fallback_test": (
-                "two-sided Mann-Whitney U; tie-corrected normal approximation; observed values only"
-            ),
-            "effect_sizes": (
-                "Cliff's delta with percentile bootstrap CI; "
-                "paired median difference; rank-biserial"
-            ),
-            "holm_family": ("B-E x detection/evidence/recovery, 12 predeclared hypotheses"),
-            "survival": (
-                "Kaplan-Meier and RMST to the smallest frozen censor "
-                "limit per group; missing endpoints are excluded"
-            ),
-            "r1": ("descriptive median baseline/first/last with explicit missing counts"),
-            "claims": "exploratory case study; no confirmatory claims",
-        },
+        "batch": _batch_block(meta, rows, r2_rows, alpha, bootstrap, seed),
+        "method": _method_block(),
         "exclusions": exclusions,
-        "overview": overview,
+        "overview": _overview_entries(r2_rows, exclusions),
         "r1": _r1_entries(rows),
-        "survival": survival_entries,
+        "survival": _survival_entries(r2_rows, exclusions),
         "efficacy": efficacy,
-        "families": [
-            {
-                "id": "r2_efficacy_managed_drift",
-                "description": ("B-E x detection/evidence/recovery, two-sided, Holm correction"),
-                "predeclared_size": FAMILY_SIZE,
-                "tested": len(p_values),
-                "untested": FAMILY_SIZE - len(p_values),
-                "alpha": alpha,
-                "correction": "holm",
-                "note": (
-                    "Untestable hypotheses are treated as p=1, so the correction is conservative."
-                ),
-            }
-        ],
+        "families": _family_block(alpha, tested),
         "r3": {"status": "not_measured", "statement": "R3: not measured", "claim": "none"},
-        "notes": [
-            "Exploratory single-case inference; no confirmatory claim.",
-            "A is the HPA control and G a descriptive non-Argo case; only B-E enter efficacy.",
-            (
-                "F is a declared Service targetPort drift reported separately, not "
-                "pooled into efficacy: the twelve-hypothesis family was fixed before "
-                "collection, so adding F now would expand it post hoc."
-            ),
-            (
-                "G is excluded from efficacy even though batch rows carry "
-                "efficacy_eligible=true; the frozen method classifies G as "
-                "descriptive non-Argo."
-            ),
-            "Censored observations are never imputed as zero.",
-            (
-                "Missing endpoints (unobserved_before_stop) are excluded from "
-                "survival and numeric tests; they are not censored observations."
-            ),
-            (
-                "Paired and unpaired tests are complete-case/observed-only; "
-                "missingness and censoring are not adjusted."
-            ),
-            (
-                "Paired tests require every scenario/rep block to have both arms "
-                "fully observed and at least two pairs."
-            ),
-            "The RMST horizon is the smallest frozen censor limit per group.",
-        ],
+        "notes": _notes_block(),
     }
 
 
@@ -1006,8 +1077,8 @@ def main(argv: list[str] | None = None) -> int:
     """Load inputs, run the analysis, and write JSON and LaTeX artifacts."""
     args = parse_args(argv)
     try:
-        rows = _load_jsonl(args.source)
-        raw_rows = _load_jsonl(args.rows) if args.rows else None
+        rows = load_jsonl(args.source)
+        raw_rows = load_jsonl(args.rows) if args.rows else None
         result = analyze(rows, raw_rows, bootstrap=args.bootstrap, seed=args.seed, alpha=args.alpha)
         paths = write_outputs(result, args.out, force=args.force)
     except (ValueError, OSError) as error:

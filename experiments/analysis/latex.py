@@ -4,49 +4,17 @@ from __future__ import annotations
 
 if __package__:
     from . import core as _core
+    from . import formatting as _formatting
 else:  # direct script execution
     import core as _core  # type: ignore[no-redef]
+    import formatting as _formatting  # type: ignore[no-redef]
 
 METRIC_LABELS = _core.METRIC_LABELS
 
-
-def _tex_escape(value: object) -> str:
-    text = str(value).replace("\n", " ").replace("\r", " ").replace("\t", " ")
-    replacements = {
-        "\\": r"\textbackslash{}",
-        "&": r"\&",
-        "%": r"\%",
-        "$": r"\$",
-        "#": r"\#",
-        "_": r"\_",
-        "{": r"\{",
-        "}": r"\}",
-        "~": r"\textasciitilde{}",
-        "^": r"\textasciicircum{}",
-    }
-    return "".join(replacements.get(char, char) for char in text)
-
-
-def _num(value: float | None, digits: int = 3) -> str:
-    if value is None:
-        return "--"
-    return f"{value:.{digits}f}".replace(".", ",")
-
-
-def _p(value: float | None) -> str:
-    if value is None:
-        return "--"
-    if value < 0.001:
-        return "$<0{,}001$"
-    return f"{value:.3f}".replace(".", ",")
-
-
-def _interval(value: float | None, interval: list | None) -> str:
-    if value is None:
-        return "--"
-    if interval is None:
-        return _num(value)
-    return f"{_num(value)} [{_num(interval[0])}; {_num(interval[1])}]"
+_tex_escape = _formatting.tex_escape
+_num = _formatting.format_num
+_p = _formatting.format_p
+_interval = _formatting.format_interval
 
 
 def _overview_tex(result: dict) -> str:
