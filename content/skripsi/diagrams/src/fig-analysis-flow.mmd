@@ -1,17 +1,15 @@
 flowchart TB
-  A["210 sel: 7 skenario × 2 mode × 15 pengulangan"] --> B["211 baris mentah: 210 sel dan 1 percobaan baseline yang gagal"]
-  B --> C["4 baris dikecualikan: 2 instrumentation, 1 batch_stop, 1 baseline"]
-  C --> D["207 baris analisis: 192 observed, 15 right_censored"]
-  D --> Q["Jalur waktu RQ: 140 sel, 137 baris per metrik<br/>10 pengulangan × 7 skenario × 2 mode"]
-  D --> V["Kotak validitas R1 (kelengkapan): 70 sel, 70 baris<br/>5 pengulangan × 7 skenario × 2 mode"]
-  Q --> E["t_d, t_e, t_r per skenario; nilai hilang tidak diimputasi"]
-  V --> F["Cacah R1 = 100/75/50/25; predikat pemulihan, bukan perbandingan"]
-  Q -. "G: kasus batas deskriptif, tidak diatribusikan" .-> G["G GitOps tetap 75 pada R1"]
+  A["Alur data: 210 sel → 211 baris mentah → 207 baris analisis"] --> B["4 baris dikecualikan: 2 kegagalan instrumentasi, 1 penghentian sesi, 1 percobaan baseline yang diulang"]
+  B --> C["Waktu deteksi dan pemulihan (140 sel)"]
+  B --> D["Pemeriksaan kecocokan konfigurasi (70 sel)"]
+  C --> E["Median waktu per skenario; nilai yang tidak teramati tidak diisi"]
+  D --> F["Skor 100/75/50/25; predikat pemulihan, bukan perbandingan"]
+  C -. "G: kasus batas deskriptif" .-> G["G GitOps tetap 75"]
   classDef count fill:#eef2f7,stroke:#64748b,color:#14212b;
   classDef branch fill:#e8f0ff,stroke:#2563eb,color:#14212b;
   classDef validity fill:#e7f7ed,stroke:#15803d,color:#14212b;
   classDef detail fill:#f8fafc,stroke:#94a3b8,color:#14212b;
-  class A,B,C,D count;
-  class Q branch;
-  class V,G validity;
+  class A,B count;
+  class C branch;
+  class D,G validity;
   class E,F detail;
