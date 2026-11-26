@@ -2,91 +2,108 @@
 
 \section{Kesimpulan}
 
-Penelitian ini membandingkan prosedur imperatif otomatis berbasis \texttt{kubectl} dengan GitOps berbasis ArgoCD pada satu \textit{stack} InvenioRDM mirip produksi. Prosedur imperatif bekerja pada tingkat prosedur, bukan kinerja operator manusia. Desain memakai tujuh skenario drift, lima belas pengulangan per skenario per mode, dan total 210 sel. Dari 211 baris mentah, 207 baris dianalisis; 210 sel terminal, tiga sel tidak menghasilkan baris analisis, dan satu percobaan \textit{baseline} yang gagal diulang. Empat baris mentah dikecualikan dan dilaporkan terbuka pada Bab IV, dan kedua mode dijalankan berurutan pada \textit{stack} yang sama dengan urutan mode yang tetap.
+Penelitian ini membandingkan prosedur imperatif otomatis berbasis \texttt{kubectl} dengan GitOps berbasis ArgoCD pada satu \textit{stack} InvenioRDM mirip produksi. Desain memakai tujuh skenario drift, lima belas pengulangan per skenario per mode, dan total 210 sel. Seluruh percobaan GitOps mendahului seluruh percobaan imperatif, dan urutan itu tidak diacak ulang per blok.
 
-\subsection{Validitas Manipulasi}
-\label{subsec:validitas-kesimpulan}
+\subsection{Temuan Utama}
+\label{subsec:temuan-utama}
 
-R1 dipakai sebagai pemeriksaan validitas manipulasi, bukan sebagai jawaban komparatif. Skor 100 berarti keempat sumber daya terpilih cocok dengan deklarasi. Median R1 untuk B--F kembali ke 100 pada kedua mode setelah injeksi menurunkannya ke 75. Pemeriksa dan evaluator memakai kontrak beku yang sama, sehingga konvergensi B--F merupakan syarat agar manipulasi dianggap bekerja; kegagalan konvergensi akan menunjukkan masalah manipulasi, bukan keunggulan mode. Skenario A tetap 100 karena \texttt{/spec/replicas} dimiliki HPA dan dikecualikan dari pemeriksaan statis.
+Waktu deteksi GitOps berada pada 0,96--1,02 detik, sedangkan mode imperatif pada 5,22--5,25 detik. Selisih 4,2--4,3 detik itu konsisten dengan pemeriksa 5 detik dan pencatat 1 detik; jadwal pengamatan saja dapat menghasilkan selisih hampir 5 detik. Temuan utamanya karena itu bukan bahwa GitOps lebih cepat, melainkan bahwa waktu deteksi dibatasi oleh seberapa sering keadaan dibaca. Data ini tidak dapat memisahkan kecepatan respons pengendali dari selang pengamatan, sehingga klaim superioritas GitOps tidak dapat ditarik.
 
-Satu-satunya pengecualian adalah skenario G, dan penyebabnya tidak diatribusikan. Mode GitOps tidak mengembalikan anotasi pada SealedSecret ke \textit{desired state}, sedangkan mode imperatif melakukannya. Baris hasil mencatat status \texttt{recovery\_controller} sebagai \texttt{unattributed}. Mekanisme yang paling mungkin adalah ArgoCD tidak menganggap anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen \textit{harness} melihat anotasi itu, sedangkan pengendali GitOps tidak memulihkannya. Mekanisme itu tidak diukur, dan tidak ada bukti bahwa G disebabkan masalah izin. G dilaporkan sebagai kasus batas deskriptif, bukan sebagai jawaban penelitian atau generalisasi kegagalan ArgoCD.
+Waktu pemulihan tidak seragam. Selisih median paling besar pada D, yaitu 5,08 detik. Pada B, C, dan E, selisihnya berada di sekitar 3 detik; pada B, selisih itu tidak cukup konsisten untuk dibaca sebagai perbedaan yang jelas. Pada E, arahnya lebih konsisten daripada B. Kecepatan deteksi karena itu tidak otomatis berarti kecepatan pemulihan.
 
-Kesetaraan skor tidak membuktikan kebenaran semantik konfigurasi. Kedua mode dapat mencapai kondisi yang identik dan sama-sama salah apabila deklarasi sumbernya keliru. Penelitian ini mengukur kesesuaian terhadap deklarasi, bukan kualitas deklarasi itu sendiri. Kesehatan layanan juga tidak diringkas menjadi skor komparatif: status \textit{Running} dan \textit{Ready} dipakai sebagai \textit{guardrail} kesiapan dan \textit{postcondition}, bukan sebagai hasil yang dibandingkan.
+Pemeriksaan kecocokan konfigurasi mengembalikan skor 100 untuk B--F pada kedua mode setelah injeksi menurunkannya ke 75. Skenario A tetap 100 karena replikanya dimiliki HPA. Skenario G adalah pengecualian: GitOps tidak memulihkan anotasi SealedSecret dalam 300 detik dan skornya tetap 75, sedangkan mode imperatif kembali ke 100. Pemeriksaan itu bukan perbandingan antarmode; hasilnya menunjukkan bahwa rekonsiliasi hanya menegakkan \textit{field} yang benar-benar tercakup oleh pengendali.
 
-\subsection{Jawaban RQ: Waktu Deteksi, Bukti, dan Pemulihan}
+\subsection{Rekomendasi Kontekstual}
+\label{subsec:rekomendasi-kontekstual}
 
-Seluruh 12 perbandingan B sampai E menghasilkan $p$ terkoreksi di bawah 0,05 pada model uji eksploratif, dengan nilai $p$ terkoreksi berkisar 0,0054 sampai 0,0195. Nilai itu bukan estimasi populasi. Arah dan besarnya perbedaan tidak seragam. Seluruh run GitOps mendahului seluruh run imperatif; pengulangan bersifat pseudoreplikat, sehingga nilai $p$ adalah ringkasan deskriptif, bukan estimasi kausal.
+GitOps layak dipertimbangkan untuk pengamatan berkelanjutan, jejak audit berbasis Git, dan alur tinjauan. Namun, selisih waktu deteksinya harus diverifikasi pada selang pengamatan yang benar-benar dipakai, dan cakupan \textit{field} yang dikelola harus diperiksa sebelum adopsi. Organisasi yang memilih GitOps perlu menguji apakah pengendali membaca \textit{field} yang menjadi tanggung jawabnya, termasuk metadata dan anotasi, serta mengukur waktu deteksi pada konfigurasi nyata, bukan mengandalkan klaim umum.
 
-Pada metrik deteksi dan ketersediaan bukti, ukuran efek mencapai nilai maksimum yang mungkin ($\delta = 1{,}00$). Pada perbandingan berpasangan B dan E selisih median teramati berada pada kisaran 4,0 sampai 4,3 detik. Kisaran itu berdekatan dengan interval pemeriksa 5 detik dan \textit{sampler} 1 detik, sehingga nilainya bukan estimasi murni respons pengendali. C dan D memakai fallback Mann--Whitney untuk deteksi dan bukti sehingga selisih median berpasangan tidak tersedia. Bukti waktu juga asimetris: pada mode imperatif $t_e=t_d$ menurut konstruksi, sedangkan $t_e$ GitOps berasal dari kolektor independen. Keunggulan waktu karena itu hanya berlaku pada sinyal yang teramati di bawah cadence masing-masing.
+Pemilihan mode sebaiknya mempertimbangkan lama penyimpangan yang dapat ditoleransi, selang pengamatan yang tersedia, jalur pemulihan yang teruji, dan biaya operasional. Pada konteks dengan jendela toleransi panjang dan volume perubahan rendah, selisih deteksi beberapa detik mungkin tidak banyak mengubah risiko. Pada konteks yang menuntut deteksi dalam hitungan detik, pengamatan yang lebih rapat dapat memberi manfaat, tetapi manfaat itu tetap perlu diverifikasi dan dibandingkan dengan biayanya.
 
-Pada metrik pemulihan, ukuran efek lebih kecil pada skenario B ($\delta = 0{,}48$) dan C ($\delta = 0{,}75$). Pada B, interval kepercayaan 95\% adalah $[-0{,}08;\,1{,}00]$, yang mencakup nol, sehingga pemulihan B tidak dibaca sebagai keunggulan yang jelas. Ukuran efek tetap tinggi pada D ($\delta = 1{,}00$; $\Delta$ median 5,05 detik) dan E ($\delta = 0{,}86$; $\Delta$ median 3,03 detik). Pada B dan C, mendeteksi drift lebih mudah dipisahkan antarmode daripada mengakhirinya. Pada D dan E perbedaan pemulihan tetap besar, sehingga pernyataan bahwa jalur pemulihan kedua mode konvergen tidak berlaku umum. Analisis sensitivitas yang menyertakan \texttt{gitops-C-r02} tidak mengubah arah kesimpulan, tetapi menurunkan ukuran efek pemulihan C dari 0,75 menjadi 0,64 dan batas bawah IK dari 0,25 menjadi 0,11. Temuan pemulihan C karena itu lebih tepat dibaca sebagai efek positif yang tidak seragam daripada sebagai keunggulan besar yang stabil.
+\section{Biaya dan \textit{Overhead}}
+\label{sec:biaya-overhead}
 
-Jawaban penelitian bukan pernyataan bahwa salah satu mode lebih unggul secara umum. Selisih waktu besar pada tahap deteksi dan menyusut pada tahap pemulihan untuk B dan C, tetapi tetap besar pada pemulihan D dan E. Implikasi praktisnya, pemilihan mode perlu mempertimbangkan skenario drift dan lama penyimpangan yang dapat ditoleransi, bukan hanya kecepatan deteksi.
+Penelitian ini tidak mengukur biaya. Perbandingan waktu pada Bab IV tidak mencakup biaya kontrol, penyimpanan, atau waktu orang, sehingga hasilnya tidak dapat dipakai untuk menyimpulkan bahwa satu mode lebih murah daripada mode lain. Bagian ini mencatat komponen biaya yang perlu diukur dan metriknya, bukan angka atau perkiraan harga.
 
-\subsection{Batas Kesimpulan}
+Komponen biaya yang perlu diperhitungkan meliputi:
+\begin{enumerate}
+  \item komponen \textit{control plane} ArgoCD, yaitu \textit{application controller}, \textit{repo server}, \textit{API server}, Redis, dan CRD;
+  \item repositori Git, alur tinjauan, \textit{CI runner}, \textit{image registry}, dan manajemen secret;
+  \item observabilitas, termasuk Prometheus, Grafana, penyimpanan metrik, dan retensi log;
+  \item operasi dan pembelajaran, termasuk RBAC, peningkatan versi, kepemilikan insiden, dan pelatihan; dan
+  \item kapasitas cadangan untuk rollback atau menjalankan dua mode secara berdampingan.
+\end{enumerate}
 
-Secara keseluruhan, penelitian ini tidak menyimpulkan keunggulan salah satu mode secara umum, kelayakan adopsi, atau kesetaraan semantik konfigurasi. Pada \textit{apparatus}, protokol, serta cakupan \textit{field} yang diuji, kedua mode mengembalikan drift ke \textit{desired state} untuk B--F; G adalah pengecualian deskriptif. Pola perbedaan waktu deteksi konsisten dengan cadence pengamatan, tetapi kontribusi kausalnya tidak dapat diisolasi. Perbedaan waktu pemulihan lebih kecil pada B dan C tetapi tetap besar pada D dan E.
+Tabel~\ref{tab:biaya-metrik} merangkum metrik yang perlu diukur. Tabel ini tidak memuat angka karena penelitian ini tidak mengumpulkannya.
 
-Skenario A dilaporkan sebagai kontrol HPA, F sebagai drift Service terdeklarasi yang dilaporkan terpisah, dan G sebagai kasus deskriptif di luar populasi efikasi, sehingga ketiganya tidak digabungkan ke estimasi efikasi B sampai E. Posisi penelitian ini adalah studi kasus eksploratif, bukan studi konfirmatori, karena desain satu kasus, urutan mode yang tetap, dan pengulangan yang bersifat pseudoreplikat.
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Metrik biaya dan \textit{overhead} yang perlu diukur}
+  \label{tab:biaya-metrik}
+  \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}p{3.5cm}|}
+    \hline
+    Kategori & Metrik & Cara mengukur \\
+    \hline
+    \textit{Control plane} ArgoCD & Pemakaian CPU dan memori, jumlah Pod, penyimpanan, dan waktu aktif komponen & Metrik klaster per namespace dan \textit{right-sizing} \\
+    \hline
+    Git dan tinjauan & Jumlah \textit{commit}, waktu tunggu tinjauan, jumlah peninjau, dan waktu penyelesaian perubahan & Log Git, data \textit{pull request}, dan wawancara \\
+    \hline
+    CI dan \textit{registry} & Menit \textit{CI}, jumlah \textit{build}, ukuran \textit{image}, dan penyimpanan \textit{registry} & Metrik \textit{pipeline} dan kuota \textit{registry} \\
+    \hline
+    Observabilitas & Jumlah sampel, ukuran basis data metrik, retensi log, dan biaya penyimpanan & Ukuran penyimpanan dan kebijakan retensi \\
+    \hline
+    Operasi dan pembelajaran & Jam orang untuk RBAC, peningkatan versi, insiden, dan pelatihan & Pencatatan waktu dan wawancara \\
+    \hline
+    Kapasitas cadangan & \textit{Headroom} CPU, memori, dan penyimpanan untuk rollback atau dua mode & Kapasitas terpakai dibandingkan kapasitas tersedia \\
+    \hline
+  \end{tabularx}
+\end{table}
 
-\section{Saran}
+\section{Aspek yang Tidak Diukur}
+\label{sec:aspek-tidak-diukur}
 
-\subsection{Bagi Praktisi}
+Beberapa manfaat GitOps yang sering disebut dalam praktik tidak diukur dalam penelitian ini. Kolaborasi antaranggota tim, waktu tinjauan perubahan, kelengkapan jejak audit, dan kepemilikan insiden adalah aspek yang mungkin membaik dengan GitOps, tetapi penelitian ini hanya mengukur waktu deteksi, waktu pemulihan, dan kecocokan \textit{field}. Aspek-aspek itu tidak boleh disajikan sebagai temuan.
 
-Pertama, pilih mode berdasarkan lama toleransi penyimpangan, bukan berdasarkan kecepatan deteksi semata. Apabila organisasi memiliki jendela toleransi panjang dan volume perubahan rendah, selisih deteksi yang teramati mungkin tidak banyak mengubah risiko operasional pada konteks itu. Sebaliknya, apabila penyimpangan harus terdeteksi dalam hitungan detik, mekanisme pengamatan yang lebih rapat dapat memberi manfaat yang tetap perlu diverifikasi pada konteks organisasi masing-masing.
-
-Kedua, jangan mengasumsikan bahwa rekonsiliasi otomatis mencakup seluruh \textit{field} objek. Temuan skenario G (Bagian~\ref{subsec:validitas-kesimpulan}) menunjukkan bahwa anotasi tertentu dapat bertahan meskipun objek secara umum telah selaras. Organisasi perlu menetapkan secara eksplisit \textit{field} mana yang menjadi tanggung jawab otomasi, memahami cakupan \textit{diff} dan \textit{client-side apply}, serta memverifikasi cakupan pengendali, bukan mengandalkannya.
-
-Ketiga, siapkan jalur pemulihan yang diuji terpisah dari jalur deteksi, karena pemulihan tidak selalu secepat deteksi. Alarm yang cepat tanpa prosedur remediasi yang teruji hanya memindahkan penundaan ke tahap berikutnya. Kesiapan \textit{apparatus} juga perlu diukur sebelum pengukuran dimulai, karena ketersediaan API, kesegaran metrik, dan stabilitas koneksi dapat menjadi sumber kegagalan yang tidak terkait dengan perbedaan mode.
-
-\subsection{Bagi Peneliti}
-
-Protokol perlu dibakukan sebelum pengumpulan data. Isinya mencakup definisi \textit{desired state}, daftar \textit{field} yang dibandingkan, aturan penyensoran, keluarga uji, dan kriteria penerimaan injeksi. Analisis penelitian ini memakai aturan yang ditetapkan sebelum data dikumpulkan, termasuk aturan cadangan ketika pasangan lengkap tidak tersedia. Pendekatan itu mencegah pemilihan uji secara \textit{post hoc}.
-
-Semua kategori kegagalan dan penyensoran perlu dipertahankan dan dilaporkan, bukan dibersihkan untuk memperoleh distribusi yang lebih menguntungkan. Empat baris mentah yang dikecualikan pada penelitian ini dilaporkan dengan identitas \textit{run} masing-masing agar dapat diaudit, dan klaim komparatif perlu dibatasi pada prosedur, \textit{workload}, klaster, dan resolusi instrumen yang benar-benar diuji.
+Penelitian lanjutan dapat memakai metode kualitatif atau campuran untuk mengukur aspek itu. Wawancara dengan operator dan peninjau dapat memetakan kolaborasi serta kepemilikan insiden; cap waktu \textit{pull request} dan tinjauan dapat mengukur waktu tinjauan; rekonstruksi jejak audit dapat menilai kelengkapan catatan perubahan; dan studi kasus pada organisasi yang berbeda dapat membandingkan praktik. Rancangan seperti itu memerlukan data organisasi dan persetujuan partisipan, sehingga tidak dapat disimpulkan dari data eksperimen ini.
 
 \section{Keterbatasan Penelitian}
+\label{sec:keterbatasan}
 
-Keterbatasan pertama berkaitan dengan cakupan kasus. Penelitian ini memakai satu klaster, satu \textit{stack} InvenioRDM mirip produksi, dan satu implementasi GitOps. Kedua mode dijalankan berurutan pada \textit{stack} yang sama, sehingga perlakuan tidak terisolasi dari beban latar, dependensi bersama, dan \textit{state} klaster yang berubah. Urutan mode adalah GitOps lalu imperatif dan tidak diacak ulang per blok. Efek periode tidak dapat dipisahkan sepenuhnya dari efek mode. Observasi juga tidak independen, sehingga nilai $p$ dan interval kepercayaan dilaporkan sebagai ringkasan eksploratif untuk \textit{apparatus} ini.
+Keterbatasan pertama berkaitan dengan cakupan kasus. Penelitian ini memakai satu klaster, satu \textit{stack} InvenioRDM mirip produksi, dan satu implementasi GitOps. Kedua mode dijalankan berurutan pada \textit{stack} yang sama, sehingga perlakuan tidak terisolasi dari beban latar, dependensi bersama, dan \textit{state} klaster yang berubah. Urutan mode adalah GitOps lalu imperatif dan tidak diacak ulang per blok. Efek periode tidak dapat dipisahkan sepenuhnya dari efek mode. Pengulangan juga tidak sepenuhnya independen, sehingga angka pada Bab IV adalah ringkasan deskriptif.
 
-Keterbatasan kedua berkaitan dengan pengukuran. Interval pengambilan sampel satu detik membatasi ketelitian waktu kejadian. Pemeriksa imperatif memakai interval nominal lima detik, dan horizon pengamatan dibatasi 300 detik. Kesehatan layanan tidak dianalisis sebagai skor komparatif, dan R1 mengukur kesetaraan \textit{field} terpilih, bukan kebenaran semantik atau keamanan konfigurasi. Skenario A dibatasi plafon HPA empat replika, sedangkan skenario G tidak dapat digeneralisasi sebagai ukuran \textit{self-healing} karena pengendali pemulihannya tidak teratribusi.
+Keterbatasan kedua berkaitan dengan pengukuran. Pencatat bekerja pada interval satu detik dan pemeriksa imperatif pada interval lima detik, sehingga perbedaan waktu deteksi tidak dapat dipisahkan dari perbedaan selang pengamatan. Horizon pengamatan dibatasi 300 detik. Pemeriksaan kecocokan konfigurasi hanya mencakup empat sumber daya terpilih dan tidak menilai kebenaran semantik atau keamanan konfigurasi. Kesehatan layanan tidak dianalisis sebagai skor komparatif. Skenario A dibatasi plafon HPA empat replika, sedangkan skenario G tidak dapat digeneralisasi sebagai ukuran \textit{self-healing} karena pengendali pemulihannya tidak teratribusi.
 
-Keterbatasan ketiga berkaitan dengan lingkungan dan data. Kedua mode berbagi satu domain kegagalan penyimpanan dan tidak memiliki salinan \textit{off-site}. Konfigurasi SMTP masih berupa \textit{placeholder}, dan pemulihan data awal belum selesai. Empat baris mentah dikecualikan dari analisis karena dua kegagalan instrumentasi, satu \textit{run} lengkap dengan \textit{non-zero exit code} proses \textit{harness}, dan satu kegagalan \textit{baseline} pra-injeksi yang diulang. Tiga sel tidak menghasilkan baris analisis dan satu sel tetap dianalisis melalui percobaan ulang, tanpa nilai imputasi. Jumlah 15 pengulangan per sel juga bukan jaminan daya statistik per skenario \citep{dyba2006power,kitchenham2024small}.
+Keterbatasan ketiga berkaitan dengan lingkungan dan data. Kedua mode berbagi satu domain kegagalan penyimpanan dan tidak memiliki salinan di luar lokasi. Konfigurasi SMTP masih berupa \textit{placeholder}, dan pemulihan data awal belum selesai. Empat baris mentah dikecualikan dari analisis karena dua kegagalan instrumentasi, satu percobaan lengkap dengan kode keluar proses yang bukan nol, dan satu kegagalan \textit{baseline} pra-injeksi yang diulang. Tiga sel tidak menghasilkan baris analisis dan satu sel tetap dianalisis melalui percobaan ulang, tanpa nilai imputasi. Jumlah 15 pengulangan per sel juga bukan jaminan daya statistik per skenario \citep{dyba2006power,kitchenham2024small}.
 
-Atribusi pelaku mutasi tidak diukur karena audit API server tidak tersedia. Penelitian ini juga tidak menilai kesesuaian hasil dengan \textit{state} klaster setelah pengumpulan, sehingga kesimpulan dibatasi pada data yang dianalisis dan \textit{apparatus} yang diuji.
+Atribusi pelaku perubahan tidak diukur karena audit API server tidak tersedia. Penelitian ini juga tidak menilai kesesuaian hasil dengan \textit{state} klaster setelah pengumpulan, sehingga kesimpulan dibatasi pada data yang dianalisis dan \textit{apparatus} yang diuji. Biaya dan aspek kualitatif juga tidak diukur, seperti dijelaskan pada Bagian~\ref{sec:biaya-overhead} dan Bagian~\ref{sec:aspek-tidak-diukur}.
 
 \section{Pekerjaan Lanjutan}
+\label{sec:pekerjaan-lanjutan}
 
-\subsection{Replikasi dan Validitas Eksternal}
+\subsection{Replikasi dan Perbandingan Alat}
+\label{subsec:replikasi}
 
-Prioritas pertama adalah replikasi pada beberapa klaster dan \textit{stack} independen. Studi ini hanya memakai satu \textit{stack} berurutan. Replikasi pada setidaknya tiga \textit{stack} paralel yang terisolasi memungkinkan pemisahan efek urutan dari efek mode serta uji berpasangan yang sebenarnya. Replikasi juga memungkinkan estimasi varians antar-\textit{stack}, yang tidak dapat diperoleh dari satu kasus.
+Prioritas pertama adalah replikasi pada sekurang-kurangnya tiga \textit{stack} independen yang terisolasi. Studi ini hanya memakai satu \textit{stack} berurutan. Replikasi pada beberapa \textit{stack} memungkinkan pemisahan efek urutan dari efek mode, uji berpasangan yang sebenarnya, dan estimasi varians antar-\textit{stack} yang tidak dapat diperoleh dari satu kasus.
 
-Prioritas berikutnya adalah membandingkan lebih dari satu implementasi GitOps, misalnya Flux atau ArgoCD dengan konfigurasi manajemen \textit{field} yang berbeda, menggunakan definisi metrik yang sama. Pola G dapat diuji dengan cara ini. Perbandingan beberapa implementasi dapat menunjukkan seberapa umum pola itu, tanpa mengklaim penyebabnya.
+Prioritas berikutnya adalah membandingkan lebih dari satu implementasi GitOps, misalnya Flux atau ArgoCD dengan konfigurasi manajemen \textit{field} yang berbeda, menggunakan definisi metrik yang sama. Pola pada skenario G dapat diuji dengan cara ini. Perbandingan beberapa implementasi dapat menunjukkan seberapa umum pola itu, tanpa mengklaim penyebabnya. Pekerjaan lanjutan juga perlu mencakup \textit{workload} yang menyimpan \textit{state} dan yang tidak, karena keduanya memiliki risiko dan jalur pemulihan yang berbeda.
 
-\subsection{Pengukuran yang Dapat Diperluas}
+\subsection{Pengukuran Biaya dan Studi Kualitatif}
+\label{subsec:biaya-kualitatif}
 
-Apabila tersedia sumber daya komputasi dan anggaran yang lebih besar, beberapa pengukuran yang saat ini berada di luar jangkauan dapat dilakukan.
-\begin{enumerate}
-  \item \textbf{Resolusi waktu yang lebih tinggi.} Mengurangi interval pengambilan sampel menjadi di bawah satu detik dan menambahkan sinkronisasi jam presisi, misalnya \textit{Precision Time Protocol} (PTP), akan memisahkan komponen cadangan mekanisme dari komponen ketanggapan pengendali secara lebih tegas. Pada penelitian ini, selisih deteksi teramati 4,0 sampai 4,3 detik berdekatan dengan interval nominal pemeriksa 5 detik. Keduanya tidak identik, dan kontribusi kausal masing-masing komponen belum dapat dipisahkan.
-  \item \textbf{Beban pengguna yang realistis.} Menjalankan percobaan pada trafik pengguna nyata atau beban sintetis yang terkalibrasi memungkinkan pengukuran dampak pemulihan terhadap layanan, bukan hanya terhadap konfigurasi. Ini juga menguji apakah pemulihan yang cepat tetap cepat ketika klaster berada di bawah tekanan.
-  \item \textbf{Volume data dan skala klaster.} Mengulang pada volume objek dan jumlah node yang jauh lebih besar akan menguji apakah perbedaan mode berskala atau justru menyempit ketika biaya rekonsiliasi meningkat.
-  \item \textbf{Daya statistik per skenario.} Menambah jumlah pengulangan per skenario berdasarkan perhitungan daya yang memakai varians teramati pada studi ini dapat mempersempit interval kepercayaan pada metrik pemulihan.
-  \item \textbf{Skenario drift yang lebih kompleks.} Menambahkan drift berganda yang saling bergantung, drift yang melibatkan beberapa objek sekaligus, dan drift yang bersaing dengan rekonsiliasi lain akan menguji perilaku ketika penyimpangan tidak berdiri sendiri.
-  \item \textbf{Dampak layanan sebagai hasil.} Mengukur kesiapan dan ketersediaan layanan secara sistematis akan melengkapi validitas manipulasi dan blok waktu dengan dampak terhadap pengguna.
-\end{enumerate}
+Biaya dan jam orang perlu diukur dengan metrik pada Tabel~\ref{tab:biaya-metrik}, bukan dengan perkiraan harga. Pengukuran itu mencakup komponen \textit{control plane}, penyimpanan observabilitas, menit CI, dan waktu yang dipakai untuk RBAC, peningkatan versi, serta penanganan insiden. Tanpa data itu, rekomendasi adopsi hanya mencakup waktu, bukan total biaya kepemilikan.
 
-\subsection{Mengurangi Batasan Protokol}
+Aspek kolaborasi, waktu tinjauan, jejak audit, dan kepemilikan insiden perlu diuji dengan metode kualitatif atau campuran. Wawancara, pengamatan alur tinjauan, dan rekonstruksi audit dapat memberi gambaran yang tidak tertangkap oleh pengukuran waktu. Studi seperti itu tidak menggantikan hasil eksperimen ini, tetapi melengkapinya pada dimensi yang tidak diukur.
 
-Beberapa batasan berasal dari keputusan desain yang diambil untuk menjaga kelayakan, bukan dari keterbatasan yang tak terhindarkan. Dengan kelonggaran yang lebih besar, batasan berikut dapat dikurangi.
-\begin{enumerate}
-  \item \textbf{\textit{Stack} kembar yang terisolasi.} Dua \textit{stack} identik yang berjalan paralel akan menghilangkan efek urutan dan memisahkan perlakuan dari beban latar bersama. Konsekuensinya adalah kebutuhan kapasitas dua kali lipat dan hilangnya sebagian validitas ekologis, karena kedua \textit{stack} tidak lagi berbagi kondisi yang sama.
-  \item \textbf{Jendela pengamatan yang lebih panjang.} Memperpanjang batas pengamatan akan mengurangi jumlah kejadian tersensor dan mempersempit selang kepercayaan pada metrik pemulihan. Pada penelitian ini seluruh sensoring pemulihan berasal dari satu skenario, sehingga perpanjangan jendela terutama bermanfaat untuk memahami kasus itu.
-  \item \textbf{Infrastruktur independen dan salinan \textit{off-site}.} Memisahkan penyimpanan cadangan dari domain kegagalan utama akan memungkinkan pengujian pemulihan yang sesungguhnya, termasuk skenario kehilangan penyimpanan primer. Penelitian ini tidak dapat menguji hal itu karena keduanya berbagi satu server \textit{Network File System} (NFS).
-  \item \textbf{Jam yang tersertifikasi.} Menggunakan sumber waktu yang tersertifikasi memungkinkan klaim selang waktu absolut, bukan hanya perbandingan relatif dengan penanganan konservatif.
-  \item \textbf{Lingkungan yang tenang dan terkendali.} Menjalankan percobaan pada klaster khusus tanpa beban lain akan meningkatkan presisi, dengan mengorbankan kesetiaan terhadap kondisi operasional nyata.
-\end{enumerate}
+\subsection{Hipotesis Selang Pemeriksaan Setara}
+\label{subsec:hipotesis-selang}
+
+\textbf{Hipotesis.} Jika pemeriksa imperatif dijalankan pada selang 1 detik, selisih waktu deteksi terhadap GitOps dapat menyusut atau hilang. Hipotesis ini belum diuji dan tidak boleh dibaca sebagai hasil. Data yang ada memakai pemeriksa 5 detik, sehingga selisih 4,2--4,3 detik masih bercampur dengan perbedaan selang pengamatan.
+
+Untuk menguji hipotesis itu, diperlukan 40 percobaan imperatif tambahan pada skenario B--E dengan 10 pengulangan per skenario pada selang 1 detik, lalu dibandingkan dengan data GitOps yang sudah ada. Perbandingan itu masih membawa risiko efek periode karena data GitOps lama dan data imperatif baru berasal dari waktu yang berbeda; idealnya kedua mode dijalankan ulang dalam urutan berselang-seling atau diacak. Rancangan itu menjaga beban uji dan definisi metrik tetap sama sekaligus menyamakan selang pemeriksaan. Jika selisih deteksi menyusut, temuan akan mendukung penjelasan bahwa selang pengamatan adalah faktor utama; jika tidak, komponen respons pengendali perlu dicari lebih lanjut.
 
 \subsection{Agenda yang Diprioritaskan}
+\label{subsec:agenda}
 
 Tabel~\ref{tab:lanjutan} merangkum prioritas pekerjaan lanjutan beserta alasan dan perkiraan sumber daya yang dibutuhkan. Urutan disusun berdasarkan rasio antara nilai inferensial dan biaya pelaksanaan.
 
@@ -101,19 +118,19 @@ Tabel~\ref{tab:lanjutan} merangkum prioritas pekerjaan lanjutan beserta alasan d
     \hline
     1 & Replikasi pada tiga \textit{stack} terisolasi & Memisahkan efek urutan dari efek mode & Tinggi \\
     \hline
-    2 & Sinkronisasi jam presisi dan \textit{sampling} sub-detik & Memisahkan cadangan mekanisme dari ketanggapan pengendali & Sedang \\
+    2 & Subset selang 1 detik: 40 percobaan imperatif pada B--E & Menguji hipotesis bahwa selisih deteksi menyusut & Sedang \\
     \hline
-    3 & Menambah pengulangan berdasarkan daya teramati & Mempersempit selang kepercayaan pada metrik pemulihan & Sedang \\
+    3 & Perbandingan alat GitOps kedua, misalnya Flux & Menguji generalitas pola cakupan \textit{field} & Sedang \\
     \hline
-    4 & Beban pengguna realistis & Menguji dampak terhadap layanan, bukan hanya konfigurasi & Sedang \\
+    4 & Pengukuran biaya dan jam orang & Melengkapi keputusan adopsi dengan total biaya & Sedang \\
     \hline
-    5 & Membandingkan beberapa implementasi GitOps & Menguji generalitas temuan skenario G & Sedang \\
+    5 & Studi kualitatif atau campuran & Mengukur kolaborasi, tinjauan, audit, dan kepemilikan insiden & Sedang \\
     \hline
-    6 & Infrastruktur cadangan independen & Menguji pemulihan lintas domain kegagalan & Tinggi \\
+    6 & \textit{Workload} stateful dan stateless & Menguji validitas eksternal pada jenis beban berbeda & Sedang \\
     \hline
-    7 & Skenario drift berganda dan saling bergantung & Menguji perilaku di luar drift tunggal & Sedang \\
+    7 & Jendela pengamatan lebih panjang dan penyimpanan independen & Mengurangi pengamatan yang berhenti sebelum peristiwa dan menguji domain kegagalan & Tinggi \\
     \hline
   \end{tabularx}
 \end{table}
 
-Arah pekerjaan lanjutan yang paling bernilai bukan menambah jumlah pengamatan pada \textit{apparatus} yang sama. Arah yang lebih bernilai adalah memisahkan variabel yang belum dapat dipisahkan. Pemisahan itu mencakup mekanisme pengamatan dari ketanggapan pengendali, efek urutan dari efek mode, serta cakupan \textit{field} terkelola dari cakupan \textit{field} yang diasumsikan. Pemisahan itu membutuhkan sumber daya dan kelonggaran yang lebih besar. Namun, pemisahan itu akan mengubah temuan dari deskriptif menjadi penjelasan.
+Arah pekerjaan lanjutan yang paling bernilai bukan menambah jumlah pengamatan pada \textit{apparatus} yang sama. Arah yang lebih bernilai adalah memisahkan variabel yang belum dapat dipisahkan: selang pengamatan dari respons pengendali, efek urutan dari efek mode, serta cakupan \textit{field} terkelola dari cakupan \textit{field} yang diasumsikan.

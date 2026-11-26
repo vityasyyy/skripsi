@@ -5,6 +5,11 @@ the frozen revision that owns the numbers, and the command that reproduces the
 view. It does not replace `experiments/REVISIONS.md` or
 [`claim-traceability.md`](claim-traceability.md).
 
+The frozen analyzer and collection modules use `R1` and `R2` as internal
+data-phase labels. The manuscript does not: it calls the check
+"pemeriksaan kecocokan konfigurasi" and the two blocks "blok waktu" and
+"blok kecocokan".
+
 ## Frozen identities
 
 | Role | Tag | Commit | What it fixes |
@@ -24,15 +29,19 @@ recompute the observed values.
 | Thesis section | Claim block | Code path | Frozen owner | Reproduction |
 |---|---|---|---|---|
 | Bab III §Desain, §Beban Uji, §Protokol | Apparatus, 210 cells, baseline gate, reset, 60 s cooldown | `experiments/live/harness.py`, `experiments/live/run_matrix.py`, `experiments/live/declaration.py` | Collection `3572f3c` | `python3 -m unittest discover -s experiments/tests` |
-| Bab III §Pemeriksaan Validitas Manipulasi | R1 contract, four selected resources, HPA-owned replicas excluded | `experiments/live/declaration.py`, `experiments/live/harness.py` (`build_contract`, `score`) | Collection `3572f3c` | Inspector tests in `experiments/tests/test_live_harness.py` |
-| Bab III §Waktu Deteksi, Bukti, Pemulihan | `t_0`, `t_d`, `t_e`, `t_r`; censoring; evidence asymmetry | `experiments/live/harness.py`, `experiments/live/timeline.py`, `experiments/live/sampling.py` | Collection `3572f3c` | Timeline and sampler tests |
-| Bab IV §Validitas Manipulasi | R1 medians; B–F convergence; G = 75 on GitOps | `experiments/analysis/analyze_live.py` (`_r1_entries`) | Analysis `a1d43ea` | `rq2_report.py` (below); audit table in Lampiran A |
-| Bab IV §Waktu Deteksi, Bukti, Pemulihan | Censoring counts, 12 B–E tests, Holm p-values, Cliff's δ, paired gaps | `experiments/analysis/analyze_live.py`, `core.py`, `stats.py`, `survival.py`, `latex.py` | Analysis `a1d43ea` | Frozen `live_analysis.json` plus `rq2_report.py` |
-| Bab IV §Analisis Sensitivitas | C-r02 re-inclusion; C recovery δ 0.75 → 0.64 | `experiments/sensitivity/c_r02_sensitivity.py` | Sensitivity `6cfc99e` | `python3 experiments/sensitivity/c_r02_sensitivity.py --out /tmp/c-r02.json` |
-| Bab IV/V §Batas Klaim, §Kasus Batas G | Block order, pseudoreplicates, G unattributed | `experiments/analysis/analyze_live.py` notes; `experiments/live/run_matrix.py` order | Analysis `a1d43ea`; collection `3572f3c` | `live_analysis.json` (`batch`, `notes`, `r1`) |
-| Lampiran A §Audit R1 | Median audit table; no comparative test | `analyze_live._r1_entries`; counts at 100/75/50/25 from `rq2_report.recovery_completeness` when frozen rows are present | Analysis `a1d43ea`; post-freeze view (PR1) | `rq2_report.py` (below) |
-| Lampiran A §Catatan Perubahan dari Proposal | Title/F/G definition history | No code; pre-collection decisions | Collection freeze boundary | `git show 3572f3c:docs/...` and the appendix text |
-| Deck slides 4, 8–9, 11–16 | One RQ, validity check, timing result, claim boundaries | `presentation/skripsi/contents/slides.tex`; diagrams in `presentation/skripsi/diagrams/` | Numbers from analysis `a1d43ea` | `make presentation-skripsi` |
+| Bab III §Pemeriksaan Kecocokan Konfigurasi | Four selected resources; HPA-owned replicas excluded; score 100/75 | `experiments/live/declaration.py`, `experiments/live/harness.py` (`build_contract`, `score`) | Collection `3572f3c` | Inspector tests in `experiments/tests/test_live_harness.py` |
+| Bab III §Waktu Deteksi, Bukti, Pemulihan | `t_0`, `t_d`, `t_e`, `t_r`; observation horizon; evidence asymmetry | `experiments/live/harness.py`, `experiments/live/timeline.py`, `experiments/live/sampling.py` | Collection `3572f3c` | Timeline and sampler tests |
+| Bab IV §Data yang Dianalisis | 210 cells, 211 raw rows, 207 analysis rows, 4 exclusions; audit medians | `experiments/analysis/analyze_live.py` (`_exclusions`, `_r1_entries`) | Analysis `a1d43ea` | Frozen `live_analysis.json`; audit table in Lampiran A |
+| Bab IV §Waktu Deteksi, §Waktu Pemulihan | Median detection and recovery times; interval explanation | `experiments/analysis/analyze_live.py`, `core.py`, `stats.py`, `survival.py`, `latex.py` | Analysis `a1d43ea` | Frozen `live_analysis.json` plus `rq2_report.py` |
+| Bab IV §Kasus G | G description; GitOps recovery stops at 300 s; score 75 | `analyze_live.py` (`_r1_entries`, `_survival_entries`); runner G branch | Analysis `a1d43ea`; collection `3572f3c` | `live_analysis.json` (`r1`, `survival`) |
+| Bab V §Temuan Utama, §Rekomendasi | Interval-bound detection; mixed recovery; contextual recommendation | Analysis outputs and design records | Analysis `a1d43ea`; collection `3572f3c` | `live_analysis.json` |
+| Bab V §Biaya dan Overhead, §Aspek yang Tidak Diukur | What was not measured; metrics to collect | No code; design boundary | — | Thesis text only |
+| Bab V §Hipotesis Selang Pemeriksaan Setara | 40 additional imperative runs at 1 s on B–E | Future work; no output | — | Not measured |
+| Lampiran A §Audit Pemeriksaan Kecocokan Konfigurasi | Median audit table; no comparative test | `analyze_live._r1_entries` | Analysis `a1d43ea` | Frozen `live_analysis.json` |
+| Lampiran A §Baris yang Dikecualikan | Four raw rows with IDs and reasons | `analyze_live._exclusions`, `_classify_raw` | Analysis `a1d43ea` | `live_analysis.json.exclusions` |
+| Lampiran B §Tabel Uji Lengkap, §Tabel Ukuran Efek | 12 B–E tests; Holm p-values; Cliff's delta; bootstrap intervals | `analyze_live.py`, `core.py`, `stats.py` | Analysis `a1d43ea` | `live_tests.tex`, `live_effects.tex` |
+| Lampiran B §Analisis Sensitivitas | C, repetition 2 re-inclusion; C recovery delta 0.75 to 0.64 | `experiments/sensitivity/c_r02_sensitivity.py` | Sensitivity `6cfc99e` | `python3 experiments/sensitivity/c_r02_sensitivity.py --out /tmp/c-r02.json` |
+| Lampiran B §Pengamatan Berhenti Sebelum Peristiwa | Censoring counts; Kaplan–Meier; RMST | `analyze_live.py`, `survival.py` | Analysis `a1d43ea` | Frozen `live_survival.tex` |
 
 ## Thesis-facing timing view
 
@@ -40,7 +49,8 @@ recompute the observed values.
 It does not change `analyze_live.py`, `core.py`, `stats.py`, `survival.py`,
 `latex.py`, or any collection module. It selects `batch`, `exclusions`,
 `overview`, `survival`, `efficacy`, and `families`; derives the descriptive
-repair interval `t_r - t_d`; and reports the R1 recovery predicate as counts.
+repair interval `t_r - t_d`; and reports the configuration-match predicate as
+counts.
 
 ```bash
 python3 experiments/analysis/rq2_report.py \
@@ -54,7 +64,8 @@ python3 experiments/analysis/rq2_report.py \
 
 Outputs: `rq2_analysis.json`, `rq2_overview.tex`, `rq2_survival.tex`,
 `rq2_tests.tex`, `rq2_effects.tex`, `rq2_repair.tex`,
-`recovery_completeness.tex`. There is deliberately no R1 comparative table.
+`recovery_completeness.tex`. There is deliberately no comparative table for the
+configuration-match check.
 
 `--check-frozen` compares the six selected analyzer fields with the frozen
 `live_analysis.json` and exits non-zero on mismatch. When the frozen file is
@@ -64,7 +75,7 @@ mismatch or invalid input, and 2 means the frozen comparison was skipped.
 
 ### Historical schema alias
 
-The frozen schema stores the imperative arm as `env=manual`. That alias is part
+The frozen schema stores the imperative mode as `env=manual`. That alias is part
 of the frozen data and is never renamed in place. The view maps it for display:
 
 - analysis field: `env=manual`
@@ -72,8 +83,8 @@ of the frozen data and is never renamed in place. The view maps it for display:
 - preserved audit field: `legacy_env=manual`
 
 The analyzer's `overview` and `survival` entries use the same historical alias;
-`rq2_report.py` is the only layer that renames it. Do not "fix" the alias in
-the frozen analyzer or in the collection rows.
+`rq2_report.py` is the only layer that renames it. Do not "fix" the alias in the
+frozen analyzer or in the collection rows.
 
 ## Frozen inspector commands
 
@@ -88,9 +99,7 @@ Rebuild the thesis-facing artifacts:
 
 ```bash
 make skripsi-diagrams
-make presentation-skripsi-diagrams
 make skripsi
-make presentation-skripsi
 make check-experiments
 make thesis-style
 ```

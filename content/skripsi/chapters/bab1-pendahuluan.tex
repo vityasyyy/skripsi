@@ -6,32 +6,35 @@ Kubernetes mengelola aplikasi melalui \textit{desired state} (keadaan yang diing
 
 Dampak drift tidak kecil. \citet{zhang2026configuration} menemukan 719 \textit{defect} konfigurasi pada 2.260 skrip Kubernetes, dan 533 di antaranya (74,1\%) menyebabkan \textit{crash}, operasi salah, atau \textit{outage}. \citet{rahman2023security} juga menunjukkan bahwa \textit{security misconfiguration} pada manifest \textit{open-source} berulang dalam 11 kategori. Temuan itu menjelaskan mengapa drift perlu ditangani sebagai masalah operasional, bukan sekadar ketidakrapian berkas.
 
-Dua cara umum merespons drift adalah prosedur imperatif dan GitOps. Pada prosedur imperatif, pemeriksa menjalankan perintah seperti \texttt{kubectl\allowbreak{} edit}, \texttt{kubectl\allowbreak{} patch}, atau \texttt{kubectl\allowbreak{} scale}; pada GitOps, agen seperti ArgoCD membandingkan klaster dengan deklarasi di Git lalu mencoba menyelaraskannya. Perbandingan keduanya sering dibayangkan sebagai perbandingan kecepatan manusia dengan otomasi, tetapi gambaran itu menyesatkan jika yang diukur adalah mekanisme, bukan orang. Kecepatan dan keputusan operator berubah antarorang dan antarsituasi, sehingga penelitian ini memakai pemeriksa dan \textit{runbook} otomatis berbasis \texttt{kubectl} yang tetap sebagai prosedur imperatif. Prosedur imperatif berjalan pada tingkat prosedur, dan tidak ada waktu reaksi, pengetikan, atau pemilihan tindakan oleh manusia yang diukur. Karena prosedur itu otomatis dan tetap, pembandingnya bersifat konservatif: ia mewakili versi otomatis yang dibakukan, bukan operator yang lambat. Dengan demikian, keunggulan waktu GitOps tidak dapat dijelaskan oleh kelambatan manusia.
+Dua cara umum merespons drift adalah prosedur imperatif dan GitOps. Pada prosedur imperatif, pemeriksa menjalankan perintah seperti \texttt{kubectl\allowbreak{} edit}, \texttt{kubectl\allowbreak{} patch}, atau \texttt{kubectl\allowbreak{} scale}; pada GitOps, agen seperti ArgoCD membandingkan klaster dengan deklarasi di Git lalu mencoba menyelaraskannya. Perbandingan keduanya sering dibayangkan sebagai perbandingan kecepatan manusia dengan otomasi, tetapi gambaran itu menyesatkan jika yang diukur adalah mekanisme, bukan orang. Kecepatan dan keputusan operator berubah antarorang dan antarsituasi, sehingga penelitian ini memakai pemeriksa dan \textit{runbook} otomatis berbasis \texttt{kubectl} yang tetap sebagai prosedur imperatif. Prosedur imperatif berjalan pada tingkat prosedur, dan tidak ada waktu reaksi, pengetikan, atau pemilihan tindakan oleh manusia yang diukur. Karena prosedur itu otomatis dan tetap, pembandingnya bersifat konservatif: ia mewakili versi otomatis yang ditetapkan sebelum pengujian, bukan operator yang lambat. Dengan demikian, perbedaan waktu tidak dapat dijelaskan oleh kelambatan manusia.
 
-Studi komparatif tentang GitOps sudah ada. Shrestha dan Ali membandingkan waktu induksi, penemuan, dan pemulihan drift antara GitOps dan Ansible \citep{shrestha2024configuration}; Kagganti Nataraja mendeskripsikan perbandingan terkontrol pada Minikube satu node \citep{kaggantinataraja2025security}; Matubber mengevaluasi manajemen infrastruktur Kubernetes dan menyertakan pembanding semi-otomatis \citep{matubber2025managing}. Temuan itu menunjukkan bahwa perbandingan terkontrol bukan hal baru, sehingga penelitian ini tidak mengklaim sebagai yang pertama dan tidak berangkat dari anggapan bahwa GitOps selalu lebih unggul.
+Studi komparatif tentang GitOps sudah ada. Shrestha dan Ali membandingkan waktu induksi, penemuan, dan pemulihan drift antara GitOps dan Ansible \citep{shrestha2024configuration}; Kagganti Nataraja mendeskripsikan perbandingan terkontrol pada Minikube satu node \citep{kaggantinataraja2025security}; Matubber mengevaluasi manajemen infrastruktur Kubernetes dan menyertakan pembanding semi-otomatis \citep{matubber2025managing}. Studi-studi itu menunjukkan bahwa perbandingan terkontrol bukan hal baru, sehingga penelitian ini tidak mengklaim sebagai yang pertama dan tidak berangkat dari anggapan bahwa GitOps selalu lebih unggul.
 
-Celah yang dituju lebih sempit: diperlukan pengukuran pada \textit{workload} multi-service nyata yang memisahkan kesetaraan konfigurasi dari sinyal kesehatan layanan yang hanya berfungsi sebagai \textit{guardrail}, serta memisahkan sinyal deteksi, ketersediaan bukti, dan pemulihan konfigurasi. Ketiga hal itu sering dilebur menjadi satu angka waktu, padahal menunjukkan proses yang berbeda. Penelitian ini memisahkan ketiganya pada satu \textit{stack} InvenioRDM yang mirip produksi (\textit{production-like}) dengan tujuh skenario drift dan dua mode manajemen. Mode non-GitOps memakai pemeriksa dan \textit{runbook} \texttt{kubectl} otomatis, sedangkan mode GitOps memakai ArgoCD; kedua mode berjalan berurutan pada \textit{stack} yang sama, sehingga perbandingan tidak memerlukan dua \textit{deployment} terpisah.
+Celah yang dituju lebih sempit: diperlukan pengukuran pada \textit{workload} multi-service nyata yang memisahkan waktu deteksi dari waktu pemulihan, serta tidak mencampur kesetaraan konfigurasi dengan kesehatan layanan. Bab II menjelaskan mengapa waktu deteksi dan waktu pemulihan dipisahkan. Penelitian ini memisahkan keduanya pada satu \textit{stack} InvenioRDM yang mirip produksi (\textit{production-like}) dengan tujuh skenario drift dan dua mode manajemen. Mode non-GitOps memakai pemeriksa dan \textit{runbook} \texttt{kubectl} otomatis, sedangkan mode GitOps memakai ArgoCD; kedua mode berjalan berurutan pada \textit{stack} yang sama, sehingga perbandingan tidak memerlukan dua \textit{deployment} terpisah.
 
-Rancangan ini membatasi klaim sejak awal. Satu klaster dan satu \textit{stack} tidak dapat mewakili semua organisasi, dan urutan mode yang tetap membuat efek periode tidak dapat dipisahkan sepenuhnya dari efek mode. Karena itu, hasilnya dilaporkan sebagai studi kasus komparatif terkontrol yang eksploratif, dengan kesimpulan yang berlaku untuk \textit{apparatus}, protokol, dan cakupan \textit{field} yang benar-benar diuji. Bab IV menyajikan validitas manipulasi dan hasil waktu, sedangkan Bab V merangkum jawaban, saran, dan keterbatasan.
+Istilah ``terkontrol'' pada penelitian ini dipakai secara terbatas. Protokol, cara injeksi, cara pengukuran, dan \textit{apparatus} ditetapkan sebelum pengujian dan tidak diubah selama pengumpulan. Urutan mode diacak satu kali dengan angka acak: GitOps dijalankan lebih dahulu, lalu imperatif. Urutan skenario yang terwujud adalah E, A, G, D, C, F, B, dan pengulangan berjalan berurutan. Urutan itu tidak diacak ulang per percobaan; konsekuensinya dibahas pada Bab III §Rancangan Perbandingan dan Bab V §Keterbatasan.
+
+Rancangan ini membatasi klaim sejak awal. Satu klaster dan satu \textit{stack} tidak dapat mewakili semua organisasi. Karena itu, hasilnya dilaporkan sebagai studi kasus komparatif terkontrol yang eksploratif, dengan kesimpulan yang berlaku untuk \textit{apparatus}, protokol, dan cakupan \textit{field} yang benar-benar diuji.
 
 \section{Rumusan Masalah}
 
 Penelitian ini diarahkan oleh satu pertanyaan penelitian tentang waktu.
 
 \begin{quote}
-Seberapa besar perbedaan waktu deteksi, waktu tersedianya bukti yang dapat diverifikasi, dan waktu pemulihan konfigurasi penuh antara prosedur imperatif otomatis dan GitOps pada setiap skenario drift, dan pada kondisi apa keunggulan waktu menyusut atau bertahan?
+Seberapa besar perbedaan waktu deteksi dan waktu pemulihan konfigurasi antara prosedur imperatif otomatis dan GitOps pada setiap skenario drift, dan pada kondisi apa perbedaan itu menyusut atau bertahan?
 \end{quote}
 
-Ketiga komponen waktu dioperasionalkan sebagai berikut:
+Kedua komponen waktu dioperasionalkan sebagai berikut:
 \begin{enumerate}
-  \item \textbf{Deteksi:} $t_d - t_0$, yaitu waktu sampai sinyal deteksi pertama yang memenuhi jendela.
-  \item \textbf{Bukti:} $t_e - t_0$, yaitu waktu sampai evaluasi perbedaan \textit{field} pertama yang dapat diverifikasi.
-  \item \textbf{Pemulihan:} $t_r - t_0$, yaitu waktu sampai inventaris dan seluruh \textit{field} R1 kembali cocok.
+  \item \textbf{Deteksi:} $t_d - t_0$, yaitu waktu sampai sinyal deteksi pertama yang memenuhi jendela pengamatan.
+  \item \textbf{Pemulihan:} $t_r - t_0$, yaitu waktu sampai inventaris dan seluruh \textit{field} yang diperiksa kembali cocok dengan deklarasi, dikonfirmasi oleh observasi berikutnya.
 \end{enumerate}
 
-Pertanyaan ``pada kondisi apa'' dijawab oleh perbandingan per skenario, bukan oleh subpertanyaan keempat. Kesehatan layanan (\textit{Running}/\textit{Ready}) bukan jawaban penelitian. Status itu dipakai sebagai \textit{guardrail} kesiapan sebelum injeksi dan \textit{postcondition} setelah pemulihan; kesehatan tidak diskor, tidak dibandingkan antarmode, dan tidak masuk penyebut R1.
+Waktu tersedianya bukti, $t_e - t_0$, dicatat sebagai diagnostik dan bukan sebagai metrik utama; penjelasan mekanismenya ada pada Bab III §Waktu Deteksi, Bukti, dan Pemulihan.
 
-R1 dipakai sebagai pemeriksaan validitas manipulasi, bukan sebagai pertanyaan komparatif. Skor R1 sebesar 100 adalah predikat pemulihan: pemeriksa dan evaluator memakai kontrak beku yang sama, sehingga skenario B--F harus kembali ke 100 bila prosedur bekerja. Skenario A berfungsi sebagai kontrol \textit{Horizontal Pod Autoscaler} (HPA), F adalah drift \texttt{targetPort} pada Service yang dideklarasikan, dan G adalah kasus batas deskriptif yang tidak diatribusikan. Ketiganya dilaporkan terpisah dari keluarga uji B sampai E, dan tidak adanya status OutOfSync tidak ditafsirkan sebagai waktu deteksi nol.
+Pemeriksaan kecocokan konfigurasi dipakai untuk memastikan manipulasi bekerja, bukan untuk menjawab pertanyaan komparatif. Skor 100 berarti keempat sumber daya terpilih ada dan seluruh \textit{field} terpilihnya cocok dengan deklarasi. Pemeriksa dan evaluator memakai kontrak yang sama, sehingga skenario B--F harus kembali ke 100 bila prosedur bekerja; kegagalan konvergensi akan menunjukkan masalah manipulasi, bukan perbedaan yang menguntungkan salah satu mode. Skenario A berfungsi sebagai kontrol \textit{Horizontal Pod Autoscaler} (HPA), F adalah drift \texttt{targetPort} pada Service yang dideklarasikan, dan G adalah kasus batas deskriptif yang tidak diatribusikan. Ketiganya dilaporkan terpisah dari keluarga uji B sampai E, dan tidak adanya status OutOfSync tidak ditafsirkan sebagai waktu deteksi nol.
+
+Kesehatan layanan (\textit{Running}/\textit{Ready}) bukan jawaban penelitian. Status itu dipakai sebagai pemeriksaan pengaman sebelum injeksi dan pemeriksaan setelah pemulihan; kesehatan tidak diskor, tidak dibandingkan antarmode, dan tidak masuk skor kecocokan konfigurasi.
 
 \section{Batasan Masalah}
 
@@ -41,22 +44,22 @@ Ruang lingkup penelitian dibatasi sebagai berikut.
   \item Perbandingan mencakup satu prosedur imperatif otomatis berbasis \texttt{kubectl} dan satu implementasi GitOps berbasis ArgoCD, tanpa mengukur waktu reaksi manusia; prosedur imperatif adalah versi otomatis dan konservatif, sehingga hasil tidak mewakili kecepatan operator atau semua implementasi kedua paradigma.
   \item Beban uji adalah satu \textit{stack} InvenioRDM multi-service pada satu klaster Kubernetes di namespace \texttt{invenio}, tanpa \textit{stack} kembar atau eksekusi paralel; karena \textit{stack} yang sama dipakai bergantian, perlakuan tidak terisolasi dari beban latar dan dependensi bersama.
   \item Intervensi terbatas pada tujuh skenario yang didefinisikan pada Tabel~\ref{tab:skenario-intervensi}; skenario A adalah kontrol HPA, F adalah drift Service yang dilaporkan terpisah, dan G adalah kasus deskriptif.
-  \item R1 menilai kesetaraan inventaris dan \textit{field} deklaratif yang ditetapkan dengan aturan yang sama pada kedua mode, tetapi tidak menilai kebenaran semantik atau keamanan konfigurasi; nilai Secret tidak dipublikasikan.
-  \item Sampel berisi 15 pengulangan per skenario per mode, yaitu 10 pengulangan blok waktu dan 5 pengulangan blok validitas, dengan total 210 pengujian; jumlah itu bukan jaminan kecukupan daya, dan data tersensor, kegagalan injeksi, serta kegagalan instrumentasi dilaporkan terpisah tanpa imputasi.
-  \item Hasil bersifat eksploratif karena desain satu kasus, urutan mode yang tetap, dan pengulangan yang bersifat pseudoreplikat, sehingga nilai $p$ dan interval kepercayaan tidak ditafsirkan sebagai estimasi populasi.
+  \item Pemeriksaan kecocokan konfigurasi menilai kesetaraan inventaris dan \textit{field} deklaratif yang ditetapkan dengan aturan yang sama pada kedua mode, tetapi tidak menilai kebenaran semantik atau keamanan konfigurasi; nilai Secret tidak dipublikasikan.
+  \item Sampel berisi 15 pengulangan per skenario per mode, yaitu 10 pengulangan blok waktu dan 5 pengulangan blok kecocokan, dengan total 210 sel; jumlah itu bukan jaminan kecukupan daya, dan pengamatan yang berhenti sebelum peristiwa terjadi, kegagalan injeksi, serta kegagalan instrumentasi dilaporkan terpisah tanpa imputasi.
+  \item Hasil bersifat eksploratif karena desain satu kasus, urutan mode yang tetap, dan pengulangan yang tidak sepenuhnya independen, sehingga nilai $p$ dan interval kepercayaan tidak ditafsirkan sebagai estimasi populasi.
 \end{enumerate}
 
 \section{Tujuan Penelitian}
 
-Penelitian ini bertujuan mengevaluasi perbedaan waktu operasional antara prosedur imperatif otomatis berbasis \texttt{kubectl} dan GitOps berbasis ArgoCD pada beban uji multi-service InvenioRDM. Pertanyaan penelitian dioperasionalkan melalui waktu deteksi, ketersediaan bukti, dan pemulihan konfigurasi, sedangkan validitas manipulasi diperiksa melalui skor R1. Kesehatan layanan (\textit{Running}/\textit{Ready}) dipakai sebagai \textit{guardrail} kesiapan dan \textit{postcondition}, bukan sebagai hasil komparatif. Penelitian ini tidak menetapkan sebelumnya mode mana yang lebih baik.
+Penelitian ini bertujuan mengevaluasi perbedaan waktu deteksi dan waktu pemulihan antara prosedur imperatif otomatis berbasis \texttt{kubectl} dan GitOps berbasis ArgoCD pada beban uji multi-service InvenioRDM. Pemeriksaan kecocokan konfigurasi dipakai untuk memastikan manipulasi bekerja, bukan sebagai hasil komparatif. Kesehatan layanan (\textit{Running}/\textit{Ready}) dipakai sebagai pemeriksaan pengaman sebelum injeksi dan pemeriksaan setelah pemulihan. Penelitian ini tidak menetapkan sebelumnya mode mana yang lebih baik.
 
 \section{Manfaat Penelitian}
 
 Hasil penelitian ini diharapkan dapat:
 \begin{enumerate}
   \item memberikan deskripsi empiris yang dibatasi pada \textit{workload}, skenario, dan konfigurasi yang benar-benar diuji;
-  \item mendokumentasikan definisi pengukuran serta aturan penanganan data tersensor agar dapat ditinjau dan direplikasi; dan
-  \item menyediakan informasi kontekstual bagi praktisi tanpa mengubah hasil satu kasus menjadi rekomendasi universal tentang GitOps atau manajemen imperatif.
+  \item mendokumentasikan definisi pengukuran serta aturan penanganan pengamatan yang berhenti sebelum peristiwa terjadi agar dapat ditinjau dan direplikasi; dan
+  \item menyediakan informasi kontekstual bagi praktisi, termasuk biaya dan aspek yang belum diukur, tanpa mengubah hasil satu kasus menjadi rekomendasi universal tentang GitOps atau manajemen imperatif.
 \end{enumerate}
 
 \section{Sistematika Penulisan}
@@ -66,6 +69,6 @@ Skripsi ini disusun sebagai berikut:
   \item Bab I menjelaskan latar belakang, rumusan masalah, batasan, tujuan, manfaat, dan sistematika penulisan.
   \item Bab II membahas konsep drift, pendekatan manajemen konfigurasi, studi empiris terkait, serta ruang kontribusi yang dibatasi.
   \item Bab III menjelaskan rancangan perbandingan, \textit{workload}, skenario, definisi metrik, protokol, analisis, dan ancaman validitas.
-  \item Bab IV menyajikan validitas manipulasi, hasil waktu, analisis per skenario, serta pembahasan.
-  \item Bab V merangkum kesimpulan, saran, keterbatasan, dan pekerjaan lanjutan.
+  \item Bab IV menyajikan data yang dianalisis, waktu deteksi, waktu pemulihan, kasus G, batas kepercayaan, dan interpretasi.
+  \item Bab V merangkum kesimpulan, rekomendasi kontekstual, biaya dan \textit{overhead}, aspek yang tidak diukur, keterbatasan, dan pekerjaan lanjutan.
 \end{itemize}

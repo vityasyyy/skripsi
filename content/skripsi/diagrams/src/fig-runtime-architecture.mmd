@@ -1,5 +1,5 @@
 flowchart LR
-  GIT["Repositori Git<br/>deklarasi beku"]
+  GIT["Repositori Git<br/>deklarasi tetap"]
   subgraph K8S["Klaster Kubernetes RKE2"]
     ARGO["ArgoCD<br/>namespace argocd<br/>auto-sync, self-heal"]
     WEB["InvenioRDM<br/>namespace invenio<br/>web, worker, scheduler<br/>HPA 2-4 replika"]
@@ -9,7 +9,7 @@ flowchart LR
   end
   GIT --> ARGO
   ARGO --> WEB
-  WEB -->|"state"| DATA
+  WEB -->|"data"| DATA
   WEB -->|"berkas"| STORE
   WEB -. "metrik" .-> PROM
   classDef ext fill:#eef2f7,stroke:#64748b,color:#14212b;

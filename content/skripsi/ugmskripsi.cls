@@ -57,8 +57,7 @@
 %------------------------------------------------------------
 %The form of page numbering
 %------------------------------------------------------------
-\pagestyle{myheadings}
-\markright{}
+\pagestyle{plain}
 
 %------------------------------------------------------------
 %Define page numbering in the first chapter
@@ -310,7 +309,7 @@
 %Acceptance Page
 %------------------------------------------------------------
 \def\approvalpage{%
-  \newpage\thispagestyle{empty}%
+  \newpage\thispagestyle{chapterheading}%
   \sloppy
   \begin{center}
   \begin{singlespace}

@@ -1,6 +1,6 @@
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{diagrams/fig-control-loop.pdf}
-  \caption{Dua siklus kendali: mode imperatif otomatis menjalankan pemeriksa dan prosedur \texttt{kubectl} tetap, sedangkan mode GitOps membiarkan ArgoCD merekonsiliasi deklarasi Git secara periodik atau event-driven; interval rekonsiliasi internalnya tidak diukur.}
+  \caption{Dua siklus kendali: mode imperatif menjalankan pemeriksa dan prosedur \texttt{kubectl} tetap setiap 5 detik, sedangkan mode GitOps membiarkan ArgoCD membandingkan keadaan aktual dengan deklarasi di Git lalu menyelaraskannya secara otomatis; selang rekonsiliasi internal ArgoCD tidak diukur.}
   \label{fig:kontrol-loop-imperatif-gitops}
 \end{figure}
