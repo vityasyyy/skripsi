@@ -1,0 +1,206 @@
+\stepcounter{chapter}
+\phantomsection
+\chapter*{LAMPIRAN B}
+\addcontentsline{toc}{chapter}{LAMPIRAN B}
+
+Lampiran ini memuat definisi istilah statistik, rumus teknis, tabel uji lengkap, analisis sensitivitas, dan panduan membaca hasil. Bab IV memakai ringkasan median; angka rinci dan istilah teknis ditempatkan di sini agar narasi Bab IV tetap dapat dibaca tanpa latar belakang statistik.
+
+\section{Definisi Istilah}
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Istilah statistik yang dipakai pada Bab III dan Bab IV}
+  \label{tab:lampiran-b-istilah}
+  \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
+    \hline
+    Istilah & Arti \\
+    \hline
+    Nilai $p$ & Peluang mengamati selisih sebesar atau lebih besar dari yang teramati bila tidak ada perbedaan sistematis. Nilai ini bukan ukuran besarnya perbedaan. \\
+    \hline
+    Ukuran efek & Besaran perbedaan antarkelompok. Dilaporkan bersama nilai $p$ agar perbedaan yang kecil tetapi konsisten tidak disalahartikan sebagai perbedaan yang praktis. \\
+    \hline
+    Interval kepercayaan & Rentang nilai yang masuk akal bagi suatu estimasi pada tingkat keyakinan tertentu. Interval ini bukan rentang nilai populasi yang pasti. \\
+    \hline
+    Wilcoxon \textit{signed-rank} & Uji nonparametrik berpasangan untuk membandingkan dua kondisi pada unit yang sama. Selisih nol diabaikan. \\
+    \hline
+    Mann--Whitney U & Uji nonparametrik tidak berpasangan untuk membandingkan dua kelompok. Pada penelitian ini uji ini dipakai bila pasangan lengkap tidak tersedia. \\
+    \hline
+    Holm & Koreksi nilai $p$ untuk banyak pengujian sekaligus. Keluarga 12 hipotesis ditetapkan sebelum pengumpulan, sehingga koreksi tidak dipilih setelah melihat hasil. \\
+    \hline
+    Cliff's $\delta$ & Ukuran efek nonparametrik dari $-1$ sampai $1$. Nilai $1$ berarti seluruh pengamatan satu kelompok lebih besar daripada kelompok lain. \\
+    \hline
+    Kaplan--Meier & Metode estimasi kurva kelangsungan hidup yang memperhitungkan pengamatan yang berhenti sebelum peristiwa terjadi. \\
+    \hline
+    RMST & \textit{Restricted Mean Survival Time}, yaitu rata-rata waktu bertahan pada horizon tertentu. Nilai ini dipakai karena tahan terhadap pengamatan yang berhenti sebelum peristiwa terjadi. \\
+    \hline
+    Pengamatan berhenti sebelum peristiwa terjadi & Pengamatan yang berakhir sebelum peristiwa terjadi. Nilainya diketahui melebihi batas pengamatan, tetapi nilainya tidak diketahui dan tidak diisi dengan nol. \\
+    \hline
+    Pseudoreplikat & Pengulangan yang berbagi lingkungan dan periode sehingga tidak sepenuhnya independen. Nilai $p$ dan interval kepercayaan karena itu bersifat deskriptif. \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\section{Rumus dan Definisi Teknis}
+
+Skor kecocokan konfigurasi dihitung dari empat sumber daya terpilih. Setiap sumber daya dihitung cocok hanya jika seluruh \textit{field} terpilihnya cocok dengan deklarasi:
+\[
+  S = \frac{\text{jumlah sumber daya terpilih yang seluruh \textit{field}-nya cocok}}{\text{jumlah sumber daya terpilih}} \times 100.
+\]
+Dengan empat sumber daya, satu ketidakcocokan menghasilkan skor 75 dan seluruh kecocokan menghasilkan skor 100. Skor dicatat pada kondisi awal, sampel lengkap pertama setelah injeksi, dan sampel lengkap terakhir yang memenuhi jendela pengamatan.
+
+Tiga durasi didefinisikan dari waktu monotonik:
+\[
+  \text{deteksi} = t_d - t_0, \qquad
+  \text{bukti} = t_e - t_0, \qquad
+  \text{pemulihan} = t_r - t_0.
+\]
+Waktu bukti adalah diagnostik, bukan metrik utama. Pada mode imperatif, $t_e=t_d$ menurut konstruksi karena pemeriksa mengevaluasi kontrak yang sama dengan evaluator. Pada mode GitOps, $t_e$ berasal dari kolektor independen yang membaca perbedaan \textit{field}; karena itu $t_e$ dapat mendahului $t_d$. Selang bertanda $t_e-t_d$ dilaporkan apa adanya dan tidak dibulatkan menjadi nol.
+
+\section{Tabel Uji Lengkap}
+
+Tabel~\ref{tab:lampiran-b-uji} memuat 12 perbandingan B--E untuk metrik deteksi, bukti, dan pemulihan. Seluruh uji dua sisi dan dikoreksi Holm pada $\alpha=0{,}05$ di bawah model uji eksploratif.
+
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
+  \caption{Uji eksploratif efikasi drift terkelola B--E}
+  \label{tab:lampiran-b-uji}
+  \begin{tabularx}{\textwidth}{|c|c|c|c|r|r|r|c|}
+    \hline
+    Sk. & Metrik & Uji & $n$ & Statistik & $p$ & $p$ Holm & Keputusan \\
+    \hline
+    B & Deteksi & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    \hline
+    B & Bukti & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    \hline
+    B & Pemulihan & Wilcoxon (P) & 10 pasang & 50,0000 & 0,0195 & 0,0195 & tolak \\
+    \hline
+    C & Deteksi & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 & tolak \\
+    \hline
+    C & Bukti & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 & tolak \\
+    \hline
+    C & Pemulihan & Mann--Whitney (U) & 10 vs 8 & 10,0000 & 0,0088 & 0,0176 & tolak \\
+    \hline
+    D & Deteksi & Mann--Whitney (U) & 10 vs 4 & 0,0000 & 0,0058 & 0,0176 & tolak \\
+    \hline
+    D & Bukti & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 & tolak \\
+    \hline
+    D & Pemulihan & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    \hline
+    E & Deteksi & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    \hline
+    E & Bukti & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    \hline
+    E & Pemulihan & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize P = berpasangan; U = tidak berpasangan. Uji Wilcoxon memakai $W^+$; uji Mann--Whitney memakai $U$ terkecil. Mann--Whitney memakai aproksimasi normal dengan koreksi ikatan dan hanya memakai nilai teramati. Seluruh nilai bersifat eksploratif; tidak ada klaim konfirmatoris. Keluarga Holm berisi 12 hipotesis B--E $\times$ \{deteksi, bukti, pemulihan\} yang ditetapkan sebelum data, dan hipotesis yang tidak dapat diuji diperlakukan sebagai $p=1$.\normalsize
+
+\section{Tabel Ukuran Efek}
+
+Tabel~\ref{tab:lampiran-b-efek} memuat ukuran efek dan selisih median berpasangan. Nilai $\Delta$ adalah imperatif dikurangi GitOps; nilai positif berarti mode imperatif lebih lama. Tanda ``--'' berarti statistik berpasangan tidak tersedia pada fallback Mann--Whitney.
+
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
+  \caption{Ukuran efek perbandingan imperatif terhadap GitOps (B--E)}
+  \label{tab:lampiran-b-efek}
+  \begin{tabularx}{\textwidth}{|c|c|r|r|r|r|}
+    \hline
+    Sk. & Metrik & Cliff's $\delta$ & IK 95\% $\delta$ & $\Delta$ median (detik) & RB \\
+    \hline
+    B & Deteksi & 1,0000 & $[1,0000;\,1,0000]$ & 4,2747 & 1,0000 \\
+    \hline
+    B & Bukti & 1,0000 & $[1,0000;\,1,0000]$ & 4,0478 & 1,0000 \\
+    \hline
+    B & Pemulihan & 0,4800 & $[-0,0800;\,1,0000]$ & 2,9462 & 0,8182 \\
+    \hline
+    C & Deteksi & 1,0000 & $[1,0000;\,1,0000]$ & -- & -- \\
+    \hline
+    C & Bukti & 1,0000 & $[1,0000;\,1,0000]$ & -- & -- \\
+    \hline
+    C & Pemulihan & 0,7500 & $[0,2500;\,1,0000]$ & -- & -- \\
+    \hline
+    D & Deteksi & 1,0000 & $[1,0000;\,1,0000]$ & -- & -- \\
+    \hline
+    D & Bukti & 1,0000 & $[1,0000;\,1,0000]$ & -- & -- \\
+    \hline
+    D & Pemulihan & 1,0000 & $[1,0000;\,1,0000]$ & 5,0523 & 1,0000 \\
+    \hline
+    E & Deteksi & 1,0000 & $[1,0000;\,1,0000]$ & 4,2927 & 1,0000 \\
+    \hline
+    E & Bukti & 1,0000 & $[1,0000;\,1,0000]$ & 4,0441 & 1,0000 \\
+    \hline
+    E & Pemulihan & 0,8600 & $[0,6400;\,1,0000]$ & 3,0314 & 1,0000 \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize RB = \textit{rank-biserial}. Interval adalah \textit{percentile bootstrap} deterministik dengan 2.000 resampling; resampling mengikuti blok berpasangan bila pemasangan dipertahankan, selain itu per mode. Nilai $\delta$ dan intervalnya adalah ringkasan eksploratif, bukan estimasi populasi.\normalsize
+
+\section{Analisis Sensitivitas}
+
+Analisis primer mengecualikan satu percobaan GitOps pada skenario C, pengulangan ke-2, sebagai penghentian sesi karena proses pengumpulan berakhir dengan kode keluar bukan nol. Baris itu sendiri lengkap dan teramati: deteksi 0,98 detik, bukti 1,16 detik, pemulihan 5,77 detik, dan skor kecocokan 100/75/100. Analisis sensitivitas menyertakan baris mentah itu pada perbandingan skenario C tanpa mengubah berkas analisis primer. Karena percobaan GitOps pada skenario C, pengulangan ke-1, tetap tidak tersedia, pasangan lengkap tidak terbentuk dan uji C tetap memakai Mann--Whitney U dengan 10 nilai imperatif versus 9 nilai GitOps.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Analisis sensitivitas skenario C dengan percobaan C, pengulangan ke-2, disertakan}
+  \label{tab:lampiran-b-sensitivitas}
+  \begin{tabularx}{\textwidth}{|c|c|r|r|r|r|}
+    \hline
+    Metrik & $n$ (imperatif vs GitOps) & $p$ & $p$ Holm & Cliff's $\delta$ & IK 95\% $\delta$ \\
+    \hline
+    Deteksi & 10 vs 9 & 0,0003 & 0,0034 & 1,0000 & $[1,0000;\,1,0000]$ \\
+    \hline
+    Bukti & 10 vs 9 & 0,0003 & 0,0034 & 1,0000 & $[1,0000;\,1,0000]$ \\
+    \hline
+    Pemulihan & 10 vs 9 & 0,0200 & 0,0391 & 0,6400 & $[0,1100;\,1,0000]$ \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize Nilai $p$ dua sisi dan dikoreksi Holm pada keluarga 12 hipotesis yang sama. Pada keluarga sensitivitas, nilai Holm pemulihan B naik dari 0,0195 menjadi 0,0391. Arah kesimpulan tidak berubah, tetapi ukuran efek pemulihan C turun dari 0,7500 menjadi 0,6400 dan batas bawah intervalnya turun dari 0,2500 menjadi 0,1100. Analisis primer tetap memakai 207 baris.\normalsize
+
+\section{Pengamatan yang Berhenti Sebelum Peristiwa dan Analisis Kelangsungan Hidup}
+
+Tabel~\ref{tab:lampiran-b-censoring} merangkum status setiap metrik per blok. Kategori ``tidak teramati sebelum berhenti'' bukan pengamatan yang berhenti sebelum peristiwa dan tidak disertakan dalam uji numerik.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Jumlah observasi per metrik waktu dan status pelaporan}
+  \label{tab:lampiran-b-censoring}
+  \begin{tabularx}{\textwidth}{|c|c|r|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
+    \hline
+    Blok & Metrik & Teramati & Berhenti sebelum peristiwa & Tidak teramati sebelum berhenti \\
+    \hline
+    Waktu & Deteksi & 121 & 10 & 6 \\
+    \hline
+    Waktu & Bukti & 134 & 0 & 3 \\
+    \hline
+    Waktu & Pemulihan & 127 & 10 & 0 \\
+    \hline
+    Kecocokan & Deteksi & 61 & 5 & 4 \\
+    \hline
+    Kecocokan & Bukti & 70 & 0 & 0 \\
+    \hline
+    Kecocokan & Pemulihan & 65 & 5 & 0 \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+Seluruh 15 kejadian pemulihan yang berhenti sebelum peristiwa berasal dari mode GitOps pada skenario G: 10 pada blok waktu dan 5 pada blok kecocokan. Tidak ada nilai yang diberi imputasi. Pada skenario G, kurva Kaplan--Meier GitOps tidak mencapai median dalam horizon 300 detik, dan RMST-nya 300,0000 detik; mode imperatif mencapai median 5,7300 detik dengan RMST 5,7130 detik. Angka-angka itu dihitung dari nilai teramati dan tidak mengubah pengamatan yang berhenti menjadi nol.
+
+\section{Cara Membaca Hasil}
+
+Pertama, nilai $p$ yang kecil menunjukkan bahwa perbedaan yang teramati sulit dijelaskan oleh kebetulan, tetapi tidak menunjukkan besarnya perbedaan. Karena itu setiap perbandingan disertai ukuran efek. Pada penelitian ini seluruh perbandingan deteksi memiliki ukuran efek maksimum, sedangkan pemulihan tidak; perbedaan pada ukuran efek itulah yang membuat pemulihan B dan C tidak dapat dibaca sebagai keunggulan yang jelas.
+
+Kedua, pengamatan yang berhenti sebelum peristiwa bukan pengamatan gagal. Apabila pemulihan belum terjadi sampai batas pengamatan, yang diketahui adalah bahwa waktunya melebihi batas itu; nilainya tidak diketahui dan tidak diisi dengan angka karangan. Pada penelitian ini seluruh kejadian pemulihan yang berhenti sebelum peristiwa berasal dari satu skenario pada satu mode, sehingga kejadian itu dilaporkan sebagai temuan, bukan dibuang.
+
+Ketiga, seluruh nilai pada lampiran ini bersifat eksploratif. Observasi tidak sepenuhnya independen karena satu \textit{stack}, urutan mode tetap, dan pengulangan yang berbagi periode. Nilai $p$ dan interval kepercayaan adalah ringkasan deskriptif, bukan estimasi populasi atau estimasi kausal.
