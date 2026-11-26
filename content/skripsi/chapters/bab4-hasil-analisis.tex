@@ -60,7 +60,7 @@ Pertanyaan penelitian waktu membandingkan waktu deteksi pada pengulangan 1 sampa
   \end{tabularx}
 \end{table}
 
-Waktu deteksi GitOps berada pada 0,96--1,02 detik, sedangkan mode imperatif berada pada 5,22--5,25 detik. Selisihnya 4,21--4,29 detik, atau sekitar 4,2--4,3 detik. Pemeriksa imperatif membaca keadaan setiap 5 detik, sedangkan pencatat membaca setiap 1 detik, sehingga selisih maksimum yang diharapkan dari kedua selang itu adalah sekitar 4 detik. Selisih teramati sedikit di atas angka itu, tetapi besarnya mendekati batas itu.
+Waktu deteksi GitOps berada pada 0,96--1,02 detik, sedangkan mode imperatif berada pada 5,22--5,25 detik. Selisihnya 4,21--4,29 detik, atau sekitar 4,2--4,3 detik. Pemeriksa imperatif membaca keadaan setiap 5 detik, sedangkan pencatat membaca setiap 1 detik. Jadwal pengamatan saja dapat menghasilkan selisih hampir 5 detik: perubahan dapat terjadi tepat setelah pemeriksa membaca, lalu baru terbaca pada putaran berikutnya, sementara pencatat sudah melihatnya lebih awal. Selisih teramati 4,2--4,3 detik konsisten dengan kedua selang itu; angka itu bukan estimasi murni kecepatan respons pengendali.
 
 Pola itu menunjukkan bahwa waktu deteksi dibatasi oleh seberapa sering keadaan dibaca. Setiap mode memakai selang pengamatan yang berbeda, sehingga data ini tidak dapat memisahkan kecepatan respons pengendali dari selang pengamatannya. Temuan yang dapat dipertahankan adalah bahwa deteksi GitOps lebih cepat pada sinyal yang teramati dengan pencatat 1 detik, bukan bahwa GitOps secara inheren lebih cepat dalam semua konfigurasi. Skenario F menunjukkan pola yang sama dan dilaporkan sebagai deskripsi, bukan sebagai bagian keluarga B--E.
 
@@ -89,7 +89,7 @@ Waktu pemulihan diukur sampai inventaris dan seluruh \textit{field} yang diperik
   \end{tabularx}
 \end{table}
 
-Hasil pemulihan tidak seragam. Pada B dan C, selisih median berada di sekitar 3 detik. Pada B, selisih itu tidak cukup konsisten untuk dibaca sebagai keunggulan yang jelas; pada C, selisihnya juga moderat. Pada D, selisihnya mencapai 5,08 detik dan merupakan yang terbesar. Pada E, selisihnya 3,03 detik tetapi arahnya lebih konsisten daripada B. Pola ini menunjukkan bahwa kecepatan deteksi tidak otomatis berarti kecepatan pemulihan. Skenario F juga kembali ke skor 100 pada kedua mode, tetapi waktu F tidak dimasukkan ke keluarga B--E dan tidak diuji sebagai hasil komparatif.
+Hasil pemulihan tidak seragam. Pada B dan C, selisih median berada di sekitar 3 detik. Pada B, selisih itu tidak cukup konsisten untuk dibaca sebagai perbedaan yang jelas; pada C, selisihnya juga moderat. Pada D, selisihnya mencapai 5,08 detik dan merupakan yang terbesar. Pada E, selisihnya 3,03 detik tetapi arahnya lebih konsisten daripada B. Pola ini menunjukkan bahwa kecepatan deteksi tidak otomatis berarti kecepatan pemulihan. Skenario F juga kembali ke skor 100 pada kedua mode, tetapi waktu F tidak dimasukkan ke keluarga B--E dan tidak diuji sebagai hasil komparatif.
 
 \noindent\footnotesize Selisih pada Tabel~\ref{tab:hasil-deteksi} dan Tabel~\ref{tab:hasil-pemulihan} dihitung dari median marginal, bukan selisih berpasangan. Jumlah nilai teramati, status pengamatan, dan selisih berpasangan ada pada Lampiran B.\normalsize
 
@@ -112,4 +112,4 @@ Hasil ini berasal dari satu \textit{stack} pada satu klaster, dengan urutan mode
 
 Temuan utama Bab IV adalah bahwa waktu deteksi mengikuti selang pengamatan. GitOps membaca keadaan setiap detik dan mode imperatif setiap lima detik, sehingga selisih yang teramati hampir sebesar selisih kedua selang itu. Keunggulan deteksi karena itu bukan sifat umum GitOps, melainkan sifat konfigurasi pengamatan yang dipakai dalam penelitian ini.
 
-Pemulihan memberi gambar yang berbeda. Pada B dan C, perbedaan antarmode lebih kecil dan pada B tidak cukup konsisten untuk disebut keunggulan yang jelas. Pada D, perbedaannya besar; pada E, perbedaannya moderat tetapi arahnya konsisten. Pemilihan mode karena itu perlu mempertimbangkan skenario drift, lama penyimpangan yang dapat ditoleransi, selang pengamatan yang tersedia, dan cakupan \textit{field} yang benar-benar dikelola. Deteksi cepat tidak dengan sendirinya menjawab apakah pemulihan juga cepat.
+Pemulihan memberi gambar yang berbeda. Pada B dan C, perbedaan antarmode lebih kecil dan pada B tidak cukup konsisten untuk disebut perbedaan yang jelas. Pada D, perbedaannya besar; pada E, perbedaannya moderat tetapi arahnya konsisten. Pemilihan mode karena itu perlu mempertimbangkan skenario drift, lama penyimpangan yang dapat ditoleransi, selang pengamatan yang tersedia, dan cakupan \textit{field} yang benar-benar dikelola. Deteksi cepat tidak dengan sendirinya menjawab apakah pemulihan juga cepat.

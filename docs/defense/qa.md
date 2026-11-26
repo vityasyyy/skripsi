@@ -32,7 +32,7 @@ Mode imperatif adalah runbook dan checker `kubectl` otomatis yang tetap. Ia
 bekerja pada tingkat prosedur, bukan kecepatan operator manusia. Istilah
 "prosedur manual" hanya bertahan sebagai sejarah proposal; naskah memakai
 "prosedur imperatif otomatis" pada sebutan pertama lalu "mode imperatif".
-Karena prosedurnya otomatis dan konservatif, keunggulan waktu GitOps tidak dapat
+Karena prosedurnya otomatis dan konservatif, perbedaan waktu yang menguntungkan GitOps tidak dapat
 dijelaskan oleh kelambatan manusia. Waktu reaksi manusia tidak diukur. Lihat
 Bab I dan Bab III.
 
@@ -61,27 +61,27 @@ Pertanyaan penelitian membandingkan waktu deteksi dan waktu pemulihan. Keduanya
 proses berbeda: deteksi menandai ketidakcocokan, pemulihan membawa seluruh field
 kembali cocok. Waktu tersedianya bukti dicatat sebagai diagnostik: pada mode
 imperatif `t_e = t_d` menurut konstruksi, sedangkan pada GitOps `t_e` berasal
-dari kolektor independen. Karena itu `t_e` tidak dibandingkan sebagai keunggulan
-antarmode. Lihat Bab I §Rumusan Masalah, Bab II §Mengapa Deteksi dan Pemulihan
+dari kolektor independen. Karena itu `t_e` tidak dibandingkan sebagai perbedaan
+yang menguntungkan salah satu mode. Lihat Bab I §Rumusan Masalah, Bab II §Mengapa Deteksi dan Pemulihan
 Dipisahkan, dan Bab III §Waktu Deteksi, Bukti, dan Pemulihan.
 
 ## 7. Mengapa selisih deteksi 4,2–4,3 detik?
 
 Pemeriksa imperatif membaca keadaan setiap 5 detik, sedangkan pencatat membaca
-setiap 1 detik. Selisih maksimum yang diharapkan dari kedua selang itu sekitar
-4 detik; selisih teramati sedikit di atasnya tetapi mendekati batas itu.
+setiap 1 detik. Jadwal pengamatan saja dapat menghasilkan selisih hampir 5
+detik; selisih teramati 4,2–4,3 detik konsisten dengan kedua selang itu.
 Karena mode dan selang pengamatan berubah bersama, data ini tidak dapat
 memisahkan kecepatan respons pengendali dari selang pengamatan. Temuan yang
 dapat dipertahankan adalah bahwa deteksi dibatasi oleh seberapa sering keadaan
 dibaca, bukan bahwa GitOps secara inheren lebih cepat. Lihat Bab IV §Waktu
 Deteksi dan Bab V §Temuan Utama.
 
-## 8. Mengapa pemulihan B tidak disebut keunggulan yang jelas?
+## 8. Mengapa pemulihan B tidak disebut perbedaan yang jelas?
 
 Ukuran efek pemulihan B adalah 0,48 dengan interval kepercayaan yang mencakup
 nol. C adalah 0,75, D 1,00, dan E 0,86. Pada D selisihnya paling besar; pada E
 arahnya lebih konsisten daripada B. Karena itu pemulihan tidak dibaca sebagai
-satu keunggulan seragam. Lihat Bab IV §Waktu Pemulihan dan Lampiran B
+satu perbedaan yang seragam. Lihat Bab IV §Waktu Pemulihan dan Lampiran B
 Tabel B.3–B.4.
 
 ## 9. Apakah G membuktikan ArgoCD gagal atau masalah izin?

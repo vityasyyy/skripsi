@@ -18,6 +18,7 @@ FILES = [
     *sorted((ROOT / "content/skripsi/chapters").glob("*.tex")),
     *sorted((ROOT / "content/skripsi/lampiran").glob("*.tex")),
     *sorted((ROOT / "content/skripsi/diagrams").glob("*.tex")),
+    *sorted((ROOT / "content/skripsi/diagrams/src").glob("*.mmd")),
 ]
 ALLOW_MARKER = "style-allow: proposal-history"
 

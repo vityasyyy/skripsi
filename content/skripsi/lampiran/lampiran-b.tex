@@ -10,7 +10,7 @@ Lampiran ini memuat definisi istilah statistik, rumus teknis, tabel uji lengkap,
 \begin{table}[H]
   \centering
   \small
-  \caption{Istilah statistik yang dipakai pada Bab III dan Bab IV}
+  \caption{Istilah statistik yang dipakai pada Bab III dan Lampiran B}
   \label{tab:lampiran-b-istilah}
   \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}X|}
     \hline
@@ -69,33 +69,33 @@ Tabel~\ref{tab:lampiran-b-uji} memuat 12 perbandingan B--E untuk metrik deteksi,
   \setlength{\tabcolsep}{2pt}
   \caption{Uji eksploratif efikasi drift terkelola B--E}
   \label{tab:lampiran-b-uji}
-  \begin{tabularx}{\textwidth}{|c|c|c|c|r|r|r|c|}
+  \begin{tabularx}{\textwidth}{|c|c|c|c|r|r|r|}
     \hline
-    Sk. & Metrik & Uji & $n$ & Statistik & $p$ & $p$ Holm & Keputusan \\
+    Sk. & Metrik & Uji & $n$ & Statistik & $p$ & $p$ Holm \\
     \hline
-    B & Deteksi & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    B & Deteksi & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 \\
     \hline
-    B & Bukti & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    B & Bukti & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 \\
     \hline
-    B & Pemulihan & Wilcoxon (P) & 10 pasang & 50,0000 & 0,0195 & 0,0195 & tolak \\
+    B & Pemulihan & Wilcoxon (P) & 10 pasang & 50,0000 & 0,0195 & 0,0195 \\
     \hline
-    C & Deteksi & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 & tolak \\
+    C & Deteksi & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 \\
     \hline
-    C & Bukti & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 & tolak \\
+    C & Bukti & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 \\
     \hline
-    C & Pemulihan & Mann--Whitney (U) & 10 vs 8 & 10,0000 & 0,0088 & 0,0176 & tolak \\
+    C & Pemulihan & Mann--Whitney (U) & 10 vs 8 & 10,0000 & 0,0088 & 0,0176 \\
     \hline
-    D & Deteksi & Mann--Whitney (U) & 10 vs 4 & 0,0000 & 0,0058 & 0,0176 & tolak \\
+    D & Deteksi & Mann--Whitney (U) & 10 vs 4 & 0,0000 & 0,0058 & 0,0176 \\
     \hline
-    D & Bukti & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 & tolak \\
+    D & Bukti & Mann--Whitney (U) & 10 vs 8 & 0,0000 & 0,0004 & 0,0054 \\
     \hline
-    D & Pemulihan & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    D & Pemulihan & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 \\
     \hline
-    E & Deteksi & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    E & Deteksi & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 \\
     \hline
-    E & Bukti & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    E & Bukti & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 \\
     \hline
-    E & Pemulihan & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 & tolak \\
+    E & Pemulihan & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0176 \\
     \hline
   \end{tabularx}
 \end{table}
@@ -201,7 +201,7 @@ Seluruh 15 kejadian pemulihan yang berhenti sebelum peristiwa berasal dari mode 
 
 \section{Cara Membaca Hasil}
 
-Pertama, nilai $p$ yang kecil menunjukkan bahwa perbedaan yang teramati sulit dijelaskan oleh kebetulan, tetapi tidak menunjukkan besarnya perbedaan. Karena itu setiap perbandingan disertai ukuran efek. Pada penelitian ini seluruh perbandingan deteksi memiliki ukuran efek maksimum, sedangkan pemulihan tidak; perbedaan pada ukuran efek itulah yang membuat pemulihan B dan C tidak dapat dibaca sebagai keunggulan yang jelas.
+Pertama, nilai $p$ yang kecil menunjukkan bahwa perbedaan yang teramati sulit dijelaskan oleh kebetulan, tetapi tidak menunjukkan besarnya perbedaan. Karena itu setiap perbandingan disertai ukuran efek. Pada penelitian ini seluruh perbandingan deteksi memiliki ukuran efek maksimum, sedangkan pemulihan tidak. Pada B, interval ukuran efek pemulihan mencakup nol, sehingga selisihnya tidak dapat dibaca sebagai perbedaan yang jelas. Pada C, arah pemulihan positif pada analisis primer, tetapi melemah ketika satu percobaan yang dikecualikan disertakan; C karena itu tidak boleh dibaca sebagai perbedaan yang stabil.
 
 Kedua, pengamatan yang berhenti sebelum peristiwa bukan pengamatan gagal. Apabila pemulihan belum terjadi sampai batas pengamatan, yang diketahui adalah bahwa waktunya melebihi batas itu; nilainya tidak diketahui dan tidak diisi dengan angka karangan. Pada penelitian ini seluruh kejadian pemulihan yang berhenti sebelum peristiwa berasal dari satu skenario pada satu mode, sehingga kejadian itu dilaporkan sebagai temuan, bukan dibuang.
 
