@@ -38,7 +38,7 @@ TERM_DRIFT = [
     ("cadence", re.compile(r"\bcadence\b", re.IGNORECASE)),
     ("arm", re.compile(r"\barm\b", re.IGNORECASE)),
     ("batch", re.compile(r"\bbatch\b", re.IGNORECASE)),
-    ("run", re.compile(r"\brun\b", re.IGNORECASE)),
+    ("run", re.compile(r"\bruns?\b", re.IGNORECASE)),
     ("seed", re.compile(r"\bseed\b", re.IGNORECASE)),
     ("pembakuan", re.compile(r"pembakuan", re.IGNORECASE)),
     ("pembekuan", re.compile(r"pembekuan", re.IGNORECASE)),
