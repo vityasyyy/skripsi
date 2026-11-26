@@ -20,6 +20,11 @@ Status legend:
 - **Gap** — no direct committed output/test; reported in
   [`verification-2026-11-19.md`](verification-2026-11-19.md) and the worker report.
 
+Note on labels: `R1` and `R2` are internal data-phase labels in the frozen
+analyzer and collection files. They are not manuscript metrics. The thesis calls
+the check "pemeriksaan kecocokan konfigurasi" and the two blocks "blok waktu"
+and "blok kecocokan".
+
 Tests use synthetic fixtures. A passing test locks the algorithm, not the
 observed batch numbers; the observed numbers are locked by the frozen outputs
 and their SHA-256 manifest. `experiments/analysis/rq2_report.py` is a
