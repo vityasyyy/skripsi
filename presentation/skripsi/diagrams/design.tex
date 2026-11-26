@@ -12,7 +12,7 @@
 \begin{tikzpicture}[
     node distance=0.30cm,
     box/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8,
-                text width=2.3cm, minimum height=1.62cm, align=center,
+                text width=2.45cm, minimum height=2.0cm, align=center,
                 line width=0.8pt, font=\scriptsize, inner sep=3pt},
     note/.style={rectangle, rounded corners=3pt, draw=gray!45, fill=gray!4,
                  text width=4.0cm, align=left, font=\scriptsize, inner sep=5pt},
@@ -25,28 +25,32 @@
     InvenioRDM\\
     27 objek render
 };
-\node[box=gitopsblue, right=of stack] (gitops) {
+\node[box=gitopsblue, right=of stack, text width=2.7cm] (gitops) {
     \includegraphics[height=9pt]{logos/argocd.png}\\[1pt]
     \textbf{Mode GitOps}\\
+    Amati keadaan aktual\\
     ArgoCD aktif\\
-    15 \textit{run}
+    7$\times$15 percobaan
 };
-\node[box=imperativegray, right=of gitops] (reset) {
-    \textbf{Reset \textit{baseline}}\\
+\node[box=imperativegray, right=of gitops, text width=2.45cm] (reset) {
+    \textbf{Pemulihan}\\
+    \textbf{kondisi awal}\\
     verifikasi inventaris\\
-    penangguhan 60 detik
+    jeda 60 detik
 };
-\node[box=imperativegray, right=of reset] (imperative) {
+\node[box=imperativegray, right=of reset, text width=2.9cm] (imperative) {
     \includegraphics[height=9pt]{logos/kubernetes.png}\\[1pt]
     \textbf{Mode imperatif}\\
+    Amati keadaan aktual\\
     ArgoCD ditangguhkan\\
-    pemeriksa +\\\textit{runbook}
+    pemeriksa 5 detik\\
+    + \textit{runbook}
 };
-\node[box=metricyellow!85!black, right=of imperative, text width=2.5cm] (eval) {
+\node[box=metricyellow!85!black, right=of imperative, text width=2.9cm] (eval) {
     \textbf{Evaluator}\\
-    RQ: tiga waktu\\
-    R1: validitas pemulihan\\
-    kesehatan: \textit{guardrail}
+    deteksi + pemulihan\\
+    kecocokan konfigurasi\\
+    kesehatan: pemeriksaan pengaman
 };
 
 \draw[arrow] (stack) -- (gitops);
@@ -55,7 +59,7 @@
 \draw[arrow] (imperative) -- (eval);
 
 \node[note, below=0.42cm of stack.south west, anchor=north west] (n1)
-    {\textbf{Bukan dua \textit{deployment}.}\\Satu stack dipakai bergantian.};
+    {\textbf{Bukan dua \textit{deployment}.}\\Satu \textit{stack} dipakai bergantian.};
 \node[note, below=0.42cm of reset.south, anchor=north] (n2)
     {\textbf{HPA aktif pada kedua mode.}\\Skenario A adalah kontrol HPA.};
 \node[note, below=0.42cm of eval.south east, anchor=north east] (n3)
