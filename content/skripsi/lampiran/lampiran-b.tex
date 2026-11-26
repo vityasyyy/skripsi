@@ -59,6 +59,8 @@ Waktu bukti adalah diagnostik, bukan metrik utama. Pada mode imperatif, $t_e=t_d
 
 \section{Tabel Uji Lengkap}
 
+Uji \textit{Wilcoxon signed-rank} dipakai bila setiap blok skenario-pengulangan memiliki kedua mode dan kedua nilai teramati. Bila pasangan lengkap tidak tersedia, \textit{Mann--Whitney U} dengan koreksi ikatan dipakai dan selisih berpasangan tidak tersedia; aturan ini ditetapkan sebelum analisis. Keluarga 12 hipotesis B--E ditetapkan sebelum pengumpulan, dan hipotesis yang tidak dapat diuji diperlakukan sebagai $p=1$.
+
 Tabel~\ref{tab:lampiran-b-uji} memuat 12 perbandingan B--E untuk metrik deteksi, bukti, dan pemulihan. Seluruh uji dua sisi dan dikoreksi Holm pada $\alpha=0{,}05$ di bawah model uji eksploratif.
 
 \begin{table}[H]
@@ -118,7 +120,7 @@ Tabel~\ref{tab:lampiran-b-efek} memuat ukuran efek dan selisih median berpasanga
     \hline
     B & Bukti & 1,0000 & $[1,0000;\,1,0000]$ & 4,0478 & 1,0000 \\
     \hline
-    B & Pemulihan & 0,4800 & $[-0,0800;\,1,0000]$ & 2,9462 & 0,8182 \\
+    B & Pemulihan & 0,4800 & $[-0,0805;\,1,0000]$ & 2,9462 & 0,8182 \\
     \hline
     C & Deteksi & 1,0000 & $[1,0000;\,1,0000]$ & -- & -- \\
     \hline
@@ -160,12 +162,12 @@ Analisis primer mengecualikan satu percobaan GitOps pada skenario C, pengulangan
     \hline
     Bukti & 10 vs 9 & 0,0003 & 0,0034 & 1,0000 & $[1,0000;\,1,0000]$ \\
     \hline
-    Pemulihan & 10 vs 9 & 0,0200 & 0,0391 & 0,6400 & $[0,1100;\,1,0000]$ \\
+    Pemulihan & 10 vs 9 & 0,0200 & 0,0391 & 0,6444 & $[0,1111;\,1,0000]$ \\
     \hline
   \end{tabularx}
 \end{table}
 
-\noindent\footnotesize Nilai $p$ dua sisi dan dikoreksi Holm pada keluarga 12 hipotesis yang sama. Pada keluarga sensitivitas, nilai Holm pemulihan B naik dari 0,0195 menjadi 0,0391. Arah kesimpulan tidak berubah, tetapi ukuran efek pemulihan C turun dari 0,7500 menjadi 0,6400 dan batas bawah intervalnya turun dari 0,2500 menjadi 0,1100. Analisis primer tetap memakai 207 baris.\normalsize
+\noindent\footnotesize Nilai $p$ dua sisi dan dikoreksi Holm pada keluarga 12 hipotesis yang sama. Pada keluarga sensitivitas, nilai Holm pemulihan B naik dari 0,0195 menjadi 0,0391. Arah kesimpulan tidak berubah, tetapi ukuran efek pemulihan C turun dari 0,7500 menjadi 0,6444 dan batas bawah intervalnya turun dari 0,2500 menjadi 0,1111. Analisis primer tetap memakai 207 baris.\normalsize
 
 \section{Pengamatan yang Berhenti Sebelum Peristiwa dan Analisis Kelangsungan Hidup}
 

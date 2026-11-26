@@ -54,6 +54,7 @@ TERM_DRIFT = [
 LATIN = re.compile(r"\b(e\.g\.|i\.e\.|etc\.)")
 DOUBLE_SPACE = re.compile(r" {2,}")
 TERSEBUT = re.compile(r"\btersebut\b", re.IGNORECASE)
+RUN_ID = re.compile(r"\b[A-Z]-r\d{2}\b")
 TEXTTT = re.compile(r"\\texttt\{[^{}]*\}")
 PATH = re.compile(r"\\(?:path|url|seqsplit)\{[^{}]*\}")
 
@@ -110,6 +111,8 @@ def main() -> int:
                 continue
             body = _strip_inline_code(line).lstrip()
             raw_body = line.lstrip()
+            if RUN_ID.search(line) and path.name != "lampiran-a.tex":
+                drift.append((path, number, f"raw run identifier -> {line.strip()[:100]}"))
             for label, pattern in BANNED:
                 if pattern.search(body):
                     banned.append((path, number, f"{label} -> {line.strip()[:100]}"))

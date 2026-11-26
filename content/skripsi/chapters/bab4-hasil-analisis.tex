@@ -45,7 +45,7 @@ Pertanyaan penelitian waktu membandingkan waktu deteksi pada pengulangan 1 sampa
   \label{tab:hasil-deteksi}
   \begin{tabularx}{\textwidth}{|c|r|r|r|>{\raggedright\arraybackslash}X|}
     \hline
-    Skenario & GitOps & Imperatif & Selisih & Catatan \\
+    Skenario & GitOps & Imperatif & Selisih median & Catatan \\
     \hline
     B & 0,98 & 5,25 & 4,27 & Drift \textit{tag} \textit{image} \\
     \hline
@@ -76,7 +76,7 @@ Waktu pemulihan diukur sampai inventaris dan seluruh \textit{field} yang diperik
   \label{tab:hasil-pemulihan}
   \begin{tabularx}{\textwidth}{|c|r|r|r|>{\raggedright\arraybackslash}X|}
     \hline
-    Skenario & GitOps & Imperatif & Selisih & Catatan \\
+    Skenario & GitOps & Imperatif & Selisih median & Catatan \\
     \hline
     B & 2,73 & 5,71 & 2,98 & Drift \textit{tag} \textit{image} \\
     \hline
@@ -91,10 +91,12 @@ Waktu pemulihan diukur sampai inventaris dan seluruh \textit{field} yang diperik
 
 Hasil pemulihan tidak seragam. Pada B dan C, selisih median berada di sekitar 3 detik. Pada B, selisih itu tidak cukup konsisten untuk dibaca sebagai keunggulan yang jelas; pada C, selisihnya juga moderat. Pada D, selisihnya mencapai 5,08 detik dan merupakan yang terbesar. Pada E, selisihnya 3,03 detik tetapi arahnya lebih konsisten daripada B. Pola ini menunjukkan bahwa kecepatan deteksi tidak otomatis berarti kecepatan pemulihan. Skenario F juga kembali ke skor 100 pada kedua mode, tetapi waktu F tidak dimasukkan ke keluarga B--E dan tidak diuji sebagai hasil komparatif.
 
+\noindent\footnotesize Selisih pada Tabel~\ref{tab:hasil-deteksi} dan Tabel~\ref{tab:hasil-pemulihan} dihitung dari median marginal, bukan selisih berpasangan. Jumlah nilai teramati, status pengamatan, dan selisih berpasangan ada pada Lampiran B.\normalsize
+
 \section{Kasus G}
 \label{sec:kasus-g}
 
-Skenario G adalah kasus batas yang paling informatif. Pada mode GitOps, anotasi metadata yang ditambahkan pada SealedSecret tidak dipulihkan dalam 300 detik. Sepuluh pengamatan blok waktu dan lima pengamatan blok kecocokan berakhir pada batas itu, dan skor kecocokan GitOps tetap 75. Pada mode imperatif, anotasi itu dipulihkan dengan median 5,73 detik dan skor kembali ke 100.
+Skenario G adalah kasus batas yang paling informatif. Pada mode GitOps, anotasi metadata yang ditambahkan pada SealedSecret tidak dipulihkan dalam 300 detik. Sepuluh pengamatan blok waktu dan lima pengamatan blok kecocokan berakhir pada batas itu, dan skor kecocokan GitOps tetap 75. Deteksi GitOps pada G juga tidak menghasilkan sinyal yang dapat dipakai dalam 300 detik, sehingga G tidak masuk tabel median deteksi. Pada mode imperatif, anotasi itu dipulihkan dengan median 5,73 detik dan skor kembali ke 100.
 
 Temuan ini bukan kegagalan instrumentasi: barisnya tercatat sebagai pengamatan yang berakhir sebelum peristiwa terjadi, bukan sebagai kesalahan. Mekanisme yang paling mungkin adalah ArgoCD tidak memperlakukan anotasi tambahan sebagai \textit{drift} terkelola karena cakupan \textit{diff} dan \textit{client-side apply}; pembanding independen melihat anotasi itu, sedangkan pengendali GitOps tidak memulihkannya. Mekanisme itu belum diukur secara langsung, sehingga atribusinya tetap tidak diketahui dan tidak ada bukti bahwa G disebabkan masalah izin.
 
