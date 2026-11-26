@@ -16,11 +16,11 @@ Lampiran ini memuat definisi istilah statistik, rumus teknis, tabel uji lengkap,
     \hline
     Istilah & Arti \\
     \hline
-    Nilai $p$ & Peluang mengamati selisih sebesar atau lebih besar dari yang teramati bila tidak ada perbedaan sistematis. Nilai ini bukan ukuran besarnya perbedaan. \\
+    Nilai $p$ & Peluang mengamati selisih sebesar atau lebih ekstrem dari yang teramati bila tidak ada perbedaan sistematis. Nilai ini bukan ukuran besarnya perbedaan. \\
     \hline
     Ukuran efek & Besaran perbedaan antarkelompok. Dilaporkan bersama nilai $p$ agar perbedaan yang kecil tetapi konsisten tidak disalahartikan sebagai perbedaan yang praktis. \\
     \hline
-    Interval kepercayaan & Rentang nilai yang masuk akal bagi suatu estimasi pada tingkat keyakinan tertentu. Interval ini bukan rentang nilai populasi yang pasti. \\
+    Interval kepercayaan (IK) & Rentang nilai yang masuk akal bagi suatu estimasi pada tingkat keyakinan tertentu. Interval ini bukan rentang nilai populasi yang pasti. \\
     \hline
     Wilcoxon \textit{signed-rank} & Uji nonparametrik berpasangan untuk membandingkan dua kondisi pada unit yang sama. Selisih nol diabaikan. \\
     \hline
@@ -143,7 +143,7 @@ Tabel~\ref{tab:lampiran-b-efek} memuat ukuran efek dan selisih median berpasanga
   \end{tabularx}
 \end{table}
 
-\noindent\footnotesize RB = \textit{rank-biserial}. Interval adalah \textit{percentile bootstrap} deterministik dengan 2.000 resampling; resampling mengikuti blok berpasangan bila pemasangan dipertahankan, selain itu per mode. Nilai $\delta$ dan intervalnya adalah ringkasan eksploratif, bukan estimasi populasi.\normalsize
+\noindent\footnotesize RB = \textit{rank-biserial}; IK = interval kepercayaan. Interval adalah \textit{percentile bootstrap} deterministik dengan 2.000 resampling; resampling mengikuti blok berpasangan bila pemasangan dipertahankan, selain itu per mode. Nilai $\delta$ dan intervalnya adalah ringkasan eksploratif, bukan estimasi populasi.\normalsize
 
 \section{Analisis Sensitivitas}
 
@@ -205,4 +205,4 @@ Pertama, nilai $p$ yang kecil menunjukkan bahwa perbedaan yang teramati sulit di
 
 Kedua, pengamatan yang berhenti sebelum peristiwa bukan pengamatan gagal. Apabila pemulihan belum terjadi sampai batas pengamatan, yang diketahui adalah bahwa waktunya melebihi batas itu; nilainya tidak diketahui dan tidak diisi dengan angka karangan. Pada penelitian ini seluruh kejadian pemulihan yang berhenti sebelum peristiwa berasal dari satu skenario pada satu mode, sehingga kejadian itu dilaporkan sebagai temuan, bukan dibuang.
 
-Ketiga, seluruh nilai pada lampiran ini bersifat eksploratif. Observasi tidak sepenuhnya independen karena satu \textit{stack}, urutan mode tetap, dan pengulangan yang berbagi periode. Nilai $p$ dan interval kepercayaan adalah ringkasan deskriptif, bukan estimasi populasi atau estimasi kausal.
+Ketiga, seluruh nilai pada lampiran ini bersifat eksploratif. Observasi tidak sepenuhnya independen karena satu \textit{stack}, urutan mode tetap, dan pengulangan yang berbagi periode. Nilai $p$ dan interval kepercayaan adalah hasil uji eksploratif yang tidak ditafsirkan sebagai estimasi populasi atau kausal.

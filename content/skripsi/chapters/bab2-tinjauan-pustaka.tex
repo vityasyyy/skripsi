@@ -52,7 +52,7 @@ Metrik organisasi seperti \textit{deployment frequency}, \textit{lead time for c
 
 \textit{Runbook} adalah dokumen terstandardisasi yang berisi prosedur operasional untuk menanggapi insiden atau melakukan pemulihan. Dalam operasi TI, \textit{runbook} berfungsi sebagai \textit{playbook} yang menetapkan langkah korektif berurutan berdasarkan jenis insiden \citep{schlette2024playbook}, sehingga penggunaan \textit{runbook} mengurangi variabilitas akibat perbedaan keahlian dan keputusan subjektif selama pemulihan.
 
-Dalam penelitian ini, prosedur imperatif diwakili oleh pemeriksa dan \textit{runbook} otomatis yang tetap. Prosedur itu membandingkan deklarasi dengan \textit{actual state}, lalu menjalankan tindakan \texttt{kubectl} yang telah ditetapkan, tanpa menerima identitas skenario atau label injeksi. Dengan cara ini, perbandingan menguji mekanisme manajemen, bukan kecepatan atau pilihan seorang operator, sehingga hasil tidak dapat dibaca sebagai perbandingan kinerja manusia.
+Dalam penelitian ini, prosedur imperatif diwakili oleh pemeriksa dan \textit{runbook} otomatis yang tetap. Prosedur itu membandingkan deklarasi dengan \textit{actual state}, lalu menjalankan tindakan \texttt{kubectl} yang telah ditetapkan, tanpa menerima identitas skenario atau label injeksi. Dengan cara ini, perbandingan menguji mekanisme manajemen.
 
 \section{Studi Empiris Terkait}
 
@@ -64,13 +64,13 @@ Perbandingan penelitian perlu dibaca sesuai tujuan, alat, lingkungan, konfiguras
 
 \input{diagrams/fig-control-loop}
 
-Gambar~\ref{fig:kontrol-loop-imperatif-gitops} memperlihatkan bahwa perbedaan kedua mode terletak pada pemilik keputusan koreksi: pemeriksa eksternal membandingkan \textit{actual state} lalu menjalankan \textit{runbook} tetap, sedangkan ArgoCD membandingkan dan merekonsiliasi di dalam klaster. Keduanya sama-sama otomatis, sehingga hasil tidak dapat dibaca sebagai perbandingan kecepatan manusia.
+Gambar~\ref{fig:kontrol-loop-imperatif-gitops} memperlihatkan bahwa perbedaan kedua mode terletak pada pemilik keputusan koreksi: pemeriksa eksternal membandingkan \textit{actual state} lalu menjalankan \textit{runbook} tetap, sedangkan ArgoCD membandingkan dan merekonsiliasi di dalam klaster. Keduanya sama-sama otomatis; Bab I menjelaskan mengapa hasilnya tidak dibaca sebagai perbandingan kecepatan manusia.
 
 \section{Mengapa Deteksi dan Pemulihan Dipisahkan}
 
 Deteksi dan pemulihan adalah dua proses yang berbeda. Deteksi menandai bahwa keadaan aktual tidak lagi cocok dengan deklarasi; pemulihan membawa seluruh \textit{field} yang diperiksa kembali cocok. Sebuah mode dapat mendeteksi cepat tetapi memulihkan lambat, atau sebaliknya. Karena itu, penelitian ini mengukur keduanya secara terpisah dan tidak menyimpulkan salah satunya dari yang lain.
 
-Waktu tersedianya bukti dicatat sebagai diagnostik. Pada mode imperatif, pemeriksa mengevaluasi kontrak yang sama dengan evaluator, sehingga waktu bukti sama dengan waktu deteksi menurut konstruksi. Pada mode GitOps, waktu bukti berasal dari kolektor independen yang membaca perbedaan \textit{field}. Perbedaan mekanisme itu membuat waktu bukti tidak dapat dibandingkan sebagai perbedaan yang menguntungkan salah satu mode, tetapi tetap berguna untuk menjelaskan mengapa kedua mode dapat menghasilkan urutan sinyal yang berbeda.
+Waktu tersedianya bukti juga dicatat sebagai diagnostik; perbedaan mekanismenya dijelaskan pada Bab III §Waktu Deteksi, Bukti, dan Pemulihan.
 
 \section{Klasifikasi Beban Uji}
 

@@ -2,14 +2,14 @@
 
 \section{Kesimpulan}
 
-Penelitian ini membandingkan prosedur imperatif otomatis berbasis \texttt{kubectl} dengan GitOps berbasis ArgoCD pada satu \textit{stack} InvenioRDM mirip produksi. Prosedur imperatif bekerja pada tingkat prosedur, bukan kinerja operator manusia. Desain memakai tujuh skenario drift, lima belas pengulangan per skenario per mode, dan total 210 sel. Seluruh percobaan GitOps mendahului seluruh percobaan imperatif, dan urutan itu tidak diacak ulang per blok.
+Penelitian ini membandingkan prosedur imperatif otomatis berbasis \texttt{kubectl} dengan GitOps berbasis ArgoCD pada satu \textit{stack} InvenioRDM mirip produksi. Desain memakai tujuh skenario drift, lima belas pengulangan per skenario per mode, dan total 210 sel. Seluruh percobaan GitOps mendahului seluruh percobaan imperatif, dan urutan itu tidak diacak ulang per blok.
 
 \subsection{Temuan Utama}
 \label{subsec:temuan-utama}
 
 Waktu deteksi GitOps berada pada 0,96--1,02 detik, sedangkan mode imperatif pada 5,22--5,25 detik. Selisih 4,2--4,3 detik itu konsisten dengan pemeriksa 5 detik dan pencatat 1 detik; jadwal pengamatan saja dapat menghasilkan selisih hampir 5 detik. Temuan utamanya karena itu bukan bahwa GitOps lebih cepat, melainkan bahwa waktu deteksi dibatasi oleh seberapa sering keadaan dibaca. Data ini tidak dapat memisahkan kecepatan respons pengendali dari selang pengamatan, sehingga klaim superioritas GitOps tidak dapat ditarik.
 
-Waktu pemulihan tidak seragam. Selisih median pada B dan C berada di sekitar 3 detik, dengan B tidak cukup konsisten untuk dibaca sebagai perbedaan yang jelas. Pada D, selisihnya 5,08 detik dan merupakan yang terbesar. Pada E, selisihnya 3,03 detik tetapi arahnya lebih konsisten daripada B. Kecepatan deteksi karena itu tidak otomatis berarti kecepatan pemulihan.
+Waktu pemulihan tidak seragam. Selisih median paling besar pada D, yaitu 5,08 detik. Pada B, C, dan E, selisihnya berada di sekitar 3 detik; pada B, selisih itu tidak cukup konsisten untuk dibaca sebagai perbedaan yang jelas. Pada E, arahnya lebih konsisten daripada B. Kecepatan deteksi karena itu tidak otomatis berarti kecepatan pemulihan.
 
 Pemeriksaan kecocokan konfigurasi mengembalikan skor 100 untuk B--F pada kedua mode setelah injeksi menurunkannya ke 75. Skenario A tetap 100 karena replikanya dimiliki HPA. Skenario G adalah pengecualian: GitOps tidak memulihkan anotasi SealedSecret dalam 300 detik dan skornya tetap 75, sedangkan mode imperatif kembali ke 100. Pemeriksaan itu bukan perbandingan antarmode; hasilnya menunjukkan bahwa rekonsiliasi hanya menegakkan \textit{field} yang benar-benar tercakup oleh pengendali.
 
@@ -100,7 +100,7 @@ Aspek kolaborasi, waktu tinjauan, jejak audit, dan kepemilikan insiden perlu diu
 
 \textbf{Hipotesis.} Jika pemeriksa imperatif dijalankan pada selang 1 detik, selisih waktu deteksi terhadap GitOps dapat menyusut atau hilang. Hipotesis ini belum diuji dan tidak boleh dibaca sebagai hasil. Data yang ada memakai pemeriksa 5 detik, sehingga selisih 4,2--4,3 detik masih bercampur dengan perbedaan selang pengamatan.
 
-Untuk menguji hipotesis itu, diperlukan 40 percobaan imperatif tambahan pada skenario B--E dengan 10 pengulangan per skenario pada selang 1 detik, lalu dibandingkan dengan data GitOps yang sudah ada. Perbandingan itu masih membawa risiko efek periode karena data GitOps lama dan data imperatif baru berasal dari waktu yang berbeda; idealnya kedua mode dijalankan ulang dalam urutan berselang-seling atau diacak. Rancangan itu menjaga beban uji dan definisi metrik tetap sama, tetapi menyamakan selang pemeriksaan. Jika selisih deteksi menyusut, temuan akan mendukung penjelasan bahwa selang pengamatan adalah faktor utama; jika tidak, komponen respons pengendali perlu dicari lebih lanjut.
+Untuk menguji hipotesis itu, diperlukan 40 percobaan imperatif tambahan pada skenario B--E dengan 10 pengulangan per skenario pada selang 1 detik, lalu dibandingkan dengan data GitOps yang sudah ada. Perbandingan itu masih membawa risiko efek periode karena data GitOps lama dan data imperatif baru berasal dari waktu yang berbeda; idealnya kedua mode dijalankan ulang dalam urutan berselang-seling atau diacak. Rancangan itu menjaga beban uji dan definisi metrik tetap sama sekaligus menyamakan selang pemeriksaan. Jika selisih deteksi menyusut, temuan akan mendukung penjelasan bahwa selang pengamatan adalah faktor utama; jika tidak, komponen respons pengendali perlu dicari lebih lanjut.
 
 \subsection{Agenda yang Diprioritaskan}
 \label{subsec:agenda}
