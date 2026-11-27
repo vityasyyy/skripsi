@@ -270,6 +270,148 @@ class PlanTests(unittest.TestCase):
             self.assertIn(manifest["arm_order"][0], run_matrix.ARMS)
 
 
+class MatchedIntervalTests(unittest.TestCase):
+    def test_interleaved_plan_alternates_arms_within_each_scenario_rep(self):
+        plan = run_matrix.build_plan(
+            ["gitops", "imperative"], list("BCDE"), 10, 20261127, interleave_arms=True
+        )
+        legacy = run_matrix.build_plan(["gitops", "imperative"], list("BCDE"), 10, 20261127)
+        self.assertEqual(plan["arm_order"], legacy["arm_order"])
+        self.assertEqual(plan["scenario_order"], legacy["scenario_order"])
+        self.assertEqual(len(plan["runs"]), 80)
+        self.assertEqual([run["index"] for run in plan["runs"]], list(range(80)))
+        pairs = [plan["runs"][index : index + 2] for index in range(0, 80, 2)]
+        for pair in pairs:
+            self.assertEqual([run["arm"] for run in pair], plan["arm_order"])
+            self.assertEqual(pair[0]["scenario"], pair[1]["scenario"])
+            self.assertEqual(pair[0]["rep"], pair[1]["rep"])
+        self.assertEqual(
+            [(pair[0]["scenario"], pair[0]["rep"]) for pair in pairs],
+            [(scenario, rep) for scenario in plan["scenario_order"] for rep in range(1, 11)],
+        )
+        self.assertEqual({run["phase"] for run in plan["runs"]}, {"R2"})
+
+    def test_non_interleaved_plan_keeps_arm_blocks(self):
+        plan = run_matrix.build_plan(
+            ["gitops", "imperative"], list("BCDE"), 10, 20261127, interleave_arms=False
+        )
+        arms = [run["arm"] for run in plan["runs"]]
+        cut = len(plan["scenario_order"]) * 10
+        self.assertEqual(set(arms[:cut]), {plan["arm_order"][0]})
+        self.assertEqual(set(arms[cut:]), {plan["arm_order"][1]})
+
+    def test_legacy_210_run_plan_and_batch_id_are_pinned(self):
+        args = run_matrix.parse_args(
+            [
+                "--arms",
+                "gitops",
+                "imperative",
+                "--scenarios",
+                "A-G",
+                "--reps",
+                "15",
+                "--seed",
+                "20261029",
+            ]
+        )
+        plan = run_matrix.build_plan(args.arms, args.scenarios, args.reps, args.seed)
+        self.assertEqual(plan["arm_order"], ["gitops", "imperative"])
+        self.assertEqual(plan["scenario_order"], ["E", "A", "G", "D", "C", "F", "B"])
+        self.assertEqual(
+            plan["runs"][:3],
+            [
+                {"index": 0, "arm": "gitops", "scenario": "E", "rep": 1, "phase": "R2"},
+                {"index": 1, "arm": "gitops", "scenario": "E", "rep": 2, "phase": "R2"},
+                {"index": 2, "arm": "gitops", "scenario": "E", "rep": 3, "phase": "R2"},
+            ],
+        )
+        self.assertEqual(
+            plan["runs"][-1],
+            {"index": 209, "arm": "imperative", "scenario": "B", "rep": 15, "phase": "R1"},
+        )
+        self.assertEqual(run_matrix.default_batch_id(args), "fb-6ac88e5697")
+
+    def test_parse_args_accepts_interval_and_interleave(self):
+        args = run_matrix.parse_args(["--imperative-interval", "1.0", "--interleave-arms"])
+        self.assertEqual(args.imperative_interval, 1.0)
+        self.assertTrue(args.interleave_arms)
+        default = run_matrix.parse_args([])
+        self.assertEqual(default.imperative_interval, 5.0)
+        self.assertFalse(default.interleave_arms)
+
+    def test_batch_records_interval_and_interleave_and_resume_rejects_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(
+                live_args(
+                    directory,
+                    "matched",
+                    "gitops imperative",
+                    "BC",
+                    "1",
+                    "--imperative-interval",
+                    "1.0",
+                    "--interleave-arms",
+                )
+            )
+            self.assertEqual(run_quiet(args, run_one=fake_runner()[0]), 0)
+            paths = run_matrix._batch_paths(args.out, "matched")
+            manifest = json.loads(paths["manifest"].read_text())
+            summary = json.loads(paths["summary"].read_text())
+            self.assertEqual(manifest["imperative_interval"], 1.0)
+            self.assertTrue(manifest["interleave_arms"])
+            self.assertEqual(summary["imperative_interval"], 1.0)
+            self.assertTrue(summary["interleave_arms"])
+            self.assertEqual([run["arm"] for run in manifest["runs"]], ["gitops", "imperative"] * 2)
+            plan = run_matrix.build_plan(
+                args.arms, args.scenarios, args.reps, args.seed, interleave_arms=True
+            )
+            self.assertEqual(
+                run_matrix._validate_resume(args, plan, "matched", paths)["batch_id"], "matched"
+            )
+            for key, value in (("imperative_interval", 2.0), ("interleave_arms", False)):
+                with self.subTest(key=key):
+                    bad = copy.deepcopy(manifest)
+                    bad[key] = value
+                    paths["manifest"].write_text(json.dumps(bad))
+                    with self.assertRaisesRegex(
+                        run_matrix.BatchSafetyError, f"{key} does not match"
+                    ):
+                        run_matrix._validate_resume(args, plan, "matched", paths)
+            for key in ("imperative_interval", "interleave_arms"):
+                with self.subTest(missing=key):
+                    bad = copy.deepcopy(manifest)
+                    del bad[key]
+                    paths["manifest"].write_text(json.dumps(bad))
+                    with self.assertRaisesRegex(run_matrix.BatchSafetyError, f"missing {key}"):
+                        run_matrix._validate_resume(args, plan, "matched", paths)
+
+    def test_default_batch_id_changes_with_interval_and_interleave(self):
+        base = argparse.Namespace(
+            arms=["gitops", "imperative"],
+            scenarios=list("BCDE"),
+            reps=10,
+            seed=20261127,
+            namespace="invenio",
+            app="invenio-bootstrap",
+            source_revision="a" * 40,
+            render_sha256="b" * 64,
+            live=True,
+            production_like=True,
+            imperative_interval=5.0,
+            interleave_arms=False,
+        )
+        legacy = run_matrix.default_batch_id(base)
+        fast = copy.copy(base)
+        fast.imperative_interval = 1.0
+        interleaved = copy.copy(base)
+        interleaved.interleave_arms = True
+        self.assertNotEqual(run_matrix.default_batch_id(fast), legacy)
+        self.assertNotEqual(run_matrix.default_batch_id(interleaved), legacy)
+        self.assertNotEqual(
+            run_matrix.default_batch_id(fast), run_matrix.default_batch_id(interleaved)
+        )
+
+
 class DryRunTests(unittest.TestCase):
     def test_dry_run_is_zero_mutation_and_writes_analysis_ready_summary(self):
         temporary = tempfile.TemporaryDirectory()
@@ -1126,6 +1268,10 @@ class RunMatrixEdgeTests(unittest.TestCase):
             ["--reps", "0"],
             ["--cooldown-seconds", "-1"],
             ["--cooldown-seconds", "nan"],
+            ["--imperative-interval", "0"],
+            ["--imperative-interval", "-1"],
+            ["--imperative-interval", "nan"],
+            ["--imperative-interval", "inf"],
             ["--baseline-retries", "-1"],
             ["--batch-id", "bad id"],
             ["--source-revision", "short"],
@@ -1556,6 +1702,20 @@ class RunMatrixEdgeTests(unittest.TestCase):
             forwarded = main.call_args[0][0]
             for flag in ("--source-revision", "--render-sha256", "--render-file", "--live"):
                 self.assertIn(flag, forwarded)
+
+    def test_run_one_forwards_the_imperative_interval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = run_matrix.parse_args(
+                full_args(directory, "interval", "gitops", "A", "1", "--imperative-interval", "1.0")
+            )
+            item = self._item()
+            run_id = "interval-gitops-A-r01"
+            write_row(directory, run_id, make_row(item))
+            with mock.patch.object(run_matrix.harness, "main", return_value=0) as main:
+                run_matrix._run_one(args, item, run_id)
+            forwarded = main.call_args[0][0]
+            position = forwarded.index("--imperative-interval")
+            self.assertEqual(forwarded[position + 1], "1.0")
 
     def test_classify_covers_each_terminal_shape(self):
         live = argparse.Namespace(live=True)
