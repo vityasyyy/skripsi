@@ -5,9 +5,10 @@ jawaban menunjuk ke Bab/tabel atau ke artefak reproduksi. Angka hasil berasal
 dari `experiments/analysis-formal-20261029/live_analysis.json` dan
 `experiments/formal-20261029/formal-20261029.summary.json`.
 
-Catatan istilah: label `R1`/`R2` adalah nama fase data internal pada keluaran
-analisis. Naskah tidak memakai label itu sebagai metrik; naskah memakai
-"pemeriksaan kecocokan konfigurasi" dan "blok waktu / blok kecocokan".
+Catatan istilah: kode dan keluaran beku masih memakai nama field internal serta
+alias historis `env=manual`. Nama itu adalah nama teknis, bukan metrik naskah.
+Naskah dan deck memakai "pemeriksaan kecocokan konfigurasi" serta "blok waktu /
+blok kecocokan".
 
 ## 1. Mengapa 210 sel, 211 baris mentah, dan 207 baris analisis?
 
@@ -32,9 +33,9 @@ Mode imperatif adalah runbook dan checker `kubectl` otomatis yang tetap. Ia
 bekerja pada tingkat prosedur, bukan kecepatan operator manusia. Istilah
 "prosedur manual" hanya bertahan sebagai sejarah proposal; naskah memakai
 "prosedur imperatif otomatis" pada sebutan pertama lalu "mode imperatif".
-Karena prosedurnya otomatis dan konservatif, perbedaan waktu yang menguntungkan GitOps tidak dapat
-dijelaskan oleh kelambatan manusia. Waktu reaksi manusia tidak diukur. Lihat
-Bab I dan Bab III.
+Karena prosedurnya otomatis dan konservatif, perbedaan waktu yang menguntungkan
+GitOps tidak dapat dijelaskan oleh kelambatan manusia. Waktu reaksi manusia
+tidak diukur. Lihat Bab I dan Bab III.
 
 ## 4. Mengapa hanya satu stack dan dua mode berurutan?
 
@@ -62,8 +63,9 @@ proses berbeda: deteksi menandai ketidakcocokan, pemulihan membawa seluruh field
 kembali cocok. Waktu tersedianya bukti dicatat sebagai diagnostik: pada mode
 imperatif `t_e = t_d` menurut konstruksi, sedangkan pada GitOps `t_e` berasal
 dari kolektor independen. Karena itu `t_e` tidak dibandingkan sebagai perbedaan
-yang menguntungkan salah satu mode. Lihat Bab I §Rumusan Masalah, Bab II §Mengapa Deteksi dan Pemulihan
-Dipisahkan, dan Bab III §Waktu Deteksi, Bukti, dan Pemulihan.
+yang menguntungkan salah satu mode. Lihat Bab I §Rumusan Masalah, Bab II §Mengapa
+Deteksi dan Pemulihan Dipisahkan, dan Bab III §Waktu Deteksi, Bukti, dan
+Pemulihan.
 
 ## 7. Mengapa selisih deteksi 4,2–4,3 detik?
 
@@ -78,19 +80,25 @@ Deteksi dan Bab V §Temuan Utama.
 
 ## 8. Mengapa pemulihan B tidak disebut perbedaan yang jelas?
 
-Ukuran efek pemulihan B adalah 0,48 dengan interval kepercayaan yang mencakup
-nol. C adalah 0,75, D 1,00, dan E 0,86. Pada D selisihnya paling besar; pada E
-arahnya lebih konsisten daripada B. Karena itu pemulihan tidak dibaca sebagai
-satu perbedaan yang seragam. Lihat Bab IV §Waktu Pemulihan dan Lampiran B
-Tabel B.3–B.4.
+Pemulihan tidak seragam. Selisih median paling besar pada D, yaitu 5,08 detik.
+Pada B, C, dan E selisihnya sekitar 3 detik: 2,98; 2,99; dan 3,03 detik. Pada B,
+ukuran efek 0,48 dengan interval kepercayaan 95% [−0,08; 1,00] yang mencakup
+nol, sehingga selisihnya tidak dibaca sebagai perbedaan yang jelas. Pada C,
+ukuran efek 0,75 melemah menjadi 0,64 ketika satu percobaan yang dikecualikan
+disertakan; arahnya tetap positif tetapi tidak stabil. Pada E, ukuran efek 0,86
+lebih konsisten daripada B, tetapi bukan 5 detik seperti D. Jangan menggabungkan
+E dengan D. Lihat Bab IV §Waktu Pemulihan dan Lampiran B Tabel B.3–B.4.
 
 ## 9. Apakah G membuktikan ArgoCD gagal atau masalah izin?
 
 Tidak. G menunjukkan anotasi SealedSecret tidak kembali ke desired state dalam
-300 detik pada mode GitOps. Mekanisme yang paling mungkin adalah cakupan diff
-dan client-side apply, tetapi mekanisme itu tidak diukur. Status formalnya
-`unattributed`; tidak ada bukti masalah izin. G adalah kasus batas deskriptif,
-bukan uji self-heal ArgoCD. Lihat Bab IV §Kasus G.
+300 detik pada mode GitOps; skor kecocokan tetap 75 dan 15 pengamatan berhenti
+sebelum peristiwa. Mekanisme yang paling mungkin adalah cakupan diff dan
+client-side apply, tetapi mekanisme itu tidak diukur. Status formalnya
+`unattributed`; tidak ada bukti masalah izin. Pelajaran praktisnya adalah
+cakupan field: rekonsiliasi hanya menegakkan field yang benar-benar dikelola
+pengendali. G adalah kasus batas deskriptif, bukan uji self-heal ArgoCD. Lihat
+Bab IV §Kasus G.
 
 ## 10. Mengapa pemeriksaan kecocokan konfigurasi bukan hasil komparatif?
 
@@ -105,21 +113,23 @@ antarmode. Lihat Bab III §Pemeriksaan Kecocokan Konfigurasi dan Lampiran A
 
 Keluarga uji ditetapkan sebelum koleksi: empat skenario efikasi B–E × tiga
 metrik waktu (deteksi, bukti, pemulihan) = 12. Holm mengendalikan family-wise
-error pada keluarga itu. A, F, dan G tidak ditambahkan ke keluarga. Di naskah,
+error pada keluarga itu. A, F, dan G tidak ditambahkan ke keluarga. Bukti tetap
+diuji sebagai diagnostik karena keluarga itu sudah ditetapkan sebelum
+pengumpulan; jangan membacanya sebagai metrik utama atau keunggulan. Di naskah,
 angka p dan nama uji ditempatkan di Lampiran B; Bab IV hanya memakai median.
 Lihat Bab III §Analisis Data dan Lampiran B.
 
 ## 12. Mengapa C dan D memakai Mann–Whitney?
 
-Wilcoxon hanya dipakai bila setiap blok skenario–replikasi memiliki kedua mode
+Wilcoxon hanya dipakai bila setiap blok skenario–pengulangan memiliki kedua mode
 dan kedua nilai teramati. Pada C, pasangan lengkap tidak terbentuk; pada D
 deteksi dan bukti juga tidak. Aturan fallback ditetapkan sebelum analisis,
 bukan dipilih setelah melihat hasil. Lihat Lampiran B Tabel B.2.
 
-## 13. Mengapa ada 15 kejadian pemulihan yang berhenti sebelum peristiwa?
+## 13. Mengapa ada 15 pengamatan pemulihan yang berhenti sebelum peristiwa?
 
 Sepuluh terjadi pada blok waktu dan lima pada blok kecocokan; seluruhnya berasal
-dari mode GitOps pada skenario G. Observasi tersebut tidak mencapai titik akhir
+dari mode GitOps pada skenario G. Pengamatan itu tidak mencapai titik akhir
 dalam horizon 300 detik, jadi dilaporkan berhenti sebelum peristiwa, bukan
 kegagalan instrumen dan bukan nilai nol. Tidak ada imputasi. Lihat Bab IV
 §Kasus G dan Lampiran B §Pengamatan yang Berhenti Sebelum Peristiwa dan
@@ -140,11 +150,12 @@ deklarasi. Kedua mode dapat mencapai kondisi identik dan sama-sama salah bila
 deklarasi sumbernya keliru. Pemeriksaan kecocokan juga tidak menilai kesehatan
 layanan secara umum. Lihat Bab V §Keterbatasan.
 
-## 16. Mengapa R3 tidak diukur?
+## 16. Apakah atribusi pelaku perubahan diukur?
 
-R3 (traceability/audit API) membutuhkan audit log API server yang tidak tersedia
-pada apparatus ini. R3 dilaporkan sebagai `not_measured` dan menjadi pekerjaan
-lanjutan, bukan hasil. Lihat Bab V §Keterbatasan.
+Tidak. Atribusi memerlukan audit API server untuk menghubungkan perubahan dengan
+pelakunya. Audit itu tidak tersedia pada apparatus ini, sehingga atribusi
+dilaporkan sebagai keterbatasan dan pekerjaan lanjutan, bukan hasil. Lihat Bab V
+§Keterbatasan.
 
 ## 17. Apakah biaya sudah diukur?
 
@@ -163,17 +174,107 @@ mengukurnya. Jangan menyajikan aspek itu sebagai temuan. Lihat Bab V.
 ## 19. Apa satu kalimat yang harus diingat penguji?
 
 Pada apparatus, protokol, dan cakupan field yang diuji, waktu deteksi mengikuti
-selang pengamatan (1 detik versus 5 detik), pemulihan tidak seragam (B/C lebih
-kecil, D paling besar), dan G adalah pengecualian deskriptif yang tidak
-diatribusikan.
+selang pengamatan (1 detik versus 5 detik); pemulihan tidak seragam (B/C lebih
+kecil, D paling besar, E moderat; B tidak jelas dan C melemah pada sensitivitas);
+dan G adalah pengecualian deskriptif yang menunjukkan batas cakupan field.
 
 ## 20. Apakah refactor kode setelah koleksi membatalkan hasil?
 
 Tidak. Apparatus koleksi ditetapkan pada `3572f3c`; kode `HEAD` bukan revisi
-koleksi. Refactor pasca-koleksi diuji dengan 502 tes inti + 9 tes sensitivity,
-keluaran analisis yang ditetapkan identik, dan dry-run 210 sel. Untuk mengaudit
-angka, gunakan keluaran yang ditetapkan dan data mentah, bukan menjalankan ulang
-batch. Lihat `experiments/REVISIONS.md`.
+koleksi. Refactor pasca-koleksi diuji dengan suite tes inti (505 tes di `HEAD`;
+502 tes saat refactor) + 9 tes sensitivity, keluaran analisis yang ditetapkan
+identik, dan dry-run 210 sel. Untuk mengaudit angka, gunakan keluaran yang
+ditetapkan dan data mentah, bukan menjalankan ulang koleksi. Lihat
+`experiments/REVISIONS.md`.
+
+## 21. Apakah follow-up 80 sel sudah dijalankan?
+
+Belum. Rancangan yang disiapkan adalah 80 sel: B–E, dua mode, 10 pengulangan,
+selang 1 detik, dengan urutan berselang-seling. Bab V juga menyebut 40 percobaan
+imperatif tambahan sebagai langkah minimum; versi lengkapnya menjalankan ulang
+kedua mode agar efek periode tidak bercampur dengan efek selang. Tidak ada hasil
+yang dilaporkan; jangan mengutip angka. Lihat Bab V §Hipotesis Selang
+Pemeriksaan Setara.
+
+## Bukti, kode, dan reproduksi
+
+### Di mana bukti angkanya?
+
+- Sesi pengumpulan `formal-20261029`: 210 sel terminal, 211 baris mentah, 207
+  baris analisis, dan 4 baris dikecualikan (2 kegagalan instrumentasi, 1
+  kegagalan baseline yang diulang, 1 penghentian sesi).
+- Peta klaim: `docs/reproducibility/claim-traceability.md`.
+- Keluaran beku: `experiments/analysis-formal-20261029/` (tujuh berkas, termasuk
+  `live_analysis.json`); data mentah dan keluaran itu tersimpan lokal dan
+  diabaikan Git.
+
+### Identitas yang ditetapkan
+
+| Peran | Tag | Commit |
+|---|---|---|
+| Apparatus koleksi | `thesis-collection-20261029` | `3572f3c` |
+| Analisis primer | `thesis-analysis-20261030` | `a1d43ea` |
+| Analisis sensitivitas | `thesis-sensitivity-20261030` | `6cfc99e` |
+
+`HEAD` adalah kode pasca-koleksi. Angka primer berasal dari keluaran beku, bukan
+dari menjalankan ulang apparatus.
+
+### Perintah reproduksi analisis
+
+Dari akar repository:
+
+```bash
+D=experiments/formal-20261029
+python3 experiments/analysis/analyze_live.py \
+  --in $D/formal-20261029.analysis.jsonl \
+  --rows $D/formal-20261029.rows.jsonl \
+  --out /tmp/formal-20261029-rerun \
+  --bootstrap 2000 --seed 20261029 --alpha 0.05
+```
+
+Nilai `--seed 20261029` harus dipakai; nilai bawaan kode adalah `20261027`,
+sehingga tanpa flag itu interval bootstrap dan keluaran tidak identik dengan
+paket beku. Setelah perintah itu:
+
+```bash
+diff -r experiments/analysis-formal-20261029 /tmp/formal-20261029-rerun
+```
+
+Satu-satunya perbedaan yang diharapkan adalah `SHA256SUMS` yang tidak ditulis
+oleh analyzer. Tujuh keluaran lain harus identik. Lihat `experiments/DATA.md`
+§Reproduksi Analisis.
+
+### Verifikasi data mentah
+
+```bash
+cd experiments/formal-20261029
+shasum -a 256 -c SHA256SUMS
+```
+
+Hasil yang diharapkan: 3.024 baris `OK`, 0 gagal. Checkout tanpa data mentah
+dapat memverifikasi kode dan tes, tetapi tidak dapat menghitung ulang angka
+teramati.
+
+### Analisis sensitivitas
+
+```bash
+python3 experiments/sensitivity/c_r02_sensitivity.py \
+  --out /tmp/c-r02-sensitivity.json
+```
+
+Skrip ini tidak menulis ke direktori beku. Nilai sensitivitas tidak memiliki
+berkas keluaran yang dikomit, sehingga statusnya dicatat sebagai gap yang dapat
+direproduksi di `docs/reproducibility/claim-traceability.md`.
+
+### Tes instrumen
+
+```bash
+python3 -m unittest discover -s experiments/tests -q                    # 505 tes
+python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -q  # 9 tes
+```
+
+`experiments/DATA.md` mencatat 492 tes dari verifikasi 2026-11-19; suite
+bertambah setelah refactor. Angka 505 adalah hasil perintah di atas pada `HEAD`.
 
 ## 5-minute code walkthrough
 
@@ -186,9 +287,9 @@ not claims; stop at the collection boundary.
 | 0:40 | `experiments/live/harness.py` (`build_contract`, `score`, baseline gate) | The contract is fixed; score 100 is the recovery predicate. |
 | 1:40 | `experiments/live/harness.py` timing endpoints and `experiments/live/sampling.py` | `t_d`, `t_e`, `t_r` come from completed observations; no imputation; 5 s checker versus 1 s recorder. |
 | 2:30 | `experiments/analysis/analyze_live.py` (`analyze`, `_r1_entries`, `_comparison`, `holm_adjust`) | The analyzer selects B–E, applies the fixed fallback rule, and keeps the configuration check descriptive. |
-| 3:30 | `experiments/analysis/rq2_report.py` and `docs/defense/source-map.md` | The thesis view selects the timing fields, derives `t_r - t_d`, and maps the historical `env=manual` alias to `arm=imperative` while preserving `legacy_env=manual`. |
+| 3:30 | `experiments/analysis/rq2_report.py` and `docs/defense/source-map.md` | The thesis view selects the timing fields, derives `t_r - t_d`, and maps the historical `env=manual` alias to the imperative mode while preserving `legacy_env=manual`. |
 | 4:30 | `experiments/formal-20261029/PROVENANCE.json` and `experiments/DATA.md` | Raw rows and analysis outputs are local; the checkout documents and tests the code, not a recomputation of observed numbers. |
 
-Never edit the analyzer or the collection modules during a walkthrough.
-If a live rerun is requested, stop: a new batch needs new approval, a new
-identity, and a new apparatus freeze.
+Never edit the analyzer or the collection modules during a walkthrough. If a
+live rerun is requested, stop: a new collection session needs new approval, a
+new identity, and a new apparatus identity.

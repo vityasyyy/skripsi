@@ -12,28 +12,29 @@
 \begin{tikzpicture}[
     node distance=0.28cm,
     box/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8,
-                text width=1.92cm, minimum height=1.45cm, align=center,
+                text width=2.30cm, minimum height=1.68cm, align=center,
                 line width=0.8pt, font=\scriptsize, inner sep=3pt},
     arrow/.style={-{Latex[length=2mm]}, line width=0.9pt, draw=gray!65}
 ]
 
 \node[box=gitopsblue] (freeze) {
-    \textbf{Bekukan}\\\textit{apparatus}\\27 objek render
+    \textbf{Tetapkan}\\\textit{apparatus}\\27 objek render
 };
 \node[box=imperativegray, right=of freeze] (gate) {
-    \textbf{Pemeriksaan}\\\textbf{kesiapan}\\CPU dan memori $<70\%$
+    \textbf{Pemeriksaan}\\\textbf{kesiapan}\\CPU/memori $<70\%$
 };
 \node[box=gitopsblue, right=of gate] (gitops) {
-    \textbf{Blok GitOps}\\ArgoCD aktif\\15 \textit{run}
+    \textbf{Blok GitOps}\\ArgoCD aktif\\7$\times$15 percobaan
 };
 \node[box=imperativegray, right=of gitops] (reset) {
-    \textbf{Reset \textit{baseline}}\\verifikasi\\tunggu 60 detik
+    \textbf{Pemulihan}\\\textbf{kondisi awal}\\verifikasi, jeda 60 detik
 };
 \node[box=imperativegray, right=of reset] (imp) {
-    \textbf{Imperatif}\\ArgoCD ditangguhkan\\15 \textit{run}
+    \textbf{Blok}\\\textbf{imperatif}\\ArgoCD\\ditangguhkan\\7$\times$15 percobaan
 };
 \node[box=metricyellow!85!black, right=of imp, text width=2.2cm] (analysis) {
-    \textbf{Pemulihan +}\\\textbf{validitas R1}\\analisis waktu RQ
+    \textbf{Analisis waktu}\\\textbf{+ pemeriksaan}\\\textbf{kecocokan}\\
+    median per skenario
 };
 
 \draw[arrow] (freeze) -- (gate);
