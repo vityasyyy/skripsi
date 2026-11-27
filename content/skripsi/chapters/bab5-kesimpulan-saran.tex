@@ -11,6 +11,8 @@ Waktu deteksi GitOps berada pada 0,96--1,02 detik, sedangkan mode imperatif pada
 
 Waktu pemulihan tidak seragam. Selisih median paling besar pada D, yaitu 5,08 detik. Pada B, C, dan E, selisihnya berada di sekitar 3 detik; pada B, selisih itu tidak cukup konsisten untuk dibaca sebagai perbedaan yang jelas. Pada E, arahnya lebih konsisten daripada B. Kecepatan deteksi karena itu tidak otomatis berarti kecepatan pemulihan.
 
+Uji tindak lanjut dengan pemeriksa 1 detik memberi hasil yang sejalan. Selisih deteksi turun dari 4,2--4,3 detik menjadi 0,25--0,32 detik, sedangkan pemulihan tetap tidak seragam: B dan E hampir sama, C lebih cepat pada mode imperatif, dan D lebih cepat pada GitOps. Hasil itu berasal dari sesi terpisah dengan satu sel hilang dan deteksi D yang hanya dua nilai; data tidak digabung dengan 210 sel utama, sehingga hasilnya tetap eksploratif.
+
 Pemeriksaan kecocokan konfigurasi mengembalikan skor 100 untuk B--F pada kedua mode setelah injeksi menurunkannya ke 75. Skenario A tetap 100 karena replikanya dimiliki HPA. Skenario G adalah pengecualian: GitOps tidak memulihkan anotasi SealedSecret dalam 300 detik dan skornya tetap 75, sedangkan mode imperatif kembali ke 100. Pemeriksaan itu bukan perbandingan antarmode; hasilnya menunjukkan bahwa rekonsiliasi hanya menegakkan \textit{field} yang benar-benar tercakup oleh pengendali.
 
 \subsection{Rekomendasi Kontekstual}
@@ -72,9 +74,11 @@ Penelitian lanjutan dapat memakai metode kualitatif atau campuran untuk mengukur
 
 Keterbatasan pertama berkaitan dengan cakupan kasus. Penelitian ini memakai satu klaster, satu \textit{stack} InvenioRDM mirip produksi, dan satu implementasi GitOps. Kedua mode dijalankan berurutan pada \textit{stack} yang sama, sehingga perlakuan tidak terisolasi dari beban latar, dependensi bersama, dan \textit{state} klaster yang berubah. Urutan mode adalah GitOps lalu imperatif dan tidak diacak ulang per blok. Efek periode tidak dapat dipisahkan sepenuhnya dari efek mode. Pengulangan juga tidak sepenuhnya independen, sehingga angka pada Bab IV adalah ringkasan deskriptif.
 
-Keterbatasan kedua berkaitan dengan pengukuran. Pencatat bekerja pada interval satu detik dan pemeriksa imperatif pada interval lima detik, sehingga perbedaan waktu deteksi tidak dapat dipisahkan dari perbedaan selang pengamatan. Horizon pengamatan dibatasi 300 detik. Pemeriksaan kecocokan konfigurasi hanya mencakup empat sumber daya terpilih dan tidak menilai kebenaran semantik atau keamanan konfigurasi. Kesehatan layanan tidak dianalisis sebagai skor komparatif. Skenario A dibatasi plafon HPA empat replika, sedangkan skenario G tidak dapat digeneralisasi sebagai ukuran \textit{self-healing} karena pengendali pemulihannya tidak teratribusi.
+Keterbatasan kedua berkaitan dengan pengukuran. Pada pengumpulan utama, pencatat bekerja pada interval satu detik dan pemeriksa imperatif pada interval lima detik, sehingga perbedaan waktu deteksi pada data itu tidak dapat dipisahkan sepenuhnya dari perbedaan selang pengamatan. Horizon pengamatan dibatasi 300 detik. Pemeriksaan kecocokan konfigurasi hanya mencakup empat sumber daya terpilih dan tidak menilai kebenaran semantik atau keamanan konfigurasi. Kesehatan layanan tidak dianalisis sebagai skor komparatif. Skenario A dibatasi plafon HPA empat replika, sedangkan skenario G tidak dapat digeneralisasi sebagai ukuran \textit{self-healing} karena pengendali pemulihannya tidak teratribusi.
 
 Keterbatasan ketiga berkaitan dengan lingkungan dan data. Kedua mode berbagi satu domain kegagalan penyimpanan dan tidak memiliki salinan di luar lokasi. Konfigurasi SMTP masih berupa \textit{placeholder}, dan pemulihan data awal belum selesai. Empat baris mentah dikecualikan dari analisis karena dua kegagalan instrumentasi, satu percobaan lengkap dengan kode keluar proses yang bukan nol, dan satu kegagalan \textit{baseline} pra-injeksi yang diulang. Tiga sel tidak menghasilkan baris analisis dan satu sel tetap dianalisis melalui percobaan ulang, tanpa nilai imputasi. Jumlah 15 pengulangan per sel juga bukan jaminan daya statistik per skenario \citep{dyba2006power,kitchenham2024small}.
+
+Tindak lanjut selang setara menambahkan keterbatasan tersendiri. Sesi itu merencanakan 80 sel dan menganalisis 79; satu percobaan imperatif pada skenario C, pengulangan ke-2, gagal instrumentasi sebelum injeksi. Deteksi D hanya didukung dua nilai GitOps karena delapan percobaan lainnya sudah pulih sebelum sinyal deteksi terpisah tercatat. Render tindak lanjut juga mengubah HPA \texttt{invenio-web} menjadi hanya CPU, meskipun empat \textit{field} terpilih tetap identik dengan render pengumpulan utama. Sesi itu terpisah, tidak digabung dengan 210 sel utama, dan tetap dijalankan pada satu \textit{stack} dengan urutan mode berselang-seling tetapi berurutan.
 
 Atribusi pelaku perubahan tidak diukur karena audit API server tidak tersedia. Penelitian ini juga tidak menilai kesesuaian hasil dengan \textit{state} klaster setelah pengumpulan, sehingga kesimpulan dibatasi pada data yang dianalisis dan \textit{apparatus} yang diuji. Biaya dan aspek kualitatif juga tidak diukur, seperti dijelaskan pada Bagian~\ref{sec:biaya-overhead} dan Bagian~\ref{sec:aspek-tidak-diukur}.
 
@@ -95,12 +99,10 @@ Biaya dan jam orang perlu diukur dengan metrik pada Tabel~\ref{tab:biaya-metrik}
 
 Aspek kolaborasi, waktu tinjauan, jejak audit, dan kepemilikan insiden perlu diuji dengan metode kualitatif atau campuran. Wawancara, pengamatan alur tinjauan, dan rekonstruksi audit dapat memberi gambaran yang tidak tertangkap oleh pengukuran waktu. Studi seperti itu tidak menggantikan hasil eksperimen ini, tetapi melengkapinya pada dimensi yang tidak diukur.
 
-\subsection{Hipotesis Selang Pemeriksaan Setara}
-\label{subsec:hipotesis-selang}
+\subsection{Tindak Lanjut Selang Setara}
+\label{subsec:tindak-lanjut}
 
-\textbf{Hipotesis.} Jika pemeriksa imperatif dijalankan pada selang 1 detik, selisih waktu deteksi terhadap GitOps dapat menyusut atau hilang. Hipotesis ini belum diuji dan tidak boleh dibaca sebagai hasil. Data yang ada memakai pemeriksa 5 detik, sehingga selisih 4,2--4,3 detik masih bercampur dengan perbedaan selang pengamatan.
-
-Untuk menguji hipotesis itu, diperlukan 40 percobaan imperatif tambahan pada skenario B--E dengan 10 pengulangan per skenario pada selang 1 detik, lalu dibandingkan dengan data GitOps yang sudah ada. Perbandingan itu masih membawa risiko efek periode karena data GitOps lama dan data imperatif baru berasal dari waktu yang berbeda; idealnya kedua mode dijalankan ulang dalam urutan berselang-seling atau diacak. Rancangan itu menjaga beban uji dan definisi metrik tetap sama sekaligus menyamakan selang pemeriksaan. Jika selisih deteksi menyusut, temuan akan mendukung penjelasan bahwa selang pengamatan adalah faktor utama; jika tidak, komponen respons pengendali perlu dicari lebih lanjut.
+Pertanyaan apakah selisih deteksi menyusut ketika pemeriksa imperatif dijalankan pada selang 1 detik sudah diuji dalam sesi tindak lanjut. Selisih deteksi turun dari 4,2--4,3 detik pada pemeriksa 5 detik menjadi 0,25--0,32 detik. Pemulihan tetap tidak seragam: B dan E hampir sama, C lebih cepat pada mode imperatif, dan D lebih cepat pada GitOps. Hasil itu berasal dari 80 sel terminal; 79 sel dianalisis dan satu sel imperatif pada skenario C gagal instrumentasi sebelum injeksi. Deteksi D hanya didukung dua nilai GitOps, HPA \texttt{invenio-web} pada render baru hanya memakai metrik CPU, dan data tidak digabung dengan 210 sel utama. Karena itu, hasil ini menutup pertanyaan selang pemeriksaan sebagai pekerjaan lanjutan, tetapi tidak menghapus kebutuhan replikasi pada \textit{stack} terpisah. Rincian uji dan ukuran efek ada pada Lampiran~\ref{sec:tindak-lanjut-lampiran}.
 
 \subsection{Agenda yang Diprioritaskan}
 \label{subsec:agenda}
@@ -118,19 +120,17 @@ Tabel~\ref{tab:lanjutan} merangkum prioritas pekerjaan lanjutan beserta alasan d
     \hline
     1 & Replikasi pada tiga \textit{stack} terisolasi & Memisahkan efek urutan dari efek mode & Tinggi \\
     \hline
-    2 & Subset selang 1 detik: 40 percobaan imperatif pada B--E & Menguji hipotesis bahwa selisih deteksi menyusut & Sedang \\
+    2 & Perbandingan alat GitOps kedua, misalnya Flux & Menguji generalitas pola cakupan \textit{field} & Sedang \\
     \hline
-    3 & Perbandingan alat GitOps kedua, misalnya Flux & Menguji generalitas pola cakupan \textit{field} & Sedang \\
+    3 & Pengukuran biaya dan jam orang & Melengkapi keputusan adopsi dengan total biaya & Sedang \\
     \hline
-    4 & Pengukuran biaya dan jam orang & Melengkapi keputusan adopsi dengan total biaya & Sedang \\
+    4 & Studi kualitatif atau campuran & Mengukur kolaborasi, tinjauan, audit, dan kepemilikan insiden & Sedang \\
     \hline
-    5 & Studi kualitatif atau campuran & Mengukur kolaborasi, tinjauan, audit, dan kepemilikan insiden & Sedang \\
+    5 & \textit{Workload} stateful dan stateless & Menguji validitas eksternal pada jenis beban berbeda & Sedang \\
     \hline
-    6 & \textit{Workload} stateful dan stateless & Menguji validitas eksternal pada jenis beban berbeda & Sedang \\
-    \hline
-    7 & Jendela pengamatan lebih panjang dan penyimpanan independen & Mengurangi pengamatan yang berhenti sebelum peristiwa dan menguji domain kegagalan & Tinggi \\
+    6 & Jendela pengamatan lebih panjang dan penyimpanan independen & Mengurangi pengamatan yang berhenti sebelum peristiwa dan menguji domain kegagalan & Tinggi \\
     \hline
   \end{tabularx}
 \end{table}
 
-Arah pekerjaan lanjutan yang paling bernilai bukan menambah jumlah pengamatan pada \textit{apparatus} yang sama. Arah yang lebih bernilai adalah memisahkan variabel yang belum dapat dipisahkan: selang pengamatan dari respons pengendali, efek urutan dari efek mode, serta cakupan \textit{field} terkelola dari cakupan \textit{field} yang diasumsikan.
+Arah pekerjaan lanjutan yang paling bernilai bukan menambah jumlah pengamatan pada \textit{apparatus} yang sama. Setelah selang pemeriksaan disamakan, arah yang lebih bernilai adalah memisahkan efek urutan dari efek mode serta cakupan \textit{field} terkelola dari cakupan \textit{field} yang diasumsikan; sisa selisih deteksi 0,25--0,32 detik juga perlu diuji pada \textit{stack} terpisah.
