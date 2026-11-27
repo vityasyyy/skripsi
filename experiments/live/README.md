@@ -100,6 +100,19 @@ python3 experiments/live/run_matrix.py \
 Tanpa flag itu batch live tetap boleh berjalan sebagai pilot, tetapi semua baris
 batch mencatat `formal_execution_approved: false`.
 
+### Interval pemeriksa dan interleaving lengan
+
+- `--imperative-interval` (default `5.0`) — interval nominal pemeriksa
+  imperatif, diteruskan ke setiap panggilan `harness.main`. Nilai harus finite
+  dan `> 0`, dicatat di manifest dan summary, dan menjadi bagian identitas batch
+  deterministik.
+- `--interleave-arms` (default mati) — menyusun rencana per skenario/repetisi
+  sehingga lengan bergantian, bukan berblok. Tanpa flag ini urutan historis
+  (blok lengan, lalu skenario, lalu repetisi) dan batch ID lama tidak berubah.
+- `--resume` menolak manifest yang menyimpan interval/flag berbeda. Manifest
+  baru memakai `schema_version: 3`; batch lama tanpa field ini tidak dapat
+  dilanjutkan.
+
 Batch berhenti pada status `invalid_injection`, `instrumentation_failure`,
 `reset_failure`, `recovery_failure`, `cleanup_failure`, `arm_restore_failure`,
 atau kegagalan keras lain (arm state, safety refusal, nonzero exit). Kegagalan
@@ -118,7 +131,8 @@ python3 experiments/live/run_matrix.py \
 ```
 
 Resume hanya menerima manifest yang cocok dengan rencana (seed, lengan,
-skenario, replikasi, namespace, app, revisi, render, mode, flag cooldown/retry)
+skenario, replikasi, namespace, app, revisi, render, mode, flag cooldown/retry,
+interval pemeriksa, dan interleaving lengan)
 dan tidak pernah menimpa run terminal. Run terminal tidak diulang. Berkas
 render dibaca dan di-hash ulang pada setiap invokasi; isi/revisi/hash yang
 berubah tidak dapat melanjutkan batch beku, dan path saja bukan identitas.
@@ -544,7 +558,7 @@ Kolom JSONL utama: `run_id`, `timing_convention`, `env`/`arm`, `scenario`, `rep`
 
 | Berkas | Isi |
 |---|---|
-| `<batch_id>.manifest.json` | seed, urutan lengan, permutasi skenario, run ID/status/urutan, revisi/render, `timing_convention`, cooldown/retry, `attempts` per sel, `cooldowns`, hitungan agregat |
+| `<batch_id>.manifest.json` | seed, urutan lengan, permutasi skenario, run ID/status/urutan, revisi/render, `timing_convention`, `imperative_interval`, `interleave_arms`, cooldown/retry, `attempts` per sel, `cooldowns`, hitungan agregat |
 | `<batch_id>.rows.jsonl` | seluruh baris attempt dengan metadata batch; `env` tetap lengan mentah |
 | `<batch_id>.analysis.jsonl` | baris v2 yang layak analisis, satu baris per sel (attempt terakhir); `env=imperative` dipetakan ke `manual` |
 | `<batch_id>.csv` | gabungan kolom CSV historis melalui `convert.py` |

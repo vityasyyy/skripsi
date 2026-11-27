@@ -44,7 +44,8 @@ DEFAULT_REPS = 15
 DEFAULT_SEED = 20261027
 DEFAULT_COOLDOWN_SECONDS = 60.0
 DEFAULT_BASELINE_RETRIES = 1
-BATCH_SCHEMA_VERSION = 2
+DEFAULT_IMPERATIVE_INTERVAL = 5.0
+BATCH_SCHEMA_VERSION = 3
 TIMING_CONVENTION = harness.TIMING_CONVENTION
 R2_REPS = range(1, 11)
 R1_REPS = range(11, 16)
@@ -89,6 +90,8 @@ MANIFEST_KEYS = (
     "cooldown_seconds",
     "baseline_retries",
     "timing_convention",
+    "imperative_interval",
+    "interleave_arms",
     "runs",
     "cooldowns",
     "counts",
@@ -164,8 +167,10 @@ def phase_for(rep: int) -> str:
     raise ValueError(f"rep {rep} is outside the frozen 1..15 protocol")
 
 
-def build_plan(arms: list, scenarios: list, reps: int, seed: int) -> dict:
-    """Return the frozen order: shuffled arms, one scenario permutation for both."""
+def build_plan(
+    arms: list, scenarios: list, reps: int, seed: int, interleave_arms: bool = False
+) -> dict:
+    """Return the planned order; interleaving changes the cell sequence only."""
     if not 1 <= reps <= DEFAULT_REPS:
         raise ValueError("reps must be between 1 and 15")
     rng = random.Random(seed)
@@ -173,21 +178,30 @@ def build_plan(arms: list, scenarios: list, reps: int, seed: int) -> dict:
     rng.shuffle(arm_order)
     scenario_order = list(scenarios)
     rng.shuffle(scenario_order)
-    runs = []
-    index = 0
-    for arm in arm_order:
-        for scenario in scenario_order:
-            for rep in range(1, reps + 1):
-                runs.append(
-                    {
-                        "index": index,
-                        "arm": arm,
-                        "scenario": scenario,
-                        "rep": rep,
-                        "phase": phase_for(rep),
-                    }
-                )
-                index += 1
+    if interleave_arms:
+        cells = (
+            (arm, scenario, rep)
+            for scenario in scenario_order
+            for rep in range(1, reps + 1)
+            for arm in arm_order
+        )
+    else:
+        cells = (
+            (arm, scenario, rep)
+            for arm in arm_order
+            for scenario in scenario_order
+            for rep in range(1, reps + 1)
+        )
+    runs = [
+        {
+            "index": index,
+            "arm": arm,
+            "scenario": scenario,
+            "rep": rep,
+            "phase": phase_for(rep),
+        }
+        for index, (arm, scenario, rep) in enumerate(cells)
+    ]
     return {"arm_order": arm_order, "scenario_order": scenario_order, "runs": runs}
 
 
@@ -206,6 +220,10 @@ def default_batch_id(args: argparse.Namespace) -> str:
         "live": bool(args.live),
         "production_like": bool(args.production_like),
     }
+    if args.imperative_interval != DEFAULT_IMPERATIVE_INTERVAL:
+        identity["imperative_interval"] = args.imperative_interval
+    if args.interleave_arms:
+        identity["interleave_arms"] = True
     digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:10]
     return "fb-" + digest
 
@@ -305,6 +323,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--baseline-timeout", type=float, default=300.0)
     parser.add_argument("--cooldown-seconds", type=float, default=DEFAULT_COOLDOWN_SECONDS)
     parser.add_argument("--baseline-retries", type=int, default=DEFAULT_BASELINE_RETRIES)
+    parser.add_argument("--imperative-interval", type=float, default=DEFAULT_IMPERATIVE_INTERVAL)
+    parser.add_argument("--interleave-arms", action="store_true")
     parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "runs")
     parser.add_argument("--namespace", default=harness.DEFAULT_NAMESPACE)
     parser.add_argument("--app", default=harness.DEFAULT_APP)
@@ -330,6 +350,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--reps must be between 1 and 15")
     if args.cooldown_seconds < 0 or not math.isfinite(args.cooldown_seconds):
         parser.error("--cooldown-seconds must be a finite value >= 0")
+    if args.imperative_interval <= 0 or not math.isfinite(args.imperative_interval):
+        parser.error("--imperative-interval must be a finite value > 0")
     if args.baseline_retries < 0:
         parser.error("--baseline-retries must be >= 0")
     if args.batch_id and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", args.batch_id):
@@ -416,6 +438,8 @@ def _new_manifest(args: argparse.Namespace, plan: dict, batch_id: str) -> dict:
         "render_sha256": args.render_sha256,
         "cooldown_seconds": args.cooldown_seconds,
         "baseline_retries": args.baseline_retries,
+        "imperative_interval": args.imperative_interval,
+        "interleave_arms": bool(args.interleave_arms),
         "runs": runs,
         "cooldowns": [],
         "counts": _counts(runs),
@@ -487,6 +511,8 @@ def _validate_resume(args: argparse.Namespace, plan: dict, batch_id: str, paths:
         "render_sha256": args.render_sha256,
         "cooldown_seconds": args.cooldown_seconds,
         "baseline_retries": args.baseline_retries,
+        "imperative_interval": args.imperative_interval,
+        "interleave_arms": bool(args.interleave_arms),
     }
     for key, value in expected.items():
         if manifest.get(key) != value:
@@ -961,6 +987,8 @@ def _summary(manifest: dict, analysis_rows: list, exclusions: list) -> dict:
         "stack_isolated": False,
         "r3_status": "not_measured",
         "timing_convention": manifest["timing_convention"],
+        "imperative_interval": manifest["imperative_interval"],
+        "interleave_arms": manifest["interleave_arms"],
         "seed": manifest["seed"],
         "arm_order": manifest["arm_order"],
         "scenario_order": manifest["scenario_order"],
@@ -1039,6 +1067,7 @@ def _run_one(
     if args.render_file:
         argv.extend(["--render-file", args.render_file])
     argv.extend(["--baseline-timeout", str(args.baseline_timeout)])
+    argv.extend(["--imperative-interval", str(args.imperative_interval)])
     if args.live:
         argv.extend(["--live", "--confirm-single-stack"])
     with redirect_stdout(io.StringIO()):
@@ -1314,7 +1343,9 @@ def run_batch(
     """Execute or resume the planned batch and write its outputs."""
     sleep = sleep or time.sleep
     validate_batch_args(args)
-    plan = build_plan(args.arms, args.scenarios, args.reps, args.seed)
+    plan = build_plan(
+        args.arms, args.scenarios, args.reps, args.seed, interleave_arms=args.interleave_arms
+    )
     batch_id = _resolve_batch_id(args, plan)
     paths = _batch_paths(args.out, batch_id)
     manifest, rows = _prepare_batch(args, plan, batch_id, paths)
