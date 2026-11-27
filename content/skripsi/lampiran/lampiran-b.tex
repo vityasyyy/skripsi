@@ -206,3 +206,136 @@ Pertama, nilai $p$ yang kecil menunjukkan bahwa perbedaan yang teramati sulit di
 Kedua, pengamatan yang berhenti sebelum peristiwa bukan pengamatan gagal. Apabila pemulihan belum terjadi sampai batas pengamatan, yang diketahui adalah bahwa waktunya melebihi batas itu; nilainya tidak diketahui dan tidak diisi dengan angka karangan. Pada penelitian ini seluruh kejadian pemulihan yang berhenti sebelum peristiwa berasal dari satu skenario pada satu mode, sehingga kejadian itu dilaporkan sebagai temuan, bukan dibuang.
 
 Ketiga, seluruh nilai pada lampiran ini bersifat eksploratif. Observasi tidak sepenuhnya independen karena satu \textit{stack}, urutan mode tetap, dan pengulangan yang berbagi periode. Nilai $p$ dan interval kepercayaan adalah hasil uji eksploratif yang tidak ditafsirkan sebagai estimasi populasi atau kausal.
+
+\section{Uji Tindak Lanjut Selang Setara}
+\label{sec:tindak-lanjut-lampiran}
+
+Uji tindak lanjut memakai sesi pengumpulan terpisah dengan 80 sel yang direncanakan: skenario B--E, dua mode, dan sepuluh pengulangan per skenario per mode. Sesi itu mencapai 80 sel terminal; 79 sel dianalisis dan satu sel dikecualikan. Sel yang dikecualikan adalah percobaan imperatif pada skenario C, pengulangan ke-2, yang gagal instrumentasi karena batas waktu API Kubernetes sebelum injeksi. Kegagalan itu tidak diulang dan tidak diberi nilai imputasi. Tabel~\ref{tab:lampiran-b-tindak-lanjut-desain} merangkum rancangan dan identitas sesi.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Rancangan dan identitas uji tindak lanjut}
+  \label{tab:lampiran-b-tindak-lanjut-desain}
+  \begin{tabularx}{\textwidth}{|l|>{\raggedright\arraybackslash}X|}
+    \hline
+    Butir & Nilai \\
+    \hline
+    Sesi pengumpulan & \texttt{matched1s-20261127b} \\
+    \hline
+    Sel direncanakan & 80 (4 skenario $\times$ 2 mode $\times$ 10 pengulangan) \\
+    \hline
+    Sel terminal & 80; 0 tertunda \\
+    \hline
+    Status terminal & 79 teramati; 1 kegagalan instrumentasi \\
+    \hline
+    Baris dianalisis & 79, seluruhnya blok waktu (pengulangan 1--10) \\
+    \hline
+    Baris dieksklusi & 1; percobaan imperatif skenario C pengulangan ke-2; batas waktu API Kubernetes sebelum injeksi \\
+    \hline
+    Skenario & B, C, D, E \\
+    \hline
+    Mode & GitOps dan imperatif \\
+    \hline
+    Selang pemeriksa imperatif & 1,0 detik \\
+    \hline
+    Selang pencatat & 1,0 detik \\
+    \hline
+    Urutan mode & Berselang-seling dalam setiap pasangan skenario-pengulangan; berurutan, bukan paralel \\
+    \hline
+    Revisi sumber & \texttt{\seqsplit{2aff56d8021c3394929ac5a59f949db567bb2298}} \\
+    \hline
+    SHA-256 render & \texttt{\seqsplit{ffff8d73b5a7ba09324582928a1a5e6597c30f1430d185bc38dc852aac541efa}} \\
+    \hline
+    Perubahan \textit{apparatus} & HPA \texttt{invenio-web} hanya memakai metrik CPU; empat sumber daya terpilih identik dengan render \texttt{\seqsplit{81ddd259780e0e6aef333811a0126f86d70a094e}} \\
+    \hline
+    Penggabungan & Tidak digabung dengan 210 sel utama \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+Tabel~\ref{tab:lampiran-b-tindak-lanjut-uji} memuat 12 perbandingan B--E untuk metrik deteksi, bukti, dan pemulihan. Sebelas perbandingan dapat diuji; deteksi D tidak terestimasi karena hanya dua nilai GitOps yang teramati. Seluruh uji dua sisi dan dikoreksi Holm pada $\alpha=0{,}05$ di bawah model uji eksploratif. Keluarga Holm berisi 12 hipotesis B--E $\times$ \{deteksi, bukti, pemulihan\} yang ditetapkan sebelum data, dan hipotesis yang tidak dapat diuji diperlakukan sebagai $p=1$.
+
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
+  \caption{Uji eksploratif tindak lanjut B--E}
+  \label{tab:lampiran-b-tindak-lanjut-uji}
+  \begin{tabularx}{\textwidth}{|c|c|c|c|r|r|r|}
+    \hline
+    Sk. & Metrik & Uji & $n$ & Statistik & $p$ & $p$ Holm \\
+    \hline
+    B & Deteksi & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0195 \\
+    \hline
+    B & Bukti & Wilcoxon (P) & 10 pasang & 33,0000 & 0,6250 & 1,0000 \\
+    \hline
+    B & Pemulihan & Wilcoxon (P) & 10 pasang & 10,0000 & 0,0840 & 0,5879 \\
+    \hline
+    C & Deteksi & Mann--Whitney (U) & 9 vs 10 & 0,0000 & $<0{,}001$ & 0,0034 \\
+    \hline
+    C & Bukti & Mann--Whitney (U) & 9 vs 10 & 38,0000 & 0,5956 & 1,0000 \\
+    \hline
+    C & Pemulihan & Mann--Whitney (U) & 9 vs 10 & 1,0000 & $<0{,}001$ & 0,0042 \\
+    \hline
+    D & Deteksi & Tidak terestimasi & -- & -- & -- & -- \\
+    \hline
+    D & Bukti & Mann--Whitney (U) & 10 vs 9 & 25,0000 & 0,1113 & 0,5879 \\
+    \hline
+    D & Pemulihan & Wilcoxon (P) & 10 pasang & 55,0000 & 0,0020 & 0,0195 \\
+    \hline
+    E & Deteksi & Wilcoxon (P) & 10 pasang & 49,0000 & 0,0273 & 0,2188 \\
+    \hline
+    E & Bukti & Wilcoxon (P) & 10 pasang & 43,0000 & 0,1309 & 0,5879 \\
+    \hline
+    E & Pemulihan & Wilcoxon (P) & 10 pasang & 10,0000 & 0,0840 & 0,5879 \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize P = berpasangan; U = tidak berpasangan. Uji Wilcoxon memakai $W^+$; uji Mann--Whitney memakai $U$ terkecil. Mann--Whitney memakai aproksimasi normal dengan koreksi ikatan dan hanya memakai nilai teramati. Nilai $p$ dan $p$ Holm dibulatkan ke empat desimal. Seluruh nilai bersifat eksploratif; tidak ada klaim konfirmatoris dan tidak ada kolom keputusan. Deteksi D tidak terestimasi karena hanya dua nilai GitOps yang teramati; baris bukti bersifat diagnostik dan tidak dipakai sebagai temuan utama. Berkas analisis menamai mode imperatif sebagai \texttt{manual}; tabel ini memakai istilah mode imperatif.\normalsize
+
+Tabel~\ref{tab:lampiran-b-tindak-lanjut-efek} memuat ukuran efek dan selisih median berpasangan. Nilai $\Delta$ adalah imperatif dikurangi GitOps; nilai positif berarti mode imperatif lebih lama. Tanda ``--'' berarti statistik berpasangan tidak tersedia pada fallback Mann--Whitney.
+
+\begin{table}[H]
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
+  \caption{Ukuran efek uji tindak lanjut (B--E)}
+  \label{tab:lampiran-b-tindak-lanjut-efek}
+  \begin{tabularx}{\textwidth}{|c|c|r|r|r|}
+    \hline
+    Sk. & Metrik & Cliff's $\delta$ & IK 95\% $\delta$ & $\Delta$ median (detik) \\
+    \hline
+    B & Deteksi & 1,000 & $[1{,}000;\,1{,}000]$ & 0,294 \\
+    \hline
+    B & Bukti & 0,200 & $[-0{,}180;\,0{,}620]$ & 0,005 \\
+    \hline
+    B & Pemulihan & -0,520 & $[-0{,}980;\,0{,}060]$ & -0,033 \\
+    \hline
+    C & Deteksi & 1,000 & $[1{,}000;\,1{,}000]$ & -- \\
+    \hline
+    C & Bukti & 0,156 & $[-0{,}378;\,0{,}689]$ & -- \\
+    \hline
+    C & Pemulihan & -0,978 & $[-1{,}000;\,-0{,}867]$ & -- \\
+    \hline
+    D & Deteksi & 1,000 & $[1{,}000;\,1{,}000]$ & -- \\
+    \hline
+    D & Bukti & 0,444 & $[-0{,}111;\,0{,}911]$ & -- \\
+    \hline
+    D & Pemulihan & 1,000 & $[1{,}000;\,1{,}000]$ & 1,026 \\
+    \hline
+    E & Deteksi & 0,880 & $[0{,}520;\,1{,}000]$ & 0,313 \\
+    \hline
+    E & Bukti & 0,320 & $[-0{,}280;\,0{,}840]$ & 0,017 \\
+    \hline
+    E & Pemulihan & -0,520 & $[-1{,}000;\,-0{,}040]$ & -0,175 \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize Nilai $\delta$ dan $\Delta$ dibulatkan ke tiga desimal. Interval adalah \textit{percentile bootstrap} deterministik dengan 2.000 resampling; resampling mengikuti blok berpasangan bila pemasangan dipertahankan, selain itu per mode. Nilai $\delta$ dan intervalnya adalah ringkasan eksploratif, bukan estimasi populasi. Baris deteksi D hanya didukung dua nilai GitOps; ukuran efeknya tidak ditafsirkan.\normalsize
+
+Sesi pertama dengan pengenal \texttt{matched1s-20261127} berhenti pada percobaan imperatif skenario E, pengulangan ke-1, karena revisi sumber aktif sudah bergerak dari \texttt{81ddd259780e0e6aef333811a0126f86d70a094e}. Sesi itu tidak mencapai injeksi dan disimpan sebagai bukti, bukan sebagai data yang dianalisis; sesi yang dianalisis adalah \texttt{matched1s-20261127b}.
+
+Uji tindak lanjut ini eksploratif dan berlaku untuk satu \textit{stack}, satu \textit{apparatus}, dan satu urutan mode. Data tidak digabung dengan 210 sel utama, dan hasilnya bukan estimasi populasi atau klaim kausal. Deteksi D tidak diestimasi; pemulihan D dapat diuji karena kedua mode memiliki sepuluh nilai. Perubahan HPA membuat \textit{apparatus} tidak identik sepenuhnya, meskipun empat \textit{field} terpilih yang dianalisis tetap sama.

@@ -182,6 +182,26 @@ python3 -m unittest discover -s experiments/tests -q          # 492 tes
 python3 -m unittest discover -s experiments/sensitivity -p 'test_*.py' -q  # 9 tes
 ```
 
+## Sesi tindak lanjut selang setara
+
+Sesi `matched1s-20261127b` (27 November 2026) adalah uji tindak lanjut terpisah
+dari batch formal. Sesi ini merencanakan 80 sel (B–E × dua mode × 10
+pengulangan), mencapai 80 sel terminal, dan menganalisis 79 sel; satu percobaan
+imperatif pada skenario C, pengulangan ke-2, berstatus kegagalan instrumentasi
+karena batas waktu API Kubernetes sebelum injeksi. Sesi memakai pemeriksa 1,0
+detik, pencatat 1,0 detik, dan urutan mode berselang-seling. Revisi sumber
+`2aff56d8021c3394929ac5a59f949db567bb2298` dan SHA-256 render
+`ffff8d73b5a7ba09324582928a1a5e6597c30f1430d185bc38dc852aac541efa`; HPA
+`invenio-web` hanya memakai metrik CPU, sedangkan empat sumber daya terpilih
+identik dengan render formal. Data tidak digabung dengan 210 sel formal.
+
+Percobaan pertama `matched1s-20261127` berhenti sebelum injeksi karena revisi
+sumber aktif sudah bergerak dari `81ddd259780e0e6aef333811a0126f86d70a094e`;
+sesi itu disimpan sebagai bukti dan tidak dianalisis. Keluaran analisis sesi
+yang dianalisis berada di `experiments/analysis-matched1s-20261127b/` (lokal,
+diabaikan Git). Rincian rancangan, hasil, dan batas ada di
+[`../docs/reproducibility/matched-interval-20261127.md`](../docs/reproducibility/matched-interval-20261127.md).
+
 ## Privasi dan batas berbagi
 
 - Data mentah dan bukti per run hanya tersimpan lokal; `.gitignore` mengecualikan

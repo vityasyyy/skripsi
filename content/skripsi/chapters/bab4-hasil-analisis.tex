@@ -107,9 +107,68 @@ Pelajaran praktisnya bukan bahwa ArgoCD gagal memulihkan seluruh \textit{drift},
 
 Hasil ini berasal dari satu \textit{stack} pada satu klaster, dengan urutan mode yang tetap dan tanpa pengacakan ulang per percobaan. Pengulangan berbagi \textit{stack} dan periode yang sama, sehingga pengulangan tidak sepenuhnya independen. Angka pada Bab IV adalah ringkasan deskriptif, bukan estimasi populasi dan bukan estimasi kausal. Perbedaan waktu deteksi juga bercampur dengan perbedaan selang pengamatan, sehingga tidak dapat dibaca sebagai efek murni dari jenis pengendali. Karena itu, hasilnya berlaku untuk \textit{apparatus}, protokol, dan cakupan \textit{field} yang diuji.
 
+\section{Uji Tindak Lanjut dengan Selang Setara}
+\label{sec:tindak-lanjut-selang}
+
+Uji tindak lanjut memakai sesi pengumpulan terpisah untuk memeriksa apakah selisih deteksi pada Bagian~\ref{sec:waktu-deteksi} sebagian besar berasal dari selang pemeriksaan. Sesi itu merencanakan 80 sel: skenario B--E, dua mode, dan sepuluh pengulangan per skenario per mode. Pemeriksa imperatif dijalankan pada selang 1 detik, sama dengan selang pencatat, dan urutan mode dibuat berselang-seling dalam setiap pasangan skenario-pengulangan. Dari 80 sel terminal, 79 sel dianalisis; satu percobaan imperatif pada skenario C, pengulangan ke-2, gagal instrumentasi karena batas waktu API Kubernetes sebelum injeksi dan dipertahankan sebagai baris yang dikecualikan, bukan diulang. Sesi itu memakai render baru yang identitasnya dicatat pada Lampiran~\ref{sec:tindak-lanjut-lampiran}; perubahan \textit{apparatus}-nya adalah HPA \texttt{invenio-web} yang hanya memakai metrik CPU, sedangkan empat sumber daya terpilih identik dengan render pengumpulan utama. Data uji tindak lanjut tidak digabung dengan 210 sel utama.
+
+Tabel~\ref{tab:tindak-lanjut-deteksi} menyajikan median waktu deteksi. Dengan selang pemeriksa 1 detik, median GitOps berada pada 0,92--0,96 detik dan median mode imperatif pada 1,21--1,24 detik. Selisihnya 0,25--0,32 detik, jauh lebih kecil daripada 4,2--4,3 detik pada pemeriksa 5 detik. Pada skenario D, hanya dua percobaan GitOps yang menghasilkan sinyal deteksi terpisah; delapan percobaan lainnya sudah pulih sebelum sinyal itu tercatat, sehingga selisih D tidak dilaporkan. Angka pada tabel adalah median per mode, bukan selisih berpasangan.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Median waktu deteksi pada uji tindak lanjut (detik)}
+  \label{tab:tindak-lanjut-deteksi}
+  \begin{tabularx}{\textwidth}{|c|r|r|r|>{\raggedright\arraybackslash}X|}
+    \hline
+    Skenario & GitOps (n) & Imperatif (n) & Selisih median & Catatan \\
+    \hline
+    B & 0,92 (10) & 1,24 (10) & 0,32 & Drift \textit{tag} \textit{image} \\
+    \hline
+    C & 0,92 (10) & 1,23 (9) & 0,31 & Drift nilai ConfigMap \\
+    \hline
+    D & 0,96 (2) & 1,21 (10) & tidak dilaporkan & Deployment dihapus \\
+    \hline
+    E & 0,96 (10) & 1,23 (10) & 0,27 & Batas memori diubah \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize Selisih pada Tabel~\ref{tab:tindak-lanjut-deteksi} dihitung dari median masing-masing mode. Rentang 0,25--0,32 detik mencakup D; selisih D tidak dilaporkan karena hanya dua nilai GitOps. Tabel uji lengkap dan ukuran efek ada pada Lampiran~\ref{sec:tindak-lanjut-lampiran}.\normalsize
+
+Tabel~\ref{tab:tindak-lanjut-pemulihan} menyajikan median waktu pemulihan. Pada B, kedua mode hampir sama: 2,67 detik untuk GitOps dan 2,64 detik untuk mode imperatif, dengan selisih -0,03 detik. Pada E, selisihnya juga kecil, yaitu -0,16 detik. Pada C, mode imperatif lebih cepat: 1,63 detik berbanding 2,69 detik, dengan selisih -1,06 detik. Pada D, arahnya berlawanan: GitOps 1,65 detik dan mode imperatif 2,67 detik, dengan selisih +1,02 detik. Selisih pada tabel dihitung sebagai median imperatif dikurangi median GitOps; nilai negatif berarti mode imperatif lebih cepat.
+
+\begin{table}[H]
+  \centering
+  \small
+  \caption{Median waktu pemulihan pada uji tindak lanjut (detik)}
+  \label{tab:tindak-lanjut-pemulihan}
+  \begin{tabularx}{\textwidth}{|c|r|r|r|>{\raggedright\arraybackslash}X|}
+    \hline
+    Skenario & GitOps (n) & Imperatif (n) & Selisih median & Catatan \\
+    \hline
+    B & 2,67 (10) & 2,64 (10) & -0,03 & Drift \textit{tag} \textit{image} \\
+    \hline
+    C & 2,69 (10) & 1,63 (9) & -1,06 & Drift nilai ConfigMap \\
+    \hline
+    D & 1,65 (10) & 2,67 (10) & +1,02 & Deployment dihapus \\
+    \hline
+    E & 2,76 (10) & 2,60 (10) & -0,16 & Batas memori diubah \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\footnotesize Selisih pada Tabel~\ref{tab:tindak-lanjut-pemulihan} dihitung dari median masing-masing mode; nilai negatif berarti mode imperatif lebih cepat. Tabel uji lengkap dan ukuran efek ada pada Lampiran~\ref{sec:tindak-lanjut-lampiran}.\normalsize
+
+Pola deteksi mendukung penjelasan bahwa selisih 4,2--4,3 detik pada pemeriksa 5 detik sebagian besar berasal dari selang pengamatan: ketika kedua mode diamati pada selang 1 detik, selisihnya turun menjadi sekitar 0,3 detik. Sisa selisih 0,25--0,32 detik masih dapat mencakup perbedaan jadwal pemeriksaan, waktu evaluasi, atau respons pengendali, dan rancangan ini tidak memisahkan komponen itu. Pemulihan tetap bergantung pada skenario: B dan E hampir sama, C lebih cepat pada mode imperatif, dan D lebih cepat pada GitOps. Kecepatan deteksi karena itu tidak dapat dipakai untuk menyimpulkan kecepatan pemulihan.
+
+Hasil uji tindak lanjut tetap terbatas pada satu \textit{stack}, satu sesi pengumpulan, dan satu urutan mode yang berselang-seling tetapi tetap berurutan. Satu sel imperatif pada skenario C tidak dianalisis, dan deteksi D hanya didukung dua nilai GitOps; kedua hal itu membatasi perbandingan pada C dan D. Perubahan HPA juga membuat \textit{apparatus} tidak identik sepenuhnya dengan pengumpulan utama, meskipun empat \textit{field} terpilih yang dipakai dalam analisis tetap sama. Karena sesi itu terpisah dan tidak digabung dengan 210 sel utama, hasilnya adalah keterangan tambahan yang eksploratif, bukan estimasi populasi atau klaim kausal.
+
 \section{Apa Artinya}
 \label{sec:apa-artinya}
 
 Temuan utama Bab IV adalah bahwa selisih waktu deteksi konsisten dengan selang pengamatan. Pencatat membaca keadaan setiap detik, sedangkan pemeriksa imperatif setiap lima detik; selisih 4,2--4,3 detik konsisten dengan selisih kedua selang itu dan bukan estimasi murni respons pengendali. Perbedaan deteksi karena itu bukan sifat umum GitOps, melainkan sifat konfigurasi pengamatan yang dipakai dalam penelitian ini.
 
 Pemulihan memberi gambar yang berbeda. Pada B dan C, perbedaan antarmode lebih kecil dan pada B tidak cukup konsisten untuk disebut perbedaan yang jelas. Pada D, perbedaannya besar; pada E, perbedaannya moderat tetapi arahnya konsisten. Pemilihan mode karena itu perlu mempertimbangkan skenario drift, lama penyimpangan yang dapat ditoleransi, selang pengamatan yang tersedia, dan cakupan \textit{field} yang benar-benar dikelola. Deteksi cepat tidak dengan sendirinya menjawab apakah pemulihan juga cepat.
+
+Uji tindak lanjut dengan selang 1 detik menurunkan selisih deteksi dari 4,2--4,3 detik menjadi sekitar 0,3 detik. Pemulihan tetap tidak seragam: B dan E hampir sama, C lebih cepat pada mode imperatif, dan D lebih cepat pada GitOps. Pola ini memperkuat penjelasan bahwa deteksi dibatasi selang pengamatan, sekaligus menunjukkan bahwa pemulihan tidak dapat disimpulkan dari deteksi.
