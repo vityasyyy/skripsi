@@ -18,6 +18,13 @@ data-phase labels. The manuscript does not: it calls the check
 | Primary analysis | `thesis-analysis-20261030` | `a1d43eaf0d349249f1eb0a8e880badebe4eb851d` | `analyze_live.py` and its frozen outputs |
 | Sensitivity analysis | `thesis-sensitivity-20261030` | `6cfc99ec63a71825e88b53a96704c8c792891bd9` | `experiments/sensitivity/` |
 
+The 80-cell follow-up session `matched1s-20261127b` (2026-11-27) is separate
+from the three frozen tags above. Its identity is source
+`2aff56d8021c3394929ac5a59f949db567bb2298`, render
+`ffff8d73b5a7ba09324582928a1a5e6597c30f1430d185bc38dc852aac541efa`, and
+analysis `experiments/analysis-matched1s-20261127b/` (local, gitignored). It is
+not pooled with `formal-20261029`.
+
 `HEAD` is post-collection. The primary numbers come from the frozen
 `experiments/analysis-formal-20261029/live_analysis.json`; they are not produced
 by rerunning the apparatus. The frozen rows and `live_analysis.json` are local
@@ -34,14 +41,16 @@ recompute the observed values.
 | Bab IV §Data yang Dianalisis | 210 cells, 211 raw rows, 207 analysis rows, 4 exclusions; audit medians | `experiments/analysis/analyze_live.py` (`_exclusions`, `_r1_entries`) | Analysis `a1d43ea` | Frozen `live_analysis.json`; audit table in Lampiran A |
 | Bab IV §Waktu Deteksi, §Waktu Pemulihan | Median detection and recovery times; interval explanation | `experiments/analysis/analyze_live.py`, `core.py`, `stats.py`, `survival.py`, `latex.py` | Analysis `a1d43ea` | Frozen `live_analysis.json` plus `rq2_report.py` |
 | Bab IV §Kasus G | G description; GitOps recovery stops at 300 s; score 75 | `analyze_live.py` (`_r1_entries`, `_survival_entries`); runner G branch | Analysis `a1d43ea`; collection `3572f3c` | `live_analysis.json` (`r1`, `survival`) |
+| Bab IV §Uji Tindak Lanjut dengan Selang Setara | 80-cell matched-interval follow-up: 79 analyzed, 1 instrumentation failure; detection/recovery medians | `experiments/analysis/analyze_live.py`, `experiments/live/run_matrix.py` | Follow-up session `matched1s-20261127b`; source `2aff56d8`; render `ffff8d73` | `experiments/analysis-matched1s-20261127b/live_analysis.json`, `live_tests.tex`, `live_effects.tex` |
 | Bab V §Temuan Utama, §Rekomendasi | Interval-bound detection; mixed recovery; contextual recommendation | Analysis outputs and design records | Analysis `a1d43ea`; collection `3572f3c` | `live_analysis.json` |
+| Bab V §Tindak Lanjut Selang Setara | Follow-up result: detection gap 4.2–4.3 s → 0.25–0.32 s; recovery mixed (B/E equal, C imperative, D GitOps) | `experiments/analysis/analyze_live.py` | Follow-up session `matched1s-20261127b` | `live_analysis.json`, `live_tests.tex` |
 | Bab V §Biaya dan Overhead, §Aspek yang Tidak Diukur | What was not measured; metrics to collect | No code; design boundary | — | Thesis text only |
-| Bab V §Hipotesis Selang Pemeriksaan Setara | 40 additional imperative runs at 1 s on B–E | Future work; no output | — | Not measured |
 | Lampiran A §Audit Pemeriksaan Kecocokan Konfigurasi | Median audit table; no comparative test | `analyze_live._r1_entries` | Analysis `a1d43ea` | Frozen `live_analysis.json` |
 | Lampiran A §Baris yang Dikecualikan | Four raw rows with IDs and reasons | `analyze_live._exclusions`, `_classify_raw` | Analysis `a1d43ea` | `live_analysis.json.exclusions` |
 | Lampiran B §Tabel Uji Lengkap, §Tabel Ukuran Efek | 12 B–E tests; Holm p-values; Cliff's delta; bootstrap intervals | `analyze_live.py`, `core.py`, `stats.py` | Analysis `a1d43ea` | `live_tests.tex`, `live_effects.tex` |
 | Lampiran B §Analisis Sensitivitas | C, repetition 2 re-inclusion; C recovery delta 0.75 to 0.64 | `experiments/sensitivity/c_r02_sensitivity.py` | Sensitivity `6cfc99e` | `python3 experiments/sensitivity/c_r02_sensitivity.py --out /tmp/c-r02.json` |
 | Lampiran B §Pengamatan Berhenti Sebelum Peristiwa | Censoring counts; Kaplan–Meier; RMST | `analyze_live.py`, `survival.py` | Analysis `a1d43ea` | Frozen `live_survival.tex` |
+| Lampiran B §Uji Tindak Lanjut Selang Setara | 12-row test table (11 testable); effect sizes; failed first attempt note | `experiments/analysis/analyze_live.py` | Follow-up session `matched1s-20261127b` | `live_tests.tex`, `live_effects.tex` |
 
 ## Thesis-facing timing view
 
