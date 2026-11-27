@@ -570,7 +570,59 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
 }
 
 % =============================================
-% 16. Future work
+% 16. Matched-interval follow-up
+% =============================================
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}
+    \frametitle{Tindak Lanjut: Selang 1 Detik}
+    \scriptsize
+    \textbf{Desain:} 80 sel, B--E $\times$ dua mode $\times$ 10 pengulangan; pemeriksa dan pencatat 1 detik; urutan berselang-seling; batch terpisah. 79 dianalisis; satu sel imperatif C gagal sebelum injeksi.
+    \vspace{0.06cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \centering\scriptsize
+            \textbf{Deteksi: median (detik)}\\[2pt]
+            \begin{tabular}{@{}lrrr@{}}
+                \toprule
+                \textbf{Skenario} & \textbf{GitOps} & \textbf{Imperatif} & \textbf{Selisih} \\
+                \midrule
+                B & 0,919 & 1,239 & 0,320 \\
+                C & 0,916 & 1,226 & 0,310 \\
+                D & 0,962 & 1,213 & -- \\
+                E & 0,956 & 1,227 & 0,272 \\
+                \bottomrule
+            \end{tabular}\\[2pt]
+            {\tiny $n=10$, kecuali C imperatif 9 dan D GitOps 2. Selisih D tidak dilaporkan: 8/10 pulih sebelum sinyal deteksi terpisah. Selang 5 detik: 4,2--4,3 detik.}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \centering\scriptsize
+            \textbf{Pemulihan: median (detik)}\\[2pt]
+            \begin{tabular}{@{}lrrr@{}}
+                \toprule
+                \textbf{Skenario} & \textbf{GitOps} & \textbf{Imperatif} & \textbf{$\Delta$} \\
+                \midrule
+                B & 2,670 & 2,636 & $-0{,}034$ \\
+                C & 2,691 & 1,633 & $-1{,}058$ \\
+                D & 1,652 & 2,669 & $+1{,}017$ \\
+                E & 2,760 & 2,603 & $-0{,}157$ \\
+                \bottomrule
+            \end{tabular}\\[2pt]
+            {\tiny $n=10$, kecuali C imperatif 9. $\Delta$ = imperatif $-$ GitOps.}
+        \end{column}
+    \end{columns}
+    \vspace{0.04cm}
+    \raggedright\scriptsize
+    Selisih deteksi mengecil menjadi 0,25--0,32 detik saat selang pemeriksa disamakan. Pemulihan: B dan E hampir sama; C lebih cepat pada mode imperatif sekitar 1,1 detik; D lebih cepat pada GitOps sekitar 1,0 detik.
+    \vspace{0.04cm}
+    \slidelead{Deteksi sebagian besar mengikuti selang pengamatan; pemulihan bergantung skenario.}
+    \vspace{0.02cm}
+    \smallnote{Batas: satu \textit{stack}; HPA hanya CPU (perubahan \textit{apparatus}); satu sel hilang; D terbatas; tidak digabungkan dengan batch 210 sel.}
+\end{frame}
+}
+
+% =============================================
+% 17. Future work
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -581,10 +633,9 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \scriptsize
             \textbf{Memisahkan variabel}
             \begin{itemize}\setlength{\itemsep}{3pt}
-                \item Tiga \textit{stack} terisolasi untuk memisahkan efek urutan dari efek mode.
+                \item Sekurang-kurangnya tiga \textit{stack} terisolasi untuk memisahkan efek urutan dari efek mode.
                 \item Alat GitOps kedua, misalnya Flux, dengan definisi metrik yang sama.
                 \item \textit{Workload} stateful dan stateless.
-                \item Jendela pengamatan lebih panjang dan penyimpanan independen.
             \end{itemize}
         \end{column}
         \begin{column}{0.48\textwidth}
@@ -593,41 +644,38 @@ Dosen Penguji 2: Aina Musdholifah, S.Kom., M.Kom., Ph.D.}
             \begin{itemize}\setlength{\itemsep}{3pt}
                 \item Biaya dan jam orang dengan metrik yang eksplisit.
                 \item Studi kualitatif: kolaborasi, tinjauan, audit, dan kepemilikan insiden.
-                \item Uji selang pemeriksaan yang setara.
+                \item Jendela pengamatan lebih panjang dan penyimpanan independen.
             \end{itemize}
         \end{column}
     \end{columns}
-    \vspace{0.10cm}
-    \begin{beamercolorbox}[wd=\textwidth, sep=0.12cm, rounded=true]{structure}
-        \scriptsize
-        \textbf{Tindak lanjut 80 sel (versi lengkap), belum dijalankan:} B--E, dua mode, 10 pengulangan, selang 1 detik, urutan berselang-seling. Rancangan sudah disusun; tidak ada hasil yang dilaporkan.
-    \end{beamercolorbox}
-    \vspace{0.06cm}
+    \vspace{0.12cm}
     \slidelead{Prioritas: memisahkan variabel yang belum dapat dipisahkan, bukan menambah pengamatan pada \textit{apparatus} yang sama.}
+    \vspace{0.06cm}
+    \smallnote{Tindak lanjut 80 sel dengan selang 1 detik sudah selesai; hasilnya dilaporkan terpisah dan tidak digabungkan ke batch 210 sel.}
 \end{frame}
 }
 
 % =============================================
-% 17. Conclusion
+% 18. Conclusion
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
 \begin{frame}
     \frametitle{Kesimpulan: Selang Pengamatan dan Pemulihan yang Beragam}
     \scriptsize
-    \begin{itemize}\setlength{\itemsep}{5pt}
-        \item \textbf{Deteksi.} GitOps 0,96--1,02 detik; imperatif 5,22--5,25 detik. Selisih 4,2--4,3 detik konsisten dengan pemeriksa 5 detik dan pencatat 1 detik. Temuan utamanya: deteksi dibatasi oleh seberapa sering keadaan dibaca, bukan bahwa GitOps inheren lebih cepat.
-        \item \textbf{Pemulihan.} Tidak seragam: D paling besar (5,08 detik); B, C, dan E sekitar 3 detik. B tidak cukup konsisten; C melemah pada analisis sensitivitas; E moderat dan lebih konsisten daripada B.
+    \begin{itemize}\setlength{\itemsep}{2pt}
+        \item \textbf{Deteksi.} Selang 5 detik: 4,2--4,3 detik. Selang 1 detik: 0,25--0,32 detik. Selisih menyusut ketika selang pemeriksa disamakan; temuan utamanya tetap bahwa deteksi dibatasi oleh seberapa sering keadaan dibaca, bukan bahwa GitOps inheren lebih cepat.
+        \item \textbf{Pemulihan.} Bukan keunggulan tunggal GitOps. Pada selang 1 detik, B dan E hampir sama, C lebih cepat pada mode imperatif sekitar 1,1 detik, dan D lebih cepat pada GitOps sekitar 1,0 detik. Pada selang 5 detik, D tetap yang terbesar (5,08 detik).
         \item \textbf{Kecocokan konfigurasi.} B--F kembali ke 100 pada kedua mode; G adalah pengecualian deskriptif. Rekonsiliasi hanya menegakkan \textit{field} yang tercakup pengendali.
-        \item \textbf{Batas.} Tidak ada klaim superioritas universal, kelayakan adopsi, atau kesetaraan semantik. Biaya dan aspek kualitatif tidak diukur.
+        \item \textbf{Rekomendasi dan batas.} Rekomendasi tetap kontekstual: verifikasi selang pengamatan dan cakupan \textit{field}. Tidak ada klaim superioritas universal, kelayakan adopsi, atau kesetaraan semantik; biaya dan aspek kualitatif tidak diukur.
     \end{itemize}
-    \vspace{0.10cm}
+    \vspace{0.04cm}
     \slidelead{Satu pertanyaan waktu, dua metrik, dan batas klaim yang eksplisit.}
 \end{frame}
 }
 
 % =============================================
-% 18. Closing
+% 19. Closing
 % =============================================
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -696,7 +744,46 @@ shasum -a 256 -c SHA256SUMS
 }
 
 % ---------------------------------------------
-% B2: Measurement boundaries
+% B2: Follow-up identity
+% ---------------------------------------------
+{
+\usebackgroundtemplate{\backgroundcontent}
+\begin{frame}[fragile]
+    \frametitle{Backup: Identitas Tindak Lanjut}
+    \begin{columns}[T]
+        \begin{column}{0.47\textwidth}
+            \tiny
+            \textbf{Batch \texttt{matched1s-20261127b}}
+            \begin{itemize}\tiny\setlength{\itemsep}{1pt}
+                \item 80 sel direncanakan; 80 terminal; 79 dianalisis.
+                \item 1 kegagalan instrumentasi: imperatif C-r02, API Kubernetes \textit{time-out} sebelum injeksi.
+                \item Satu sel hilang; tidak ada imputasi.
+                \item Revisi live \texttt{2aff56d8}; render SHA-256 \texttt{ffff8d73b5a7ba09324582928a1a5e6597c30}\allowbreak\texttt{f1430d185bc38dc852aac541efa}.
+            \end{itemize}
+            \vspace{0.04cm}
+            \textbf{Batch pertama} \texttt{matched1s-20261127} tidak dianalisis: revisi \texttt{81ddd25} tidak cocok dengan render \texttt{2aff56d8}. Batch \texttt{b} adalah batch yang dianalisis.
+        \end{column}
+        \begin{column}{0.49\textwidth}
+            \tiny
+            \textbf{Reproduksi analisis}
+            \begin{lstlisting}
+B=experiments/live/runs/matched1s-20261127b
+python3 experiments/analysis/analyze_live.py \
+  --in $B/matched1s-20261127b.analysis.jsonl \
+  --rows $B/matched1s-20261127b.rows.jsonl \
+  --out experiments/analysis-matched1s-20261127b \
+  --bootstrap 2000 --seed 20261127 --alpha 0.05
+            \end{lstlisting}
+            \textbf{Desain:} pemeriksa dan pencatat 1 detik; B--E; 10 pengulangan; urutan berselang-seling; satu \textit{stack}.
+        \end{column}
+    \end{columns}
+    \vspace{0.02cm}
+    \smallnote{Data mentah dan keluaran analisis tersimpan lokal dan diabaikan Git. Batch ini terpisah dan tidak digabungkan dengan batch 210 sel.}
+\end{frame}
+}
+
+% ---------------------------------------------
+% B3: Measurement boundaries
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -716,7 +803,7 @@ shasum -a 256 -c SHA256SUMS
 }
 
 % ---------------------------------------------
-% B3: Cell accounting
+% B4: Cell accounting
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -750,7 +837,7 @@ shasum -a 256 -c SHA256SUMS
 }
 
 % ---------------------------------------------
-% B4: Scenario G
+% B5: Scenario G
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}
@@ -768,7 +855,7 @@ shasum -a 256 -c SHA256SUMS
 }
 
 % ---------------------------------------------
-% B5: Main references
+% B6: Main references
 % ---------------------------------------------
 {
 \usebackgroundtemplate{\backgroundcontent}

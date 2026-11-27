@@ -2,8 +2,11 @@
 
 Dokumen ini adalah alat latihan sidang, bukan bagian dari naskah skripsi. Setiap
 jawaban menunjuk ke Bab/tabel atau ke artefak reproduksi. Angka hasil berasal
-dari `experiments/analysis-formal-20261029/live_analysis.json` dan
-`experiments/formal-20261029/formal-20261029.summary.json`.
+dari `experiments/analysis-formal-20261029/live_analysis.json`,
+`experiments/formal-20261029/formal-20261029.summary.json`, dan
+`experiments/analysis-matched1s-20261127b/live_analysis.json` untuk tindak
+lanjut selang 1 detik. Pertanyaan 1–20 membahas batch utama `formal-20261029`;
+pertanyaan 21–22 membahas tindak lanjut `matched1s-20261127b`.
 
 Catatan istilah: kode dan keluaran beku masih memakai nama field internal serta
 alias historis `env=manual`. Nama itu adalah nama teknis, bukan metrik naskah.
@@ -75,8 +78,9 @@ detik; selisih teramati 4,2–4,3 detik konsisten dengan kedua selang itu.
 Karena mode dan selang pengamatan berubah bersama, data ini tidak dapat
 memisahkan kecepatan respons pengendali dari selang pengamatan. Temuan yang
 dapat dipertahankan adalah bahwa deteksi dibatasi oleh seberapa sering keadaan
-dibaca, bukan bahwa GitOps secara inheren lebih cepat. Lihat Bab IV §Waktu
-Deteksi dan Bab V §Temuan Utama.
+dibaca, bukan bahwa GitOps secara inheren lebih cepat. Uji tindak lanjut dengan
+pemeriksa 1 detik menurunkan selisih menjadi 0,25–0,32 detik; lihat pertanyaan
+21. Lihat Bab IV §Waktu Deteksi dan Bab V §Temuan Utama.
 
 ## 8. Mengapa pemulihan B tidak disebut perbedaan yang jelas?
 
@@ -174,9 +178,11 @@ mengukurnya. Jangan menyajikan aspek itu sebagai temuan. Lihat Bab V.
 ## 19. Apa satu kalimat yang harus diingat penguji?
 
 Pada apparatus, protokol, dan cakupan field yang diuji, waktu deteksi mengikuti
-selang pengamatan (1 detik versus 5 detik); pemulihan tidak seragam (B/C lebih
-kecil, D paling besar, E moderat; B tidak jelas dan C melemah pada sensitivitas);
-dan G adalah pengecualian deskriptif yang menunjukkan batas cakupan field.
+selang pengamatan: selisih 4,2–4,3 detik pada selang 5 detik dan 0,25–0,32 detik
+pada selang 1 detik. Pemulihan tidak seragam (B/C lebih kecil, D paling besar,
+E moderat; B tidak jelas dan C melemah pada sensitivitas); pada tindak lanjut,
+B dan E hampir sama, C lebih cepat pada mode imperatif, dan D lebih cepat pada
+GitOps. G adalah pengecualian deskriptif yang menunjukkan batas cakupan field.
 
 ## 20. Apakah refactor kode setelah koleksi membatalkan hasil?
 
@@ -187,14 +193,31 @@ identik, dan dry-run 210 sel. Untuk mengaudit angka, gunakan keluaran yang
 ditetapkan dan data mentah, bukan menjalankan ulang koleksi. Lihat
 `experiments/REVISIONS.md`.
 
-## 21. Apakah follow-up 80 sel sudah dijalankan?
+## 21. Apa hasil uji tindak lanjut dengan selang 1 detik?
 
-Belum. Rancangan yang disiapkan adalah 80 sel: B–E, dua mode, 10 pengulangan,
-selang 1 detik, dengan urutan berselang-seling. Bab V juga menyebut 40 percobaan
-imperatif tambahan sebagai langkah minimum; versi lengkapnya menjalankan ulang
-kedua mode agar efek periode tidak bercampur dengan efek selang. Tidak ada hasil
-yang dilaporkan; jangan mengutip angka. Lihat Bab V §Hipotesis Selang
-Pemeriksaan Setara.
+Batch `matched1s-20261127b` merencanakan 80 sel (B–E, dua mode, 10 pengulangan)
+dengan pemeriksa dan pencatat 1 detik serta urutan berselang-seling. Dari 80 sel
+terminal, 79 dianalisis; satu sel imperatif C gagal sebelum injeksi karena API
+Kubernetes time-out, sehingga tidak menghasilkan baris analisis dan tidak
+diimputasi. Selisih deteksi menyusut dari 4,2–4,3 detik pada selang 5 detik
+menjadi 0,25–0,32 detik; ini mendukung penjelasan bahwa deteksi sebagian besar
+mengikuti selang pengamatan. Pemulihan tetap bergantung skenario: B dan E hampir
+sama, C lebih cepat pada mode imperatif sekitar 1,1 detik, dan D lebih cepat pada
+GitOps sekitar 1,0 detik. Deteksi D GitOps hanya memiliki dua nilai teramati,
+sehingga tidak dilaporkan. Batch ini memakai HPA dengan metrik CPU saja
+(perubahan apparatus), satu stack, dan tidak digabungkan dengan batch 210 sel.
+Uji lengkap dan ukuran efek ada di `experiments/analysis-matched1s-20261127b/live_tests.tex`
+dan `live_effects.tex`; slide utama hanya memuat median. Lihat
+`experiments/analysis-matched1s-20261127b/live_analysis.json` dan Bab V.
+
+## 22. Apa pekerjaan lanjutan setelah tindak lanjut?
+
+Subset selang 1 detik tidak lagi menjadi pekerjaan lanjutan karena batch 80 sel
+sudah dijalankan. Prioritasnya: replikasi pada sekurang-kurangnya tiga stack
+terisolasi; perbandingan alat GitOps kedua, misalnya Flux; pengukuran biaya dan
+jam orang; studi kualitatif atau campuran; workload stateful dan stateless; serta
+jendela pengamatan lebih panjang dengan penyimpanan independen. Lihat Bab V
+§Pekerjaan Lanjutan.
 
 ## Bukti, kode, dan reproduksi
 
@@ -203,6 +226,10 @@ Pemeriksaan Setara.
 - Sesi pengumpulan `formal-20261029`: 210 sel terminal, 211 baris mentah, 207
   baris analisis, dan 4 baris dikecualikan (2 kegagalan instrumentasi, 1
   kegagalan baseline yang diulang, 1 penghentian sesi).
+- Batch tindak lanjut `matched1s-20261127b`: 80 sel direncanakan, 80 terminal,
+  79 dianalisis, 1 kegagalan instrumentasi (imperatif C-r02, API Kubernetes
+  time-out sebelum injeksi); keluaran di
+  `experiments/analysis-matched1s-20261127b/`.
 - Peta klaim: `docs/reproducibility/claim-traceability.md`.
 - Keluaran beku: `experiments/analysis-formal-20261029/` (tujuh berkas, termasuk
   `live_analysis.json`); data mentah dan keluaran itu tersimpan lokal dan
@@ -218,6 +245,12 @@ Pemeriksaan Setara.
 
 `HEAD` adalah kode pasca-koleksi. Angka primer berasal dari keluaran beku, bukan
 dari menjalankan ulang apparatus.
+
+Batch tindak lanjut `matched1s-20261127b` memakai revisi sumber `2aff56d8` dan
+render SHA-256 `ffff8d73b5a7ba09324582928a1a5e6597c30f1430d185bc38dc852aac541efa`.
+Batch pertama `matched1s-20261127` tidak dianalisis karena revisi `81ddd25` tidak
+cocok dengan render tersebut. Data mentah dan keluaran analisis batch tindak
+lanjut tersimpan lokal dan diabaikan Git.
 
 ### Perintah reproduksi analisis
 
@@ -243,6 +276,19 @@ diff -r experiments/analysis-formal-20261029 /tmp/formal-20261029-rerun
 Satu-satunya perbedaan yang diharapkan adalah `SHA256SUMS` yang tidak ditulis
 oleh analyzer. Tujuh keluaran lain harus identik. Lihat `experiments/DATA.md`
 §Reproduksi Analisis.
+
+Untuk batch tindak lanjut:
+
+```bash
+B=experiments/live/runs/matched1s-20261127b
+python3 experiments/analysis/analyze_live.py \
+  --in $B/matched1s-20261127b.analysis.jsonl \
+  --rows $B/matched1s-20261127b.rows.jsonl \
+  --out /tmp/matched1s-20261127b-rerun \
+  --bootstrap 2000 --seed 20261127 --alpha 0.05
+```
+
+Bandingkan hasilnya dengan paket beku `experiments/analysis-matched1s-20261127b/`.
 
 ### Verifikasi data mentah
 
